@@ -161,11 +161,11 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
         <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="name" />
         <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags" style="min-width: 124px"
           placeholder="Owners" :loading="loading" v-model:value="owners" :options="result?.value
-              ? result.value.users.map((e) => ({
-                value: e.username,
-                label: e.displayName || e.username,
-              }))
-              : []
+            ? result.value.users.map((e: any) => ({
+              value: e.username,
+              label: e.displayName || e.username,
+            }))
+            : []
             ">
           <template #dropdownRender="{ menuNode: menu }">
             <v-nodes :vnodes="menu" />
@@ -177,34 +177,34 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
         </a-select>
         <a-select allowClear showArrow filterOption mode="tags" style="min-width: 128px" placeholder="Media types"
           :loading="loading" v-model:value="types" :options="result?.value
-              ? result.value.mediaTypes
-                .filter(
-                  (e) =>
-                    !['shape', 'media'].includes(e.name.toLowerCase()),
-                )
-                .map((e) => ({
-                  value: e.name,
-                  label: capitalize(e.name),
-                }))
-              : []
+            ? result.value.mediaTypes
+              .filter(
+                (e: any) =>
+                  !['shape', 'media'].includes(e.name.toLowerCase()),
+              )
+              .map((e: any) => ({
+                value: e.name,
+                label: capitalize(e.name),
+              }))
+            : []
             ">
         </a-select>
         <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags" style="min-width: 160px"
           placeholder="Stages assigned" :loading="loading" v-model:value="stages" :options="result?.value
-              ? result.value.stages.map((e) => ({
-                value: e.id,
-                label: e.name,
-              }))
-              : []
+            ? result.value.stages.map((e: any) => ({
+              value: e.id,
+              label: e.name,
+            }))
+            : []
             ">
         </a-select>
         <a-select allowClear showArrow mode="tags" style="min-width: 160px" placeholder="Tags" :loading="loading"
           v-model:value="tags" :options="result?.value
-              ? result.value.tags.map((e) => ({
-                value: e.name,
-                label: e.name,
-              }))
-              : []
+            ? result.value.tags.map((e: any) => ({
+              value: e.name,
+              label: e.name,
+            }))
+            : []
             "></a-select>
         <a-range-picker :placeholder="['Created from', 'to date']" v-model:value="dates as any"
           :ranges="ranges as any" />

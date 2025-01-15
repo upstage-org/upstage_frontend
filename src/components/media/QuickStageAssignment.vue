@@ -43,8 +43,8 @@ const { result, loading } = useQuery<StudioGraph>(
 const dataSource = computed(() => {
   if (result.value) {
     const s = keyword.value.trim();
-    return result.value.stages.edges
-      .filter(({ node }) => {
+    return result.value.stages
+      .filter((node) => {
         if (node.owner.username !== result.value?.whoami.username) {
           return false;
         }
@@ -52,8 +52,7 @@ const dataSource = computed(() => {
           return true;
         }
         return false;
-      })
-      .map(({ node }) => node);
+      });
   }
   return [];
 });

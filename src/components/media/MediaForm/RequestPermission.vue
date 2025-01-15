@@ -45,7 +45,7 @@ const handleOk = async () => {
     okText="Send Request"
   >
     You are requesting permission for
-    <a-avatar class="my-2" :src="absolutePath(media.src)" />
+    <a-avatar class="my-2" :src="absolutePath(media.fileLocation)" />
     {{ media.name }}.
     <a-textarea
       v-model:value="note"

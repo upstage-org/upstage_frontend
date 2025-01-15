@@ -31,10 +31,7 @@ const params = computed(() => ({
   ...inquiryResult.value.inquiry,
 }));
 
-const { result, loading, fetchMore, refetch } = useQuery<
-  StudioGraph,
-  { page: number; limit: number; sort?: string[] }
->(
+const { result, loading, fetchMore, refetch } = useQuery(
   gql`
     query StageTable(
       $page: Int

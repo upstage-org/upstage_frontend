@@ -51,7 +51,7 @@ const refresh = () => refetch();
               <template #avatar>
                 <a-avatar
                   class="my-2"
-                  :src="absolutePath(notification.mediaUsage.asset.src)"
+                  :src="absolutePath(notification.mediaUsage.asset.fileLocation)"
                 />
               </template>
               <template #title>

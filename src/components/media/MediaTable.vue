@@ -269,7 +269,7 @@ const composingMode = inject<Ref<boolean>>("composingMode");
 
 const addFrameToEditingMedia = (media: Media) => {
   if (files && composingMode) {
-    let frames = [media.src];
+    let frames = [media.fileLocation];
     const attribute = JSON.parse(media.description || "{}") as MediaAttributes;
     if (attribute.multi) {
       frames = attribute.frames;
