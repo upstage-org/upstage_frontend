@@ -58,8 +58,15 @@ export default {
           query adminPlayersTable(
             $page: Int
             $limit: Int
+            $usernameLike: String
+            $createdBetween: [String]
           ) {
-            adminPlayers(page: $page limit: $limit) {
+            adminPlayers(
+              page: $page 
+              limit: $limit 
+              usernameLike: $usernameLike 
+              createdBetween: $createdBetween
+            ) {
               totalCount
               edges {
                 id
@@ -80,7 +87,7 @@ export default {
             }
           }
         `,
-      tableParams,
+      params,
       { notifyOnNetworkStatusChange: true },
     );
 

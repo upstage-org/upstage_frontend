@@ -36,10 +36,16 @@ const { result, loading, fetchMore, refetch } = useQuery(
     query StageTable(
       $page: Int
       $limit: Int
+      $name: String
+      $createdBetween: [Date]
+      $owners: [String]
     ) {
       stages(input:{
         page: $page
         limit: $limit
+        name: $name
+        createdBetween: $createdBetween
+        owners: $owners
       }) {
         totalCount
         edges {
@@ -66,7 +72,7 @@ const { result, loading, fetchMore, refetch } = useQuery(
       }
     }
   `,
-  tableParams,
+  params,
   { notifyOnNetworkStatusChange: true },
 );
 

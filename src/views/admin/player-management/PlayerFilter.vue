@@ -61,7 +61,7 @@ export default {
     watch(
       name,
       useDebounceFn(() => {
-        updateInquiry({ name: name.value });
+        updateInquiry({ usernameLike: name.value });
       }, 500),
     );
     watch(dates, (dates) => {

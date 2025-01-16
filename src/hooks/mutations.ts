@@ -2,6 +2,8 @@
 import { message } from "ant-design-vue";
 import { ref } from "vue";
 import { useStore } from "vuex";
+import { userGraph } from "services/graphql";
+
 const store = useStore();
 export function useLoading<T extends unknown[], U>(
   operation: (...params: T) => Promise<U>,
@@ -96,6 +98,6 @@ export function useUpdateUser(messages?: Parameters<typeof useLoading>[1]) {
     if (includingPassword) {
       inbound.password = password;
     }
-    return;
+    return userGraph.updateUser(inbound);
   }, messages);
 }

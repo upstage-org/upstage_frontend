@@ -63,10 +63,22 @@ const { result, loading, fetchMore, refetch } = useQuery<
     query MediaTable(
       $page: Int
       $limit: Int
+      $name: String
+      $createdBetween: [Date]
+      $mediaTypes: [String]
+      $owners: [String]
+      $stages: [ID]
+      $tags: [String]
     ) {
       media(input:{
         page: $page
         limit: $limit
+        name: $name
+        createdBetween: $createdBetween
+        mediaTypes: $mediaTypes
+        owners: $owners
+        stages: $stages
+        tags: $tags
       }) {
         totalCount
         edges {
@@ -99,7 +111,7 @@ const { result, loading, fetchMore, refetch } = useQuery<
     }
     ${permissionFragment}
   `,
-  tableParams,
+  params,
   { notifyOnNetworkStatusChange: true },
 );
 
@@ -303,11 +315,11 @@ const filterTag = (tag: string) => {
   <a-layout class="w-full shadow rounded-xl bg-white overflow-hidden">
     <a-table class="w-full overflow-auto" :columns="columns as ColumnType<Media>[]" :data-source="dataSource"
       rowKey="id" :loading="loading" @change="handleTableChange" :pagination="{
-      showQuickJumper: true,
-      showSizeChanger: true,
-      total: result ? result.media.totalCount : 0,
-    } as Pagination
-      ">
+        showQuickJumper: true,
+        showSizeChanger: true,
+        total: result ? result.media.totalCount : 0,
+      } as Pagination
+        ">
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'preview'">
           <MediaPreview v-if="record.assetType" :media="record as Media" />
@@ -342,10 +354,10 @@ const filterTag = (tag: string) => {
         </template>
         <template v-if="column.key === 'copyrightLevel'">
           <span class="leading-4">{{
-      configs.MEDIA_COPYRIGHT_LEVELS.find(
-        (l) => l.value === record.copyrightLevel,
-      )?.name
-    }}</span>
+            configs.MEDIA_COPYRIGHT_LEVELS.find(
+              (l) => l.value === record.copyrightLevel,
+            )?.name
+            }}</span>
         </template>
         <template v-if="column.key === 'created_on'">
           <d-date :value="text" />
