@@ -368,7 +368,7 @@ const filterTag = (tag: string) => {
               <EditOutlined />
               Edit
             </a-button>
-            <a :href="absolutePath(record.src)" :download="record.name">
+            <a :href="absolutePath(record.fileLocation)" :download="record.name">
               <a-button>
                 <template #icon>
                   <DownloadOutlined />
