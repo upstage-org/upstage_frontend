@@ -74,7 +74,7 @@
         <template v-if="loggedIn">
           <a
             v-if="!isGuest"
-            :href="configs.STUDIO_ENDPOINT"
+            href="/stages/"
             class="button is-primary m-2"
           >
             <strong>{{ $t("studio") }}</strong>

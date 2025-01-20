@@ -1,7 +1,6 @@
 export interface SharedConfigs {
   GRAPHQL_ENDPOINT: string;
   STATIC_ASSETS_ENDPOINT: string;
-  STUDIO_ENDPOINT: string;
   AXIOS_TIMEOUT: number;
   ACCESS_TOKEN_KEY: string;
   MQTT_NAMESPACE: string;

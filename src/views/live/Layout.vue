@@ -79,7 +79,7 @@ export default {
       ready,
       canPlay,
       loggedIn,
-      studioEndpoint: configs.STUDIO_ENDPOINT,
+      studioEndpoint: "/stages/",
     };
   },
 };

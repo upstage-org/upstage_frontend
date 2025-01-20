@@ -15,7 +15,7 @@ export default {
   components: { LoginForm },
   methods: {
     onLoginSuccess() {
-      window.location.href = configs.STUDIO_ENDPOINT;
+      window.location.href = "/stages/";
     },
   },
 };
