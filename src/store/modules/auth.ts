@@ -53,7 +53,7 @@ export default {
             }
           }).catch((err) => {
             message.error(
-              err.response?.errors ? err.response?.errors[0].message: "Error!"
+              err.response?.errors ? err.response?.errors[0].message : "Error!"
             );
             reject(err);
           });
@@ -83,6 +83,12 @@ export default {
           const token = response.refreshToken.access_token;
           commit("SET_TOKEN", token);
           return token;
+        }).catch(err => {
+          commit("CLEAR_USER_DATA");
+          localStorage.clear();
+          removeToken();
+          removeRefreshToken();
+          window.location.href = "/";
         });
     },
   },
