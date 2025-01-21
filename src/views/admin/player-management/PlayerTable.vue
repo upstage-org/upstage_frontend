@@ -60,12 +60,14 @@ export default {
             $limit: Int
             $usernameLike: String
             $createdBetween: [String]
+            $sort: [AdminPlayerSortEnum]
           ) {
             adminPlayers(
               page: $page 
               limit: $limit 
               usernameLike: $usernameLike 
               createdBetween: $createdBetween
+              sort: $sort
             ) {
               totalCount
               edges {

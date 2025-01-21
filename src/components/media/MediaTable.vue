@@ -44,7 +44,7 @@ const tableParams = reactive({
   page: 1,
   limit: 10,
   cursor: undefined,
-  //sort: "CREATED_ON_DESC",
+  sort: "CREATED_ON_DESC",
 });
 const { result: inquiryResult } = useQuery(gql`
   {
@@ -69,6 +69,7 @@ const { result, loading, fetchMore, refetch } = useQuery<
       $owners: [String]
       $stages: [ID]
       $tags: [String]
+      $sort: [AssetSortEnum]
     ) {
       media(input:{
         page: $page
@@ -79,6 +80,7 @@ const { result, loading, fetchMore, refetch } = useQuery<
         owners: $owners
         stages: $stages
         tags: $tags
+        sort: $sort
       }) {
         totalCount
         edges {
@@ -381,7 +383,7 @@ const filterTag = (tag: string) => {
 
                 <template #icon>
                   <DeleteOutlined />
-                </template>
+                </template> 
               </a-button>
             </a-popconfirm>
           </a-space>
