@@ -55,10 +55,7 @@ const params = computed(() => ({
   ...tableParams,
   ...inquiryResult.value.inquiry,
 }));
-const { result, loading, fetchMore, refetch } = useQuery<
-  StudioGraph,
-  { page: number; limit: number; sort?: string[] }
->(
+const { result, loading, fetchMore, refetch } = useQuery(
   gql`
     query MediaTable(
       $page: Int
