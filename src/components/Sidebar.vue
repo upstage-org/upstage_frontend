@@ -57,7 +57,9 @@ export default {
                     {
                       player: whoami.value,
                       saving: saving.value,
-                      onSave: userGraph.updateUser as any,
+                      onSave: (payload)=>{
+                        store.dispatch("user/updateUserProfile", payload);
+                      },
                       noUploadLimit: true,
                       noStatusToggle: true,
                     },
