@@ -111,7 +111,7 @@
           'Audience access only',
           'Player access',
           'Player and edit access',
-        ]" :data="users" :owner="owner" :renderLabel="displayName" :renderValue="(item) => item.dbId" :renderKeywords="(item) =>
+        ]" :data="users" :owner="owner" :renderLabel="displayName" :renderValue="(item) => item.id" :renderKeywords="(item) =>
         `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
         " v-model="playerAccess" />
       </div>

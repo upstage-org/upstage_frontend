@@ -132,7 +132,7 @@ export default {
     });
 
     const saveMedia = async () => {
-      const ids = selectedMedia.value.map((media) => media.dbId);
+      const ids = selectedMedia.value.map((media) => media.id);
       await save("Stage updated successfully!", stage.value.id, ids);
       clearCache();
     };

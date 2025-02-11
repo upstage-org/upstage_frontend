@@ -59,7 +59,7 @@ const dataSource = computed(() => {
 
 const { mutate } = useMutation<
   { quickAssignMutation: { asset: Media } },
-  { id: string; stageId: number }
+  { id: string; stageId: string }
 >(gql`
   mutation QuickAssignMutation($id: ID, $stageId: Int) {
     quickAssignMutation(id: $id, stageId: $stageId) {
@@ -73,7 +73,7 @@ const refresh = inject("refresh", () => {});
 const quickAssign = async (stage: Stage) => {
   await mutate({
     id: props.media.id,
-    stageId: stage.dbId,
+    stageId: stage.id,
   });
   message.success(
     `${props.media.name} had been assigned to ${stage.name} successfully!`,
@@ -111,7 +111,7 @@ const quickAssign = async (stage: Stage) => {
         <a-list-item class="p-0">
           <template #actions>
             <a-tooltip
-              v-if="media.stages.some((s) => s.id === item.dbId)"
+              v-if="media.stages.some((s) => s.id === item.id)"
               title="Already assigned"
               placement="topRight"
             >

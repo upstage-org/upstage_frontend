@@ -139,7 +139,7 @@ export default {
       }
       if (filter.stage && filter.stage.id) {
         list = list.filter((media) =>
-          media.stages.find((s) => s.id === filter.stage.dbId),
+          media.stages.find((s) => s.id === filter.stage.id),
         );
       }
       return list;

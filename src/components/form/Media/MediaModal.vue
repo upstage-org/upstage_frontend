@@ -41,7 +41,7 @@
           <HorizontalField v-show="[2].includes(form.copyrightLevel)">
             <div style="margin-right: 32px">
               <MultiTransferColumn :columns="['No access', 'Readonly access', 'Editor access']" :data="users"
-                :renderLabel="displayName" :renderValue="(item) => item.dbId" :renderKeywords="(item) =>
+                :renderLabel="displayName" :renderValue="(item) => item.id" :renderKeywords="(item) =>
       `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
       " v-model="playerAccess" />
             </div>
@@ -170,7 +170,7 @@ export default {
             Object.assign(form, response.uploadMedia.asset);
           msg = "Media created successfully!";
         }
-        const stageIds = form.assignedStages.map((s) => s.dbId);
+        const stageIds = form.assignedStages.map((s) => s.id);
         const {
           id,
           multi,
@@ -268,7 +268,7 @@ export default {
       (val) => {
         if (val) {
           form.assignedStages = form.stages.map((stage) =>
-            val.find((s) => s.dbId === stage.id),
+            val.find((s) => s.id === stage.id),
           );
         } else {
           form.assignedStages = [];
