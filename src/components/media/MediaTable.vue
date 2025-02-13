@@ -359,7 +359,13 @@ const filterTag = (tag: string) => {
           <d-date :value="text" />
         </template>
         <template v-if="column.key === 'actions'">
-          <a-space v-if="isAdmin || record.owner.username === whoami?.username">
+          <a-space v-if="composingMode">
+            <a-button type="primary" @click="addFrameToEditingMedia(record as Media)">
+              <DoubleRightOutlined />
+              Append frames
+            </a-button>
+          </a-space>
+          <a-space v-else-if="isAdmin || record.owner.username === whoami?.username">
             <a-button type="primary" @click="editMedia(record as Media)">
               <EditOutlined />
               Edit
@@ -380,12 +386,6 @@ const filterTag = (tag: string) => {
                 </template> 
               </a-button>
             </a-popconfirm>
-          </a-space>
-          <a-space v-else-if="composingMode">
-            <a-button type="primary" @click="addFrameToEditingMedia(record as Media)">
-              <DoubleRightOutlined />
-              Append frames
-            </a-button>
           </a-space>
           <template v-else>
             <a-space v-if="record.privilege === 'NONE'">

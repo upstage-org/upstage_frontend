@@ -50,7 +50,7 @@ const handleUpload = async (file: UploadFile) => {
       const hide = message.error({
         content: i18n.global.t("over_limit_upload", {
           size: humanFileSize(file.file.size),
-          limit: humanFileSize(profile?.data.whoami.uploadLimit ?? 0),
+          limit: humanFileSize(uploadLimit ?? 0),
           name: file.file.name,
         }),
         duration: 0,
