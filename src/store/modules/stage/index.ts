@@ -97,7 +97,6 @@ export default {
       interval: null,
       speed: 1,
     },
-    loadingRunningStreams: false,
     audioPlayers: [],
     isSavingScene: false,
     isLoadingScenes: false,
@@ -105,7 +104,6 @@ export default {
     showClearChatSetting: false,
     showDownloadChatSetting: false,
     lastSeenPrivateMessage: localStorage.getItem("lastSeenPrivateMessage") ?? 0,
-    runningStreams: [],
     masquerading: false,
     purchasePopup: {
       isActive: false,
@@ -207,24 +205,23 @@ export default {
     SET_MODEL(state, model) {
       state.model = model;
       if (model) {
-        const media = model.media;
+        const media = model.assets;
         if (media && media.length) {
           media.forEach((item) => {
-            if (item.description) {
-              const meta = JSON.parse(item.description);
-              delete item.description;
-              Object.assign(item, meta);
-            }
-            if (item.type === "stream") {
-              item.url = absolutePath(item.src);
-              delete item.src;
+            if (item.assetType?.name === "stream") {
+              item.url = absolutePath(item.fileLocation);
             } else {
-              item.src = absolutePath(item.src);
+              if (item.description) {
+                const meta = JSON.parse(item.description);
+                delete item.description;
+                Object.assign(item, meta);
+              }
+              item.src = absolutePath(item.fileLocation);
             }
             if (item.multi) {
               item.frames = item.frames.map((src) => absolutePath(src));
             }
-            const key = item.type + "s";
+            const key = item.assetType?.name + "s";
             if (!state.tools[key]) {
               state.tools[key] = [];
             }
@@ -454,10 +451,8 @@ export default {
       state.board.texts = state.board.texts.filter((d) => d.textId !== textId);
     },
     PUSH_STREAM_TOOL(state, stream) {
+      console.log("===stream", stream)
       state.tools.streams.push(stream);
-    },
-    PUSH_RUNNING_STREAMS(state, streams) {
-      state.runningStreams = streams;
     },
     UPDATE_IS_DRAWING(state, isDrawing) {
       state.preferences.isDrawing = isDrawing;

@@ -20,6 +20,16 @@ export const stageFragment = gql`
       username
       displayName
     }
+    assets {
+      id
+      name
+      assetType {
+        name
+      }
+      src
+      description
+      fileLocation
+    }
   }
 `;
 
@@ -329,11 +339,9 @@ export default {
   saveStageMedia: (id, mediaIds) =>
     studioClient.request(
       gql`
-        mutation SaveStageMedia($id: ID!, $mediaIds: [Int]) {
+        mutation assignMedia($id: ID!, $mediaIds: [ID]) {
           assignMedia(input: { id: $id, mediaIds: $mediaIds }) {
-            stage {
-              ...stageFragment
-            }
+            ...stageFragment
           }
         }
         ${stageFragment}

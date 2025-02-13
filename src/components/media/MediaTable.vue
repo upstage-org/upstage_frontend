@@ -228,10 +228,7 @@ const handleTableChange = (
       `${columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
     );
   Object.assign(tableParams, {
-    cursor:
-      current > 1
-        ? window.btoa(`arrayconnection:${(current - 1) * pageSize}`)
-        : undefined,
+    page: current,
     limit: pageSize,
     sort,
   });

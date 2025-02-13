@@ -1,6 +1,6 @@
 <template>
-  <audio controls v-if="asset.mediaType === 'audio'" :src="src"></audio>
-  <template v-else-if="asset.mediaType === 'stream'">
+  <audio controls v-if="asset.assetType === 'audio'" :src="src"></audio>
+  <template v-else-if="asset.assetType === 'stream'">
     <video controls :src="src"></video>
   </template>
   <img
@@ -20,8 +20,8 @@ export default {
   emits: ["detectSize"],
   components: { },
   setup: (props, { emit }) => {
-    if (props.asset.mediaType) {
-      Object.assign(props.asset, { mediaType: props.asset.mediaType.name });
+    if (props.asset.assetType) {
+      Object.assign(props.asset, { assetType: props.asset.assetType.name });
     }
     const src = computed(
       () => props.asset.base64 ?? absolutePath(props.asset.src),

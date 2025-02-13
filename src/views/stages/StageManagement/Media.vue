@@ -30,10 +30,10 @@
       <div class="mx-3 my-1">
         <div class="columns">
           <div class="column is-narrow media-preview">
-            <Asset v-if="!['audio', 'stream'].includes(item.mediaType)" :asset="item" show-type />
+            <Asset v-if="!['audio', 'stream'].includes(item.assetType)" :asset="item" show-type />
           </div>
           <div class="type-icon">
-            <Icon :src="item.mediaType + '.svg'" />
+            <Icon :src="item.assetType + '.svg'" style="width: 16px; height: 16px;"/>
           </div>
           <div class="column">{{ item.name }}</div>
           <div class="column has-text-right has-text-grey-dark">
@@ -112,7 +112,7 @@ export default {
 
     const mapData = () => {
       if (!stage.value || !mediaList.value) return;
-      selectedMedia.value = (stage.value.media || []).map((m) =>
+      selectedMedia.value = (stage.value.assets || []).map((m) =>
         mediaList.value.find((media) => media.id === m.id),
       );
       if (selectedMedia.value[0]) {
