@@ -1,82 +1,47 @@
 <template>
-  <div
-    ref="el"
-    tabindex="0"
-    @keyup.delete="deleteObject"
-    @dblclick="hold"
-    @click="openLink"
-    :style="
-      activeMovable
-        ? {
-            position: 'relative',
-            'z-index': 1,
-          }
-        : {}
-    "
-  >
-    <ContextMenu
-      :pad-left="-stageSize.left"
-      :pad-top="-stageSize.top"
-      :pad-right="250"
-      :opacity="0.8"
-    >
+  <div ref="el" tabindex="0" @keyup.delete="deleteObject" @dblclick="hold" @click="openLink" :style="activeMovable
+    ? {
+      position: 'relative',
+      'z-index': 1,
+    }
+    : {}
+    ">
+    <ContextMenu :pad-left="-stageSize.left" :pad-top="-stageSize.top" :pad-right="250" :opacity="0.8">
       <template #trigger>
-        <div
-          :style="{
-            position: 'absolute',
-            left: object.x + 'px',
-            top: object.y + 'px',
-            width: object.w + 'px',
-            height: object.h + 'px',
-            transform: `rotate(${object.rotate}deg)`,
-          }"
-        >
-          <OpacitySlider
-            v-model:active="active"
-            v-model:slider-mode="sliderMode"
-            :object="object"
-          />
+        <div :style="{
+          position: 'absolute',
+          left: object.x + 'px',
+          top: object.y + 'px',
+          width: object.w + 'px',
+          height: object.h + 'px',
+          transform: `rotate(${object.rotate}deg)`,
+        }">
+          <OpacitySlider v-model:active="active" v-model:slider-mode="sliderMode" :object="object" />
           <QuickAction :object="object" v-model:active="active" />
           <Topping :object="object" v-model:active="active" />
         </div>
-        <Moveable
-          v-model:active="active"
-          :controlable="controlable"
-          :object="object"
-        >
-          <div
-            class="object"
-            :class="{ 'link-hover-effect': hasLink && object.link.effect }"
-            :style="{
-              width: '100%',
-              height: '100%',
-              cursor: controlable
-                ? 'grab'
-                : object.link && object.link.url
-                  ? 'pointer'
-                  : 'normal',
-            }"
-            @dragstart.prevent
-          >
+        <Moveable v-model:active="active" :controlable="controlable" :object="object">
+          <div class="object" :class="{ 'link-hover-effect': hasLink && object.link.effect }" :style="{
+            width: '100%',
+            height: '100%',
+            cursor: controlable
+              ? 'grab'
+              : object.link && object.link.url
+                ? 'pointer'
+                : 'normal',
+          }" @dragstart.prevent>
             <slot name="render">
-              <Image
-                class="the-object"
-                :src="src"
-                :transition="object.autoplayFrames"
-              />
+              <video v-if="object.assetType?.name == 'stream'" class="the-object-video" :src="object.url" controls
+                autoplay></video>
+              <Image v-else class="the-object" :src="src" />
             </slot>
           </div>
         </Moveable>
       </template>
       <template #context="slotProps">
         <div v-if="isWearing || controlable">
-          <slot
-            name="menu"
-            v-bind="slotProps"
-            :slider-mode="sliderMode"
-            :set-slider-mode="(mode) => (sliderMode = mode)"
-            :keep-active="() => (active = true)"
-          />
+          <slot name="menu" v-bind="slotProps" :slider-mode="sliderMode"
+            :set-slider-mode="(mode) => (sliderMode = mode)" :keep-active="() => (active = true)" />
         </div>
       </template>
     </ContextMenu>
@@ -130,7 +95,7 @@ export default {
 
     const deleteObject = () => {
       if (controlable.value) {
-        store.dispatch("stage/deleteObject", props.object);
+        //store.dispatch("stage/deleteObject", props.object);
       }
     };
 
@@ -144,7 +109,7 @@ export default {
         () => {
           const { autoplayFrames, frames, src } = props.object;
           clearInterval(frameAnimation.interval);
-          if (autoplayFrames) {
+          if (autoplayFrames && autoplayFrames > 0) {
             frameAnimation.currentFrame = src;
             frameAnimation.interval = setInterval(() => {
               let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
@@ -152,7 +117,9 @@ export default {
                 nextFrame = 0;
               }
               frameAnimation.currentFrame = frames[nextFrame];
-            }, autoplayFrames);
+            }, parseFloat(autoplayFrames) * 1000);
+          } else {
+            frameAnimation.currentFrame = src;
           }
         },
         {
@@ -217,17 +184,24 @@ export default {
 </script>
 
 <style lang="scss">
-
 div[tabindex] {
   outline: none;
 }
+
 .object {
   z-index: 10;
+
   &.link-hover-effect {
     transition: transform v-bind(transition);
   }
+
   &.link-hover-effect:hover {
     transform: scale(1.2) !important;
   }
+}
+
+.the-object-video {
+  width: 100%;
+  height: 100%;
 }
 </style>

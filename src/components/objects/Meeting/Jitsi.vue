@@ -58,6 +58,8 @@ export default {
         (t) => t.getParticipantId() === props.object.participantId,
       ),
     );
+    const volume = computed(() => props.object.volume);
+
     const reloadStreams = computed(() => store.getters["stage/reloadStreams"]);
     const videoTrack = computed(() => {
       const vTracks = tracks.value.filter((t) => t.type === "video")
@@ -71,7 +73,6 @@ export default {
     });
     const loadTrack = () => {
       if (tracks.value.length) {
-        console.log("~~~~~~~~~~~~~~~~~~~~~~~~~")
         try {
           if (videoTrack.value) {
             videoTrack.value.attach(videoEl.value);
@@ -128,6 +129,27 @@ export default {
     const toggleMuted = () => {
       localMuted.value = !localMuted.value;
     };
+
+    watch(
+      volume,
+      (vol) => {
+        if (vol && audioEl.value) {
+          audioEl.value.volume = vol;
+        }
+      },
+      { immediate: true },
+    );
+
+    watch(
+      audioEl,
+      (audio) => {
+        if (audio) {
+          audio.volume = volume.value;
+        }
+      },
+      { immediate: true },
+    );
+
     const isPlayer = computed(() => store.getters["stage/canPlay"]);
 
     const timeupdate = (e) => {

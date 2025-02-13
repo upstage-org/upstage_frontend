@@ -1,27 +1,18 @@
 <template>
-  <input
-    class="opacity-slider slider is-fullwidth"
-    :class="{
-      'is-primary': sliderMode === 'opacity',
-      'is-warning': sliderMode === 'animation',
-      'is-danger': sliderMode === 'speed',
-    }"
-    step="0.01"
-    min="0"
-    max="1"
-    :value="value"
-    type="range"
-    :style="{
-      top: '-26px',
-      left: '-15px',
-      width: object.h + 'px',
-    }"
-    v-show="showSlider"
-    @change="handleChange"
-    @mousedown.stop="keepActive"
-    @mouseover.stop="keepActive"
-    @mouseup.stop="keepActive"
-  />
+  <input v-if="sliderMode === 'animation'" class="input animation-input" type="number" v-show="showSlider" step="0.5"
+    min="0" :value="value" @input="handleChange" 
+    @keydown.stop="keepActive" @keyup.stop="keepActive"
+    @keypress.stop="keepActive"/>
+  <input v-else class="opacity-slider slider is-fullwidth" :class="{
+    'is-primary': sliderMode === 'opacity',
+    'is-warning': sliderMode === 'volume',
+    'is-danger': sliderMode === 'speed',
+  }" step="0.01" min="0" max="1" :value="value" type="range" :style="{
+    top: '-26px',
+    left: '-15px',
+    width: object.h + 'px',
+  }" v-show="showSlider" @change="handleChange" @mousedown.stop="keepActive" @mouseover.stop="keepActive"
+    @mouseup.stop="keepActive" />
 </template>
 
 <script>
@@ -37,13 +28,13 @@ export default {
     const value = computed(() => {
       switch (props.sliderMode) {
         case "animation":
-          return props.object.autoplayFrames == 0
-            ? 0
-            : maxFrameSpeed / props.object.autoplayFrames;
+          return props.object.autoplayFrames || "";
         case "speed":
           return props.object.moveSpeed == 0
             ? 0
             : maxMoveSpeed / props.object.moveSpeed;
+        case "volume":
+          return props.object.volume;
         default:
           return props.object.opacity;
       }
@@ -62,7 +53,7 @@ export default {
     const sendChangeFrameAnimationSpeed = (e) => {
       store.dispatch("stage/shapeObject", {
         ...props.object,
-        autoplayFrames: calcAutoplayFrames(e),
+        autoplayFrames: e.target.value,
       });
     };
 
@@ -80,6 +71,13 @@ export default {
       emit("update:active", true);
     };
 
+    const sendChangeVolume = (e) => {
+      store.dispatch("stage/shapeObject", {
+        ...props.object,
+        volume: e.target.value,
+      });
+    };
+
     const handleChange = (e) => {
       keepActive();
       switch (props.sliderMode) {
@@ -91,6 +89,8 @@ export default {
           break;
         case "speed":
           sendChangeMoveSpeed(e);
+        case "volume":
+          sendChangeVolume(e);
           break;
       }
     };
@@ -116,5 +116,13 @@ export default {
   position: absolute;
   transform: rotate(270deg) translateX(-100%);
   transform-origin: left;
+}
+
+.animation-input {
+  position: absolute;
+  width: 68px;
+  right: 100%;
+  top: 0;
+  padding: 4px 10px;
 }
 </style>

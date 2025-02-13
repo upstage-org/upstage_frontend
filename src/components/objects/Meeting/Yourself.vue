@@ -14,6 +14,7 @@ export default {
       participantId: null,
       w: 100,
       h: 100,
+      volume: 0.5
     });
 
     const jitsi = inject("jitsi");

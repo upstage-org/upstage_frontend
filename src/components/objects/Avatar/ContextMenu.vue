@@ -65,18 +65,29 @@
             'has-background-primary-light': sliderMode === 'opacity',
           }" @click="changeSliderMode('opacity')">
             <span class="mt-1">
-              <Icon src="opacity-slider.svg" />
+              <Icon src="opacity-slider.svg" style="width: 16px; height: 16px;" />
             </span>
           </button>
         </a-tooltip>
       </p>
       <p v-if="object.multi" class="control menu-group-item">
-        <a-tooltip title="Animation speed">
+        <a-tooltip title="Animation speed(seconds)">
           <button class="button is-light" :class="{
             'has-background-warning-light': sliderMode === 'animation',
           }" @click="changeSliderMode('animation')">
             <span class="mt-1">
-              <Icon src="animation-slider.svg" />
+              <Icon src="animation-slider.svg" style="width: 16px; height: 16px;" />
+            </span>
+          </button>
+        </a-tooltip>
+      </p>
+      <p v-if="object.type == 'jitsi'" class="control menu-group-item">
+        <a-tooltip title="Volume">
+          <button class="button is-light" :class="{
+            'has-background-warning-light': sliderMode === 'volume',
+          }" @click="changeSliderMode('volume')">
+            <span class="mt-1">
+              <Icon src="animation-slider.svg" style="width: 16px; height: 16px;" />
             </span>
           </button>
         </a-tooltip>
@@ -87,7 +98,7 @@
             'has-background-danger-light': sliderMode === 'speed',
           }" @click="changeSliderMode('speed')">
             <span class="mt-1">
-              <Icon src="movement-slider.svg" />
+              <Icon src="movement-slider.svg" style="width: 16px; height: 16px;" />
             </span>
           </button>
         </a-tooltip>
@@ -216,7 +227,12 @@ export default {
       store
         .dispatch("stage/toggleAutoplayFrames", {
           ...props.object,
-          autoplayFrames: props.object.autoplayFrames ? 0 : 100,
+          ...props.object.autoplayFrames ? {
+            autoplayFrames: null,
+            lastAutoplayFrames: props.object.autoplayFrames
+          } : {
+            autoplayFrames: props.object.lastAutoplayFrames || 1
+          }
         })
         .then(() => {
           emit("update:active", true);
@@ -368,7 +384,7 @@ export default {
       flex: auto;
     }
 
-    button {
+    button{
       width: 100%;
     }
   }
