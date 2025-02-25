@@ -1,0 +1,16 @@
+services:
+  upstage:
+    image: node:18-bookworm
+    container_name: upstage_frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/app
+      - /frontend_app:/app/dist
+    working_dir: /app
+    command: >
+      /bin/sh -c "
+      yarn install --frozen-lockfile &&
+      yarn build &&
+      tail -f /dev/null
+      "
