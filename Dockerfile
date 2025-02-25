@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:18-alpine AS build
+FROM node:18-bookworm AS build
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -15,7 +15,10 @@ COPY . .
 RUN yarn build
 
 # Stage 2: Serve with Nginx
-FROM nginx:1.25-alpine
+FROM node:18-bookworm AS production
+
+# Install Nginx
+RUN apt-get update && apt-get install -y nginx
 
 # Remove default Nginx website and add Vue app
 # RUN rm -rf /usr/share/nginx/html/*
