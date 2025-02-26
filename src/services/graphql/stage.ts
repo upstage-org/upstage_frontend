@@ -347,7 +347,7 @@ export default {
   assignStages: (id, stageIds) =>
     studioClient.request(
       gql`
-        mutation AssignStages($id: ID!, $stageIds: [Int]) {
+        mutation AssignStages($id: ID!, $stageIds: [ID!]) {
           assignStages(input: { id: $id, stageIds: $stageIds }) {
             id
           }

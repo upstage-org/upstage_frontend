@@ -199,11 +199,11 @@ export default {
           uploadedFrames,
         };
         await Promise.all([updateMedia(payload), assignStages(id, stageIds)]);
-        //message.success(msg);
+        message.success(msg);
         emit("complete", form);
         closeModal();
       } catch (error) {
-        //message.error(error);
+        message.error(error);
         closeModal();
       } finally {
         loading.value = false;
