@@ -24,6 +24,7 @@ output_file=".env"
 declare -A values
 values[MQTT_USERNAME]=$MQTT_USERNAME
 values[MQTT_PASSWORD]=$MQTT_PASSWORD
+values[DOMAIN]=$DOMAIN
 
 for var in "${vars[@]}"; do
   if [ "$var" == "JITSI_ENDPOINT" ]; then
