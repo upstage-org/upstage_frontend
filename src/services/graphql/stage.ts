@@ -78,18 +78,16 @@ export default {
   createStage: async (variables) => {
     let result = await studioClient.request(
       gql`
-        mutation CreateStage($name: String, $fileLocation: String) {
-          createStage(input: { name: $name, fileLocation: $fileLocation }) {
-            stage {
-              id
-            }
+        mutation CreateStage($name: String, $fileLocation: String, $status: String) {
+          createStage(input: { name: $name, fileLocation: $fileLocation, status: $status }) {
+            id
           }
         }
       `,
       variables,
     );
     if (result) {
-      variables.id = result.createStage.stage.id;
+      variables.id = result.createStage.id;
       result = await stageGraph.updateStage(variables);
       return result.updateStage.stage;
     }
