@@ -4,7 +4,8 @@ services:
     container_name: upstage_frontend
     volumes:
       - .:/app
-      - /frontend_app:/app/dist
+      - /frontend_app/dist:/app/dist
+      - /frontend_app/.env:/app/.env
     working_dir: /app
     command: >
       /bin/sh -c "

@@ -19,7 +19,11 @@ dpath="$(dirname $dirpath)"
 IFS='/' read -ra parts <<< "$dpath"
 DOMAIN=${parts[4]}
 
-output_file=".env"
+output_file="/frontend_app/.env"
+
+if [ ! -d "/frontend_app" ]; then
+  mkdir -p /frontend_app/dist
+fi
 
 declare -A values
 values[MQTT_USERNAME]=$MQTT_USERNAME
