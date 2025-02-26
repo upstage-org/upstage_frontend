@@ -42,7 +42,7 @@ export default {
         media.value = {
           name: file.name,
           base64: base64.value,
-          mediaType: getType(type),
+          assetType: getType(type),
           fileType: type,
           filename: file.name,
           stages: [],

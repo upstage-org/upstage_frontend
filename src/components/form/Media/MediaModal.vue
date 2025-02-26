@@ -5,11 +5,11 @@
       <footer class="modal-card-foot">
         <div class="columns is-fullwidth">
           <div class="column is-narrow">
-            <SaveButton @click="save" :loading="loading" :disabled="!form.name || !form.mediaType" />
+            <SaveButton @click="save" :loading="loading" :disabled="!form.name || !form.assetType" />
           </div>
           <div class="column is-narrow">
             <Field horizontal label="Media Type">
-              <MediaType v-model="form.mediaType" :data="availableTypes" />
+              <MediaType v-model="form.assetType" :data="availableTypes" />
             </Field>
           </div>
           <div class="column">
@@ -28,9 +28,7 @@
         </template>
         <template #preview>
           <div class="preview">
-            <template>
-              <Asset :asset="media" @detect-size="updateMediaSize" />
-            </template>
+            <Asset :asset="media" @detect-size="updateMediaSize" />
           </div>
         </template>
         <template #copyright>
@@ -42,8 +40,8 @@
             <div style="margin-right: 32px">
               <MultiTransferColumn :columns="['No access', 'Readonly access', 'Editor access']" :data="users"
                 :renderLabel="displayName" :renderValue="(item) => item.id" :renderKeywords="(item) =>
-      `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
-      " v-model="playerAccess" />
+                  `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
+                  " v-model="playerAccess" />
             </div>
           </HorizontalField>
         </template>
@@ -57,8 +55,8 @@
                   <span style="float: right">
                     Created by
                     <span class="has-text-primary">{{
-      displayName(item.owner)
-    }}</span>
+                      displayName(item.owner)
+                      }}</span>
                   </span>
                 </div>
               </div>
@@ -139,7 +137,7 @@ export default {
         blank: true,
       };
     }
-    if (form.assetType) {
+    if (form.assetType?.name) {
       form.assetType = form.assetType.name;
     }
 
@@ -154,7 +152,7 @@ export default {
         const {
           name,
           base64,
-          mediaType,
+          assetType,
           filename,
           copyrightLevel,
           playerAccess,
@@ -162,12 +160,12 @@ export default {
         let msg = "Media updated successfully!";
         if (!form.id) {
           const response = await uploadMedia({
-              name,
-              base64,
-              mediaType,
-              filename,
-            });
-            Object.assign(form, response.uploadMedia.asset);
+            name,
+            base64,
+            mediaType: assetType,
+            filename,
+          });
+          Object.assign(form, response.uploadMedia);
           msg = "Media created successfully!";
         }
         const stageIds = form.assignedStages.map((s) => s.id);
@@ -185,7 +183,7 @@ export default {
         const payload = {
           id,
           name,
-          mediaType,
+          mediaType: assetType,
           base64,
           description: JSON.stringify({
             multi,
@@ -213,13 +211,13 @@ export default {
     };
 
     const fileType = computed(() => {
-      if (["avatar", "prop", "backdrop", "curtain"].includes(form.mediaType)) {
+      if (["avatar", "prop", "backdrop", "curtain"].includes(form.assetType)) {
         return "image";
       }
-      if (["audio"].includes(form.mediaType)) {
+      if (["audio"].includes(form.assetType)) {
         return "audio";
       }
-      if (["stream"].includes(form.mediaType)) {
+      if (["stream"].includes(form.assetType)) {
         return "video";
       }
     });
@@ -236,13 +234,13 @@ export default {
         { key: "copyright", label: "Copyright", icon: "fas fa-copyright" },
         { key: "stages", label: "Stage", icon: "fas fa-person-booth" },
       ];
-      if (form.mediaType === "avatar") {
+      if (form.assetType === "avatar") {
         res.push({ key: "voice", label: "Voice", icon: "fas fa-volume-up" });
       }
-      if (["avatar", "prop"].includes(form.mediaType)) {
+      if (["avatar", "prop"].includes(form.assetType)) {
         res.push({ key: "link", label: "Link", icon: "fas fa-link" });
       }
-      if (["avatar", "prop", "backdrop"].includes(form.mediaType)) {
+      if (["avatar", "prop", "backdrop"].includes(form.assetType)) {
         res.push({
           key: "multiframe",
           label: "Multiframe",

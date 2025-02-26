@@ -20,7 +20,7 @@ export default {
   emits: ["detectSize"],
   components: { },
   setup: (props, { emit }) => {
-    if (props.asset.assetType) {
+    if (props.asset.assetType?.name) {
       Object.assign(props.asset, { assetType: props.asset.assetType.name });
     }
     const src = computed(

@@ -19,7 +19,7 @@ export default {
   emits: ["update:modelValue"],
   components: { Dropdown },
   setup: (props, { emit }) => {
-    const mediaType = ref();
+    const mediaType = ref(props.modelValue);
     watchEffect(() => {
       emit("update:modelValue", mediaType.value);
     });

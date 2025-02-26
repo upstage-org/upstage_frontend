@@ -284,18 +284,16 @@ export default {
         mutation uploadMedia(
           $name: String!
           $base64: String!
-          $mediaType: String
+          $mediaType: String!
           $filename: String!
         ) {
-          uploadMedia(
+          uploadMedia(input:{
             name: $name
             base64: $base64
             mediaType: $mediaType
             filename: $filename
-          ) {
-            asset {
-              ...assetFragment
-            }
+        }) {
+            ...assetFragment
           }
         }
         ${assetFragment}
@@ -351,9 +349,7 @@ export default {
       gql`
         mutation AssignStages($id: ID!, $stageIds: [Int]) {
           assignStages(input: { id: $id, stageIds: $stageIds }) {
-            asset {
-              id
-            }
+            id
           }
         }
       `,
@@ -401,7 +397,7 @@ export default {
     studioClient.request(
       gql`
         mutation updateMedia(
-          $id: ID
+          $id: ID!
           $name: String!
           $mediaType: String
           $description: String
@@ -411,7 +407,7 @@ export default {
           $playerAccess: String
           $uploadedFrames: [String]
         ) {
-          updateMedia(
+          updateMedia(input:{
             id: $id
             name: $name
             mediaType: $mediaType
@@ -421,10 +417,8 @@ export default {
             copyrightLevel: $copyrightLevel
             playerAccess: $playerAccess
             uploadedFrames: $uploadedFrames
-          ) {
-            asset {
-              id
-            }
+          }) {
+            id
           }
         }
       `,
