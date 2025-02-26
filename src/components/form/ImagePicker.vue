@@ -7,8 +7,8 @@
       <button v-else class="button">{{ $t("choose_an_image") }}</button>
     </template>
     <template #header><span>{{
-        $t("choose_an_existing_image_or_upload_new")
-      }}</span></template>
+      $t("choose_an_existing_image_or_upload_new")
+    }}</span></template>
     <template #content="{ closeModal }">
       <Loading v-if="loading" />
       <div v-else class="columns is-multiline">
@@ -27,7 +27,7 @@
               </p>
             </div>
             <Dropdown class="column" v-model="filter.mediaType" :data="types" :render-label="(type) => (type.name === 'media' ? 'All types' : type.name)
-        " :render-value="(type) => type" style="width: 100%" fixed placeholder="All Types" />
+              " :render-value="(type) => type" style="width: 100%" fixed placeholder="All Types" />
             <Dropdown class="column" v-model="filter.owner" :data="users" :render-label="(user) => displayName(user)"
               :render-value="(user) => user" style="width: 100%" fixed placeholder="All Users" />
             <Dropdown class="column" v-model="filter.stage" :data="stages" :render-label="(stage) => stage.name"
@@ -121,7 +121,7 @@ export default {
 
     const availableImages = computed(() => {
       let list = mediaList.value;
-      list = list.filter((m) => type_dis.includes(m.assetType.name));
+      list = list.filter((m) => type_dis.includes(m.assetType?.name || m.assetType));
       if (filter.name) {
         list = list.filter((media) =>
           media.name.toLowerCase().includes(filter.name.toLowerCase()),
@@ -129,7 +129,7 @@ export default {
       }
       if (filter.assetType && filter.assetType.id) {
         list = list.filter(
-          (media) => media.assetType.name === filter.assetType.name,
+          (media) => (media.assetType?.name || media.assetType) === filter.assetType.name,
         );
       }
       if (filter.owner && filter.owner.id) {
