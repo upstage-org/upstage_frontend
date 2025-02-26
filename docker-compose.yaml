@@ -2,8 +2,6 @@ services:
   upstage:
     image: node:18-bookworm
     container_name: upstage_frontend
-    ports:
-      - "8080:80"
     volumes:
       - .:/app
       - /frontend_app:/app/dist
