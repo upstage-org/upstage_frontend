@@ -24,7 +24,7 @@ To generate the necessary environment scripts and start up the application using
 
 3. Once the scripts are generated, start up the application using Docker Compose:
     ```
-    docker compose up
+    ./run_front_end.sh
     ```
 
 4. The application should now be running. You can access it by navigating to `http://{YOUR_DOMAIN}` in your web browser.
