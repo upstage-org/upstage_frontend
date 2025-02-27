@@ -334,7 +334,7 @@ const filterTag = (tag: string) => {
           </span>
         </template>
         <template v-if="column.key === 'stages'">
-          <a v-for="(stage, i) in text" :key="i" :href="`${configs.UPSTAGE_URL}/${stage.url}`" target="_blank">
+          <a v-for="(stage, i) in text" :key="i" :href="`${configs.UPSTAGE_URL}/${stage.fileLocation}`" target="_blank">
             <a-tag color="#007011">{{ stage.name }}</a-tag>
           </a>
         </template>

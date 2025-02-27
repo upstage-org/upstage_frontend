@@ -15,6 +15,11 @@ export const stageFragment = gql`
     playerAccess
     permission
     lastAccess
+    attributes {
+      id
+      name
+      description
+    }
     owner {
       id
       username
@@ -355,9 +360,7 @@ export default {
       gql`
         mutation UpdateStage($id: ID!, $config: String) {
           updateStage(input: { id: $id, config: $config }) {
-            stage {
-              ...stageFragment
-            }
+            ...stageFragment
           }
         }
         ${stageFragment}
