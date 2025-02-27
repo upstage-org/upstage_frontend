@@ -57,7 +57,7 @@ export default {
     `, null);
     const foyer = computed(() => store.getters["config/foyer"]);
     return {
-      visibleStages: result?.foyerStageList || [],
+      visibleStages: result?.value?.foyerStageList || [],
       loading,
       absolutePath,
       foyer,
