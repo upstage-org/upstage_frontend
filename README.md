@@ -18,13 +18,13 @@ To generate the necessary environment scripts and start up the application using
 1. Open your terminal and navigate to the project root directory.
 
 2. Run the following command to generate the environment scripts:
-    ```bash
-    bash initial_scripts/generate_environments_script.sh
+    ```
+    ./initial_scripts/generate_environments_script.sh
     ```
 
 3. Once the scripts are generated, start up the application using Docker Compose:
-    ```bash
-    docker-compose up
+    ```
+    docker compose up
     ```
 
 4. The application should now be running. You can access it by navigating to `http://{YOUR_DOMAIN}` in your web browser.
