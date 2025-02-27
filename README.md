@@ -27,6 +27,6 @@ To generate the necessary environment scripts and start up the application using
     ./run_front_end.sh
     ```
 
-4. The application should now be running. You can access it by navigating to `http://{YOUR_DOMAIN}` in your web browser.
+4. The application should now be running. You can access it by navigating to `https://{YOUR_DOMAIN}` in your web browser.
 
 Make sure you have Docker and Docker Compose installed on your machine before running these commands.
