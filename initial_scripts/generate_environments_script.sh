@@ -2,7 +2,7 @@
 
 echo "Please provide the following environment variables:"
 echo "1. The SERVICE domain name for the service machine you set up before: Example:svc.yourdomain.org"
-echo "2. JITSI_ENDPOINT: The endpoint for the Jitsi server."
+echo "2. JITSI_ENDPOINT: The endpoint for the Jitsi server, WITHOUT the https://."
 echo "3. CLOUDFLARE_CAPTCHA_SITEKEY: The site key for Cloudflare CAPTCHA."
 
 declare -a vars=(
@@ -48,7 +48,7 @@ fi
 cp ./initial_scripts/.env.template "$output_file"
 
 sed -i "s|{{DOMAIN}}|${values[DOMAIN]}|g" "$output_file"
-sed -i "s|{{MQTT_ENDPOINT}}|wss://${values[SERVICE_DOMAIN]}:9002|g" "$output_file"
+sed -i "s|{{SERVICE_DOMAIN}}|${values[SERVICE_DOMAIN]}|g" "$output_file"
 sed -i "s|{{MQTT_USERNAME}}|${values[MQTT_USERNAME]}|g" "$output_file"
 sed -i "s|{{MQTT_PASSWORD}}|${values[MQTT_PASSWORD]}|g" "$output_file"
 sed -i "s|{{JITSI_ENDPOINT}}|${values[JITSI_ENDPOINT]}|g" "$output_file"
