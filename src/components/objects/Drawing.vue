@@ -15,9 +15,9 @@
 
 <script>
 import Object from "./Object.vue";
-import MenuContent from "./Avatar/ContextMenu.vue";
+import MenuContent from "./Avatar/ContextMenuAvatar.vue";
 import { useStore } from "vuex";
-import { useDrawing } from "components/stage/Toolbox/tools/Draw/composable";
+import { useDrawing } from "components/stage/Toolboxs/tools/Draw/composable";
 import { computed } from "vue";
 
 export default {

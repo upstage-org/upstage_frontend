@@ -8,7 +8,7 @@
 
 <script>
 import { computed } from "vue";
-import { useDrawing } from "./Toolbox/tools/Draw/composable";
+import { useDrawing } from "./Toolboxs/tools/Draw/composable";
 import { useStore } from "vuex";
 export default {
   setup: () => {

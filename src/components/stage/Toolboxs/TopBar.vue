@@ -19,13 +19,13 @@ import Backdrops from "./tools/Backdrops.vue";
 import Props from "./tools/Props.vue";
 import Audio from "./tools/Audio.vue";
 import Draw from "./tools/Draw/index.vue";
-import Whiteboard from "./tools/Whiteboard.vue";
+import Whiteboard from "./tools/WhiteboardTools.vue";
 import Streams from "./tools/Streams/index.vue";
 import Meeting from "./tools/Meeting/index.vue";
-import Text from "./tools/Text.vue";
+import Text from "./tools/TextTool.vue";
 import Settings from "./tools/Settings.vue";
 import Depth from "./tools/Depth.vue";
-import Curtain from "./tools/Curtain.vue";
+import Curtain from "./tools/CurtainTool.vue";
 import Scenes from "./tools/Scenes/index.vue";
 
 export default {

@@ -12,7 +12,7 @@
 
 <script>
 import Object from "../Object.vue";
-import MenuContent from "./ContextMenu.vue";
+import MenuContent from "./ContextMenuAvatar.vue";
 
 export default {
   props: ["object"],

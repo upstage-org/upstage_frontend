@@ -79,7 +79,7 @@ export default {
   this_is_page_is_under_construction: "This is page is under construction",
   no_content: "No Content",
   drag_files_here_or_click_to_upload: "Drag files here or click to upload",
-  choose_an_image: "Choose cover image",
+  choose_an_image: "Choose an image",
   choose_an_existing_image_or_upload_new:
     "Choose an existing image or upload new",
   hold_this_avatar: "Hold this avatar",

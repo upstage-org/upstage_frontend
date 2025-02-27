@@ -7,7 +7,7 @@ import Switch from "components/form/Switch.vue";
 import HorizontalField from "components/form/HorizontalField.vue";
 import MultiSelectList from "components/MultiSelectList.vue";
 import Asset from "components/Asset.vue";
-import Dropzone from "components/form/Dropzone.vue";
+import DropzoneForm from "components/form/DropzoneForm.vue";
 import Selectable from "components/Selectable.vue";
 
 const props = defineProps({
@@ -71,7 +71,7 @@ watch(uploadedFrames, (val) => {
           </Selectable>
         </div>
         <div class="column item is-12">
-          <Dropzone @change="handleDropzone" />
+          <DropzoneForm @change="handleDropzone" />
         </div>
       </template>
     </MultiSelectList>

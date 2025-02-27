@@ -43,7 +43,7 @@ import Object from "../Object.vue";
 import Loading from "components/Loading.vue";
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import AvatarContextMenu from "../Avatar/ContextMenu.vue";
+import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
 
 export default {
   components: { Object, Loading, AvatarContextMenu },

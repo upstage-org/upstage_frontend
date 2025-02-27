@@ -1,5 +1,5 @@
 <script>
-import Skeleton from "components/stage/Toolbox/Skeleton.vue";
+import Skeleton from "components/stage/Toolboxs/Skeleton.vue";
 import { computed, inject, onMounted, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useLowLevelAPI } from "./composable";

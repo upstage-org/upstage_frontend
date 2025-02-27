@@ -19,7 +19,7 @@ import { useStore } from "vuex";
 import Icon from "components/Icon.vue";
 import Skeleton from "../../Skeleton.vue";
 import { computed } from "vue";
-import Yourself from "components/objects/Meeting/Yourself.vue";
+import Yourself from "components/objects/MeetingObject/Yourself.vue";
 
 const store = useStore();
 const rooms = computed(() => store.state.stage.tools.meetings);

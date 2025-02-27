@@ -5,7 +5,7 @@
 </template>
 
 <script setup>
-import Track from "components/objects/Meeting/Track.vue";
+import Track from "components/objects/MeetingObject/Track.vue";
 import { computed } from "vue";
 import { useStore } from "vuex";
 
