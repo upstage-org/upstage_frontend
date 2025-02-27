@@ -207,6 +207,13 @@ export default {
               scenes {
                 ...sceneFragment
               }
+              events(performanceId: $performanceId) {
+                  id
+                  topic
+                  payload
+                  mqttTimestamp
+                  performanceId
+              }
             }
           }
           ${stageFragment}
@@ -225,11 +232,7 @@ export default {
         gql`
           query ListStage($fileLocation: String) {
             stageList(fileLocation: $fileLocation) {
-              edges {
-                node {
-                  permission
-                }
-              }
+              permission
             }
           }
         `,
@@ -242,12 +245,8 @@ export default {
         gql`
           query ListStage($fileLocation: String) {
             stageList(fileLocation: $fileLocation) {
-              edges {
-                node {
-                  scenes {
-                    ...sceneFragment
-                  }
-                }
+              scenes {
+                ...sceneFragment
               }
             }
           }
@@ -262,15 +261,11 @@ export default {
         gql`
           query ListStage($fileLocation: String, $cursor: Int) {
             stageList(fileLocation: $fileLocation) {
-              edges {
-                node {
-                  events(cursor: $cursor) {
-                    id
-                    topic
-                    payload
-                    mqttTimestamp
-                  }
-                }
+              events(cursor: $cursor) {
+                id
+                topic
+                payload
+                mqttTimestamp
               }
             }
           }
