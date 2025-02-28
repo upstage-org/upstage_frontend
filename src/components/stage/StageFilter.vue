@@ -179,7 +179,7 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           </template>
         </a-select>
         <a-range-picker :placeholder="['Created from', 'to date']" v-model:value="dates as any" :presets="ranges as any"
-          @change="onRangeChange" />
+          @change="onRangeChange as any" />
         <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
           <ClearOutlined />Clear Filters
         </a-button>
