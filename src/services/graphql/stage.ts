@@ -212,7 +212,7 @@ export default {
               scenes {
                 ...sceneFragment
               }
-              events(performanceId: $performanceId) {
+              events {
                   id
                   topic
                   payload
