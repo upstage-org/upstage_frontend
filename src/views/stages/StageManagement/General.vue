@@ -174,7 +174,6 @@ export default {
       ...stage.value,
       ownerId: stage.value.owner?.id,
       status: useAttribute(stage, "status").value ?? "rehearsal",
-      visibility: stage.visibility || false,
       cover: useAttribute(stage, "cover").value,
     });
 
