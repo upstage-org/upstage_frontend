@@ -1208,7 +1208,7 @@ export default {
     replayEvent({ dispatch }, { topic, payload }) {
       dispatch("handleMessage", {
         topic: unnamespaceTopic(topic),
-        message: JSON.parse(payload),
+        message: payload,
       });
     },
     replicateEvent({ dispatch }, { topic, payload }) {

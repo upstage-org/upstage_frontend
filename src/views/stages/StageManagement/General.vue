@@ -261,8 +261,8 @@ export default {
         fileLocation: url,
       });
       urlValid.value = true;
-      if (response.stageList.edges.length) {
-        const existingStage = response.stageList.edges[0].node;
+      if (response.stages.length) {
+        const existingStage = response.stages[0];
         if (existingStage.fileLocation !== stage.value.fileLocation) {
           urlValid.value = false;
         }

@@ -94,7 +94,7 @@ export default {
     if (result) {
       variables.id = result.createStage.id;
       result = await stageGraph.updateStage(variables);
-      return result.updateStage.stage;
+      return result.updateStage;
     }
   },
   updateStage: (variables) =>
@@ -232,7 +232,7 @@ export default {
         };
       }),
   loadPermission: (fileLocation) =>
-    client
+    studioClient
       .request(
         gql`
           query ListStage($fileLocation: String) {
@@ -243,9 +243,9 @@ export default {
         `,
         { fileLocation },
       )
-      .then((response) => response.stageList.edges[0]?.node?.permission),
+      .then((response) => response.stageList?.permission),
   loadScenes: (fileLocation) =>
-    client
+    studioClient
       .request(
         gql`
           query ListStage($fileLocation: String) {
@@ -259,14 +259,14 @@ export default {
         `,
         { fileLocation },
       )
-      .then((response) => response.stageList.edges[0]?.node?.scenes),
+      .then((response) => response.stageList?.scenes),
   loadEvents: (fileLocation, cursor) =>
-    client
+    studioClient
       .request(
         gql`
           query ListStage($fileLocation: String, $cursor: Int) {
-            stageList(fileLocation: $fileLocation) {
-              events(cursor: $cursor) {
+            stageList(input: {fileLocation: $fileLocation}) {
+              events {
                 id
                 topic
                 payload
@@ -277,7 +277,7 @@ export default {
         `,
         { fileLocation, cursor },
       )
-      .then((response) => response.stageList.edges[0]?.node?.events),
+      .then((response) => response.stageList?.events),
   uploadMedia: (variables) =>
     studioClient.request(
       gql`
