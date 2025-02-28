@@ -243,7 +243,7 @@ export default {
         `,
         { fileLocation },
       )
-      .then((response) => response.stageList?.permission),
+      .then((response) => response.stageList[0]?.permission),
   loadScenes: (fileLocation) =>
     studioClient
       .request(
@@ -259,13 +259,13 @@ export default {
         `,
         { fileLocation },
       )
-      .then((response) => response.stageList?.scenes),
+      .then((response) => response.stageList[0]?.scenes),
   loadEvents: (fileLocation, cursor) =>
     studioClient
       .request(
         gql`
           query ListStage($fileLocation: String, $cursor: Int) {
-            stageList(input: {fileLocation: $fileLocation}) {
+            stageList(input: {fileLocation: $fileLocation, cursor: $cursor}) {
               events {
                 id
                 topic
@@ -275,9 +275,9 @@ export default {
             }
           }
         `,
-        { fileLocation, cursor },
+        { fileLocation, ...cursor ? { cursor: parseInt(cursor) } : {} },
       )
-      .then((response) => response.stageList?.events),
+      .then((response) => response.stageList[0]?.events),
   uploadMedia: (variables) =>
     studioClient.request(
       gql`
