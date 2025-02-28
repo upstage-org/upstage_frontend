@@ -10,7 +10,7 @@ import configs from "config";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
 
-const { result, loading } = useQuery(gql`
+const { result: response, loading } = useQuery(gql`
   {
     whoami {
       username
@@ -45,6 +45,8 @@ const { result, loading } = useQuery(gql`
     }
   }
 `);
+
+const result = computed(() => response?.value);
 
 const sharedAuth = getSharedAuth();
 
@@ -160,8 +162,8 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
         </a-button>
         <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="name" />
         <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags" style="min-width: 124px"
-          placeholder="Owners" :loading="loading" v-model:value="owners" :options="result?.value
-            ? result.value.users.map((e: any) => ({
+          placeholder="Owners" :loading="loading" v-model:value="owners" :options="result
+            ? result.users.map((e: any) => ({
               value: e.username,
               label: e.displayName || e.username,
             }))
@@ -176,8 +178,8 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           </template>
         </a-select>
         <a-select allowClear showArrow filterOption mode="tags" style="min-width: 128px" placeholder="Media types"
-          :loading="loading" v-model:value="types" :options="result?.value
-            ? result.value.mediaTypes
+          :loading="loading" v-model:value="types" :options="result
+            ? result.mediaTypes
               .filter(
                 (e: any) =>
                   !['shape', 'media'].includes(e.name.toLowerCase()),
@@ -190,8 +192,8 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
             ">
         </a-select>
         <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags" style="min-width: 160px"
-          placeholder="Stages assigned" :loading="loading" v-model:value="stages" :options="result?.value
-            ? result.value.stages.map((e: any) => ({
+          placeholder="Stages assigned" :loading="loading" v-model:value="stages" :options="result
+            ? result.stages.edges.map((e: any) => ({
               value: e.id,
               label: e.name,
             }))
@@ -199,8 +201,8 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
             ">
         </a-select>
         <a-select allowClear showArrow mode="tags" style="min-width: 160px" placeholder="Tags" :loading="loading"
-          v-model:value="tags" :options="result?.value
-            ? result.value.tags.map((e: any) => ({
+          v-model:value="tags" :options="result
+            ? result.tags.map((e: any) => ({
               value: e.name,
               label: e.name,
             }))
