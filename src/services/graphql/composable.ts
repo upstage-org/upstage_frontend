@@ -70,6 +70,30 @@ export const useRequest = (service, ...params) => {
       loading.value = false;
     }
   };
+  const refetch = async (...newParams) => {
+    try {
+      const payload = newParams.length ? newParams : params;
+      const cacheKey = hash({ service, payload });
+      const cached = store.state.cache.graphql[cacheKey];
+      loading.value = true;
+      data.value = await service(...payload);
+      if (data.value) {
+        store.commit("cache/SET_GRAPHQL_CACHE", {
+          key: cacheKey,
+          value: data.value,
+        });
+        cacheKeys.push(cacheKey);
+      }
+      return data.value;
+    } catch (error) {
+      if (error.response.errors[0].message == "Invalid refresh token") {
+        logout();
+      }
+      throw error.response.errors[0].message;
+    } finally {
+      loading.value = false;
+    }
+  };
 
   const clearCache = () => {
     cacheKeys.push(hash({ service, payload: params }));
@@ -92,6 +116,7 @@ export const useRequest = (service, ...params) => {
     refresh,
     pushNode,
     popNode,
+    refetch
   };
 };
 

@@ -70,7 +70,7 @@ export default {
   props: ["id"],
   components: { Loading },
   setup: (props) => {
-    const { nodes, loading, fetch, data, refresh, clearCache } = useRequest(
+    const { nodes, loading, refetch, data, refresh, clearCache } = useRequest(
       stageGraph.getStage,
     );
     const stage = useFirst(nodes);
@@ -81,7 +81,7 @@ export default {
       () => props.id,
       () => {
         if (props.id) {
-          fetch(props.id);
+          refetch(props.id);
         } else {
           data.value = null;
         }
