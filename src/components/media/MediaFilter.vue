@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, watch, watchEffect, inject, computed, Ref } from "vue";
+import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
 import gql from "graphql-tag";
@@ -9,6 +9,8 @@ import moment, { Moment } from "moment";
 import configs from "config";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
 
 const { result: response, loading } = useQuery(gql`
   {
@@ -57,22 +59,30 @@ const owners = ref(
 const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
-const dates = ref<[Moment, Moment] | undefined>();
+const dates = ref<[Dayjs, Dayjs] | undefined>();
 
-const ranges = {
-  Today: [moment().startOf("day"), moment().endOf("day")],
-  Yesterday: [
-    moment().subtract(1, "day").startOf("day"),
-    moment().subtract(1, "day").endOf("day"),
-  ],
-  "Last 7 days": [moment().subtract(7, "days"), moment()],
-  "This month": [moment().startOf("month"), moment().endOf("day")],
-  "Last month": [
-    moment().subtract(1, "month").startOf("month"),
-    moment().subtract(1, "month").endOf("month"),
-  ],
-  "This year": [moment().startOf("year"), moment().endOf("day")],
-};
+const ranges = [
+  {
+    label: 'Today',
+    value: [dayjs(), dayjs()],
+  },
+  {
+    label: 'Yesterday',
+    value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')],
+  },
+  {
+    label: 'Last 7 days',
+    value: [dayjs().add(-7, 'd'), dayjs()],
+  },
+  {
+    label: 'Last month',
+    value: [dayjs().add(-1, 'month'), dayjs()],
+  },
+  {
+    label: 'This year',
+    value: [dayjs().startOf("year"), dayjs()],
+  }
+];
 
 const updateInquiry = (vars: any) =>
   inquiryVar({
@@ -101,16 +111,24 @@ watch(
     updateInquiry({ name: name.value });
   }, 500),
 );
-watch(dates, (dates) => {
+
+const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) => {
   updateInquiry({
-    createdBetween: dates
+    createdBetween: _dates
       ? [
-        dates[0].startOf("day").format("YYYY-MM-DD"),
-        dates[1].endOf("day").format("YYYY-MM-DD"),
+        _dates[0]?.format("YYYY-MM-DD"),
+        _dates[1]?.format("YYYY-MM-DD"),
       ]
       : undefined,
   });
+};
+
+onMounted(() => {
+  updateInquiry({
+    createdBetween: undefined
+  });
 });
+
 const clearFilters = () => {
   name.value = "";
   owners.value = [];
@@ -208,8 +226,8 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
             }))
             : []
             "></a-select>
-        <a-range-picker :placeholder="['Created from', 'to date']" v-model:value="dates as any"
-          :ranges="ranges as any" />
+        <a-range-picker :placeholder="['Created from', 'to date']" :presets="ranges as any" @change="onRangeChange"
+          v-model:value="dates as any" />
         <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
           <ClearOutlined />Clear Filters
         </a-button>
