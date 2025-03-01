@@ -14,6 +14,20 @@ ACCEPT_EMAIL_HOST = ["upstage.live"]
 ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = []
 ```
 
+Only internal to Upstage: 
+
+In ```upstage_backend/app_containers/docker-compose.yaml``` Upstage has to run a fourth container
+in the app machine. This fourth container generates email tokens for approved clients who
+can send email through our system: 
+```
+  # For Upstage internal use only.
+  #upstage_emails:
+```
+Uncomment these lines and
+run ```cd upstage_backend/app_containers && ./run_docker_compose.sh```
+
+
+
 Change to "Production" for official releases. Not equal to Production means
 the front end can be fed from localhost, which is great for debugging.
 ```
