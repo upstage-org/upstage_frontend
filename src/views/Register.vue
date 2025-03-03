@@ -34,7 +34,7 @@
                 {{ $t("tos.register") }}
                 <TermsOfService />.
               </label>
-              <turnstile ref="captcha" :site-key="siteKey" v-model="form.token" />
+              <turnstile v-if="siteKey" ref="captcha" :site-key="siteKey" v-model="form.token" />
             </div>
           </div>
           <footer class="card-footer">

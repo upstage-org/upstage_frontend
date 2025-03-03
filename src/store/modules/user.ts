@@ -4,6 +4,7 @@ import { userGraph } from "services/graphql";
 import { displayName, logout } from "utils/auth";
 import { ROLES } from "utils/constants";
 import { message } from "ant-design-vue";
+import store from "store/index";
 
 export default {
   namespaced: true,
@@ -43,16 +44,20 @@ export default {
     async fetchCurrent({ commit }) {
       commit("SET_LOADING_USER", true);
       try {
+        const token = store.getters["auth/getToken"];
+        if (!token) return;
         const { currentUser } = await userGraph.currentUser();
         commit("SET_USER_DATA", currentUser);
         return currentUser;
       } catch (error) {
+        const errorMsg = error.response?.errors[0]?.message;
         if (
           [
             "Missing Authorization Header",
             "Signature verification failed",
             "Signature has expired",
-          ].some((message) => error.message?.includes(message))
+            "Authenticated Failed"
+          ].some((message) => errorMsg?.includes(message))
         ) {
           logout();
 
@@ -97,6 +102,7 @@ export default {
             "Missing Authorization Header",
             "Signature verification failed",
             "Signature has expired",
+            "Authenticated Failed"
           ].some((message) => error.message?.includes(message))
         ) {
           logout();
@@ -127,6 +133,7 @@ export default {
             "Missing Authorization Header",
             "Signature verification failed",
             "Signature has expired",
+            "Authenticated Failed"
           ].some((message) => error.message?.includes(message))
         ) {
           logout();

@@ -234,6 +234,7 @@ export default {
         if (config) {
           Object.assign(state.config, config);
           state.config.ratio = config.ratio.width / config.ratio.height;
+          state.backdropColor = state.config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
         }
         const cover = useAttribute({ value: model }, "cover", false).value;
         state.model.cover = cover && absolutePath(cover);
@@ -861,12 +862,13 @@ export default {
         rotate: 0,
         ...data,
         id: uuidv4(),
+        type: data.assetType?.name || data.type
       };
       if (object.type === "stream") {
         object.hostId = state.session;
       }
       commit("PUSH_OBJECT", serializeObject(object));
-      if (data.type === "avatar") {
+      if (object.type === "avatar") {
         dispatch("user/setAvatarId", object.id, { root: true }).then(() => {
           commit("SET_ACTIVE_MOVABLE", null);
         });

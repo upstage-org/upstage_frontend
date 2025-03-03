@@ -28,7 +28,7 @@ export const createClient = (namespace: any) => ({
       if (
         !isRefresh &&
         refreshToken &&
-        error.response.errors[0].message === "Signature has expired"
+        ["Authenticated Failed", "Signature has expired"].includes(error.response.errors[0].message)
       ) {
         const newToken = await store.dispatch("auth/fetchRefreshToken");
         client.setHeader("Authorization", `Bearer ${newToken}`);

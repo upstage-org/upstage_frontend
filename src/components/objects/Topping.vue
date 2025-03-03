@@ -7,7 +7,7 @@
     }" @click="openChatBox"><a-tooltip :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname
       }`">
         <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
-          <Icon src="my-avatar.svg" />
+          <Icon src="my-avatar.svg" style="width: 16px; height: 16px;"/>
         </span>
       </a-tooltip>
       <transition @enter="enter" @leave="leave" :css="false" appear>
