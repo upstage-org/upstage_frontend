@@ -236,7 +236,7 @@ export default {
       .request(
         gql`
           query ListStage($fileLocation: String) {
-            stageList(fileLocation: $fileLocation) {
+            stageList(input: s{fileLocation: $fileLocation}) {
               permission
             }
           }
@@ -249,7 +249,7 @@ export default {
       .request(
         gql`
           query ListStage($fileLocation: String) {
-            stageList(fileLocation: $fileLocation) {
+            stageList(input: {fileLocation: $fileLocation}) {
               scenes {
                 ...sceneFragment
               }
