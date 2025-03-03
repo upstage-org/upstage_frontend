@@ -128,12 +128,12 @@ export default {
     },
     preloadableAssets(state) {
       const assets = []
-        .concat(state.tools.avatars.map((a) => a.src))
-        .concat(state.tools.avatars.map((a) => a.frames ?? []).flat())
-        .concat(state.tools.props.map((p) => p.src))
-        .concat(state.tools.props.map((a) => a.frames ?? []).flat())
-        .concat(state.tools.backdrops.map((b) => b.src))
-        .concat(state.tools.backdrops.map((a) => a.frames ?? []).flat())
+        .concat(state.tools.avatars.filter(a => !a.multi).map((a) => a.src))
+        .concat(state.tools.avatars.filter(a => a.multi).map((a) => a.frames ?? []).flat())
+        .concat(state.tools.props.filter(a => !a.multi).map((p) => p.src))
+        .concat(state.tools.props.filter(a => a.multi).map((a) => a.frames ?? []).flat())
+        .concat(state.tools.backdrops.filter(a => !a.multi).map((b) => b.src))
+        .concat(state.tools.backdrops.filter(a => a.multi).map((a) => a.frames ?? []).flat())
         .concat(state.tools.curtains.map((b) => b.src));
       return assets;
     },
@@ -452,7 +452,6 @@ export default {
       state.board.texts = state.board.texts.filter((d) => d.textId !== textId);
     },
     PUSH_STREAM_TOOL(state, stream) {
-      console.log("===stream", stream)
       state.tools.streams.push(stream);
     },
     UPDATE_IS_DRAWING(state, isDrawing) {
