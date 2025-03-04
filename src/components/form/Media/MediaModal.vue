@@ -217,7 +217,7 @@ export default {
       if (["audio"].includes(form.assetType)) {
         return "audio";
       }
-      if (["stream"].includes(form.assetType)) {
+      if (["video"].includes(form.assetType)) {
         return "video";
       }
     });
@@ -225,7 +225,7 @@ export default {
       const type = form.fileType ?? fileType.value;
       if (type === "image") return ["avatar", "prop", "backdrop", "curtain"];
       if (type === "audio") return ["audio"];
-      if (type === "video") return ["stream"];
+      if (type === "video") return ["video"];
     });
 
     const tabs = computed(() => {

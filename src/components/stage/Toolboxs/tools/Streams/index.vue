@@ -1,10 +1,10 @@
 <template>
   <div
-    v-for="stream in streams"
-    :key="stream"
+    v-for="video in videos"
+    :key="video"
   >
-    <Skeleton :data="stream">
-      <video :src="stream.url"></video>
+    <Skeleton :data="video">
+      <video :src="video.url"></video>
     </Skeleton>
   </div>
 </template>
@@ -25,12 +25,12 @@ export default {
   setup: () => {
     const store = useStore();
 
-    const streams = computed(() => {
-      const res = [...store.state.stage.tools.streams];
+    const videos = computed(() => {
+      const res = [...store.state.stage.tools.videos];
       return res;
     });
 
-    return { streams };
+    return { videos };
   },
 };
 </script>

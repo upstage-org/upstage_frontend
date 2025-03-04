@@ -21,7 +21,7 @@
         </span>
         <span>{{ $t("remove_from_avatar") }}</span>
       </a>
-      <a v-else-if="currentAvatar && object.type !== 'stream'" class="panel-block" @click="wearCostume">
+      <a v-else-if="currentAvatar && object.type !== 'video'" class="panel-block" @click="wearCostume">
         <span class="panel-icon">
           <Icon src="prop.svg" />
         </span>

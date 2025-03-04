@@ -33,7 +33,7 @@ export default {
     const getType = (fileType) => {
       if (fileType === "image") return "avatar";
       if (fileType === "audio") return "audio";
-      if (fileType === "video") return "stream";
+      if (fileType === "video") return "video";
     };
 
     const handleFileChange = async (file, type) => {

@@ -30,7 +30,7 @@
       <div class="mx-3 my-1">
         <div class="columns">
           <div class="column is-narrow media-preview">
-            <Asset v-if="!['audio', 'stream'].includes(item.assetType)" :asset="item" show-type />
+            <Asset v-if="!['audio', 'video'].includes(item.assetType)" :asset="item" show-type />
           </div>
           <div class="type-icon">
             <Icon :src="item.assetType + '.svg'" style="width: 16px; height: 16px;"/>
@@ -95,7 +95,7 @@ export default {
 
     const mediaList = computed(() => {
       if (!data.value) return [];
-      const { avatars, props, backdrops, audios, streams, curtains } =
+      const { avatars, props, backdrops, audios, videos, curtains } =
         data.value;
       const mediaList = []
         .concat(
@@ -103,7 +103,7 @@ export default {
           props,
           backdrops,
           audios,
-          streams,
+          videos,
           curtains,
         )
         .map((edge) => edge);
@@ -152,7 +152,7 @@ export default {
         value: "backdrop",
       },
       { label: "Audio", value: "audio" },
-      { label: "Stream", value: "stream" },
+      { label: "Video", value: "video" },
       { label: "Curtain", value: "curtain" },
     ];
     const filter = reactive({});

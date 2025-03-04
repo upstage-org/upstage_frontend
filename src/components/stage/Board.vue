@@ -13,7 +13,7 @@
       <Backdrop />
       <transition-group name="stage-avatars" :css="false" @enter="avatarEnter" @leave="avatarLeave">
         <component v-for="object in objects" :id="object.id" :key="object.id"
-          :is="object.drawingId ? 'drawing' : object.type == 'stream' ? 'avatar' : object.type ?? 'avatar'"
+          :is="object.drawingId ? 'drawing' : object.type == 'video' ? 'avatar' : object.type ?? 'avatar'"
           :object="object" />
       </transition-group>
     </div>

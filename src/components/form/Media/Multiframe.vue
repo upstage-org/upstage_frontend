@@ -51,7 +51,7 @@ watch(uploadedFrames, (val) => {
       :loading="loadingAllMedia"
       :data="
         allMedia
-          ?.filter((item) => !['audio', 'stream'].includes(item.assetType.name))
+          ?.filter((item) => !['audio', 'video'].includes(item.assetType.name))
           .map((media) => media.src)
       "
       v-model="form.frames"

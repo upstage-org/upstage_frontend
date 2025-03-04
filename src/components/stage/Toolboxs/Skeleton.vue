@@ -17,7 +17,7 @@
       'transform-origin': 0,
       'max-width': '100%'
     }" v-html="data.content"></p>
-    <div :title="`Stream key: ${data.name}`" class="is-fullwidth" v-else-if="data.type === 'stream'">
+    <div :title="`Stream key: ${data.name}`" class="is-fullwidth" v-else-if="data.type === 'video'">
       <Icon src="stream.svg" size="36" />
       <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7);">{{ data.name }}</span>
     </div>

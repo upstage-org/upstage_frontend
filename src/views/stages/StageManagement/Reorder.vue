@@ -35,7 +35,7 @@
                 <br />
                 <b>{{ item.name }}</b>
               </div>
-              <div v-else-if="mediaType === 'stream'">
+              <div v-else-if="mediaType === 'video'">
                 <Icon src="stream.svg" />
                 <br />
                 <b>{{ item.name }}</b>

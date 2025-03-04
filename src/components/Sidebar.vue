@@ -11,8 +11,6 @@ import {
   SettingOutlined,
 } from "@ant-design/icons-vue";
 import configs from "config";
-import { useLoading } from "hooks/mutations";
-import { userGraph } from "services/graphql";
 import { useStore } from "vuex";
 
 export default {

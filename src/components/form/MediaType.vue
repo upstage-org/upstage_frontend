@@ -2,7 +2,7 @@
   <Dropdown
     title="Type"
     v-model="mediaType"
-    :data="data ?? ['avatar', 'prop', 'backdrop', 'audio', 'stream', 'curtain']"
+    :data="data ?? ['avatar', 'prop', 'backdrop', 'audio', 'video', 'curtain']"
     :render-label="titleCase"
     :is-up="isUp"
   />

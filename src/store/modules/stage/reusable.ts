@@ -22,7 +22,7 @@ export function serializeObject(object) {
   const { src, type } = object;
   object = {
     ...object,
-    src: type === "stream" ? null : src,
+    src: type === "video" ? null : src,
   };
   object.x = toRelative(object.x);
   object.y = toRelative(object.y);
@@ -33,7 +33,7 @@ export function serializeObject(object) {
 }
 
 export function deserializeObject(object) {
-  if (object.type === "stream") {
+  if (object.type === "video") {
     delete object.src;
   }
   object.x = toAbsolute(object.x);

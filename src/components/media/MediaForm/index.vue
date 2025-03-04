@@ -195,7 +195,7 @@ const mediaTypes = computed(() => {
         (node) =>
           !(
             editingMediaResult.value
-              ? ["media", "stream", "shape"]
+              ? ["media", "video", "shape"]
               : ["media", "shape"]
           ).includes(node.name.toLowerCase()),
       )
@@ -248,11 +248,11 @@ watch(files as Ref, ([firstFile]) => {
     ((firstFile.status === "local" && firstFile.file.type.includes("video")) ||
       firstFile.status === "virtual")
   ) {
-    type.value = "stream";
+    type.value = "video";
   } else if (
     firstFile &&
     firstFile.status === "local" &&
-    (!type.value || type.value === "stream" || type.value === "audio")
+    (!type.value || type.value === "video" || type.value === "audio")
   ) {
     type.value = "avatar";
   }
@@ -329,7 +329,7 @@ const clearSign = () => {
           <a-select :options="mediaTypes" v-model:value="type"></a-select>
           <a-input v-model:value="name" :placeholder="mediaName"></a-input>
         </a-input-group>
-        <template v-if="!['stream', 'audio'].includes(type)">
+        <template v-if="!['video', 'audio'].includes(type)">
           <a-button type="primary" @click="visibleDropzone = true">
             <UploadOutlined />
             Upload frame
@@ -344,7 +344,7 @@ const clearSign = () => {
             Clear frames
           </a-button>
         </template>
-        <a-input v-else-if="type === 'stream' && files && files.length" v-model:value="files![0].url"
+        <a-input v-else-if="type === 'video' && files && files.length" v-model:value="files![0].url"
           placeholder="Unique key" @focus="clearSign"></a-input>
       </a-space>
     </template>
@@ -355,7 +355,7 @@ const clearSign = () => {
             <source v-if="files && files.length" :src="files[0].preview" />
             Your browser does not support the audio element.
           </audio>
-          <template v-else-if="type === 'stream'">
+          <template v-else-if="type === 'video'">
             <div v-if="files && files.length && files[0].status === 'virtual'" controls class="w-48">
 
             </div>

@@ -75,7 +75,7 @@ export const sceneFragment = gql`
   fragment sceneFragment on Scene {
     id
     name
-    
+    scenePreview
   }
 `;
 
@@ -192,6 +192,28 @@ export default {
           query stage($id: ID!) {
             stage(id: $id) {
               ...stageFragment
+              chats {
+                  payload
+                  performanceId
+              }
+              performances {
+                id
+                createdOn
+                name
+                description
+                recording
+              }
+              scenes {
+                id
+                name
+                scenePreview
+                createdOn
+                owner {
+                  id
+                  username
+                  displayName
+                }
+              }
             }
           }
           ${stageFragment}
@@ -382,7 +404,7 @@ export default {
         audios: mediaList(mediaType: "audio") {
           ...assetFragment
         }
-        streams: mediaList(mediaType: "stream") {
+        videos: mediaList(mediaType: "video") {
           ...assetFragment
         }
         curtains: mediaList(mediaType: "curtain") {

@@ -31,7 +31,7 @@
                 : 'normal',
           }" @dragstart.prevent>
             <slot name="render">
-              <video v-if="object.assetType?.name == 'stream'" class="the-object-video" :src="object.url" controls
+              <video v-if="object.assetType?.name == 'video'" class="the-object-video" :src="object.url" controls
                 autoplay></video>
               <Image v-else class="the-object" :src="src" />
             </slot>

@@ -208,7 +208,7 @@ export default {
         const media = model.assets;
         if (media && media.length) {
           media.forEach((item) => {
-            if (item.assetType?.name === "stream") {
+            if (item.assetType?.name === "video") {
               item.url = absolutePath(item.fileLocation);
             } else {
               if (item.description) {
@@ -450,9 +450,6 @@ export default {
     },
     POP_TEXT(state, textId) {
       state.board.texts = state.board.texts.filter((d) => d.textId !== textId);
-    },
-    PUSH_STREAM_TOOL(state, stream) {
-      state.tools.streams.push(stream);
     },
     UPDATE_IS_DRAWING(state, isDrawing) {
       state.preferences.isDrawing = isDrawing;
@@ -863,7 +860,7 @@ export default {
         id: uuidv4(),
         type: data.assetType?.name || data.type
       };
-      if (object.type === "stream") {
+      if (object.type === "video") {
         object.hostId = state.session;
       }
       commit("PUSH_OBJECT", serializeObject(object));
@@ -1107,11 +1104,6 @@ export default {
     addDrawing({ commit, dispatch }, drawing) {
       commit("PUSH_DRAWING", drawing);
       dispatch("placeObjectOnStage", drawing);
-    },
-    addStream({ commit, dispatch }, stream) {
-      stream.type = "stream";
-      commit("PUSH_STREAM_TOOL", stream);
-      dispatch("placeObjectOnStage", stream);
     },
     addText({ commit, dispatch }, text) {
       text.type = "text";
