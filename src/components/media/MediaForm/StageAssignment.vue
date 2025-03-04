@@ -23,43 +23,29 @@ const isAdmin = computed(
     [String(configs.ROLES.ADMIN), String(configs.ROLES.SUPER_ADMIN)].includes(String(whoami.value.role)),
 );
 
-const { result, loading } = useQuery(isAdmin.value ?
+const { result, loading } = useQuery(
   gql`
   {
     stages(input:{}) {
         edges {
           id
           name
+          permission
         }
       }
   }
-  `:
-  gql`
-  query filterStages(
-      $owners: [String]
-    )
-    {
-      stages(input:{
-        owners: $owners
-      }) {
-        edges {
-          id
-          name
-        }
-      }
-    }
   `,
-  { owners: [whoami.value.username] },
+  null,
   { fetchPolicy: "cache-and-network" },
 );
 const stages = computed(() => {
   if (result.value?.stages) {
-    return result.value.stages.edges
+    return result.value.stages.edges.filter((el: any) => isAdmin.value ? true : el.permission == "editor")
       .map(({ id, name }: any) => ({ key: id, name }));
   }
   return [];
 });
-console.log("=====result", result)
+
 const targetKeys = ref(props.modelValue);
 const filterOption = (inputValue: string, option: TransferItem) => {
   return option.name.toLowerCase().indexOf(inputValue.toLowerCase()) > -1;
