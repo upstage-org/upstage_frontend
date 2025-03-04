@@ -39,5 +39,7 @@ export default {
   position: absolute;
   z-index: 1;
   transform: translate(-50%, -65%);
+  width: 16px;
+  height: 16px;
 }
 </style>

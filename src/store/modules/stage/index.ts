@@ -1213,7 +1213,7 @@ export default {
       });
     },
     replicateEvent({ dispatch }, { topic, payload }) {
-      const message = JSON.parse(payload);
+      const message = payload;
       message.mute = true;
       dispatch("handleMessage", {
         topic: unnamespaceTopic(topic),
