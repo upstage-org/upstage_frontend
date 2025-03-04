@@ -1,11 +1,6 @@
 <template>
-  <div
-    v-for="(audio, i) in audios"
-    :key="audio"
-    class="audio has-text-centered"
-    :class="{ 'is-playing': audio.isPlaying }"
-    @mouseenter="i > audios.length - 3 ? scrollToEnd() : null"
-  >
+  <div v-for="(audio, i) in audios" :key="audio" class="audio has-text-centered"
+    :class="{ 'is-playing': audio.isPlaying }" @mouseenter="i > audios.length - 3 ? scrollToEnd() : null">
     <div>
       <div class="audio-name">
         <span v-if="i < 10">{{ i + 1 }}.</span>
@@ -13,10 +8,7 @@
       </div>
       <div class="buttons">
         <template v-if="audio.isPlaying">
-          <div
-            class="icon"
-            @click="togglePlaying(audio, audioPlayers[i]?.currentTime)"
-          >
+          <div class="icon" @click="togglePlaying(audio, audioPlayers[i]?.currentTime)">
             <Icon size="24" src="pause.svg" />
           </div>
           <div class="icon" @click="stopAudio(audio)">
@@ -24,18 +16,11 @@
           </div>
         </template>
         <template v-else>
-          <div
-            class="icon play-button"
-            @click="togglePlaying(audio, audioPlayers[i]?.currentTime)"
-          >
+          <div class="icon play-button" @click="togglePlaying(audio, audioPlayers[i]?.currentTime)">
             <Icon size="24" src="play.svg" />
           </div>
         </template>
-        <div
-          class="icon"
-          :class="{ grayscale: !audio.loop }"
-          @click="toggleLoop(audio, audioPlayers[i]?.currentTime)"
-        >
+        <div class="icon" :class="{ grayscale: !audio.loop }" @click="toggleLoop(audio, audioPlayers[i]?.currentTime)">
           <Icon size="24" src="loop.svg" />
         </div>
       </div>
@@ -44,24 +29,11 @@
           <div class="icon">
             <Icon size="24" src="voice-setting.svg" />
           </div>
-          <input
-            class="slider is-fullwidth is-dark my-0"
-            step="0.01"
-            min="0"
-            max="1"
-            :value="audio.volume ?? 1"
-            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)"
-            type="range"
-          />
+          <input class="slider is-fullwidth is-dark my-0" step="0.01" min="0" max="1" v-model="audio.volume"
+            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)" type="range" />
         </div>
-        <input
-          class="slider is-fullwidth is-primary mt-0"
-          min="0"
-          :max="audioPlayers[i]?.duration"
-          :value="audioPlayers[i]?.currentTime ?? 0"
-          @change="seek(audio, $event)"
-          type="range"
-        />
+        <input class="slider is-fullwidth is-primary mt-0" min="0" :max="audioPlayers[i]?.duration"
+          :value="audioPlayers[i]?.currentTime ?? 0" @change="seek(audio, $event)" type="range" />
         <div class="addon">
           <span v-if="audio.isPlaying">{{
             displayTimestamp(audioPlayers[i]?.currentTime ?? 0)
@@ -76,7 +48,7 @@
 <script>
 import { useStore } from "vuex";
 import Icon from "components/Icon.vue";
-import { computed } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useShortcut } from "../../composable";
 import { displayTimestamp } from "utils/common";
 import anime from "animejs";
@@ -85,7 +57,7 @@ export default {
   components: { Icon },
   setup: () => {
     const store = useStore();
-    const audios = computed(() => store.getters["stage/audios"]);
+    const audios = ref(store.getters["stage/audios"] || []);
     const audioPlayers = computed(() => store.state.stage.audioPlayers);
 
     const togglePlaying = (audio, currentTime) => {
@@ -111,7 +83,7 @@ export default {
       store.dispatch("stage/updateAudioStatus", audio);
     };
     const setVolume = (audio, e) => {
-      audio.volume = e.target.value;
+      //audio.volume = e.target.value;
       store.dispatch("stage/updateAudioStatus", audio);
     };
 
@@ -158,13 +130,14 @@ export default {
   overflow-x: hidden;
   text-overflow: ellipsis;
 }
+
 .audio {
   transition-duration: 0.25s;
   overflow-y: hidden;
   margin-top: -6px;
   height: 86px !important;
 
-  > div {
+  >div {
     width: 100%;
   }
 
@@ -177,31 +150,37 @@ export default {
 
     .play-button {
       height: 36px;
+
       img {
         height: 48px !important;
       }
     }
 
-    > * {
+    >* {
       margin: 4px 8px;
       display: none;
+
       &:first-child {
         display: block;
       }
     }
   }
+
   .sliders {
     display: none !important;
     margin-bottom: 0;
     height: 16px;
+
     .slider {
       margin: 0 4px;
     }
+
     .volume {
       .icon {
         width: 12px;
         margin-top: 4px;
       }
+
       .slider {
         position: absolute;
         top: 8px;
@@ -210,34 +189,43 @@ export default {
         transform: scale(0.75) rotate(270deg) translateX(-100%);
         transform-origin: left top;
       }
+
       .slider::-webkit-slider-thumb {
         background-color: #007011;
         border-color: #F5F5F5;
       }
     }
   }
+
   &.is-playing {
     .sliders {
       display: flex !important;
+
       .addon {
         display: none;
       }
     }
   }
+
   &:hover {
     width: 250px !important;
+
     .sliders {
       display: flex !important;
+
       .addon {
         display: block;
       }
     }
+
     .buttons {
-      > * {
+      >* {
         display: block;
       }
+
       .play-button {
         height: 32px;
+
         img {
           height: 24px !important;
         }
@@ -245,6 +233,7 @@ export default {
     }
   }
 }
+
 .grayscale {
   filter: grayscale(1);
 }

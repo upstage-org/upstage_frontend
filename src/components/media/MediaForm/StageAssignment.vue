@@ -23,7 +23,7 @@ const isAdmin = computed(
     [String(configs.ROLES.ADMIN), String(configs.ROLES.SUPER_ADMIN)].includes(String(whoami.value.role)),
 );
 
-const { result, loading } = useQuery(isAdmin ?
+const { result, loading } = useQuery(isAdmin.value ?
   gql`
   {
     stages(input:{}) {
