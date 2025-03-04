@@ -1,39 +1,20 @@
 <template>
-  <section
-    id="live-stage"
-    class="hero bg-cover is-fullheight"
-    :style="{ 'background-color': backdropColor }"
-  >
-    <div
-      id="board"
-      @dragenter.prevent
-      @dragover.prevent
-      @drop.prevent="drop"
-      :style="{
-        width: stageSize.width + 'px',
-        height: stageSize.height + 'px',
-        transform:
-          'translateX(' +
-          stageSize.left +
-          'px) translateY(' +
-          stageSize.top +
-          'px)',
-      }"
-    >
+  <section id="live-stage" class="hero bg-cover is-fullheight" :style="{ 'background-color': backdropColor }">
+    <div id="board" @dragenter.prevent @dragover.prevent @drop.prevent="drop" :style="{
+      width: stageSize.width + 'px',
+      height: stageSize.height + 'px',
+      transform:
+        'translateX(' +
+        stageSize.left +
+        'px) translateY(' +
+        stageSize.top +
+        'px)',
+    }">
       <Backdrop />
-      <transition-group
-        name="stage-avatars"
-        :css="false"
-        @enter="avatarEnter"
-        @leave="avatarLeave"
-      >
-        <component
-          v-for="object in objects"
-          :id="object.id"
-          :key="object.id"
-          :is="object.drawingId ? 'drawing' : object.type ?? 'avatar'"
-          :object="object"
-        />
+      <transition-group name="stage-avatars" :css="false" @enter="avatarEnter" @leave="avatarLeave">
+        <component v-for="object in objects" :id="object.id" :key="object.id"
+          :is="object.drawingId ? 'drawing' : object.type == 'stream' ? 'avatar' : object.type ?? 'avatar'"
+          :object="object" />
       </transition-group>
     </div>
   </section>
@@ -75,7 +56,6 @@ export default {
     const stageSize = computed(() => store.getters["stage/stageSize"]);
     const config = computed(() => store.getters["stage/config"]);
     const objects = computed(() => store.getters["stage/objects"]);
-
     const drop = (e) => {
       const { object, isReal, nodrop } = JSON.parse(
         e.dataTransfer.getData("text"),
