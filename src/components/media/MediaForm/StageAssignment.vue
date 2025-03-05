@@ -40,7 +40,7 @@ const { result, loading } = useQuery(
 );
 const stages = computed(() => {
   if (result.value?.stages) {
-    return result.value.stages.edges.filter((el: any) => isAdmin.value ? true : el.permission == "editor")
+    return result.value.stages.edges.filter((el: any) => isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
       .map(({ id, name }: any) => ({ key: id, name }));
   }
   return [];
