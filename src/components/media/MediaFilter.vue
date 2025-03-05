@@ -4,7 +4,7 @@ import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
 import gql from "graphql-tag";
 import { StudioGraph, UploadFile } from "models/studio";
-import { inquiryVar } from "apollo";
+import {editingMediaVar, inquiryVar } from "apollo";
 import moment, { Moment } from "moment";
 import configs from "config";
 import { capitalize, getSharedAuth } from "utils/common";
@@ -163,6 +163,9 @@ const composingMode = inject("composingMode");
 const VNodes = (_: any, { attrs }: { attrs: any }) => {
   return attrs.vnodes;
 };
+const onVisibleDropzone = () => {
+  editingMediaVar(undefined);
+}
 </script>
 
 <template>
@@ -175,7 +178,7 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           </template>
           Back to editing
         </a-button>
-        <a-button type="primary" v-else @click="visibleDropzone = true">
+        <a-button type="primary" v-else @click="visibleDropzone = true; onVisibleDropzone();">
           <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
         </a-button>
         <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="name" />

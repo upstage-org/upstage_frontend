@@ -38,7 +38,7 @@ import {
 
 const files = inject<Ref<UploadFile[]>>("files");
 
-const { result: editingMediaResult } = useQuery<{ editingMedia: Media }>(gql`
+const { result: editingMediaResult, refetch  } = useQuery<{ editingMedia: Media }>(gql`
   {
     editingMedia @client
   }
@@ -55,7 +55,7 @@ watch(editingMediaResult, () => {
     const attributes = JSON.parse(editingMedia.description) as MediaAttributes;
     if (files?.value) {
       const frames =
-        attributes.frames && attributes.frames.length
+        attributes?.frames && attributes.frames.length
           ? attributes.frames
           : [editingMedia.fileLocation];
       files.value = frames.map((frame, id) => ({
@@ -69,16 +69,16 @@ watch(editingMediaResult, () => {
       }));
     }
     Object.assign(voice, getDefaultAvatarVoice());
-    if (attributes.voice && attributes.voice.voice) {
+    if (attributes?.voice && attributes.voice.voice) {
       Object.assign(voice, attributes.voice);
     }
     link.url = "";
     link.blank = true;
     link.effect = false;
-    if (attributes.link) {
+    if (attributes?.link) {
       Object.assign(link, attributes.link);
     }
-    note.value = attributes.note ?? "";
+    note.value = attributes?.note ?? "";
     if (editingMedia.stages) {
       stageIds.value = editingMedia.stages.map((stage) => stage.id);
     }
@@ -150,6 +150,7 @@ const handleClose = () => {
     if (editingMediaResult.value) {
       editingMediaVar(undefined);
       files.value = [];
+      refetch();
     } else {
       Modal.confirm({
         title: "Are you sure you want to quit?",
