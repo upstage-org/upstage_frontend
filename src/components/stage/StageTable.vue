@@ -10,9 +10,10 @@ import { useI18n } from "vue-i18n";
 import { capitalize } from "utils/common";
 import { message } from "ant-design-vue";
 import { FetchResult } from "@apollo/client/core";
+import store from "store";
 
 const { t } = useI18n();
-
+const isAdmin = computed(() => store.getters["user/isAdmin"]);
 const enterStage = (stage: Stage) => {
   window.open(`/${stage.fileLocation}`, "_blank");
 };
@@ -293,8 +294,9 @@ onVisibilityUpdated(handleUpdate);
             @change="handleChangeVisibility(record as Stage)" />
         </template>
         <template v-if="column.key === 'actions'">
-          <a-space>
-            <router-link :to="`/stages/stage-management/${record.id}/`">
+          <a-space class="flex" style="justify-content: flex-end;">
+            <router-link v-if="isAdmin || record.permission == 'editor' || record.permission == 'owner'"
+              :to="`/stages/stage-management/${record.id}/`">
               <a-button>
                 <setting-outlined />
                 Manage

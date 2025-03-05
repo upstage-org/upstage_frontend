@@ -4,8 +4,7 @@ import gql from "graphql-tag";
 import { ref, computed, watchEffect, PropType } from "vue";
 import { StudioGraph } from "models/studio";
 import { TransferItem } from "ant-design-vue/lib/transfer";
-import { useStore } from "vuex";
-import configs from "config";
+import store from "store";
 
 const props = defineProps({
   modelValue: {
@@ -15,13 +14,7 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["update:modelValue"]);
-const store = useStore();
-const whoami = computed(() => store.getters["user/whoami"]);
-const isAdmin = computed(
-  () =>
-    whoami.value &&
-    [String(configs.ROLES.ADMIN), String(configs.ROLES.SUPER_ADMIN)].includes(String(whoami.value.role)),
-);
+const isAdmin = computed(() => store.getters["user/isAdmin"]);
 
 const { result, loading } = useQuery(
   gql`
