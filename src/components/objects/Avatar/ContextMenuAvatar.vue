@@ -28,6 +28,34 @@
         <span>{{ $t("add_to_avatar") }}</span>
       </a>
     </template>
+    <div v-if="object.type == 'video'">
+      <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
+        <span class="panel-icon">
+          <i class="fas fa-pause"></i>
+        </span>
+        <span>{{ $t("pause") }}</span>
+      </a>
+      <a v-else class="panel-block" @click="playVideo(slotProps)">
+        <span class="panel-icon">
+          <i class="fas fa-play"></i>
+        </span>
+        <span>{{ $t("play") }}</span>
+      </a>
+      <a class="panel-block" @click="openVolumePopup(slotProps)">
+        <span class="panel-icon">
+          <Icon src="voice-setting.svg" />
+        </span>
+        <span>{{ $t("volumn_setting") }}</span>
+      </a>
+      <a class="panel-block" @click="toggleVideoLoop">
+        <span class="panel-icon">
+          <i v-if="object.loop" class="fas fa-infinity"></i>
+          <b v-else>1</b>
+        </span>
+        <span v-if="object.loop">{{ $t("loop.on") }}</span>
+        <span v-else>{{ $t("loop.off") }}</span>
+      </a>
+    </div>
     <a class="panel-block" @click="bringToFront">
       <span class="panel-icon">
         <Icon src="bring-to-front.svg" />
@@ -62,6 +90,8 @@
       <input class="input anmation-input" type="number" step="0.5" min="0" :value="animationSpeed"
         @input="handleChangeAnimationSpeed" placeholder="seconds" />
     </div>
+
+
     <div class="field has-addons menu-group">
       <p class="control menu-group-title">
         <span class="panel-icon pt-1">
@@ -331,6 +361,38 @@ export default {
       });
     };
 
+    const pauseVideo = () => {
+      store
+        .dispatch("stage/shapeObject", {
+          ...props.object,
+          isPlaying: false,
+        })
+        .then(props.closeMenu);
+    }
+    const playVideo = () => {
+      store
+        .dispatch("stage/shapeObject", {
+          ...props.object,
+          isPlaying: true,
+        })
+        .then(props.closeMenu);
+    }
+    const openVolumePopup = () => {
+      store
+        .dispatch("stage/openSettingPopup", {
+          type: "VolumeParameters",
+        })
+        .then(props.closeMenu);
+    }
+    const toggleVideoLoop = () => {
+      store
+        .dispatch("stage/shapeObject", {
+          ...props.object,
+          loop: !props.object.loop,
+        })
+        .then(props.closeMenu);
+    }
+
     return {
       switchFrame,
       holdAvatar,
@@ -355,7 +417,11 @@ export default {
       openLink,
 
       animationSpeed,
-      handleChangeAnimationSpeed
+      handleChangeAnimationSpeed,
+      pauseVideo,
+      playVideo,
+      openVolumePopup,
+      toggleVideoLoop
     };
   },
 };

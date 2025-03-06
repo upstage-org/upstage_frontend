@@ -200,6 +200,9 @@ export default {
     reloadStreams(state) {
       return state.reloadStreams;
     },
+    activeObject(state) {
+      return state.board.objects.find((o) => o.id == state.activeMovable);
+    },
   },
   mutations: {
     SET_MODEL(state, model) {

@@ -31,8 +31,11 @@
                 : 'normal',
           }" @dragstart.prevent>
             <slot name="render">
-              <video v-if="object.assetType?.name == 'video'" class="the-object-video" :src="object.url" controls
-                autoplay></video>
+              <video v-if="object.assetType?.name == 'video'" class="the-object-video" :src="object.url" ref="video"
+                preload="auto" @ended="object.isPlaying = false" :loop="object.loop"
+                @loadeddata="loadeddata"
+                v-bind:id="'video' + object.id"
+                ></video>
               <Image v-else class="the-object" :src="src" />
             </slot>
           </div>
@@ -72,7 +75,7 @@ export default {
   setup(props) {
     // Dom refs
     const el = ref();
-
+    const video = ref();
     // Vuex store
     const store = useStore();
     const stageSize = computed(() => store.getters["stage/stageSize"]);
@@ -159,6 +162,22 @@ export default {
       }
     };
 
+    const synchronize = () => {
+      if (props.object.isPlaying && video.value) {
+        video.value.play();
+      } else {
+        video.value && video.value.pause();
+      }
+    };
+    watch(
+      () => props.object,
+      () => {
+        synchronize();
+      },
+    );
+    const loadeddata = () => {
+      synchronize();
+    };
     return {
       el,
       print,
@@ -176,6 +195,8 @@ export default {
       isWearing,
       hasLink,
       openLink,
+      loadeddata,
+      video
     };
   },
 };
