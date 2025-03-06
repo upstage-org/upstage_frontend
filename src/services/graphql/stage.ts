@@ -75,6 +75,7 @@ export const sceneFragment = gql`
   fragment sceneFragment on Scene {
     id
     name
+    payload
     scenePreview
   }
 `;
