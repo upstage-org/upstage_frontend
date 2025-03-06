@@ -161,6 +161,9 @@ const columns: ComputedRef<ColumnType<Media>[]> = computed((): ColumnType<Media>
     title: t("copyright_level"),
     dataIndex: "copyrightLevel",
     key: "copyrightLevel",
+    sorter: {
+      multiple: 6,
+    },
   },
   {
     title: t("stages"),
@@ -225,7 +228,7 @@ const handleTableChange = (
         (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple,
     )
     .map(({ columnKey, order }) =>
-      `${columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
+      `${columnKey == 'copyrightLevel' ? 'COPYRIGHT_LEVEL' : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
     );
   Object.assign(tableParams, {
     page: current,
@@ -353,7 +356,7 @@ const filterTag = (tag: string) => {
             configs.MEDIA_COPYRIGHT_LEVELS.find(
               (l) => l.value === record.copyrightLevel,
             )?.name
-            }}</span>
+          }}</span>
         </template>
         <template v-if="column.key === 'created_on'">
           <d-date :value="text" />
@@ -383,7 +386,7 @@ const filterTag = (tag: string) => {
 
                 <template #icon>
                   <DeleteOutlined />
-                </template> 
+                </template>
               </a-button>
             </a-popconfirm>
           </a-space>
