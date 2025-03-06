@@ -1,15 +1,7 @@
 <template>
-  <Image
-    v-if="src"
-    class="background-image"
-    :src="src"
-    :style="{
-      opacity: backgroundOpacity,
-    }"
-    :transition="transitionDuration"
-    :no-fallback="true"
-    fit="cover"
-  />
+  <Image v-if="src" class="background-image" :src="src" :style="{
+    opacity: backgroundOpacity,
+  }" :transition="transitionDuration" :no-fallback="true" fit="cover" />
 </template>
 
 <script>
@@ -61,7 +53,7 @@ export default {
               nextFrame = 0;
             }
             frameAnimation.currentFrame = frames[nextFrame];
-          }, 100 / speed);
+          }, parseFloat(speed || 0) * 1000);
         }
       },
       { immediate: true },

@@ -71,12 +71,12 @@
         <p class="control menu-group-item is-fullwidth">
           <input
             class="slider is-fullwidth is-primary mt-0"
-            step="0.01"
+            step="0.5"
             min="0"
-            max="1"
             :value="currentBackground.speed"
-            @change="changeBackdropSpeed"
-            type="range"
+            @input="changeBackdropSpeed"
+            placeholder="seconds"
+            type="number"
           />
         </p>
       </div>

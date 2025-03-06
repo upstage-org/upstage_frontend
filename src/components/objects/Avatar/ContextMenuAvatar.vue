@@ -52,6 +52,16 @@
       </span>
       <span>{{ $t("voice_setting") }}</span>
     </a>
+    <div v-if="object.multi" class="field has-addons menu-group">
+      <span class="panel-block">
+        <span class="panel-icon">
+          <Icon src="animation-slider.svg" />
+        </span>
+        <span>{{ "Animation speed" }}</span>
+      </span>
+      <input class="input anmation-input" type="number" step="0.5" min="0" :value="animationSpeed"
+        @input="handleChangeAnimationSpeed" placeholder="seconds" />
+    </div>
     <div class="field has-addons menu-group">
       <p class="control menu-group-title">
         <span class="panel-icon pt-1">
@@ -66,17 +76,6 @@
           }" @click="changeSliderMode('opacity')">
             <span class="mt-1">
               <Icon src="opacity-slider.svg" style="width: 16px; height: 16px;" />
-            </span>
-          </button>
-        </a-tooltip>
-      </p>
-      <p v-if="object.multi" class="control menu-group-item">
-        <a-tooltip title="Animation speed(seconds)">
-          <button class="button is-light" :class="{
-            'has-background-warning-light': sliderMode === 'animation',
-          }" @click="changeSliderMode('animation')">
-            <span class="mt-1">
-              <Icon src="animation-slider.svg" style="width: 16px; height: 16px;" />
             </span>
           </button>
         </a-tooltip>
@@ -322,6 +321,16 @@ export default {
       window.open(url, blank ? "_blank" : "_self").focus();
     };
 
+    const animationSpeed = computed(() => {
+      return props.object.autoplayFrames || "";
+    });
+    const handleChangeAnimationSpeed = (e) => {
+      store.dispatch("stage/shapeObject", {
+        ...props.object,
+        autoplayFrames: e.target.value,
+      });
+    };
+
     return {
       switchFrame,
       holdAvatar,
@@ -344,6 +353,9 @@ export default {
       flipVertical,
       hasLink,
       openLink,
+
+      animationSpeed,
+      handleChangeAnimationSpeed
     };
   },
 };
@@ -384,8 +396,17 @@ export default {
       flex: auto;
     }
 
-    button{
+    button {
       width: 100%;
+    }
+
+    .anmation-input {
+      max-width: 85px;
+      background-color: white;
+      margin: 4px 4px 4px auto;
+      padding-top: 2px;
+      padding-bottom: 2px;
+      height: 28px;
     }
   }
 }

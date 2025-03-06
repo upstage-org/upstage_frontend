@@ -109,7 +109,7 @@ export default {
         () => {
           const { autoplayFrames, frames, src } = props.object;
           clearInterval(frameAnimation.interval);
-          if (autoplayFrames && autoplayFrames > 0) {
+          if (autoplayFrames) {
             frameAnimation.currentFrame = src;
             frameAnimation.interval = setInterval(() => {
               let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
@@ -118,8 +118,6 @@ export default {
               }
               frameAnimation.currentFrame = frames[nextFrame];
             }, parseFloat(autoplayFrames) * 1000);
-          } else {
-            frameAnimation.currentFrame = src;
           }
         },
         {

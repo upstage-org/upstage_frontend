@@ -1,9 +1,5 @@
 <template>
-  <input v-if="sliderMode === 'animation'" class="input animation-input" type="number" v-show="showSlider" step="0.5"
-    min="0" :value="value" @input="handleChange" 
-    @keydown.stop="keepActive" @keyup.stop="keepActive"
-    @keypress.stop="keepActive"/>
-  <input v-else class="opacity-slider slider is-fullwidth" :class="{
+  <input class="opacity-slider slider is-fullwidth" :class="{
     'is-primary': sliderMode === 'opacity',
     'is-warning': sliderMode === 'volume',
     'is-danger': sliderMode === 'speed',
@@ -27,8 +23,6 @@ export default {
     const maxMoveSpeed = 1000;
     const value = computed(() => {
       switch (props.sliderMode) {
-        case "animation":
-          return props.object.autoplayFrames || "";
         case "speed":
           return props.object.moveSpeed == 0
             ? 0
@@ -44,16 +38,6 @@ export default {
       store.dispatch("stage/shapeObject", {
         ...props.object,
         opacity: e.target.value,
-      });
-    };
-
-    const calcAutoplayFrames = (e) =>
-      e.target.value == 0 ? 0 : maxFrameSpeed / e.target.value;
-
-    const sendChangeFrameAnimationSpeed = (e) => {
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        autoplayFrames: e.target.value,
       });
     };
 
@@ -84,9 +68,6 @@ export default {
         case "opacity":
           sendChangeOpacity(e);
           break;
-        case "animation":
-          sendChangeFrameAnimationSpeed(e);
-          break;
         case "speed":
           sendChangeMoveSpeed(e);
         case "volume":
@@ -116,13 +97,5 @@ export default {
   position: absolute;
   transform: rotate(270deg) translateX(-100%);
   transform-origin: left;
-}
-
-.animation-input {
-  position: absolute;
-  width: 68px;
-  right: 100%;
-  top: 0;
-  padding: 4px 10px;
 }
 </style>
