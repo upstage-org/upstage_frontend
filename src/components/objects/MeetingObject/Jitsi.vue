@@ -8,11 +8,7 @@
         }" @timeupdate="timeupdate">
           Please click on Reload Stream button.
         </video>
-        <audio autoplay ref="audioEl" :muted="localMuted"></audio>
-        <button v-if="isPlayer" class="button is-small mute-icon clickable" @mousedown="toggleMuted">
-          <i v-if="localMuted" class="fas fa-volume-mute has-text-danger"></i>
-          <i v-else class="fas fa-volume-up has-text-primary"></i>
-        </button>
+        <audio autoplay ref="audioEl" :muted="localMuted" v-bind:id="'video' + object.id"></audio>
       </template>
     </template>
     <template #menu="slotProps">
@@ -33,6 +29,19 @@
           </button>
         </p>
       </div>
+      <a class="panel-block" @click="toggleMuted">
+        <span class="panel-icon">
+          <i v-if="localMuted" class="fas fa-volume-mute has-text-danger"></i>
+          <i v-else class="fas fa-volume-up has-text-primary"></i>
+        </span>
+        <span>{{ localMuted ? "UnMute" : "Mute" }}</span>
+      </a>
+      <a class="panel-block" @click="openVolumePopup(slotProps)">
+        <span class="panel-icon">
+          <Icon src="voice-setting.svg" />
+        </span>
+        <span>{{ $t("volumn_setting") }}</span>
+      </a>
       <AvatarContextMenu :object="object" v-bind="slotProps" />
     </template>
   </Object>
@@ -47,7 +56,7 @@ import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
 
 export default {
   components: { Object, Loading, AvatarContextMenu },
-  props: ["object"],
+  props: ["object", "closeMenu"],
   setup: (props) => {
     const store = useStore();
     const videoEl = ref();
@@ -131,20 +140,10 @@ export default {
     };
 
     watch(
-      volume,
-      (vol) => {
-        if (vol && audioEl.value) {
-          audioEl.value.volume = vol;
-        }
-      },
-      { immediate: true },
-    );
-
-    watch(
       audioEl,
       (audio) => {
         if (audio) {
-          audio.volume = volume.value;
+          audio.volume = (volume.value || 0) / 100;
         }
       },
       { immediate: true },
@@ -154,6 +153,14 @@ export default {
 
     const timeupdate = (e) => {
       interval && clearInterval(interval);
+    }
+
+    const openVolumePopup = (slotProps) => {
+      store
+        .dispatch("stage/openSettingPopup", {
+          type: "VolumeParameters",
+        })
+        .then(slotProps.closeMenu);
     }
     return {
       videoTrack,
@@ -166,7 +173,8 @@ export default {
       isPlayer,
 
       timeupdate,
-      loadTrack
+      loadTrack,
+      openVolumePopup
     };
   },
 };
