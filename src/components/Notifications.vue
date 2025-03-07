@@ -7,7 +7,7 @@ import { StudioGraph } from "models/studio";
 import { absolutePath } from "utils/common";
 import { useConfirmPermission } from "components/media/MediaForm/composable";
 
-const { result, loading, refetch } = useQuery<StudioGraph>(gql`
+const { result, loading, refetch } = useQuery(gql`
   query Notifications {
     notifications {
       type
@@ -46,7 +46,7 @@ const refresh = () => refetch();
           :key="i"
           class="px-4"
         >
-          <template v-if="notification.type === 'MEDIA_USAGE'">
+          <template v-if="notification.type === 1">
             <a-list-item-meta>
               <template #avatar>
                 <a-avatar
