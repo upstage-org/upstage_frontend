@@ -19,7 +19,7 @@ export default {
       () => store.state.stage.background?.opacity ?? 1,
     );
     const transitionDuration = computed(
-      () => 100 / store.state.stage.background?.speed,
+      () => (store.state.stage.background?.speed || 0) * 1000,
     );
 
     const frameAnimation = reactive({
