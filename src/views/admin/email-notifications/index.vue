@@ -16,6 +16,8 @@ import { useI18n } from "vue-i18n";
 import Header from "components/Header.vue";
 import { userGraph, configGraph } from 'services/graphql';
 import { ROLES } from "utils/constants";
+import { useQuery } from "@vue/apollo-composable";
+import gql from "graphql-tag";
 
 const { t } = useI18n();
 
@@ -52,18 +54,26 @@ const addCustomRecipient = () => {
   }
 };
 
-const {
-  state: receivers,
-  isReady,
-  execute,
-} = useAsyncState(
-  () =>
-    userGraph.adminPlayers(),
-  { adminPlayers: null },
-  { resetOnExecute: false },
+const { result: receivers, loading: isReady } = useQuery(
+  gql`
+      {
+        adminPlayers {
+          totalCount
+          edges {
+            id
+            username
+            email
+            role
+            firstName
+            lastName
+            displayName
+          }
+        }
+      }
+    `,
+  {},
+  { notifyOnNetworkStatusChange: true },
 );
-
-watch(filterRole, () => execute(0));
 
 const dataSource = computed<TransferItem[]>(() => {
   return customRecipients.value
@@ -72,7 +82,7 @@ const dataSource = computed<TransferItem[]>(() => {
       title: email,
     }))
     .concat(
-      receivers.value.adminPlayers?.edges.filter((user: any) => String(user.role) == String(ROLES.ADMIN)).map((user: any, i: any) => ({
+      receivers.value?.adminPlayers?.edges.filter((user: any) => filterRole.value ? String(user.role) == String(filterRole.value) : true).map((user: any, i: any) => ({
         key: user?.email ?? `${i}`,
         title: user
           ? `${displayName(user)} <${user.email}>`
@@ -176,7 +186,7 @@ const { proceed, loading } = useLoading(
             </a-button>
           </a-space>
         </template>
-        <a-spin :spinning="!isReady">
+        <a-spin :spinning="isReady">
           <a-transfer :locale="{
             itemUnit: 'recipient',
             itemsUnit: 'recipients',
@@ -202,7 +212,7 @@ const { proceed, loading } = useLoading(
                     .concat(checked ? [] : (item?.key as string));
                   e.stopPropagation();
                 }
-                  ">
+                ">
                   <template #checkedChildren>
                     <span class="text-[8px] leading-none">BCC</span>
                   </template>
