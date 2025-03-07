@@ -10,13 +10,7 @@
         <div class="content">
           <div class="field">
             <p class="control has-icons-left">
-              <input
-                name="username"
-                class="input"
-                v-model="username"
-                placeholder="Username"
-                required
-              />
+              <input name="username" class="input" v-model="username" placeholder="Username" required />
               <span class="icon is-small is-left">
                 <i class="fas fa-user"></i>
               </span>
@@ -24,27 +18,15 @@
           </div>
           <div class="field">
             <p class="control has-icons-left has-icons-right">
-              <input
-                name="password"
-                class="input"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="Password"
-                v-model="password"
-                required
-              />
+              <input name="password" class="input" :type="showPassword ? 'text' : 'password'" placeholder="Password"
+                v-model="password" required />
               <span class="icon is-small is-left">
                 <i class="fas fa-lock"></i>
               </span>
-              <a
-                class="icon is-small is-right"
-                style="pointer-events: all"
-                @click="toggleShowPassword"
-              >
+              <a class="icon is-small is-right" style="pointer-events: all" @click="toggleShowPassword">
                 <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
               </a>
-              <a class="help has-text-right" @click="resetMode = true"
-                >Forgot password?</a
-              >
+              <a class="help has-text-right" @click="resetMode = true">Forgot password?</a>
             </p>
             <p>
               {{ $t("tos.login") }}
@@ -54,11 +36,8 @@
         </div>
       </div>
       <footer class="card-footer">
-        <button
-          type="submit"
-          class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }"
-        >
+        <button type="submit" class="card-footer-item is-white button has-text-primary"
+          :class="{ 'is-loading': loading }">
           <span>{{ $t("login") }}</span>
           <span class="icon is-medium">
             <i class="fas fa-chevron-right"></i>
@@ -80,12 +59,7 @@
           </p>
           <div class="field">
             <p class="control has-icons-left">
-              <input
-                class="input"
-                v-model="username"
-                placeholder="Username or email"
-                required
-              />
+              <input class="input" v-model="username" placeholder="Username or email" required />
               <span class="icon is-small is-left">
                 <i class="fas fa-user"></i>
               </span>
@@ -98,15 +72,8 @@
           <p>Please enter the OTP code that we've sent to your email:</p>
           <div class="field">
             <p class="control has-icons-left">
-              <input
-                name="otp"
-                autocomplete="one-time-code"
-                class="input"
-                v-model="otp"
-                placeholder="XXXXXX"
-                required
-                maxlength="6"
-              />
+              <input name="otp" autocomplete="one-time-code" class="input" v-model="otp" placeholder="XXXXXX" required
+                maxlength="6" />
               <span class="icon is-small is-left">
                 <i class="fas fa-key"></i>
               </span>
@@ -119,76 +86,44 @@
           <p>Please enter your new password:</p>
           <div class="field">
             <p class="control has-icons-left has-icons-right">
-              <input
-                class="input"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="Password"
-                v-model="password"
-                required
-              />
+              <input class="input" :type="showPassword ? 'text' : 'password'" placeholder="Password" v-model="password"
+                required />
               <span class="icon is-small is-left">
                 <i class="fas fa-lock"></i>
               </span>
-              <a
-                class="icon is-small is-right"
-                style="pointer-events: all"
-                @click="toggleShowPassword"
-              >
+              <a class="icon is-small is-right" style="pointer-events: all" @click="toggleShowPassword">
                 <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
               </a>
             </p>
           </div>
           <div class="field">
             <p class="control has-icons-left has-icons-right">
-              <input
-                class="input"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="Confirm Password"
-                v-model="passwordConfirm"
-                required
-              />
+              <input class="input" :type="showPassword ? 'text' : 'password'" placeholder="Confirm Password"
+                v-model="passwordConfirm" required />
               <span class="icon is-small is-left">
                 <i class="fas fa-lock"></i>
               </span>
-              <a
-                class="icon is-small is-right"
-                style="pointer-events: all"
-                @click="toggleShowPassword"
-              >
+              <a class="icon is-small is-right" style="pointer-events: all" @click="toggleShowPassword">
                 <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
               </a>
-              <span
-                class="help is-danger"
-                v-if="
-                  password && passwordConfirm && password !== passwordConfirm
-                "
-                >Confirm password mismatch!</span
-              >
+              <span class="help is-danger" v-if="
+                password && passwordConfirm && password !== passwordConfirm
+              ">Confirm password mismatch!</span>
             </p>
           </div>
         </div>
       </div>
       <footer class="card-footer">
-        <button
-          v-if="resetStep < 3"
-          type="submit"
-          class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }"
-        >
+        <button v-if="resetStep < 3" type="submit" class="card-footer-item is-white button has-text-primary"
+          :class="{ 'is-loading': loading }">
           <span>{{ $t("next") }}</span>
           <span class="icon is-medium">
             <i class="fas fa-chevron-right"></i>
           </span>
         </button>
-        <button
-          v-else
-          type="submit"
-          class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }"
-          :disabled="
-            !password || !passwordConfirm || password !== passwordConfirm
-          "
-        >
+        <button v-else type="submit" class="card-footer-item is-white button has-text-primary"
+          :class="{ 'is-loading': loading }" :disabled="!password || !passwordConfirm || password !== passwordConfirm
+            ">
           <span>{{ $t("finish") }}</span>
           <span class="icon is-medium">
             <i class="fas fa-chevron-right"></i>
@@ -241,7 +176,7 @@ const requestPasswordReset = async () => {
   await step1(
     (res) => {
       message.success(res.requestPasswordReset.message);
-      username.value = res.requestPasswordReset.username;
+      //username.value = res.requestPasswordReset.username;
       resetStep.value = 2;
     },
     {
@@ -261,8 +196,8 @@ const verifyOTP = async () => {
       resetStep.value = 3;
     },
     {
-      otp: otp.value.trim(),
-      username: username.value.trim(),
+      token: otp.value.trim(),
+      email: username.value.trim(),
     },
   );
   loading.value = false;
@@ -274,13 +209,13 @@ const processPasswordReset = async () => {
   loading.value = true;
   await step3(
     (res) => {
-      message.success(res.passwordReset.message);
+      message.success(res.resetPassword.message);
       resetStep.value = 1;
       resetMode.value = false;
     },
     {
-      otp: otp.value.trim(),
-      username: username.value.trim(),
+      token: otp.value.trim(),
+      email: username.value.trim(),
       password: password.value,
     },
   );

@@ -203,8 +203,8 @@ export default {
   verifyPasswordReset: (variables) =>
     studioClient.request(
       gql`
-        mutation verifyPasswordReset($username: String, $otp: String) {
-          verifyPasswordReset(username: $username, otp: $otp) {
+        mutation verifyPasswordReset($email: String!, $token: String!) {
+          verifyPasswordReset(input: { email: $email, token: $token} ) {
             message
           }
         }
@@ -214,12 +214,12 @@ export default {
   passwordReset: (variables) =>
     studioClient.request(
       gql`
-        mutation PasswordReset(
-          $username: String
-          $otp: String
+        mutation resetPassword(
+          $email: String!, 
+          $token: String!
           $password: String
         ) {
-          passwordReset(username: $username, otp: $otp, password: $password) {
+          resetPassword(input: {email: $email, token: $token, password: $password}) {
             message
           }
         }
