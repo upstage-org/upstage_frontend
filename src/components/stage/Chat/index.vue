@@ -259,7 +259,7 @@ export default {
 
   &.dark {
     background-color: #303030;
-    color: #dddddd;
+    color: #ffffff;
 
     .card-footer {
       border-top: 0.5px solid black;
@@ -270,11 +270,11 @@ export default {
     :deep(.textarea) {
       background-color: #303030 !important;
       border-color: #303030;
-      color: #dddddd;
+      color: #fff;
     }
 
     :deep(.textarea::placeholder) {
-      color: #8c939a;
+      color: #ddd;
     }
 
     :deep(img) {
@@ -282,7 +282,7 @@ export default {
     }
 
     :deep(.guest .tag) {
-      color: #8c939a;
+      color: #fff;
     }
 
     .unread {
