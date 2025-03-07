@@ -391,18 +391,18 @@ const filterTag = (tag: string) => {
             </a-popconfirm>
           </a-space>
           <template v-else>
-            <a-space v-if="record.privilege === 'NONE'">
+            <a-space v-if="record.privilege === 0">
               <a-tooltip>
                 <template #title>You don't have permission to access this media
                 </template>
                 🙅‍♀️🙅‍♂️
               </a-tooltip>
             </a-space>
-            <a-space v-else-if="record.privilege === 'REQUIRE_APPROVAL'">
+            <a-space v-else-if="record.privilege === 4">
               <RequestPermission v-if="record.copyrightLevel === 2" :media="record as Media" />
               <RequestAcknowledge v-else :media="record as Media" />
             </a-space>
-            <a-space v-else-if="record.privilege === 'PENDING_APPROVAL'" direction="vertical" class="leading-4">
+            <a-space v-else-if="record.privilege === 3" direction="vertical" class="leading-4">
               <b>✅ Request sent!</b>
               <small>Please wait for the media owner's approval</small>
             </a-space>

@@ -130,7 +130,7 @@ export const useConfirmPermission = () => {
     },
     { id: string; approved: boolean }
   >(gql`
-    mutation ConfirmPermission($id: ID, $approved: Boolean) {
+    mutation ConfirmPermission($id: ID!, $approved: Boolean) {
       confirmPermission(id: $id, approved: $approved) {
         success
         message
@@ -148,7 +148,7 @@ export const useRequestPermission = () => {
     { requestPermission: { success: boolean; message: string } },
     { assetId: string; note?: string }
   >(gql`
-    mutation RequestPermission($assetId: ID, $note: String) {
+    mutation RequestPermission($assetId: ID!, $note: String) {
       requestPermission(assetId: $assetId, note: $note) {
         success
       }
