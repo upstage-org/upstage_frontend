@@ -41,6 +41,12 @@
         </span>
         <span>{{ $t("play") }}</span>
       </a>
+      <a class="panel-block" @click="restartVideo">
+        <span class="panel-icon">
+          <i class="fas fa-sync"></i>
+        </span>
+        <span>{{ $t("restart") }}</span>
+      </a>
       <a class="panel-block" @click="openVolumePopup(slotProps)">
         <span class="panel-icon">
           <Icon src="voice-setting.svg" />
@@ -392,7 +398,14 @@ export default {
         })
         .then(props.closeMenu);
     }
-
+    const restartVideo = () => {
+      store
+        .dispatch("stage/shapeObject", {
+          ...props.object,
+          replayed: (props.object.replayed || 0) + 1,
+        })
+        .then(props.closeMenu);
+    }
     return {
       switchFrame,
       holdAvatar,
@@ -421,7 +434,8 @@ export default {
       pauseVideo,
       playVideo,
       openVolumePopup,
-      toggleVideoLoop
+      toggleVideoLoop,
+      restartVideo
     };
   },
 };

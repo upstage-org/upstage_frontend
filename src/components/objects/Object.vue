@@ -175,6 +175,12 @@ export default {
         synchronize();
       },
     );
+    watch(
+      () => props.object.replayed,
+      () => {
+        video.value.currentTime = 0;
+      },
+    );
     const loadeddata = () => {
       synchronize();
     };
