@@ -29,7 +29,7 @@
       <Modal>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="chat.svg" />
+            <Icon src="chat.svg" style="width: 16px; height: 16px;"/>
           </button>
         </template>
         <template #header>
@@ -41,14 +41,14 @@
         </template>
       </Modal>
       <button class="button is-light" @click="downloadChatLog('public', item)">
-        <Icon src="download.svg" />
+        <Icon src="download.svg" style="width: 16px; height: 16px;"/>
       </button>
     </template>
     <template #private-chat="{ item }">
       <Modal>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="chat.svg" />
+            <Icon src="chat.svg" style="width: 16px; height: 16px;"/>
           </button>
         </template>
         <template #header>
@@ -60,7 +60,7 @@
         </template>
       </Modal>
       <button class="button is-light" @click="downloadChatLog('private', item)">
-        <Icon src="download.svg" />
+        <Icon src="download.svg" style="width: 16px; height: 16px;"/>
       </button>
     </template>
     <template #replay="{ item }">
@@ -182,7 +182,7 @@ export default {
         (performances || []).forEach((p) => {
           p.messages = chats
             .filter((c) => c.performanceId === p.id)
-            .map((c) => JSON.parse(c.payload));
+            .map((c) => c.payload);
           res.push(p);
         });
       }
