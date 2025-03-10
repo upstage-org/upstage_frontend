@@ -28,20 +28,16 @@ interface Pagination {
   showSizeChanger: boolean;
   total: number;
 }
-interface SortQueryParams {
-  sortByCreated?: boolean;
-}
 
 export default {
   setup() {
     const { t } = useI18n();
     const router = useRouter();
-    const query: SortQueryParams = router.currentRoute.value.query;
 
     const tableParams = reactive({
       page: 1,
       limit: 10,
-      sort: [query.sortByCreated ? "CREATED_ON_DESC" : "CREATED_ON_ASC"],
+      sort: ["CREATED_ON_DESC"],
     });
     const { result: inquiryResult } = useQuery(gql`
       {
@@ -196,7 +192,7 @@ export default {
             value: opt.text,
           });
         },
-        defaultSortOrder: query.sortByCreated ? "descend" : "ascend",
+        defaultSortOrder: "descend",
       },
       {
         title: t("status"),
