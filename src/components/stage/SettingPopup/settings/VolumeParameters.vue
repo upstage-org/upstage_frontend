@@ -5,8 +5,7 @@
   <div class="card-content voice-parameters">
     <div class="content">
       <HorizontalField title="Volume">
-        <input v-model="parameters.volume" class="slider is-fullwidth is-primary m-0" type="range" min="0" max="100"
-          step="1" />
+        <a-slider v-model:value="parameters.volume" :min="0" :max="100" />
       </HorizontalField>
       <SaveButton @click="saveVolume" :loading="loading" />
     </div>

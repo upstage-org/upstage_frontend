@@ -865,6 +865,12 @@ export default {
       };
       if (object.type === "video") {
         object.hostId = state.session;
+        try {
+          const description = JSON.parse(data.description);
+          if (description.w && description.h) object.h = description.h * 100 / description.w;
+        } catch (e) {
+
+        }
       }
       commit("PUSH_OBJECT", serializeObject(object));
       if (object.type === "avatar") {
