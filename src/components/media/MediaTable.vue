@@ -363,7 +363,7 @@ const filterTag = (tag: string) => {
           <d-date :value="text" />
         </template>
         <template v-if="column.key === 'actions'">
-          <a-space v-if="record.dormant" direction="vertical" class="leading-4">
+          <a-space v-if="record.dormant" direction="vertical" class="leading-4" style="color: #F2A70B;">
             ⚠ DORMANT
           </a-space>
           <a-space v-else-if="composingMode">

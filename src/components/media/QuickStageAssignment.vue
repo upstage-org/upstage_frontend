@@ -19,7 +19,7 @@ const isAdmin = computed(() => store.getters["user/isAdmin"]);
 const note = computed(() => {
   try {
     const description = JSON.parse(props.media.description);
-    return description?.note;
+    return description?.note || "";
   } catch (err) {
     return ""
   }
@@ -105,7 +105,7 @@ const handleOk = async () => {
       &nbsp;&nbsp;&nbsp;
       <h4 style="color: black;">{{ media.name }}</h4>
     </div>
-    <h3 style="color: black; margin-top: 20px;">{{ media.copyrightLevel == 1 && note }}</h3>
+    <h3 style="color: black; margin-top: 20px;">{{ media.copyrightLevel == 1 ? note : "" }}</h3>
     <div class="flex">
       <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags" style="width: 100%;"
         placeholder="Stage name" :loading="loading" v-model:value="stages" :options="dataSource
