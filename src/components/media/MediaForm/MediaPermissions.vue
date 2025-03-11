@@ -131,7 +131,7 @@ watch(isAdmin, console.log);
           <b>
             <DName :user="request.user" />
           </b>
-          acknowledge of using this media.
+          acknowledges use of this media.
           <small class="text-gray-500">
             <d-date :value="request.createdOn" />
           </small>
