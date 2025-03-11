@@ -87,6 +87,7 @@ const { result, loading, fetchMore, refetch } = useQuery(
           size
           description
           fileLocation
+          dormant
           assetType {
             name
           }
@@ -362,7 +363,10 @@ const filterTag = (tag: string) => {
           <d-date :value="text" />
         </template>
         <template v-if="column.key === 'actions'">
-          <a-space v-if="composingMode">
+          <a-space v-if="record.dormant" direction="vertical" class="leading-4">
+            ⚠ DORMANT
+          </a-space>
+          <a-space v-else-if="composingMode">
             <a-button type="primary" @click="addFrameToEditingMedia(record as Media)">
               <DoubleRightOutlined />
               Append frames
