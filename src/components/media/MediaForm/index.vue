@@ -91,7 +91,7 @@ watch(editingMediaResult, () => {
 const name = ref("");
 const type = ref("avatar");
 const tags = ref<string[]>([]);
-const stageIds = ref<number[]>([]);
+const stageIds = ref<string[]>([]);
 const userIds = ref<number[]>([]);
 const note = ref<string>("");
 const mediaName = computed(() => {
