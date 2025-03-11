@@ -119,6 +119,11 @@ watch(isAdmin, console.log);
         </span>
       </a-select-option>
     </a-select>
+    <a-tooltip title="Notes">
+      <a-textarea
+        placeholder="Add notes regarding acknowledgement, credits and permissions for other players who may want to use this media."
+        :value="note" @change="$emit('update:note', $event.target.value)"></a-textarea>
+    </a-tooltip>
     <template v-if="copyrightLevel === 1">
       <a-alert show-icon v-for="request in media?.permissions" :key="request.id" class="bg-white">
         <template #icon>✅</template>
@@ -169,10 +174,6 @@ watch(isAdmin, console.log);
             : []
           " show-search :filter-option="filterOption" :render="renderItem" />
     </template>
-    <a-tooltip title="Notes">
-      <a-textarea
-        placeholder="You can put any notes here, like what the image is of, when or where taken, the actual copyright owner,..."
-        :value="note" @change="$emit('update:note', $event.target.value)"></a-textarea>
-    </a-tooltip>
+    
   </a-space>
 </template>
