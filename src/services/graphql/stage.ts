@@ -529,11 +529,11 @@ export default {
     studioClient.request(
       gql`
         mutation updatePerformance(
-          $id: Int!
-          $name: String
+          $id: ID!
+          $name: String!
           $description: String
         ) {
-          updatePerformance(id: $id, name: $name, description: $description) {
+          updatePerformance(input: { id: $id, name: $name, description: $description }) {
             success
           }
         }

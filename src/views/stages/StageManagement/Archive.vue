@@ -80,14 +80,14 @@
         </template>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="edit.svg" />
+            <Icon src="edit.svg" style="width: 16px; height: 16px;"/>
           </button>
         </template>
       </CustomConfirm>
       <CustomConfirm @confirm="(complete) => deletePerformance(item, complete)" :loading="deleting">
         <template #trigger>
           <button class="button is-light is-danger">
-            <Icon src="delete.svg" />
+            <Icon src="delete.svg" style="width: 16px; height: 16px;"/>
           </button>
         </template>
         <div class="has-text-centered">
