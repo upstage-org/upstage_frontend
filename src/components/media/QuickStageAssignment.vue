@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 import gql from "graphql-tag";
 import { computed, inject, PropType, ref } from "vue";
-import { Media, Stage } from "models/studio";
+import { Media, Stage, AssignedStage } from "models/studio";
 import store from "store";
 import MediaPreview from "./MediaPreview.vue";
 
@@ -13,7 +13,7 @@ const props = defineProps({
     required: true,
   },
 });
-const stages = ref([]);
+const stages = ref<string[]>([]);
 const visible = ref(false);
 const isAdmin = computed(() => store.getters["user/isAdmin"]);
 const note = computed(() => {
@@ -52,10 +52,13 @@ const { result, loading } = useQuery(
 
 const dataSource = computed(() => {
   if (result.value) {
-    return result.value.stages.edges
-      .filter((el: any) => {
-        return (isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner")) && !props.media.stages.some((s) => s.id === el.id)
-      });
+    const options =
+      result.value.stages.edges
+        .filter((el: any) => {
+          return isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner")
+        });
+    stages.value = props.media.stages.filter(el => options.find((item: AssignedStage) => item.id == el.id)).map((el: AssignedStage) => el.id)
+    return options;
   }
   return [];
 });
@@ -96,8 +99,7 @@ const handleOk = async () => {
     <plus-circle-outlined />Assign to stage
   </a-button>
   <a-modal v-model:visible="visible" class="custom-class" style="color: red"
-    title="Assign this media to one of your stages" :width="600" @ok="handleOk"
-    :okButtonProps="{ disabled: stages.length <= 0 }">
+    title="Assign this media to one of your stages" :width="600" ok-text="Save" @ok="handleOk">
     <div class="flex" style="align-items: center; justify-content: flex-start;">
       <div style="max-width: 350px;">
         <MediaPreview v-if="media.assetType" :media="media as Media" />

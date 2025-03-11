@@ -75,7 +75,7 @@ export interface Tag {
 }
 
 export interface AssignedStage {
-  id: number;
+  id: string;
   name: string;
   url: string;
 }
