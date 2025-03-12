@@ -77,10 +77,11 @@ export default {
   saveConfig: (name, value) =>
     studioClient.request(
       gql`
-        mutation SaveConfig($name: String!, $value: String!) {
+        mutation SaveConfig($name: String!, $value: String!, $enabled: Boolean) {
           saveConfig(input: {
           name: $name
           value: $value
+          enabled: $enabled
         }) {
             id
             name
@@ -88,7 +89,7 @@ export default {
           }
         }
       `,
-      { name, value },
+      { name, value: String(value), ...typeof value == "boolean" ? { enabled: value } : {} },
     ),
   sendEmail: (variables) =>
     studioClient.request(

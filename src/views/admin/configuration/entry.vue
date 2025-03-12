@@ -19,7 +19,7 @@ const props = defineProps<{
 const editing = ref(false);
 const value = ref(props.defaultValue);
 
-const { loading, proceed } = useLoading(async () => configGraph.saveConfig(props.name, !value.value ? "" : String(value.value)));
+const { loading, proceed } = useLoading(async () => configGraph.saveConfig(props.name, !value.value ? "" : value.value));
 
 const save = async () => {
   editing.value = false;
