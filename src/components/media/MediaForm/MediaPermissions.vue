@@ -16,7 +16,7 @@ const props = defineProps({
     default: 0,
   },
   users: {
-    type: Array as PropType<number[]>,
+    type: Array as PropType<string[]>,
     default: [],
   },
   media: Object as PropType<Media>,

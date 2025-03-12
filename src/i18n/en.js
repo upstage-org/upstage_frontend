@@ -159,7 +159,7 @@ export default {
   enter_as_audience: "Enter as Audience",
   player_login: "Player Login",
   approve: "Approve",
-  reject: "Reject",
+  reject: "Deny",
   multiframes: "Multiframes",
   no_size: "No size",
   tos: {

@@ -25,7 +25,7 @@ interface SaveMediaMutationVariables {
   copyrightLevel: CopyrightLevel;
   owner: string;
   stageIds: string[];
-  userIds: number[];
+  userIds: string[];
   tags: string[];
   w: number;
   h: number;

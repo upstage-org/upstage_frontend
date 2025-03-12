@@ -84,7 +84,7 @@ watch(editingMediaResult, () => {
     }
     userIds.value = editingMedia.permissions
       .filter((permission) => permission.approved)
-      .map((permission) => permission.userId);
+      .map((permission) => String(permission.userId));
   }
 });
 
@@ -92,7 +92,7 @@ const name = ref("");
 const type = ref("avatar");
 const tags = ref<string[]>([]);
 const stageIds = ref<string[]>([]);
-const userIds = ref<number[]>([]);
+const userIds = ref<string[]>([]);
 const note = ref<string>("");
 const mediaName = computed(() => {
   if (name.value) {
