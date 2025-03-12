@@ -1,12 +1,11 @@
 // @ts-nocheck
 import { gql } from "graphql-request";
 import { createClient } from "./graphql";
-
-const client = createClient("payment_graphql");
+import { studioClient } from '../graphql';
 
 export default {
   oneTimePurchase: (input) =>
-    client.request(gql`
+    studioClient.request(gql`
     mutation{
       oneTimePurchase(
         input: {

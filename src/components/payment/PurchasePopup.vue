@@ -161,15 +161,15 @@ export default {
         });
         await mutation().then((res) => {
           if (res.oneTimePurchase.success) {
-            notification.success("Donate to Upstage success!");
+            message.success("Donate to Upstage success!");
           } else {
-            notification.error("Donate to Upstage failure!");
+            message.error("Donate to Upstage failure!");
           }
           this.loading = false;
           this.close();
         });
       } catch (error) {
-        notification.error(error);
+        message.error(error);
       } finally {
         this.loading = false;
       }
