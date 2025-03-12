@@ -28,6 +28,7 @@
               </a>
               <a class="help has-text-right" @click="resetMode = true">Forgot password?</a>
             </p>
+            <turnstile v-if="siteKey" ref="captcha" :site-key="siteKey" v-model="token" />
             <p>
               {{ $t("tos.login") }}
               <TermsOfService />
@@ -37,7 +38,7 @@
       </div>
       <footer class="card-footer">
         <button type="submit" class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }">
+          :class="{ 'is-loading': loading }" :disabled="!!siteKey && !token">
           <span>{{ $t("login") }}</span>
           <span class="icon is-medium">
             <i class="fas fa-chevron-right"></i>
@@ -141,6 +142,11 @@ import { userGraph } from "services/graphql";
 import { useMutation } from "services/graphql/composable";
 import { ref, defineEmits } from "vue";
 import { useStore } from "vuex";
+import Turnstile from "vue-turnstile";
+import configs from "config";
+
+const siteKey = configs.CLOUDFLARE_CAPTCHA_SITEKEY;
+const token = ref("");
 
 const emit = defineEmits(["success"]);
 const showPassword = ref(false);
@@ -154,6 +160,7 @@ const toggleShowPassword = () => {
   showPassword.value = !showPassword.value;
 };
 const submit = () => {
+  if (siteKey && !token.value) return;
   const user = {
     username: username.value.trim(),
     password: password.value,
@@ -233,6 +240,7 @@ const resetPassword = () => {
     processPasswordReset();
   }
 };
+
 </script>
 
 <style></style>
