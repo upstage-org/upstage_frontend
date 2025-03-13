@@ -160,10 +160,10 @@ const toggleShowPassword = () => {
   showPassword.value = !showPassword.value;
 };
 const submit = () => {
-  if (siteKey && !token.value) return;
   const user = {
     username: username.value.trim(),
     password: password.value,
+    ...token.value ? { token: token.value } : {}
   };
   loading.value = true;
   store

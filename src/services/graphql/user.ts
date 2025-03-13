@@ -27,10 +27,12 @@ export default {
         mutation login(
           $username: String!
           $password: String!
+          $token: String
         ) {
           login(payload: {
               username: $username
               password: $password
+              token: $token
           }) {
               user_id
               access_token
