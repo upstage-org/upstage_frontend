@@ -2,9 +2,9 @@
   <transition @leave="leave">
     <section v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading)"
       class="hero is-fullheight is-fullwidth cover-image" :class="{ replaying }" @click="clicked = true" :style="{
-    'background-image': model && `url(${model.cover || '/img/greencurtain.jpg'})`,
-    'background-color': backdropColor,
-  }">
+        'background-image': model && `url(&quot;${model.cover || '/img/greencurtain.jpg'}&quot;)`,
+        'background-color': backdropColor
+      }">
       <div class="hero-body">
         <div class="container">
           <template v-if="model">
@@ -16,8 +16,8 @@
             </h2>
             <template v-if="status !== 'live' && !canPlay">
               <span v-if="status" class="tag is-dark">{{
-    status.toUpperCase()
-  }}</span>&nbsp;
+                status.toUpperCase()
+                }}</span>&nbsp;
               <span>This stage is not currently open to the public. Please come
                 back later!</span>
             </template>
@@ -187,8 +187,7 @@ section {
     opacity: 0;
   }
 
-  100% {
-    opacity: 1;
+  100% {opacity: 1;
   }
 }
 </style>
