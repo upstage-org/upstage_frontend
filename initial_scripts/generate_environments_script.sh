@@ -1,8 +1,8 @@
 #!/bin/bash
 
 echo "Please provide the following environment variables:"
-echo "1. The SERVICE domain name for the service machine you set up before: Example:svc.yourdomain.org"
-echo "2. JITSI_ENDPOINT: The endpoint for the Jitsi server, WITHOUT the https://."
+echo "1. The SERVICE domain name for the service machine you set up before: Example: svc.yourdomain.org"
+echo "2. JITSI_ENDPOINT: The endpoint for the Jitsi server, WITHOUT the https://. It's ok if it's not initialized/running yet: Exammple: streaming.yourdomain.org"
 echo "3. CLOUDFLARE_CAPTCHA_SITEKEY: The site key for Cloudflare CAPTCHA."
 
 declare -a vars=(
