@@ -45,7 +45,7 @@ if [ ! -f ./initial_scripts/.env.template ]; then
   exit 1
 fi
 
-cp ./initial_scripts/.env.template "$output_file"
+cp ./initial_scripts/env.template "$output_file"
 
 sed -i "s|{{DOMAIN}}|${values[DOMAIN]}|g" "$output_file"
 sed -i "s|{{SERVICE_DOMAIN}}|${values[SERVICE_DOMAIN]}|g" "$output_file"
