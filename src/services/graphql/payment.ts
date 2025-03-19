@@ -19,4 +19,16 @@ export default {
         success 
       }
     }`),
+  paymentSecret: (input) =>
+    studioClient.request(gql`
+      mutation{
+        paymentSecret(
+          input: {
+            amount:${input.amount}
+          })
+        {      
+          success
+          message
+        }
+      }`),
 };

@@ -25,56 +25,31 @@
                 <span class="icon card-icon">
                   <i class="fas fa-credit-card"></i>
                 </span>
-                <input
-                  required
-                  class="card-input input"
-                  type="tel"
-                  placeholder="Card Number"
-                  v-model="card.cardNumber"
-                  onkeypress="return /[0-9]/i.test(event.key)"
-                />
+                <input required class="card-input input" type="tel" placeholder="Card Number" v-model="card.cardNumber"
+                  onkeypress="return /[0-9]/i.test(event.key)" />
               </div>
               <div class="card-secret-info">
                 <div class="input">
                   <span class="icon card-icon">
                     <i class="fas fa-calendar"></i>
                   </span>
-                  <input
-                    required
-                    v-model="card.exp"
-                    onkeypress="return /[0-9]/i.test(event.key)"
-                    maxlength="5"
-                    class="card-input input"
-                    type="tel"
-                    placeholder="MM/YY"
-                    @input="card.exp = formatExp($event.target.value)"
-                  />
+                  <input required v-model="card.exp" onkeypress="return /[0-9]/i.test(event.key)" maxlength="5"
+                    class="card-input input" type="tel" placeholder="MM/YY"
+                    @input="card.exp = formatExp($event.target.value)" />
                 </div>
                 <div class="input">
                   <span class="icon card-icon">
                     <i class="fas fa-lock"></i>
                   </span>
-                  <input
-                    required
-                    class="card-input input"
-                    type="tel"
-                    placeholder="CVC"
-                    onkeypress="return /[0-9]/i.test(event.key)"
-                    maxlength="3"
-                    v-model="card.cvc"
-                  />
+                  <input required class="card-input input" type="tel" placeholder="CVC"
+                    onkeypress="return /[0-9]/i.test(event.key)" maxlength="3" v-model="card.cvc" />
                 </div>
               </div>
             </div>
             <div class="button-purchase">
-              <button
-                class="button is-primary"
-                @click="donateToUpstage()"
-                :class="{
-                  'is-loading': loading,
-                }"
-                :disabled="loading"
-              >
+              <button class="button is-primary" @click="donateToUpstage()" :class="{
+                'is-loading': loading,
+              }" :disabled="loading">
                 <span>Donate $ {{ amount }}</span>
               </button>
             </div>
@@ -86,7 +61,7 @@
 </template>
 
 <script>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import Icon from "components/Icon.vue";
 import { paymentGraph } from "services/graphql";
@@ -101,7 +76,8 @@ export default {
     const title = computed(() => store.state.stage.purchasePopup.title);
     const amount = computed(() => store.state.stage.purchasePopup.amount);
     const modal = ref();
-    const loading = ref(false);
+    const loading = ref(true);
+    const clientSecret = ref();
     const card = ref({
       email: "",
       cardNumber: "",
@@ -121,22 +97,29 @@ export default {
       return value;
     };
 
-    return {
-      isActive,
-      close,
-      modal,
-      title,
-      amount,
-      card,
-      paymentGraph,
-      loading,
-      formatExp,
-    };
-  },
-  methods: {
-    async donateToUpstage() {
+    const { mutation: paymentSecret } = useMutation(paymentGraph.paymentSecret);
+    watch(
+      () => isActive.value,
+      async (newValue) => {
+        if (newValue)
+        loading.value = true;
+          await paymentSecret({
+            amount: parseFloat(amount.value) * 100
+          }).then((res) => {
+            if (res.paymentSecret?.success) {
+              clientSecret.value = res.paymentSecret?.success;
+              loading.value = false;
+            } else {
+              message.error("Stripe Error!");
+            }
+          });
+      },
+    );
+
+    const { mutation: oneTimePurchase } = useMutation(paymentGraph.oneTimePurchase);
+    const donateToUpstage = async () => {
       try {
-        this.loading = true;
+        loading.value = true;
         if (!this.card.cardNumber || !this.card.exp || !this.card.cvc) {
           message.warning("Please input card information!");
           return;
@@ -152,29 +135,42 @@ export default {
           message.warning("Please input 3 cvc numbers!");
           return;
         }
-        const { mutation } = useMutation(paymentGraph.oneTimePurchase, {
+
+        await oneTimePurchase({
           cardNumber: this.card.cardNumber,
           expYear: this.card.exp.slice(-2),
           expMonth: this.card.exp.substring(0, 2),
           cvc: this.card.cvc,
           amount: this.amount,
-        });
-        await mutation().then((res) => {
+        }).then((res) => {
           if (res.oneTimePurchase.success) {
             message.success("Donate to Upstage success!");
           } else {
             message.error("Donate to Upstage failure!");
           }
-          this.loading = false;
+          loading.value = false;
           this.close();
         });
       } catch (error) {
         message.error(error);
       } finally {
-        this.loading = false;
+        loading.value = false;
       }
-    },
-  },
+    }
+    return {
+      isActive,
+      close,
+      modal,
+      title,
+      amount,
+      card,
+      paymentGraph,
+      loading,
+      formatExp,
+      donateToUpstage,
+      clientSecret
+    };
+  }
 };
 </script>
 <style scoped lang="scss">
