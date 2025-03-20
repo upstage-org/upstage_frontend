@@ -20,9 +20,11 @@ IFS='/' read -ra parts <<< "$dpath"
 DOMAIN=${parts[4]}
 
 output_file="/frontend_app/.env"
+build_dir="/frontend_app/build"
 
 if [ ! -d "/frontend_app" ]; then
   mkdir -p /frontend_app/dist
+  mkdir -p /frontend_app/build
 fi
 
 declare -A values
@@ -55,3 +57,8 @@ sed -i "s|{{JITSI_ENDPOINT}}|${values[JITSI_ENDPOINT]}|g" "$output_file"
 sed -i "s|{{CLOUDFLARE_CAPTCHA_SITEKEY}}|${values[CLOUDFLARE_CAPTCHA_SITEKEY]}|g" "$output_file"
 
 echo ".env file generated successfully!"
+
+cp -r ./initial_scripts/build_files/* $build_dir
+cp -r ./initial_scripts/src $build_dir
+cp -r ./initial_scripts/public $build_dir
+cp -r ./initial_scripts/docker-compose.yaml $build_dir
