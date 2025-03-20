@@ -13,46 +13,20 @@
             <span class="card-header-title">{{ title }}</span>
           </div>
           <div class="card-content">
-            <!-- <div class="input block-input">
-              <span class="icon card-icon">
-                <i class="fas fa-envelope"></i>
-              </span>
-              <input class="card-input input" type="email" x-autocompletetype="email" autocompletetype="email"
-                placeholder="Email" v-model="card.email" required>
-            </div> -->
-            <div class="block-input">
-              <div class="input">
-                <span class="icon card-icon">
-                  <i class="fas fa-credit-card"></i>
-                </span>
-                <input required class="card-input input" type="tel" placeholder="Card Number" v-model="card.cardNumber"
-                  onkeypress="return /[0-9]/i.test(event.key)" />
+            <form v-if="isActive" @submit.prevent="donateToUpstage">
+              <StripeElements :stripe-key="stripeKey" :instance-options="stripeOptions"
+                :elements-options="elementsOptions" ref="elementsComponent">
+                <StripeElement type="payment" :options="paymentElementOptions" ref="paymentComponent" />
+              </StripeElements>
+              <br />
+              <div class="button-purchase">
+                <button class="button is-primary" type="submit" :class="{
+                  'is-loading': loading,
+                }" :disabled="loading">
+                  <span>Donate $ {{ amount }}</span>
+                </button>
               </div>
-              <div class="card-secret-info">
-                <div class="input">
-                  <span class="icon card-icon">
-                    <i class="fas fa-calendar"></i>
-                  </span>
-                  <input required v-model="card.exp" onkeypress="return /[0-9]/i.test(event.key)" maxlength="5"
-                    class="card-input input" type="tel" placeholder="MM/YY"
-                    @input="card.exp = formatExp($event.target.value)" />
-                </div>
-                <div class="input">
-                  <span class="icon card-icon">
-                    <i class="fas fa-lock"></i>
-                  </span>
-                  <input required class="card-input input" type="tel" placeholder="CVC"
-                    onkeypress="return /[0-9]/i.test(event.key)" maxlength="3" v-model="card.cvc" />
-                </div>
-              </div>
-            </div>
-            <div class="button-purchase">
-              <button class="button is-primary" @click="donateToUpstage()" :class="{
-                'is-loading': loading,
-              }" :disabled="loading">
-                <span>Donate $ {{ amount }}</span>
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       </div>
@@ -61,96 +35,103 @@
 </template>
 
 <script>
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import Icon from "components/Icon.vue";
 import { paymentGraph } from "services/graphql";
 import { useMutation } from "services/graphql/composable";
 import { message } from "ant-design-vue";
+import { loadStripe } from '@stripe/stripe-js'
+import { StripeElements, StripeElement } from "vue-stripe-js"
+import config from "config";
 
 export default {
-  components: { Icon },
+  components: { Icon, StripeElements, StripeElement },
   setup: () => {
     const store = useStore();
     const isActive = computed(() => store.state.stage.purchasePopup.isActive);
     const title = computed(() => store.state.stage.purchasePopup.title);
     const amount = computed(() => store.state.stage.purchasePopup.amount);
-    const modal = ref();
     const loading = ref(true);
     const clientSecret = ref();
-    const card = ref({
-      email: "",
-      cardNumber: "",
-      exp: "",
-      cvc: "",
-    });
 
     const close = () => {
       store.dispatch("stage/closePurchasePopup");
     };
 
-    const formatExp = (value) => {
-      value = value.replaceAll("/", "");
-      if (value.length > 2) {
-        value = `${value.substring(0, 2)}/${value.substring(2)}`;
-      }
-      return value;
-    };
+    const stripe = ref(null)
+    const elementsComponent = ref()
+    const paymentComponent = ref()
+    const stripeOptions = ref({
+      // https://stripe.com/docs/js/initializing#init_stripe_js-options
+    })
+    const elementsOptions = ref({
+      // https://stripe.com/docs/js/elements_object/create#stripe_elements-options
+      mode: "payment",
+      amount: 100,
+      currency: "usd",
+      appearance: {
+        theme: "flat",
+      },
+    })
+    const paymentElementOptions = ref({
+      // https://docs.stripe.com/js/elements_object/create_payment_element#payment_element_create-options
+    })
+
+    onBeforeMount(async () => {
+      stripe.value = await loadStripe(config.STRIPE_KEY)
+    })
 
     const { mutation: paymentSecret } = useMutation(paymentGraph.paymentSecret);
     watch(
       () => isActive.value,
       async (newValue) => {
-        if (newValue)
-        loading.value = true;
+        if (newValue) {
+          loading.value = true;
           await paymentSecret({
             amount: parseFloat(amount.value) * 100
           }).then((res) => {
-            if (res.paymentSecret?.success) {
-              clientSecret.value = res.paymentSecret?.success;
+            if (res.paymentSecret) {
+              clientSecret.value = res.paymentSecret;
               loading.value = false;
             } else {
               message.error("Stripe Error!");
             }
           });
+        }
       },
     );
 
-    const { mutation: oneTimePurchase } = useMutation(paymentGraph.oneTimePurchase);
     const donateToUpstage = async () => {
       try {
         loading.value = true;
-        if (!this.card.cardNumber || !this.card.exp || !this.card.cvc) {
-          message.warning("Please input card information!");
-          return;
-        }
-        if (
-          this.card.length < 5 ||
-          !/[0-9]{2}\/[0-9]{2}/i.test(this.card.exp)
-        ) {
-          message.warning("Please input exp card (MM/YY)!");
-          return;
-        }
-        if (this.card.cvc.length < 3) {
-          message.warning("Please input 3 cvc numbers!");
-          return;
-        }
 
-        await oneTimePurchase({
-          cardNumber: this.card.cardNumber,
-          expYear: this.card.exp.slice(-2),
-          expMonth: this.card.exp.substring(0, 2),
-          cvc: this.card.cvc,
-          amount: this.amount,
-        }).then((res) => {
-          if (res.oneTimePurchase.success) {
-            message.success("Donate to Upstage success!");
-          } else {
-            message.error("Donate to Upstage failure!");
+        const stripeInstance = elementsComponent.value?.instance
+        const elements = elementsComponent.value?.elements
+
+        if (stripeInstance) {
+          const res = await elements.submit();
+          if (res.error) {
+            message.error(res.error.message);
+            return;
           }
-          loading.value = false;
-          this.close();
-        });
+          const { paymentIntent, error } = await stripeInstance.confirmPayment({
+            elements,
+            clientSecret: clientSecret.value,
+            confirmParams: {
+              return_url: window.location.href,
+            },
+            redirect: 'if_required'
+          })
+          console.log("**paymentIntent:", paymentIntent)
+          loading.false = false;
+          if (error) {
+            message.error("Donate to Upstage failure!");
+          } else {
+            message.success("Donate to Upstage success!");
+            close();
+          }
+        }
       } catch (error) {
         message.error(error);
       } finally {
@@ -160,15 +141,17 @@ export default {
     return {
       isActive,
       close,
-      modal,
       title,
       amount,
-      card,
-      paymentGraph,
       loading,
-      formatExp,
       donateToUpstage,
-      clientSecret
+      stripe,
+      stripeKey: config.STRIPE_KEY,
+      stripeOptions,
+      elementsOptions,
+      paymentElementOptions,
+      elementsComponent,
+      paymentComponent
     };
   }
 };

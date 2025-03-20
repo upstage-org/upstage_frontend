@@ -7,7 +7,8 @@ const {
   VITE_MQTT_ENDPOINT,
   VITE_MQTT_USERNAME,
   VITE_MQTT_PASSWORD,
-  VITE_JITSI_ENDPOINT
+  VITE_JITSI_ENDPOINT,
+  VITE_STRIPE_KEY
 } = import.meta.env;
 
 const configs = {
@@ -65,7 +66,8 @@ const configs = {
     connectTimeout: 4000, // Time out
     reconnectPeriod: 4000, // Reconnection interval
     retain: true,
-  }
+  },
+  STRIPE_KEY: VITE_STRIPE_KEY
 };
 
 export default configs;

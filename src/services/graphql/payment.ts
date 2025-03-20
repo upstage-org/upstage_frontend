@@ -26,9 +26,5 @@ export default {
           input: {
             amount:${input.amount}
           })
-        {      
-          success
-          message
-        }
       }`),
 };
