@@ -20,10 +20,10 @@ IFS='/' read -ra parts <<< "$dpath"
 DOMAIN=${parts[4]}
 
 output_file="/frontend_app/.env"
+build_dir="/frontend_app/build"
 
-if [ ! -d "/frontend_app" ]; then
-  mkdir -p /frontend_app/dist
-fi
+mkdir -p /frontend_app/dist
+mkdir -p /frontend_app/build
 
 declare -A values
 values[MQTT_USERNAME]=$MQTT_USERNAME
@@ -40,8 +40,8 @@ for var in "${vars[@]}"; do
 done
 
 
-if [ ! -f ./initial_scripts/.env.template ]; then
-  echo ".env.template file not found!"
+if [ ! -f ./initial_scripts/env.template ]; then
+  echo "env.template file not found!"
   exit 1
 fi
 
@@ -55,3 +55,8 @@ sed -i "s|{{JITSI_ENDPOINT}}|${values[JITSI_ENDPOINT]}|g" "$output_file"
 sed -i "s|{{CLOUDFLARE_CAPTCHA_SITEKEY}}|${values[CLOUDFLARE_CAPTCHA_SITEKEY]}|g" "$output_file"
 
 echo ".env file generated successfully!"
+
+cp -r ./initial_scripts/build_files/* $build_dir
+cp -r ./src $build_dir
+cp -r ./public $build_dir
+cp ./docker-compose.yaml $build_dir
