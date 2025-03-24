@@ -1143,6 +1143,7 @@ export default {
         } else {
           (events || []).forEach((event) => dispatch("replayEvent", event));
         }
+        await stageGraph.updateLastAccess(stage.id);
       } else {
         commit("SET_PRELOADING_STATUS", false);
       }

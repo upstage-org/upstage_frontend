@@ -149,7 +149,7 @@ export default {
   updateLastAccess: (stageId) =>
     studioClient.request(gql`
   mutation {
-    updateLastAccess(stageId: "${stageId}" ) {
+    updateLastAccess(id: "${stageId}" ) {
       result
     }
   }

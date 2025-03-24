@@ -11,6 +11,7 @@ import { capitalize } from "utils/common";
 import { message } from "ant-design-vue";
 import { FetchResult } from "@apollo/client/core";
 import store from "store";
+import PlayerAudienceCounter from "components/stage/PlayerAudienceCounter.vue";
 
 const { t } = useI18n();
 const isAdmin = computed(() => store.getters["user/isAdmin"]);
@@ -275,7 +276,11 @@ onVisibilityUpdated(handleUpdate);
           </span>
         </template>
         <template v-if="['created_on', 'last_access'].includes(column.key as string)">
-          <d-date v-if="text" :value="text" />
+          <div style="text-align: center;">
+            <d-date v-if="text" :value="text" />
+            <PlayerAudienceCounter v-if="column.key == 'last_access'" :stage-url="record.fileLocation"
+              class="counter" />
+          </div>
         </template>
         <template v-if="column.key === 'permission'">
           {{ capitalize(text) }}

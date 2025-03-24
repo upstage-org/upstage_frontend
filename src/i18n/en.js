@@ -188,7 +188,7 @@ export default {
     on: "Loop",
     off: "No Loop",
   },
-  last_access: "Last Access",
+  last_access: "Last Active",
   last_login: "Last Login",
   access: "Access",
   studio: "Studio",
