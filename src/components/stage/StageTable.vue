@@ -128,7 +128,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     sorter: {
       multiple: 6,
     },
-    defaultSortOrder: "descend",
+    //defaultSortOrder: "descend",
   },
   //    {
   //        title: t("recorded"),

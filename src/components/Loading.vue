@@ -15,7 +15,7 @@ export default {
     },
     src: {
       type: String,
-      default: "assets/loading.svg",
+      default: "/img/loading.svg",
     }
   },
 };
