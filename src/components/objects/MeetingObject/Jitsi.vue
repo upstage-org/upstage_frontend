@@ -1,14 +1,18 @@
 <template>
   <Object :object="object">
     <template #render>
-      <Loading v-if="!videoTrack && !audioTrack" height="100%" />
+      <div v-if="!videoTrack && !audioTrack" class="loading">
+        <Loading width="auto" height="22px" src="img/videoloading.gif"/>
+      </div>
       <template v-else>
         <video autoplay ref="videoEl" :style="{
           'border-radius': object.shape === 'circle' ? '100%' : '12px',
-        }" @timeupdate="timeupdate">
-          Please click on Reload Stream button.
+        }" @timeupdate="timeupdate"
+        @loadeddata="loadeddata">
+          Please click on Refresh Stream button.
         </video>
         <audio autoplay ref="audioEl" :muted="localMuted" v-bind:id="'video' + object.id"></audio>
+        <img v-if="loading" class="overlay" src="/img/videoloading.gif" />
       </template>
     </template>
     <template #menu="slotProps">
@@ -61,6 +65,7 @@ export default {
     const store = useStore();
     const videoEl = ref();
     const audioEl = ref();
+    const loading = ref(true);
 
     const tracks = computed(() =>
       store.getters["stage/jitsiTracks"].filter(
@@ -162,6 +167,11 @@ export default {
         })
         .then(slotProps.closeMenu);
     }
+
+    const loadeddata = () => {
+      loading.value=false;
+    }
+
     return {
       videoTrack,
       audioTrack,
@@ -174,7 +184,9 @@ export default {
 
       timeupdate,
       loadTrack,
-      openVolumePopup
+      openVolumePopup,
+      loadeddata,
+      loading
     };
   },
 };
@@ -225,5 +237,23 @@ video {
       width: 100%;
     }
   }
+}
+.loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.overlay {
+  position: absolute;
+  width: 40%;
+  left: 30%;
+  top: 50%;
+  -webkit-transform: translateY(-50%);
+  -moz-transform: translateY(-50%);
+  -ms-transform: translateY(-50%);
+  transform: translateY(-50%);
+  z-index: -1;
 }
 </style>

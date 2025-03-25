@@ -1,5 +1,5 @@
 <template>
-  <img src="assets/loading.svg" :style="{ width, height }" />
+  <img :src="src" :style="{ width, height }"/>
 </template>
 
 <script>
@@ -13,6 +13,10 @@ export default {
       type: String,
       default: "150px",
     },
+    src: {
+      type: String,
+      default: "assets/loading.svg",
+    }
   },
 };
 </script>

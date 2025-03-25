@@ -3,9 +3,12 @@
     v-for="video in videos"
     :key="video"
   >
-    <Skeleton :data="video">
-      <video :src="video.url"></video>
-    </Skeleton>
+    <img class="overlay" src="/img/videoloading.gif" />
+    <div style="z-index: 1;">
+      <Skeleton :data="video">
+        <video :src="video.url"></video>
+      </Skeleton>
+    </div>
   </div>
 </template>
 
@@ -55,5 +58,15 @@ video {
 
 .pending-stream {
   cursor: not-allowed;
+}
+.overlay {
+  position: absolute;
+  width: 40%;
+  left: 30%;
+  top: 45%;
+  -webkit-transform: translateY(-50%);
+  -moz-transform: translateY(-50%);
+  -ms-transform: translateY(-50%);
+  transform: translateY(-50%);
 }
 </style>

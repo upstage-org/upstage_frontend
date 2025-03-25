@@ -9,6 +9,7 @@ export default {
     let tracks = [];
     const el = ref();
     const blocked = ref(false);
+    const loading = ref(true);
     const data = reactive({
       type: "jitsi",
       participantId: null,
@@ -60,22 +61,29 @@ export default {
 
     const store = useStore();
     const nickname = computed(() => store.getters["user/nickname"]);
+
+    const loadeddata = () => {
+      loading.value=false;
+    }
     return {
       blocked,
       data,
       join,
       joined,
       el,
-      nickname
+      nickname,
+      loading,
+      loadeddata
     }
   },
 };
 </script>
 <template>
-  <div v-if="!blocked">
-    <Skeleton :data="data" class="p-2" :onDragstart="join" style="flex-direction: column;">
+  <div >
+    <img v-if="loading" class="overlay" src="/img/videoloading.gif" />
+    <Skeleton v-if="!blocked" :data="data" class="p-2" :onDragstart="join" style="flex-direction: column;">
       <video :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"
-        :onClick="join" autoplay ref="el"></video>
+        :onClick="join" autoplay ref="el"  @loadeddata="loadeddata"></video>
       <span class="tag">{{ nickname }}</span>
     </Skeleton>
   </div>
@@ -84,5 +92,15 @@ export default {
 video {
   width: 100px;
   border-radius: 8px;
+}
+.overlay {
+  position: absolute;
+  width: 40%;
+  left: 30%;
+  top: 45%;
+  -webkit-transform: translateY(-50%);
+  -moz-transform: translateY(-50%);
+  -ms-transform: translateY(-50%);
+  transform: translateY(-50%);
 }
 </style>
