@@ -1,6 +1,6 @@
 <template>
     <div v-if="objects.find(el => el.type == 'jitsi')" id="reload-stream">
-        <a-tooltip title="Reload streams">
+        <a-tooltip title="Refresh streams">
             <button class="button is-small refresh-icon clickable" @mousedown="onReload">
                 <i class="fas fa-sync"></i>
             </button>
