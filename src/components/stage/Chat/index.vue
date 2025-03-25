@@ -12,7 +12,13 @@
         <a-tooltip :title="`${unreadMessages} new message${unreadMessages > 1 ? 's' : ''
     }`">
           <span v-if="collapsed && unreadMessages" :key="unreadMessages" class="unread clickable tag is-danger is-small"
-            @click="collapsed = false">{{ unreadMessages }}</span>
+            @click="collapsed = false"
+            style="position: absolute;
+            left: 12px;
+            top: 6px;
+            background-color: #f14668 !important;
+            "
+            >{{ unreadMessages }}</span>
         </a-tooltip>
       </transition>
       <div class="actions">
@@ -43,12 +49,12 @@
             <Reaction :custom-emoji="true" />
             <div class="font-size-controls">
               <a-tooltip title="Increase font size">
-                <button class="button is-small is-rounded mx-1" @click="increateFontSize()">
+                <button class="button is-small is-rounded mx-1" @click="increateFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
                   ➕
                 </button>
               </a-tooltip>
               <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded mx-1" @click="decreaseFontSize()">
+                <button class="button is-small is-rounded mx-1" @click="decreaseFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
                   ➖
                 </button>
               </a-tooltip>
