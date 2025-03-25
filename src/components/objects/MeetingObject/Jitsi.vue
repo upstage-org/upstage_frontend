@@ -34,7 +34,7 @@
           <i v-if="localMuted" class="fas fa-volume-mute has-text-danger"></i>
           <i v-else class="fas fa-volume-up has-text-primary"></i>
         </span>
-        <span>{{ localMuted ? "UnMute" : "Mute" }}</span>
+        <span>{{ localMuted ? "UnMute locally" : "Mute locally" }}</span>
       </a>
       <a class="panel-block" @click="openVolumePopup(slotProps)">
         <span class="panel-icon">

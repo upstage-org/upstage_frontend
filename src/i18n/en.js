@@ -85,7 +85,7 @@ export default {
   hold_this_avatar: "Hold this avatar",
   remove_from_avatar: "Remove from avatar",
   add_to_avatar: "Add to avatar",
-  volumn_setting: "Volume setting",
+  volumn_setting: "Volume setting (local)",
   bring_forward: "Bring forward",
   send_back: "Send back",
   avatar_name: "Avatar name",
