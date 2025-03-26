@@ -278,6 +278,7 @@ onVisibilityUpdated(handleUpdate);
         <template v-if="['created_on', 'last_access'].includes(column.key as string)">
           <div style="text-align: center;">
             <d-date v-if="text" :value="text" />
+            <br/>
             <PlayerAudienceCounter v-if="column.key == 'last_access'" :stage-url="record.fileLocation"
               class="counter" />
           </div>

@@ -28,12 +28,8 @@ export default {
 
 <style scoped lang="scss">
 #reload-stream {
-    position: fixed;
-    right: 12px;
-    top: 85px;
-    width: 180px;
-    text-align: center;
-    z-index: 4;
+    display: inline-block;
+    margin-right: 10px;
 
     @media screen and (max-width: 767px) {
         right: unset;
@@ -43,9 +39,10 @@ export default {
 }
 
 .refresh-icon {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     padding: 0px;
+    border-radius: 4px;
 
     &:hover {
         transform: scale(1.2);

@@ -1,5 +1,6 @@
 <template>
   <div id="connection-status">
+    <ReloadStream />
     <span class="tag is-light is-small" :class="{
       'is-danger': status === 'LIVE',
       'is-warning': status === 'CONNECTING',
@@ -49,9 +50,10 @@ import anime from "animejs";
 import { ref, computed, onMounted, inject } from "vue";
 import Popover from "components/Popover.vue";
 import Session from "./Session.vue";
+import ReloadStream from "./ReloadStream.vue";
 
 export default {
-  components: { Popover, Session },
+  components: { Popover, Session, ReloadStream },
   setup: () => {
     const store = useStore();
     const dot = ref();

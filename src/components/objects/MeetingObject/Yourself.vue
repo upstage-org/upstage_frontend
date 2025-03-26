@@ -5,6 +5,7 @@ import { useStore } from "vuex";
 import { useLowLevelAPI } from "./composable";
 
 export default {
+  components: { Skeleton },
   setup() {
     let tracks = [];
     const el = ref();
