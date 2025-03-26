@@ -327,7 +327,7 @@ const clearSign = () => {
     <template #title>
       <a-space>
         <a-input-group compact>
-          <a-select :options="mediaTypes" v-model:value="type"></a-select>
+          <a-select :options="mediaTypes" v-model:value="type" style="min-width: 110px;"></a-select>
           <a-input v-model:value="name" :placeholder="mediaName"></a-input>
         </a-input-group>
         <template v-if="!['video', 'audio'].includes(type)">
