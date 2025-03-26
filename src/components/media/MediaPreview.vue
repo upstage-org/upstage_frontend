@@ -23,7 +23,7 @@ const showStreamInstruction = ref(false);
     Your browser does not support the audio element.
   </audio>
   <template v-else-if="props.media.assetType.name === 'video'">
-    <video controls class="w-48" autoplay>
+    <video class="w-48" preload="auto">
       <source :src="absolutePath(props.media.fileLocation)" />
       Your browser does not support the video tag.
     </video>
