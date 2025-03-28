@@ -4,13 +4,14 @@ import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
 import gql from "graphql-tag";
 import { StudioGraph, UploadFile } from "models/studio";
-import {editingMediaVar, inquiryVar } from "apollo";
+import { editingMediaVar, inquiryVar } from "apollo";
 import moment, { Moment } from "moment";
 import configs from "config";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
+import { useStore } from "vuex";
 
 const { result: response, loading } = useQuery(gql`
   {
@@ -47,7 +48,8 @@ const { result: response, loading } = useQuery(gql`
     }
   }
 `);
-
+const store = useStore();
+const isAdmin = computed(() => store.getters["user/isAdmin"]);
 const result = computed(() => response?.value);
 
 const sharedAuth = getSharedAuth();
@@ -60,6 +62,7 @@ const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
 const dates = ref<[Dayjs, Dayjs] | undefined>();
+const dormant = ref(false);
 
 const ranges = [
   {
@@ -103,6 +106,7 @@ watchEffect(() => {
     stages: stages.value,
     tags: tags.value,
     mediaTypes: types.value,
+    dormant: dormant.value
   });
 });
 watch(
@@ -136,6 +140,7 @@ const clearFilters = () => {
   stages.value = [];
   tags.value = [];
   dates.value = undefined;
+  dormant.value = false;
 };
 const hasFilter = computed(
   () =>
@@ -144,7 +149,8 @@ const hasFilter = computed(
     types.value.length ||
     stages.value.length ||
     tags.value.length ||
-    dates.value,
+    dates.value ||
+    dormant.value,
 );
 const handleFilterOwnerName = (keyword: string, option: any) => {
   const s = keyword.toLowerCase();
@@ -231,6 +237,12 @@ const onVisibleDropzone = () => {
             "></a-select>
         <a-range-picker :placeholder="['Created from', 'to date']" :presets="ranges as any"
           :onChange="onRangeChange as any" v-model:value="dates as any" />
+        <a-space v-if="isAdmin">
+          <span>
+            Dormant:
+          </span>
+          <a-switch v-model:checked="dormant" />
+        </a-space>
         <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
           <ClearOutlined />Clear Filters
         </a-button>

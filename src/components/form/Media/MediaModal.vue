@@ -230,6 +230,7 @@ export default {
 
     const tabs = computed(() => {
       const res = [
+      { key: "extra", label: "Preview", icon: "fas fa-image" },
         { key: "preview", label: "Preview", icon: "fas fa-image" },
         { key: "copyright", label: "Copyright", icon: "fas fa-copyright" },
         { key: "stages", label: "Stage", icon: "fas fa-person-booth" },

@@ -67,6 +67,7 @@ const { result, loading, fetchMore, refetch } = useQuery(
       $stages: [ID]
       $tags: [String]
       $sort: [AssetSortEnum]
+      $dormant: Boolean
     ) {
       media(input:{
         page: $page
@@ -78,6 +79,7 @@ const { result, loading, fetchMore, refetch } = useQuery(
         stages: $stages
         tags: $tags
         sort: $sort
+        dormant: $dormant
       }) {
         totalCount
         edges {
@@ -363,10 +365,7 @@ const filterTag = (tag: string) => {
           <d-date :value="text" />
         </template>
         <template v-if="column.key === 'actions'">
-          <a-space v-if="record.dormant" direction="vertical" class="leading-4" style="color: #F2A70B;">
-            ⚠ DORMANT
-          </a-space>
-          <a-space v-else-if="composingMode">
+          <a-space v-if="composingMode">
             <a-button type="primary" @click="addFrameToEditingMedia(record as Media)">
               <DoubleRightOutlined />
               Append frames
@@ -384,15 +383,6 @@ const filterTag = (tag: string) => {
                 </template>
               </a-button>
             </a>
-            <a-popconfirm title="Are you sure you want to delete this media?" ok-text="Yes" cancel-text="No"
-              @confirm="deleteMedia(record)" placement="left" :ok-button-props="{ danger: true }" loading="deleting">
-              <a-button type="dashed" danger>
-
-                <template #icon>
-                  <DeleteOutlined />
-                </template>
-              </a-button>
-            </a-popconfirm>
           </a-space>
           <template v-else>
             <a-space v-if="record.privilege === 0">

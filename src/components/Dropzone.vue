@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { ref, provide } from "vue";
+import { ref, provide, watch, Ref } from "vue";
 import configs from "config";
-import { StudioGraph, UploadFile } from "models/studio";
 import { message } from "ant-design-vue";
 import { useLazyQuery } from "@vue/apollo-composable";
 import gql from "graphql-tag";
 import { uploadDefault } from "models/studio";
 import i18n from "../i18n";
 import { humanFileSize } from "utils/common";
+import {
+  Media,
+  StudioGraph,
+  UploadFile,
+} from "models/studio";
+import { useQuery } from "@vue/apollo-composable";
 
 const { load, refetch } = useLazyQuery<StudioGraph>(
   gql`
@@ -22,7 +27,11 @@ const { load, refetch } = useLazyQuery<StudioGraph>(
     fetchPolicy: "network-only",
   },
 );
-
+const { result: editingMediaResult, refetch: reload } = useQuery<{ editingMedia: Media }>(gql`
+  {
+    editingMedia @client
+  }
+`);
 const visible = ref(false);
 const files = ref<UploadFile[]>([]);
 const composingMode = ref(false);
@@ -38,6 +47,10 @@ window.addEventListener("dragenter", (e) => {
 const toSrc = ({ file }: { file: File }) => {
   return URL.createObjectURL(file);
 };
+
+watch(visible as Ref, (val) => {
+  reload();
+});
 
 const handleUpload = async (file: UploadFile) => {
   let fileType = file.file.type;
@@ -60,13 +73,28 @@ const handleUpload = async (file: UploadFile) => {
       return;
     }
   }
-
-  files.value = files.value.concat({
-    ...file,
-    id: files.value.length,
-    preview: toSrc(file),
-    status: "local",
-  });
+  if(editingMediaResult.value?.editingMedia?.id) {
+    const { assetType } = editingMediaResult.value?.editingMedia;
+    if(["video","audio"].includes(assetType?.name) && !fileType.includes(assetType?.name) ||
+      (fileType.includes("video") || fileType.includes("audio")) && !["video","audio"].includes(assetType?.name)
+    ){
+      message.error("Invalid file type!");
+      return;
+    }
+    files.value =[{
+      ...file,
+      id: files.value.length,
+      preview: toSrc(file),
+      status: "local",
+    }];
+  } else {
+    files.value = files.value.concat({
+      ...file,
+      id: files.value.length,
+      preview: toSrc(file),
+      status: "local",
+    });
+  }
 };
 
 const uploadFile = async (file: any) => {
@@ -99,11 +127,10 @@ const uploadFile = async (file: any) => {
 
 <style lang="less">
 .fullscreen-dragzone {
-  z-index: 999999;
+  z-index: 999999 !important;
 
   .ant-modal {
     max-width: unset;
-
     .ant-modal-content {
       height: 100%;
       padding-right: 48px;

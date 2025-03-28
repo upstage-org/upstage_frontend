@@ -99,6 +99,7 @@ export interface Media {
   stages: AssignedStage[];
   tags: string[];
   privilege: Privilege;
+  dormant: boolean;
 }
 
 export interface MediaAttributes {

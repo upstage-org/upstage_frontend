@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useQuery } from "@vue/apollo-composable";
 import { Modal } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import gql from "graphql-tag";
@@ -35,10 +34,12 @@ import {
   getDefaultAvatarVoice,
   getDefaultVariant,
 } from "services/speech/voice";
+import { useMutation, useQuery } from "@vue/apollo-composable";
+import { message } from "ant-design-vue";
 
 const files = inject<Ref<UploadFile[]>>("files");
 
-const { result: editingMediaResult, refetch  } = useQuery<{ editingMedia: Media }>(gql`
+const { result: editingMediaResult, refetch } = useQuery<{ editingMedia: Media }>(gql`
   {
     editingMedia @client
   }
@@ -236,7 +237,17 @@ const { progress, saveMedia, saving } = useSaveMedia(
     }
   },
 );
-
+const {
+  loading: deleting,
+  mutate: deleteMedia
+} = useMutation(gql`
+  mutation deleteMedia($id: ID!) {
+    deleteMedia(id: $id) {
+      success
+      message
+    }
+  }
+`);
 watch(files as Ref, ([firstFile]) => {
   if (
     firstFile &&
@@ -319,10 +330,46 @@ const clearSign = () => {
     sign: "",
   });
 };
+const onDelete = async () => {
+  const res = await deleteMedia({ id: editingMediaResult.value?.editingMedia?.id });
+  if (res?.data.deleteMedia) {
+    message.success(res?.data.deleteMedia.message);
+    refresh();
+    handleClose();
+  } else {
+    message.error("Error!")
+  }
+}
+
+const {
+  loading: dormanting,
+  mutate: updateStatus
+} = useMutation(gql`
+  mutation updateMediaStatus($id: ID!, $status: MediaStatusEnum!) {
+    updateMediaStatus(input: { id: $id, status: $status }) {
+      success
+      message
+    }
+  }
+`);
+const onUpdateStatus = async () => {
+  const res = await updateStatus({ id: editingMediaResult.value?.editingMedia?.id, status: editingMediaResult.value?.editingMedia.dormant ? "Active" : "Dormant" });
+  if (res?.data.updateMediaStatus) {
+    message.success(res?.data.updateMediaStatus.message);
+    editingMediaVar({
+      ...editingMediaVar()!,
+      dormant: !editingMediaResult.value?.editingMedia.dormant,
+    });
+    refresh();
+  } else {
+    message.error("Error!")
+  }
+}
+
 </script>
 
 <template>
-  <a-modal :visible="!!files?.length && !composingMode" :body-style="{ padding: 0 }" :width="1000"
+  <a-modal :visible="!!files?.length && !composingMode" :body-style="{ padding: 0 }" :width="1100"
     @cancel="handleClose">
     <template #title>
       <a-space>
@@ -347,6 +394,29 @@ const clearSign = () => {
         </template>
         <a-input v-else-if="type === 'video' && files && files.length" v-model:value="files![0].url"
           placeholder="Unique key" @focus="clearSign"></a-input>
+        <template v-if="editingMediaResult?.editingMedia?.id">
+          <a-button type="primary" style="background-color: #1677ff; border-color: #1677ff;"
+            @click="visibleDropzone = true">
+            <Icon src="replace.webp" style="width: 14px; height: 14px; margin-right: 8px; margin-bottom:3px;" />
+            Replace
+          </a-button>
+          <a-popconfirm
+            :title="editingMediaResult?.editingMedia.dormant ? 'Are you sure you want to make this media as active?' : 'Are you sure you want to make this media as dormant ?'"
+            ok-text="Yes" cancel-text="No" @confirm="onUpdateStatus()" placement="bottom"
+            :ok-button-props="{ danger: true }" loading="deleting">
+            <a-button type="primary" style="background-color: #faad14; border-color: #faad14;" :loading="dormanting">
+              <Icon src="icons8-sun.svg" style="width: 14px; height: 14px; margin-right: 8px; margin-bottom:3px;" />
+              {{ editingMediaResult?.editingMedia.dormant ? "Active" : "Dormant" }}
+            </a-button>
+          </a-popconfirm>
+          <a-popconfirm title="Are you sure you want to delete this media?" ok-text="Yes" cancel-text="No"
+            @confirm="onDelete()" placement="bottom" :ok-button-props="{ danger: true }" loading="deleting">
+            <a-button type="primary" style="background-color: #ff4d4f; border-color: #ff4d4f;" :loading="deleting">
+              <DeleteOutlined />
+              Delete
+            </a-button>
+          </a-popconfirm>
+        </template>
       </a-space>
     </template>
     <a-row :gutter="12">
