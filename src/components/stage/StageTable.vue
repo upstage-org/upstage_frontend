@@ -21,7 +21,7 @@ const enterStage = (stage: Stage) => {
 const tableParams = reactive({
   page: 1,
   limit: 10,
-  sort: "CREATED_ON_DESC",
+  sort: ["CREATED_ON_DESC"],
 });
 const { result: inquiryResult } = useQuery(gql`
   {
@@ -151,6 +151,9 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     title: t("access"),
     dataIndex: "permission",
     key: "permission",
+    sorter: {
+      multiple: 6,
+    }
   },
   {
     title: `${t("manage")} ${t("stage")}`,
@@ -186,7 +189,7 @@ const handleTableChange = (
         (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple,
     )
     .map(({ columnKey, order }) =>
-      `${columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
+      `${columnKey == "permission" ? "access" : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
     );
 
   Object.assign(tableParams, {
@@ -278,7 +281,7 @@ onVisibilityUpdated(handleUpdate);
         <template v-if="['created_on', 'last_access'].includes(column.key as string)">
           <div style="text-align: center;">
             <d-date v-if="text" :value="text" />
-            <br/>
+            <br />
             <PlayerAudienceCounter v-if="column.key == 'last_access'" :stage-url="record.fileLocation"
               class="counter" />
           </div>
