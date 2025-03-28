@@ -126,7 +126,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     dataIndex: "lastAccess",
     key: "last_access",
     sorter: {
-      multiple: 6,
+      multiple: 1,
     },
     //defaultSortOrder: "descend",
   },
