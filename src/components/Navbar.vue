@@ -13,6 +13,15 @@ import {loggedIn, logout } from "utils/auth";
 const store = useStore();
 const whoami = computed(() => store.getters["user/whoami"]);
 const loading = computed(() => store.getters["user/loading"]);
+const roleName = computed(() => {
+  switch(whoami.value.role){
+    case "4": return "Guest";
+    case "1": return "Player";
+    case "8": return "Admin";
+    case "32": return "SuperAdmin";
+  }
+  return "";
+});
 const to = (path: string) => `${configs.UPSTAGE_URL}/${path}`;
 
 const onSave =(payload: any) =>{
@@ -25,7 +34,7 @@ const onSave =(payload: any) =>{
     <PlayerForm v-if="whoami" :player="whoami" :onSave="onSave" :saving="loading" noUploadLimit noStatusToggle
       v-slot="{ onClick }">
       <div :onClick="onClick" class="cursor-pointer">
-        <span class="text-gray-500 cursor-pointer">{{ whoami.roleName }}</span>
+        <span class="text-gray-500 cursor-pointer">{{ roleName }}</span>
         <a-typography-title :level="5" style="margin-bottom: 0">
           <span class="whitespace-nowrap">
             {{ whoami.displayName || whoami.username }}
