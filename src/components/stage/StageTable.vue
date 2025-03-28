@@ -101,7 +101,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     dataIndex: "name",
     key: "name",
     sorter: {
-      multiple: 3,
+      multiple: 4,
     },
   },
   {
@@ -109,7 +109,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     dataIndex: "owner",
     key: "owner_id",
     sorter: {
-      multiple: 2,
+      multiple: 3,
     },
   },
   {
@@ -126,7 +126,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     dataIndex: "lastAccess",
     key: "last_access",
     sorter: {
-      multiple: 1,
+      multiple: 2,
     },
     //defaultSortOrder: "descend",
   },
@@ -152,7 +152,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     dataIndex: "permission",
     key: "permission",
     sorter: {
-      multiple: 6,
+      multiple: 1,
     }
   },
   {
