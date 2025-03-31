@@ -113,7 +113,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     },
   },
   {
-    title: t("date"),
+    title: "Created",
     dataIndex: "createdOn",
     key: "created_on",
     sorter: {
