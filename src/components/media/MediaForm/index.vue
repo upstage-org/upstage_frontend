@@ -401,7 +401,7 @@ const onUpdateStatus = async () => {
             Replace
           </a-button>
           <a-popconfirm
-            :title="editingMediaResult?.editingMedia.dormant ? 'Are you sure you want to make this media as active?' : 'Are you sure you want to make this media as dormant ?'"
+            :title="editingMediaResult?.editingMedia.dormant ? 'Are you sure you want to make this media as active?' : `Are you sure you want to make this media as dormant? It will be available for any replay recordings that require it, but you will not see it in your Media list. Only an Admin can see it and reactivate it. If it isn't needed, please delete it rather than making it dormant.`"
             ok-text="Yes" cancel-text="No" @confirm="onUpdateStatus()" placement="bottom"
             :ok-button-props="{ danger: true }" loading="deleting">
             <a-button type="primary" style="background-color: #faad14; border-color: #faad14;" :loading="dormanting">
