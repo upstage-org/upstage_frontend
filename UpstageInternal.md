@@ -1,7 +1,7 @@
 
 Check /set these variables in /app_code/src/global_config/load_env.py :
 ```
-# These settings are only for the upstage.live server. 
+# All settings in this grouping are only for the upstage.live server: 
 # payment
 STRIPE_KEY = ""
 STRIPE_PRODUCT_ID = ""
@@ -12,6 +12,9 @@ ACCEPT_EMAIL_HOST = ["upstage.live"]
 # These are the domain names of machines from which upstage.live will accept
 # and send external email. We act as a mail proxy for approved clients.
 ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = []
+
+# This is a list of people who get CC-ed when any email is sent, directly or by proxy:
+SUPPORT_EMAILS = ['email_addr1','email_addr2',...]
 ```
 
 Advanced clients may want to edit their email templates. These can be found here:
