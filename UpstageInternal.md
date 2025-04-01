@@ -14,6 +14,13 @@ ACCEPT_EMAIL_HOST = ["upstage.live"]
 ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = []
 ```
 
+Advanced clients may want to edit their email templates. These can be found here:
+```
+src/mails/templates/templates.py
+```
+
+Note that for clients using our email services, we want our email addresses in the SUPPORT_EMAILS list in the back end config file, so that we can get CC-ed on all emails. If the client chooses to use their own email service instead of ours, we can remove ourselves from this list, and not receive CCs. If it's ours, we monitor it, and if it's theirs, we don't.
+
 Only internal to Upstage: 
 
 In ```upstage_backend/app_containers/docker-compose.yaml``` Upstage has to run a fourth container
