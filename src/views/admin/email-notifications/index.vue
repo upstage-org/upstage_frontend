@@ -23,7 +23,7 @@ const { t } = useI18n();
 
 const subject = ref("");
 
-const INITIAL_BODY_CONTENT = `<h1>Title</h1><p>Dear UpStage Users,</p><p>Thank you and best regards,</p><p>`;
+const INITIAL_BODY_CONTENT = "";
 
 const body = ref(INITIAL_BODY_CONTENT);
 
