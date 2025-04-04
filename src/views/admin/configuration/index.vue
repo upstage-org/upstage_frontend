@@ -80,6 +80,18 @@ const systemConfigs = () =>
         name: "EMAIL_SUBJECT_PREFIX",
         defaultValue: system.value.esp?.value ?? "",
       }),
+      h(Entry, {
+        label: t("email_signature"),
+        multiline: true,
+        name: "EMAIL_SIGNATURE",
+        defaultValue: system.value?.emailSignature?.value ?? "",
+        richTextEditor: true,
+      }),
+      h(Entry, {
+        label: t("adding_email_signature"),
+        name: "ADDING_EMAIL_SIGNATURE",
+        defaultValue: system.value.addingEmailSignature?.value ?? true,
+      }),
     ]
     : [h(Skeleton)];
 </script>

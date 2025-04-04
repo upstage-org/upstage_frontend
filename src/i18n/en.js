@@ -120,6 +120,8 @@ export default {
   new_text: "New Text",
   create_a_account_with_upstage: "Create a account with UpStage",
   email_subject_prefix: "Email Subject Prefix",
+  email_signature: "Email Signature",
+  adding_email_signature: "Adding email signature",
   player: "Player | Players",
   player_management: "Player Management",
   batch_user_creation: "Add New Players",

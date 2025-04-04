@@ -29,7 +29,7 @@ export default {
     const store = useStore();
 
     const videos = computed(() => {
-      const res = [...store.state.stage.tools.videos];
+      const res = [...(store.state.stage.tools?.videos || [])];
       return res;
     });
 
