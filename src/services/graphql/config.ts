@@ -34,6 +34,18 @@ export default {
                 value
                 createdOn
             }
+            emailSignature {
+                id
+                name
+                value
+                createdOn
+            }
+            addingEmailSignature {
+                id
+                name
+                value
+                createdOn
+            }
         }
         foyer {
             title {
