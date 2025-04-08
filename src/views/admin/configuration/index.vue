@@ -10,7 +10,7 @@ import Header from "components/Header.vue";
 import { useStore } from "vuex";
 const store = useStore();
 const route = useRoute();
-const activeKey = ref((route.params.section as string) || "foyer");
+const activeKey = ref(route.query.tab === "system" ? "system" : "foyer");
 const { t } = useI18n();
 
 const foyer = computed(() => store.getters["config/foyer"]);
