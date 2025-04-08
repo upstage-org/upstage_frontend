@@ -153,24 +153,17 @@ const { proceed, loading } = useLoading(
   <Header>
     <Space><span /></Space>
   </Header>
-  <Layout
-    v-if="successMessage"
-    class="bg-white rounded-lg overflow-y-auto justify-center"
-  >
-    <AResult
-      status="success"
-      title="Email notification sent"
-      class="text-center"
-      :sub-title="successMessage"
-    >
+  <Layout v-if="successMessage" class="bg-white rounded-lg overflow-y-auto justify-center">
+    <AResult status="success" title="Email notification sent" class="text-center" :sub-title="successMessage">
       <AButton class="m-auto" @click="reset()">Send another email</AButton>
     </AResult>
   </Layout>
   <Layout v-else class="bg-white rounded-lg overflow-y-auto">
     <div
-      class="bg-white shadow rounded-tl rounded-tr p-2 px-4 sticky top-0 z-50 mb-6 flex justify-between items-center"
-    >
-      <a-tag color="#007011"> <MailOutlined /> Email Notification </a-tag>
+      class="bg-white shadow rounded-tl rounded-tr p-2 px-4 sticky top-0 z-50 mb-6 flex justify-between items-center">
+      <a-tag color="#007011">
+        <MailOutlined /> Email Notification
+      </a-tag>
       <a-button type="primary" @click="proceed" :loading="loading">
         <send-outlined />
         Send
@@ -187,24 +180,15 @@ const { proceed, loading } = useLoading(
       <CloseCircleFilled />. Once the filter is cleared, all the players you
       have selected will show in the recipient list.
       <ADivider />
-      <a-form-item
-        :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }"
-        :colon="false"
-      >
+      <a-form-item :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
         <template #label>
           <a-space direction="vertical">
             {{ t("to") }}
-            <a-select
-              allow-clear
-              placeholder="Filter by role"
-              :options="
-                Object.entries(configs.ROLES).map(([key, id]) => ({
-                  value: id,
-                  label: titleCase(key),
-                }))
-              "
-              v-model:value="filterRole"
-            />
+            <a-select allow-clear placeholder="Filter by role" :options="Object.entries(configs.ROLES).map(([key, id]) => ({
+              value: id,
+              label: titleCase(key),
+            }))
+              " v-model:value="filterRole" />
             <a-button type="dashed" @click="addCustomRecipient">
               <plus-circle-outlined />
               Custom recipient
@@ -212,46 +196,32 @@ const { proceed, loading } = useLoading(
           </a-space>
         </template>
         <a-spin :spinning="isReady">
-          <a-transfer
-            :locale="{
-              itemUnit: 'recipient',
-              itemsUnit: 'recipients',
-              notFoundContent: '',
-              searchPlaceholder: 'Search by email or name',
-            }"
-            :list-style="{
+          <a-transfer :locale="{
+            itemUnit: 'recipient',
+            itemsUnit: 'recipients',
+            notFoundContent: '',
+            searchPlaceholder: 'Search by email or name',
+          }" :list-style="{
               flex: '1',
               height: '300px',
-            }"
-            :titles="[' available', ' selected']"
-            v-model:target-keys="receiverEmails"
-            :data-source="dataSource"
-            show-search
-            :filter-option="
-              (keyword, option) =>
+            }" :titles="[' available', ' selected']" v-model:target-keys="receiverEmails" :data-source="dataSource"
+            show-search :filter-option="(keyword, option) =>
                 option.title?.toLowerCase().includes(keyword.toLowerCase()) ??
                 false
-            "
-          >
+              ">
             <template #render="item">
               <a-space class="flex justify-between">
                 <span>
                   {{ item?.title }}
-                  <a-tag v-if="!item?.title?.includes('<')"
-                    >Custom recipient</a-tag
-                  >
+                  <a-tag v-if="!item?.title?.includes('<')">Custom recipient</a-tag>
                 </span>
-                <a-switch
-                  size="small"
-                  :checked="!directToEmails.includes(item?.key as string)"
-                  @change="(checked, e) => {
+                <a-switch size="small" :checked="!directToEmails.includes(item?.key as string)" @change="(checked, e) => {
                   directToEmails = directToEmails
                     .filter((email) => email !== item?.key)
                     .concat(checked ? [] : (item?.key as string));
                   e.stopPropagation();
                 }
-                "
-                >
+                ">
                   <template #checkedChildren>
                     <span class="text-[8px] leading-none">BCC</span>
                   </template>
@@ -264,29 +234,27 @@ const { proceed, loading } = useLoading(
           </a-transfer>
         </a-spin>
       </a-form-item>
-      <a-form-item
-        label="Subject"
-        :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }"
-        :colon="false"
-      >
+      <a-form-item label="Subject" :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
         <a-input v-model:value="subject" />
       </a-form-item>
-      <a-form-item
-        label="Body"
-        :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }"
-        :colon="false"
-      >
+      <a-form-item label="Body" :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
         <RichTextEditor v-model="body" @click="console.log(body)" />
       </a-form-item>
-      <a-form-item
-        label="Attach signature"
-        :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }"
-        :colon="false"
-      >
-        <a-switch v-model:checked="showSignature">
-          <template #checkedChildren>On</template>
-          <template #unCheckedChildren>Off</template>
-        </a-switch>
+      <a-form-item label="Attach signature" :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
+        <div>
+          <a-switch v-model:checked="showSignature">
+            <template #checkedChildren>On</template>
+            <template #unCheckedChildren>Off</template>
+          </a-switch>
+          <p class="text-sm mt-2 text-gray-500">
+            Go to
+            <a href="/admin/configuration?tab=system" class="text-blue-600 hover:underline">
+              System Configuration
+            </a>
+            to view and edit the email signature.
+          </p>
+        </div>
+
       </a-form-item>
     </div>
   </Layout>
