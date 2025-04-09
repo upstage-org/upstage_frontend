@@ -45,8 +45,9 @@ const checkVersion = async (): Promise<void> => {
     latestVersion.value = data.version;
 
     currentVersion.value = localStorage.getItem("appVersion") || latestVersion.value;
+    showReloadPrompt.value = false;
 
-    if (latestVersion.value !== currentVersion.value) {
+    if (latestVersion.value && latestVersion.value !== currentVersion.value) {
       showReloadPrompt.value = true;
     }
   } catch (error) {
