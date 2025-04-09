@@ -9,6 +9,7 @@ services:
     working_dir: /app
     command: >
       /bin/sh -c "
+      node src/update-version.js &&
       yarn install --frozen-lockfile &&
       yarn build &&
       tail -f /dev/null
