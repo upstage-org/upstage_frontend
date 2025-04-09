@@ -39,7 +39,9 @@ import { message } from "ant-design-vue";
 
 const files = inject<Ref<UploadFile[]>>("files");
 
-const { result: editingMediaResult, refetch } = useQuery<{ editingMedia: Media }>(gql`
+const { result: editingMediaResult, refetch } = useQuery<{
+  editingMedia: Media;
+}>(gql`
   {
     editingMedia @client
   }
@@ -131,7 +133,7 @@ const handleFrameClick = ({ event, index }: { event: any; index: number }) => {
       content: createVNode(
         "div",
         { style: "color: orange;" },
-        "There is no undo!",
+        "There is no undo!"
       ),
       onOk() {
         files.value = filesCopy.filter((_, i) => i !== index);
@@ -159,7 +161,7 @@ const handleClose = () => {
         content: createVNode(
           "div",
           { style: "color: orange;" },
-          "All selected frames will be lost, there is no undo!",
+          "All selected frames will be lost, there is no undo!"
         ),
         onOk() {
           files.value = [];
@@ -188,7 +190,7 @@ const { result, loading } = useQuery<StudioGraph>(
     }
   `,
   null,
-  { fetchPolicy: "cache-only" },
+  { fetchPolicy: "cache-only" }
 );
 const mediaTypes = computed(() => {
   if (result.value?.mediaTypes) {
@@ -199,7 +201,7 @@ const mediaTypes = computed(() => {
             editingMediaResult.value
               ? ["media", "video", "shape"]
               : ["media", "shape"]
-          ).includes(node.name.toLowerCase()),
+          ).includes(node.name.toLowerCase())
       )
       .map((node) => ({ label: capitalize(node.name), value: node.name }));
   }
@@ -235,12 +237,9 @@ const { progress, saveMedia, saving } = useSaveMedia(
       files.value = [];
       refresh();
     }
-  },
+  }
 );
-const {
-  loading: deleting,
-  mutate: deleteMedia
-} = useMutation(gql`
+const { loading: deleting, mutate: deleteMedia } = useMutation(gql`
   mutation deleteMedia($id: ID!) {
     deleteMedia(id: $id) {
       success
@@ -331,20 +330,19 @@ const clearSign = () => {
   });
 };
 const onDelete = async () => {
-  const res = await deleteMedia({ id: editingMediaResult.value?.editingMedia?.id });
+  const res = await deleteMedia({
+    id: editingMediaResult.value?.editingMedia?.id,
+  });
   if (res?.data.deleteMedia) {
     message.success(res?.data.deleteMedia.message);
     refresh();
     handleClose();
   } else {
-    message.error("Error!")
+    message.error("Error!");
   }
-}
+};
 
-const {
-  loading: dormanting,
-  mutate: updateStatus
-} = useMutation(gql`
+const { loading: dormanting, mutate: updateStatus } = useMutation(gql`
   mutation updateMediaStatus($id: ID!, $status: MediaStatusEnum!) {
     updateMediaStatus(input: { id: $id, status: $status }) {
       success
@@ -353,7 +351,12 @@ const {
   }
 `);
 const onUpdateStatus = async () => {
-  const res = await updateStatus({ id: editingMediaResult.value?.editingMedia?.id, status: editingMediaResult.value?.editingMedia.dormant ? "Active" : "Dormant" });
+  const res = await updateStatus({
+    id: editingMediaResult.value?.editingMedia?.id,
+    status: editingMediaResult.value?.editingMedia.dormant
+      ? "Active"
+      : "Dormant",
+  });
   if (res?.data.updateMediaStatus) {
     message.success(res?.data.updateMediaStatus.message);
     editingMediaVar({
@@ -362,19 +365,26 @@ const onUpdateStatus = async () => {
     });
     refresh();
   } else {
-    message.error("Error!")
+    message.error("Error!");
   }
-}
-
+};
 </script>
 
 <template>
-  <a-modal :visible="!!files?.length && !composingMode" :body-style="{ padding: 0 }" :width="1100"
-    @cancel="handleClose">
+  <a-modal
+    :visible="!!files?.length && !composingMode"
+    :body-style="{ padding: 0 }"
+    :width="1100"
+    @cancel="handleClose"
+  >
     <template #title>
       <a-space>
         <a-input-group compact>
-          <a-select :options="mediaTypes" v-model:value="type" style="min-width: 110px;"></a-select>
+          <a-select
+            :options="mediaTypes"
+            v-model:value="type"
+            style="min-width: 110px"
+          ></a-select>
           <a-input v-model:value="name" :placeholder="mediaName"></a-input>
         </a-input-group>
         <template v-if="!['video', 'audio'].includes(type)">
@@ -386,32 +396,125 @@ const onUpdateStatus = async () => {
             <PlusCircleOutlined />
             Add existing frame
           </a-button>
-          <a-button v-if="files!.length > 1" :type="clearMode ? 'primary' : 'dashed'" danger
-            @click="clearMode = !clearMode">
+          <a-button
+            v-if="files!.length > 1"
+            :type="clearMode ? 'primary' : 'dashed'"
+            danger
+            @click="clearMode = !clearMode"
+          >
             <ClearOutlined />
             Clear frames
           </a-button>
         </template>
-        <a-input v-else-if="type === 'video' && files && files.length" v-model:value="files![0].url"
-          placeholder="Unique key" @focus="clearSign"></a-input>
+        <a-input
+          v-else-if="type === 'video' && files && files.length"
+          v-model:value="files![0].url"
+          placeholder="Unique key"
+          @focus="clearSign"
+        ></a-input>
         <template v-if="editingMediaResult?.editingMedia?.id">
-          <a-button type="primary" style="background-color: #1677ff; border-color: #1677ff;"
-            @click="visibleDropzone = true">
-            <Icon src="replace.webp" style="width: 14px; height: 14px; margin-right: 8px; margin-bottom:3px;" />
+          <a-button
+            type="primary"
+            style="background-color: #1677ff; border-color: #1677ff"
+            @click="visibleDropzone = true"
+          >
+            <Icon
+              src="replace.webp"
+              style="
+                width: 14px;
+                height: 14px;
+                margin-right: 8px;
+                margin-bottom: 3px;
+              "
+            />
             Replace
           </a-button>
+          <template v-if="editingMediaResult?.editingMedia.dormant">
+            <a-popconfirm
+              placement="bottom"
+              ok-text="Yes"
+              cancel-text="No"
+              :ok-button-props="{ danger: true }"
+              @confirm="onUpdateStatus()"
+            >
+              <template #title>
+                <div>Are you sure you want to make this media as active?</div>
+              </template>
+
+              <a-button
+                type="primary"
+                style="background-color: #faad14; border-color: #faad14"
+                :loading="dormanting"
+              >
+                <Icon
+                  src="icons8-sun.svg"
+                  style="
+                    width: 14px;
+                    height: 14px;
+                    margin-right: 8px;
+                    margin-bottom: 3px;
+                  "
+                />
+                Active
+              </a-button>
+            </a-popconfirm>
+          </template>
+
+          <template v-else>
+            <a-popconfirm
+              placement="bottom"
+              ok-text="Yes"
+              cancel-text="No"
+              :ok-button-props="{ danger: true }"
+              @confirm="onUpdateStatus()"
+            >
+              <template #title>
+                <div>
+                  <p>Are you sure you want to make this media as dormant?</p>
+                  <p>
+                    It will be available for any replay recordings that require it,
+                  </p>
+                  <p>but you will not see it in your Media list.</p>
+                  <p>Only an Admin can see it and reactivate it.</p>
+                  <p>
+                    If it isn't needed, please delete it rather than making it dormant.
+                  </p>
+                </div>
+              </template>
+
+              <a-button
+                type="primary"
+                style="background-color: #faad14; border-color: #faad14"
+                :loading="dormanting"
+              >
+                <Icon
+                  src="icons8-sun.svg"
+                  style="
+                    width: 14px;
+                    height: 14px;
+                    margin-right: 8px;
+                    margin-bottom: 3px;
+                  "
+                />
+                Dormant
+              </a-button>
+            </a-popconfirm>
+          </template>
+
           <a-popconfirm
-            :title="editingMediaResult?.editingMedia.dormant ? 'Are you sure you want to make this media as active?' : `Are you sure you want to make this media as dormant? It will be available for any replay recordings that require it, but you will not see it in your Media list. Only an Admin can see it and reactivate it. If it isn't needed, please delete it rather than making it dormant.`"
-            ok-text="Yes" cancel-text="No" @confirm="onUpdateStatus()" placement="bottom"
-            :ok-button-props="{ danger: true }" loading="deleting">
-            <a-button type="primary" style="background-color: #faad14; border-color: #faad14;" :loading="dormanting">
-              <Icon src="icons8-sun.svg" style="width: 14px; height: 14px; margin-right: 8px; margin-bottom:3px;" />
-              {{ editingMediaResult?.editingMedia.dormant ? "Active" : "Dormant" }}
-            </a-button>
-          </a-popconfirm>
-          <a-popconfirm title="Are you sure you want to delete this media?" ok-text="Yes" cancel-text="No"
-            @confirm="onDelete()" placement="bottom" :ok-button-props="{ danger: true }" loading="deleting">
-            <a-button type="primary" style="background-color: #ff4d4f; border-color: #ff4d4f;" :loading="deleting">
+            title="Are you sure you want to delete this media?"
+            ok-text="Yes"
+            cancel-text="No"
+            @confirm="onDelete()"
+            placement="bottom"
+            :ok-button-props="{ danger: true }"
+            loading="deleting"
+          >
+            <a-button
+              type="primary"
+              style="background-color: #ff4d4f; border-color: #ff4d4f"
+              :loading="deleting"
+            >
               <DeleteOutlined />
               Delete
             </a-button>
@@ -421,34 +524,73 @@ const onUpdateStatus = async () => {
     </template>
     <a-row :gutter="12">
       <a-col :span="6">
-        <div class="bg-gray-200 flex items-center justify-center h-full" style="max-height: 600px">
-          <audio v-if="type === 'audio'" controls class="w-48" :key="files?.[0]?.preview">
+        <div
+          class="bg-gray-200 flex items-center justify-center h-full"
+          style="max-height: 600px"
+        >
+          <audio
+            v-if="type === 'audio'"
+            controls
+            class="w-48"
+            :key="files?.[0]?.preview"
+          >
             <source v-if="files && files.length" :src="files[0].preview" />
             Your browser does not support the audio element.
           </audio>
           <template v-else-if="type === 'video'">
-            <div v-if="files && files.length && files[0].status === 'virtual'" controls class="w-48">
-
-            </div>
-            <video v-else controls class="w-48" :key="files?.[0]?.preview" @loadedmetadata="handleVideoLoad">
+            <div
+              v-if="files && files.length && files[0].status === 'virtual'"
+              controls
+              class="w-48"
+            ></div>
+            <video
+              v-else
+              controls
+              class="w-48"
+              :key="files?.[0]?.preview"
+              @loadedmetadata="handleVideoLoad"
+            >
               <source v-if="files && files.length" :src="files[0].preview" />
               Your browser does not support the video tag.
             </video>
           </template>
-          <SlickList v-else axis="y" v-model:list="files" class="cursor-move w-full max-h-96 overflow-auto"
-            :class="{ 'cursor-not-allowed': clearMode }" @sort-start="handleFrameClick">
-            <SlickItem v-for="(file, i) in files" :key="file.id" :index="i" style="z-index: 99999">
+          <SlickList
+            v-else
+            axis="y"
+            v-model:list="files"
+            class="cursor-move w-full max-h-96 overflow-auto"
+            :class="{ 'cursor-not-allowed': clearMode }"
+            @sort-start="handleFrameClick"
+          >
+            <SlickItem
+              v-for="(file, i) in files"
+              :key="file.id"
+              :index="i"
+              style="z-index: 99999"
+            >
               <div class="my-2 px-8 text-center">
-                <img show-handle :src="file.preview" class="max-w-full rounded-md max-h-24"
-                  @load="handleImageLoad($event, i)" />
+                <img
+                  show-handle
+                  :src="file.preview"
+                  class="max-w-full rounded-md max-h-24"
+                  @load="handleImageLoad($event, i)"
+                />
               </div>
             </SlickItem>
           </SlickList>
         </div>
-        <a-alert v-if="files!.length > 1" :message="clearMode
-          ? 'Click a frame to remove it'
-          : 'Drag a frame to reorder its position'
-          " :type="clearMode ? 'error' : 'success'" show-icon closable class="text-sm" />
+        <a-alert
+          v-if="files!.length > 1"
+          :message="
+            clearMode
+              ? 'Click a frame to remove it'
+              : 'Drag a frame to reorder its position'
+          "
+          :type="clearMode ? 'error' : 'success'"
+          show-icon
+          closable
+          class="text-sm"
+        />
       </a-col>
       <a-col :span="18">
         <div class="card-container pr-4">
@@ -457,38 +599,66 @@ const onUpdateStatus = async () => {
               <StageAssignment v-model="stageIds as any" />
             </a-tab-pane>
             <a-tab-pane key="permissions" tab="Permissions">
-              <MediaPermissions :key="editingMediaResult?.editingMedia?.id" v-model="copyrightLevel"
-                v-model:owner="owner" v-model:users="userIds" v-model:note="note"
-                :media="editingMediaResult?.editingMedia" />
+              <MediaPermissions
+                :key="editingMediaResult?.editingMedia?.id"
+                v-model="copyrightLevel"
+                v-model:owner="owner"
+                v-model:users="userIds"
+                v-model:note="note"
+                :media="editingMediaResult?.editingMedia"
+              />
             </a-tab-pane>
             <a-tab-pane v-if="type === 'avatar'" key="voice" tab="Voice">
               <AvatarVoice :voice="voice" />
             </a-tab-pane>
-            <a-tab-pane v-if="type === 'avatar' || type === 'prop'" key="link" tab="Link">
+            <a-tab-pane
+              v-if="type === 'avatar' || type === 'prop'"
+              key="link"
+              tab="Link"
+            >
               <PropLink :link="link" />
             </a-tab-pane>
           </a-tabs>
         </div>
       </a-col>
     </a-row>
-    <a-progress v-if="saving" :stroke-color="{
-      from: '#108ee9',
-      to: '#87d068',
-    }" :percent="progress" status="active" class="absolute left-0 bottom-10" :show-info="false">
+    <a-progress
+      v-if="saving"
+      :stroke-color="{
+        from: '#108ee9',
+        to: '#87d068',
+      }"
+      :percent="progress"
+      status="active"
+      class="absolute left-0 bottom-10"
+      :show-info="false"
+    >
       <template #format></template>
     </a-progress>
     <template #footer>
       <a-space>
-        <a-select class="text-left" style="min-width: 200px" v-model:value="tags" mode="tags" placeholder="Tags"
-          :options="result
-            ? result.tags.map((node) => ({
-              value: node.name,
-              label: node.name,
-            }))
-            : []
-            ">
+        <a-select
+          class="text-left"
+          style="min-width: 200px"
+          v-model:value="tags"
+          mode="tags"
+          placeholder="Tags"
+          :options="
+            result
+              ? result.tags.map((node) => ({
+                  value: node.name,
+                  label: node.name,
+                }))
+              : []
+          "
+        >
         </a-select>
-        <a-button key="submit" type="primary" :loading="saving" @click="saveMedia">
+        <a-button
+          key="submit"
+          type="primary"
+          :loading="saving"
+          @click="saveMedia"
+        >
           <span v-if="saving">Saving {{ progress }}%</span>
           <span v-else>{{ $t("save") }}</span>
         </a-button>
