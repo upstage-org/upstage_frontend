@@ -1,23 +1,23 @@
 <template>
   <div
-    v-for="mediaType in types"
-    :key="mediaType"
+    v-for="assetType in types"
+    :key="assetType"
     class="columns is-vcentered has-text-centered"
   >
     <div class="column is-1">
       <h4 class="subtitle">
-        <Icon :src="mediaType + '.svg'" />
+        <Icon :src="assetType + '.svg'" />
         <br />
-        {{ mediaType }}
+        {{ assetType }}
         <br />
-        <small>({{ mediaGroups[mediaType].length }})</small>
+        <small>({{ mediaGroups[assetType].length }})</small>
       </h4>
     </div>
     <div class="column is-11">
       <div class="toolbox">
         <div class="scroller">
           <div
-            v-for="item in mediaGroups[mediaType]"
+            v-for="item in mediaGroups[assetType]"
             :key="item.id"
             :id="item.id"
             class="media-preview"
@@ -30,12 +30,12 @@
             @drop.prevent="drop"
           >
             <div style="pointer-events: none">
-              <div v-if="mediaType === 'audio'">
+              <div v-if="assetType === 'audio'">
                 <Icon src="audio.svg" />
                 <br />
                 <b>{{ item.name }}</b>
               </div>
-              <div v-else-if="mediaType === 'video'">
+              <div v-else-if="assetType === 'video'">
                 <Icon src="stream.svg" />
                 <br />
                 <b>{{ item.name }}</b>
@@ -64,12 +64,15 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"]);
 
 const types = computed(() => [
-  ...new Set(props.modelValue.map((media) => media.mediaType)),
+  ...new Set(props.modelValue.map((media) => media.assetType)),
 ]);
+
+console.log("T", props.modelValue);
+
 const mediaGroups = computed(() => {
   const res = {};
   props.modelValue.forEach((item) => {
-    res[item.mediaType] = (res[item.mediaType] ?? []).concat(item);
+    res[item.assetType] = (res[item.assetType] ?? []).concat(item);
   });
   return res;
 });
