@@ -1,14 +1,8 @@
 <template>
   <div class="columns">
     <div class="column">
-      <button class="button mr-2 is-dark" :class="{ 'is-warning': reordering }" @click="reordering = !reordering">
-        <span class="icon">
-          <i class="fas fa-arrow-left" v-if="reordering"></i>
-          <i class="fas fa-arrows-alt" v-else></i>
-        </span>
-        <span v-if="reordering">{{ $t("exit_reorder_mode") }}</span>
-        <span v-else>{{ $t("reorder_mode") }}</span>
-      </button>
+
+        <b><span v-if="reordering">Media assigned to this Stage</span></b>
       <template v-if="!reordering">
         <Dropdown class="mr-2" v-model="filter.type" :data="mediaTypes" :render-value="(item) => item.value"
           :render-label="(item) => item.label" placeholder="Media type" />
@@ -179,7 +173,7 @@ export default {
       }
     });
 
-    const reordering = ref(false);
+    const reordering = ref(true);
 
     return {
       loading,
