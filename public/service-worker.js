@@ -1,14 +1,15 @@
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // Activate the new service worker immediately
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim()); // Take control of the page immediately
+  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('fetch', (event) => {
-  event.respondWith(fetch(event.request)); // Basic fetch handling
+  event.respondWith(fetch(event.request));
 });
+
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'CHECK_UPDATE') {
     self.clients.matchAll().then(clients => {
