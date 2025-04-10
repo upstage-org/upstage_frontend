@@ -49,7 +49,7 @@ const handleOk = async () => {
     {{ media.name }}.
     <a-textarea
       v-model:value="note"
-      :placeholder="`Please write something so that ${media.owner.username} can understand more about your purpose of using the media...`"
+      :placeholder="`Please write something so that ${media.owner.username} can understand your purpose of using the media.`"
       :auto-size="{ minRows: 2, maxRows: 5 }"
     />
   </a-modal>
