@@ -6,11 +6,11 @@
   >
     <div class="column is-1">
       <h4 class="subtitle">
-        <Icon :src="assetType + '.svg'" />
+        <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px;" />
         <br />
         {{ assetType }}
         <br />
-        <small>({{ mediaGroups[assetType].length }})</small>
+        <small>({{ mediaGroups[assetType]?.length }})</small>
       </h4>
     </div>
     <div class="column is-11">
@@ -66,8 +66,6 @@ const emit = defineEmits(["update:modelValue"]);
 const types = computed(() => [
   ...new Set(props.modelValue.map((media) => media.assetType)),
 ]);
-
-console.log("T", props.modelValue);
 
 const mediaGroups = computed(() => {
   const res = {};

@@ -88,7 +88,7 @@
             <strong>{{ $t("login") }}</strong>
           </router-link>
           <router-link
-            v-if="foyer.showRegistration"
+            v-if="showRegistration"
             to="/register"
             class="button is-primary m-2 mr-6"
           >
@@ -121,7 +121,7 @@ export default {
     const toggleExpanded = () => (expanded.value = !expanded.value);
 
     const navigations = computed(() => store.getters["config/navigations"]);
-    const foyer = computed(() => store.getters["config/foyer"]);
+    const showRegistration = computed(() => store.getters["config/foyer"]?.showRegistration?.value ?? false);
     const isAdmin = computed(() => store.getters["user/isAdmin"]);
     const isGuest = computed(() => store.getters["user/isGuest"]);
 
@@ -138,7 +138,7 @@ export default {
       toggleExpanded,
       loggedIn,
       logout,
-      foyer,
+      showRegistration,
       isShow,
       navigations,
       isAdmin,
