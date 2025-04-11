@@ -4,7 +4,7 @@
     <span class="tag is-light is-small" :class="{
       'is-danger': status === 'LIVE',
       'is-warning': status === 'CONNECTING',
-      'is-rehearsal': masquerading
+      'is-rehearsal': status === 'REHEARSAL'
     }">
       <template v-if="replaying">
         <span class="icon">
@@ -57,7 +57,12 @@ export default {
   setup: () => {
     const store = useStore();
     const dot = ref();
-    const status = computed(() => store.state.stage.status);
+    const status = computed(() => {
+      if (store.state.stage?.model?.status == 'rehearsal') {
+        return 'REHEARSAL'
+      }
+      return store.state.stage.status
+    });
     const players = computed(() => store.getters["stage/players"]);
     const audiences = computed(() => store.getters["stage/audiences"]);
     const masquerading = computed(() => store.state.stage.masquerading);
