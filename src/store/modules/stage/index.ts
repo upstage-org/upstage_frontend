@@ -1162,7 +1162,7 @@ export default {
       //  await stageGraph.loadPermission(
       //   state.model.fileLocation,
       // );
-      if (permission == "owner" || permission == "editor") {
+      if (permission == "owner" || permission == "editor" || permission == "player") {
         commit("SET_SHOW_CLEAR_CHAT_SETTINGS", true);
         commit("SET_SHOW_DOWNLOAD_CHAT_SETTINGS", true);
       } else {
