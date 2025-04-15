@@ -4,7 +4,7 @@
   </span>
   <slot name="render" :open="openModal" />
   <teleport to="body">
-    <div v-if="isActive" class="modal is-active" :id="id">
+    <div v-if="isActive" class="modal is-active" :id="id" :style="{ ...styles }">
       <div class="modal-background" @click="closeModal"></div>
       <div class="modal-card" :style="{ width, height }">
         <slot>
@@ -44,6 +44,10 @@ export default {
       type: String,
       default: "unset",
     },
+    styles: {
+      type: String,
+      default: null,
+    }
   },
   emits: ["update:modelValue"],
   setup: (props, { emit }) => {

@@ -42,8 +42,8 @@
                 ? 'fas fa-times'
                 : 'fas'
             " :help="!form.fileLocation &&
-              `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
-              " :error="urlError" :disabled="!!stage.id" class="half-flex" maxlength="20" />
+                `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
+                " :error="urlError" :disabled="!!stage.id" class="half-flex" maxlength="20" />
       </div>
     </div>
 
@@ -112,8 +112,8 @@
           'Player access',
           'Player and edit access',
         ]" :data="users" :owner="owner" :renderLabel="displayName" :renderValue="(item) => item.id" :renderKeywords="(item) =>
-          `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
-          " v-model="playerAccess" />
+            `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
+            " v-model="playerAccess" />
       </div>
     </div>
 
@@ -122,7 +122,9 @@
         <label class="label">{{ $t("cover_image") }}</label>
       </div>
       <div class="field-body">
-        <ImagePicker v-model="form.cover" />
+        <Dropzone>
+          <ImagePicker v-model="form.cover" />
+        </Dropzone>
       </div>
     </div>
   </div>

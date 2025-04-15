@@ -73,28 +73,22 @@ const handleUpload = async (file: UploadFile) => {
       return;
     }
   }
-  if(editingMediaResult.value?.editingMedia?.id) {
+  if (editingMediaResult.value?.editingMedia?.id) {
     const { assetType } = editingMediaResult.value?.editingMedia;
-    if(["video","audio"].includes(assetType?.name) && !fileType.includes(assetType?.name) ||
-      (fileType.includes("video") || fileType.includes("audio")) && !["video","audio"].includes(assetType?.name)
-    ){
+    if (["video", "audio"].includes(assetType?.name) && !fileType.includes(assetType?.name) ||
+      (fileType.includes("video") || fileType.includes("audio")) && !["video", "audio"].includes(assetType?.name)
+    ) {
       message.error("Invalid file type!");
       return;
     }
-    files.value =[{
-      ...file,
-      id: files.value.length,
-      preview: toSrc(file),
-      status: "local",
-    }];
-  } else {
-    files.value = files.value.concat({
-      ...file,
-      id: files.value.length,
-      preview: toSrc(file),
-      status: "local",
-    });
+
   }
+  files.value = files.value.concat({
+    ...file,
+    id: files.value.length,
+    preview: toSrc(file),
+    status: "local",
+  });
 };
 
 const uploadFile = async (file: any) => {
@@ -131,6 +125,7 @@ const uploadFile = async (file: any) => {
 
   .ant-modal {
     max-width: unset;
+
     .ant-modal-content {
       height: 100%;
       padding-right: 48px;
