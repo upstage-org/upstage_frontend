@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { gql } from "graphql-request";
 import { stageGraph, studioClient } from ".";
-import { studioClient } from '../graphql';
+import { studioClient } from "../graphql";
 
 export const stageFragment = gql`
   fragment stageFragment on Stage {
@@ -57,6 +57,7 @@ export const assetFragment = gql`
       displayName
     }
     copyrightLevel
+    dormant
     permissions {
       id
       userId
@@ -84,13 +85,19 @@ export default {
   createStage: async (variables) => {
     let result = await studioClient.request(
       gql`
-        mutation CreateStage($name: String, $fileLocation: String, $status: String) {
-          createStage(input: { name: $name, fileLocation: $fileLocation, status: $status }) {
+        mutation CreateStage(
+          $name: String
+          $fileLocation: String
+          $status: String
+        ) {
+          createStage(
+            input: { name: $name, fileLocation: $fileLocation, status: $status }
+          ) {
             id
           }
         }
       `,
-      variables,
+      variables
     );
     if (result) {
       variables.id = result.createStage.id;
@@ -128,7 +135,7 @@ export default {
         }
         ${stageFragment}
       `,
-      variables,
+      variables
     ),
   updateStatus: (stageId) =>
     studioClient.request(gql`
@@ -159,99 +166,95 @@ export default {
       gql`
         mutation SweepStage($id: ID!) {
           sweepStage(id: $id) {
-              success
-              performanceId
+            success
+            performanceId
           }
         }
       `,
-      variables,
+      variables
     ),
   stageList: (variables) =>
     studioClient.request(
       gql`
-        query StageTable(
-          $page: Int
-          $limit: Int
-        ) {
-          stages(input:{
-            page: $page
-            limit: $limit
-          }) {
+        query StageTable($page: Int, $limit: Int) {
+          stages(input: { page: $page, limit: $limit }) {
             totalCount
             edges {
-                ...stageFragment
+              ...stageFragment
             }
           }
         }
         ${stageFragment}
       `,
-      variables,
+      variables
     ),
   getStage: (id) =>
     studioClient.request(
       gql`
-          query stage($id: ID!) {
-            stage(id: $id) {
-              ...stageFragment
-              chats {
-                  payload
-                  performanceId
-              }
-              performances {
+        query stage($id: ID!) {
+          stage(id: $id) {
+            ...stageFragment
+            chats {
+              payload
+              performanceId
+            }
+            performances {
+              id
+              createdOn
+              name
+              description
+              recording
+            }
+            scenes {
+              id
+              name
+              scenePreview
+              createdOn
+              owner {
                 id
-                createdOn
-                name
-                description
-                recording
-              }
-              scenes {
-                id
-                name
-                scenePreview
-                createdOn
-                owner {
-                  id
-                  username
-                  displayName
-                }
+                username
+                displayName
               }
             }
           }
-          ${stageFragment}
-        `,
-      { id },
+        }
+        ${stageFragment}
+      `,
+      { id }
     ),
   loadStage: (fileLocation, performanceId) =>
     studioClient
       .request(
         gql`
           query ListStage($fileLocation: String, $performanceId: ID) {
-            stageList(input: {
-              fileLocation: $fileLocation
-              performanceId: $performanceId
-            }) {
+            stageList(
+              input: {
+                fileLocation: $fileLocation
+                performanceId: $performanceId
+              }
+            ) {
               ...stageFragment
               permission
               scenes {
                 ...sceneFragment
               }
               events {
-                  id
-                  topic
-                  payload
-                  mqttTimestamp
-                  performanceId
+                id
+                topic
+                payload
+                mqttTimestamp
+                performanceId
               }
             }
           }
           ${stageFragment}
           ${sceneFragment}
         `,
-        { fileLocation, performanceId },
+        { fileLocation, performanceId }
       )
       .then((response) => {
         return {
-          stage: response.stageList[0]
+          stage: response.stageList[0],
         };
       }),
   loadPermission: (fileLocation) =>
@@ -264,7 +267,7 @@ export default {
             }
           }
         `,
-        { fileLocation },
+        { fileLocation }
       )
       .then((response) => response.stageList[0]?.permission),
   loadScenes: (fileLocation) =>
@@ -272,7 +275,7 @@ export default {
       .request(
         gql`
           query ListStage($fileLocation: String) {
-            stageList(input: {fileLocation: $fileLocation}) {
+            stageList(input: { fileLocation: $fileLocation }) {
               scenes {
                 ...sceneFragment
               }
@@ -280,7 +283,7 @@ export default {
           }
           ${sceneFragment}
         `,
-        { fileLocation },
+        { fileLocation }
       )
       .then((response) => response.stageList[0]?.scenes),
   loadEvents: (fileLocation, cursor) =>
@@ -288,7 +291,7 @@ export default {
       .request(
         gql`
           query ListStage($fileLocation: String, $cursor: Int) {
-            stageList(input: {fileLocation: $fileLocation, cursor: $cursor}) {
+            stageList(input: { fileLocation: $fileLocation, cursor: $cursor }) {
               events {
                 id
                 topic
@@ -298,7 +301,7 @@ export default {
             }
           }
         `,
-        { fileLocation, ...cursor ? { cursor: parseInt(cursor) } : {} },
+        { fileLocation, ...(cursor ? { cursor: parseInt(cursor) } : {}) }
       )
       .then((response) => response.stageList[0]?.events),
   uploadMedia: (variables) =>
@@ -310,27 +313,26 @@ export default {
           $mediaType: String!
           $filename: String!
         ) {
-          uploadMedia(input:{
-            name: $name
-            base64: $base64
-            mediaType: $mediaType
-            filename: $filename
-        }) {
+          uploadMedia(
+            input: {
+              name: $name
+              base64: $base64
+              mediaType: $mediaType
+              filename: $filename
+            }
+          ) {
             ...assetFragment
           }
         }
         ${assetFragment}
       `,
-      variables,
+      variables
     ),
   mediaList: (variables) =>
     studioClient.request(
       gql`
         query MediaList($nameLike: String, $mediaType: String) {
-          mediaList(
-            owner: $nameLike
-            mediaType: $mediaType
-          ) {
+          mediaList(owner: $nameLike, mediaType: $mediaType) {
             ...assetFragment
             stages {
               id
@@ -341,7 +343,7 @@ export default {
         }
         ${assetFragment}
       `,
-      variables,
+      variables
     ),
   mediaTypeList: (variables) =>
     studioClient.request(
@@ -353,7 +355,7 @@ export default {
           }
         }
       `,
-      variables,
+      variables
     ),
   saveStageMedia: (id, mediaIds) =>
     studioClient.request(
@@ -365,7 +367,7 @@ export default {
         }
         ${stageFragment}
       `,
-      { id, mediaIds },
+      { id, mediaIds }
     ),
   assignStages: (id, stageIds) =>
     studioClient.request(
@@ -376,7 +378,7 @@ export default {
           }
         }
       `,
-      { id, stageIds },
+      { id, stageIds }
     ),
   saveStageConfig: (id, config) =>
     studioClient.request(
@@ -388,7 +390,7 @@ export default {
         }
         ${stageFragment}
       `,
-      { id, config },
+      { id, config }
     ),
   assignableMedia: () =>
     studioClient.request(gql`
@@ -428,22 +430,24 @@ export default {
           $playerAccess: String
           $uploadedFrames: [String]
         ) {
-          updateMedia(input:{
-            id: $id
-            name: $name
-            mediaType: $mediaType
-            description: $description
-            fileLocation: $fileLocation
-            base64: $base64
-            copyrightLevel: $copyrightLevel
-            playerAccess: $playerAccess
-            uploadedFrames: $uploadedFrames
-          }) {
+          updateMedia(
+            input: {
+              id: $id
+              name: $name
+              mediaType: $mediaType
+              description: $description
+              fileLocation: $fileLocation
+              base64: $base64
+              copyrightLevel: $copyrightLevel
+              playerAccess: $playerAccess
+              uploadedFrames: $uploadedFrames
+            }
+          ) {
             id
           }
         }
       `,
-      variables,
+      variables
     ),
   deleteMedia: (id) =>
     studioClient.request(
@@ -455,7 +459,7 @@ export default {
           }
         }
       `,
-      { id },
+      { id }
     ),
   deleteStage: (id) =>
     studioClient.request(
@@ -466,7 +470,7 @@ export default {
           }
         }
       `,
-      { id },
+      { id }
     ),
   saveScene: (variables) =>
     studioClient.request(
@@ -477,17 +481,19 @@ export default {
           $preview: String
           $name: String
         ) {
-          saveScene(input:{
-            stageId: $stageId
-            payload: $payload
-            preview: $preview
-            name: $name
-        }) {
+          saveScene(
+            input: {
+              stageId: $stageId
+              payload: $payload
+              preview: $preview
+              name: $name
+            }
+          ) {
             id
           }
         }
       `,
-      variables,
+      variables
     ),
   deleteScene: (id) =>
     studioClient.request(
@@ -499,7 +505,7 @@ export default {
           }
         }
       `,
-      { id },
+      { id }
     ),
   duplicateStage: ({ id, name }) =>
     studioClient.request(
@@ -512,7 +518,7 @@ export default {
           }
         }
       `,
-      { id, name },
+      { id, name }
     ),
   deletePerformance: (id) =>
     studioClient.request(
@@ -523,7 +529,7 @@ export default {
           }
         }
       `,
-      { id },
+      { id }
     ),
   updatePerformance: (id, name, description) =>
     studioClient.request(
@@ -533,12 +539,14 @@ export default {
           $name: String!
           $description: String
         ) {
-          updatePerformance(input: { id: $id, name: $name, description: $description }) {
+          updatePerformance(
+            input: { id: $id, name: $name, description: $description }
+          ) {
             success
           }
         }
       `,
-      { id, name, description },
+      { id, name, description }
     ),
   startRecording: (stageId, name, description) =>
     studioClient.request(
@@ -559,7 +567,7 @@ export default {
           }
         }
       `,
-      { stageId, name, description },
+      { stageId, name, description }
     ),
   saveRecording: (id) =>
     studioClient.request(
@@ -572,7 +580,7 @@ export default {
           }
         }
       `,
-      { id },
+      { id }
     ),
   getStreamSign: (key) =>
     client
@@ -588,7 +596,43 @@ export default {
             }
           }
         `,
-        { key },
+        { key }
       )
       .then((response) => response.assetList.edges[0]?.node?.sign),
+  getSearchOption: () =>
+    studioClient.request(gql`
+      {
+        whoami {
+          username
+          displayName
+          roleName
+        }
+        users(active: true) {
+          id
+          username
+          displayName
+        }
+        stages(input: {}) {
+          edges {
+            id
+            name
+            createdOn
+            owner {
+              username
+              displayName
+            }
+          }
+        }
+        tags {
+          id
+          name
+          color
+          createdOn
+        }
+        mediaTypes {
+          id
+          name
+        }
+      }
+    `),
 };
