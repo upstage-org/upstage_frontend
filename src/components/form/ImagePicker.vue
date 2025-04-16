@@ -227,7 +227,7 @@ export default {
             (media) =>
               !["audio", "video"].includes(get(media, "assetType.name"))
           )
-          .filter((media) => ![3, 4].includes(media.privilege));
+          .filter((media) => ![0, 3, 4].includes(media.privilege));
       }
 
       if (formData.name) {
