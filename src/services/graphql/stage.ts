@@ -334,11 +334,24 @@ export default {
         query MediaList($nameLike: String, $mediaType: String) {
           mediaList(owner: $nameLike, mediaType: $mediaType) {
             ...assetFragment
+            id
+            name
+            createdOn
+            size
+            description
+            fileLocation
+            dormant
+            assetType {
+              name
+            }
+            copyrightLevel
+            tags
             stages {
               id
               name
               fileLocation
             }
+            privilege
           }
         }
         ${assetFragment}
