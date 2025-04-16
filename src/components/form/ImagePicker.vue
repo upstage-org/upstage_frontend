@@ -81,13 +81,8 @@
             </a-space>
           </div>
         </div>
-        <div class="column is-12 gallery">
-          <div v-for="item in availableImages" :key="item">
-            <div class="card-image clickable" @click="select(item, closeModal)">
-              <Asset :asset="item" />
-            </div>
-          </div>
-        </div>
+        <StageMediaTable :data="availableImages" :loading="loadingMedia"
+          @viewDetail="(item) => select(item, closeModal)" />
       </div>
     </template>
   </modal>
@@ -102,7 +97,7 @@ import { editingMediaVar } from "apollo";
 import Modal from "components/Modal.vue";
 import Loading from "components/Loading.vue";
 import Asset from "components/Asset.vue";
-import { computed, provide, reactive, onMounted, inject } from "vue";
+import { computed, provide, reactive, onMounted, inject, watch } from "vue";
 import { capitalize } from "utils/common";
 import Dropdown from "./Dropdown.vue";
 import { displayName } from "utils/common";
@@ -111,13 +106,14 @@ import { useQuery } from "services/graphql/composable";
 import MediaUpload from "./Media/MediaUpload.vue";
 import MediaForm from 'components/media/MediaForm/index.vue';
 import VNodes from './VNodes';
+import StageMediaTable from './StageMediaTable.vue';
 
 dayjs.extend(isBetween);
 
 export default {
   props: ["modelValue"],
   emits: ["update:modelValue"],
-  components: { Modal, Loading, Asset, Dropdown, MediaUpload, VNodes, MediaForm },
+  components: { Modal, Loading, Asset, Dropdown, MediaUpload, VNodes, MediaForm, StageMediaTable },
   setup: (props, { emit }) => {
     const {
       loading: loadingMedia,
@@ -224,6 +220,16 @@ export default {
 
     const availableImages = computed(() => {
       let medias = mediaList.value;
+
+      if (medias?.length) {
+        medias = medias
+          .filter(
+            (media) =>
+              !["audio", "video"].includes(get(media, "assetType.name"))
+          )
+          .filter((media) => ![3, 4].includes(media.privilege));
+      }
+
       if (formData.name) {
         medias = medias.filter((media) =>
           media.name.toLowerCase().includes(formData.name.toLowerCase()),
@@ -279,6 +285,7 @@ export default {
       users,
       displayName,
       hasFilter,
+      mediaList,
       stages,
       formData,
       result,
