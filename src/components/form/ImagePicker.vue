@@ -239,7 +239,7 @@ export default {
         medias = medias.filter((media) => formData.owners.includes(media.owner.displayName || media.owner.username))
       }
       if (formData.types.length) {
-        medias = medias.filter((media) => formData.types.includes(get(media, 'assetType.id', get(media, 'assetType'))))
+        medias = medias.filter((media) => formData.types.includes(get(media, 'assetType.name', get(media, 'assetType'))))
       }
       if (formData.stages.length) {
         medias = medias.filter((media) => formData.stages.some((stage) => media.stages.some(({ id }) => id === stage)))
