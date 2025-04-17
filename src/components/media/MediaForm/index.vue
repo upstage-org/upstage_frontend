@@ -8,6 +8,7 @@ import {
   inject,
   Ref,
   createVNode,
+  defineModel,
   watch,
   reactive,
   ComputedRef,
@@ -37,6 +38,7 @@ import {
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 
+const model = defineModel()
 const files = inject<Ref<UploadFile[]>>("files");
 
 const { result: editingMediaResult, refetch } = useQuery<{
@@ -269,7 +271,7 @@ watch(files as Ref, ([firstFile]) => {
   }
 });
 
-const visibleDropzone = inject("visibleDropzone");
+const visibleDropzone = inject<Ref<boolean>>("visibleDropzone");
 const composingMode = inject<Ref<boolean>>("composingMode");
 
 watch(visibleDropzone as Ref, (val) => {
@@ -341,6 +343,13 @@ const onDelete = async () => {
     message.error("Error!");
   }
 };
+
+const handleReplace = (): void => {
+  if (visibleDropzone) {
+    visibleDropzone.value = true;
+  }
+  model.value = true;
+}
 
 const { loading: dormanting, mutate: updateStatus } = useMutation(gql`
   mutation updateMediaStatus($id: ID!, $status: MediaStatusEnum!) {
@@ -414,10 +423,9 @@ const onUpdateStatus = async () => {
         ></a-input>
         <template v-if="editingMediaResult?.editingMedia?.id">
           <a-button
-            v-if="files?.length == 1"
             type="primary"
             style="background-color: #1677ff; border-color: #1677ff"
-            @click="visibleDropzone = true"
+            @click="handleReplace"
           >
             <Icon
               src="replace.webp"
