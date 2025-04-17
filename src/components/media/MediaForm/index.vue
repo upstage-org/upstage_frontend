@@ -423,6 +423,7 @@ const onUpdateStatus = async () => {
         ></a-input>
         <template v-if="editingMediaResult?.editingMedia?.id">
           <a-button
+            v-if="files?.length == 1"
             type="primary"
             style="background-color: #1677ff; border-color: #1677ff"
             @click="handleReplace"
