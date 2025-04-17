@@ -1,8 +1,13 @@
+<script setup lang="ts">
+  import { ref } from 'vue';
+  const isReplace = ref<boolean>(false);
+</script>
+
 <template>
-  <Dropzone>
+  <Dropzone v-model="isReplace">
     <MediaFilter />
     <MediaTable>
-      <MediaForm />
+      <MediaForm v-model="isReplace" />
     </MediaTable>
   </Dropzone>
 </template>

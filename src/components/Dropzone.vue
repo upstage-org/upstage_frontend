@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, provide, watch, Ref } from "vue";
+import { ref, provide, watch, Ref, defineModel } from "vue";
 import configs from "config";
 import { message } from "ant-design-vue";
 import { useLazyQuery } from "@vue/apollo-composable";
@@ -14,6 +14,7 @@ import {
 } from "models/studio";
 import { useQuery } from "@vue/apollo-composable";
 
+const model = defineModel()
 const { load, refetch } = useLazyQuery<StudioGraph>(
   gql`
     query WhoAmI {
@@ -81,14 +82,24 @@ const handleUpload = async (file: UploadFile) => {
       message.error("Invalid file type!");
       return;
     }
-
   }
-  files.value = files.value.concat({
-    ...file,
-    id: files.value.length,
-    preview: toSrc(file),
-    status: "local",
-  });
+  if (model.value) {
+    files.value = [{
+      ...file,
+      id: files.value.length,
+      preview: toSrc(file),
+      status: "local",
+    }];
+
+    model.value = !model.value
+  } else {
+    files.value = files.value.concat({
+      ...file,
+      id: files.value.length,
+      preview: toSrc(file),
+      status: "local",
+    });
+  }
 };
 
 const uploadFile = async (file: any) => {
