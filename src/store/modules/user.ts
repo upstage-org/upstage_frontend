@@ -48,6 +48,7 @@ export default {
         if (!token) return;
         const { currentUser } = await userGraph.currentUser();
         commit("SET_USER_DATA", currentUser);
+        commit("SET_NICK_NAME", displayName(currentUser));
         return currentUser;
       } catch (error) {
         const errorMsg = error.response?.errors[0]?.message;
@@ -56,7 +57,7 @@ export default {
             "Missing Authorization Header",
             "Signature verification failed",
             "Signature has expired",
-            "Authenticated Failed"
+            "Authenticated Failed",
           ].some((message) => errorMsg?.includes(message))
         ) {
           logout();
@@ -79,7 +80,7 @@ export default {
             ...avatar,
             name: nickname,
           },
-          { root: true },
+          { root: true }
         );
       } else {
         commit("SET_NICK_NAME", nickname);
@@ -95,14 +96,16 @@ export default {
       commit("SET_LOADING_USER", true);
       try {
         const { currentUser } = await userGraph.currentUser();
-        return [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(String(currentUser?.role));
+        return [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(
+          String(currentUser?.role)
+        );
       } catch (error) {
         if (
           [
             "Missing Authorization Header",
             "Signature verification failed",
             "Signature has expired",
-            "Authenticated Failed"
+            "Authenticated Failed",
           ].some((message) => error.message?.includes(message))
         ) {
           logout();
@@ -133,7 +136,7 @@ export default {
             "Missing Authorization Header",
             "Signature verification failed",
             "Signature has expired",
-            "Authenticated Failed"
+            "Authenticated Failed",
           ].some((message) => error.message?.includes(message))
         ) {
           logout();
@@ -164,7 +167,9 @@ export default {
       return name;
     },
     isAdmin(state) {
-      return [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(String(state.user?.role));
+      return [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(
+        String(state.user?.role)
+      );
     },
     isGuest(state) {
       if (!state.user) {
@@ -181,7 +186,7 @@ export default {
     avatar(state, getters, rootState) {
       if (state.avatarId) {
         const avatar = rootState.stage.board.objects.find(
-          (o) => o.id === state.avatarId,
+          (o) => o.id === state.avatarId
         );
         return avatar;
       }

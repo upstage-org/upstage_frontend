@@ -79,7 +79,7 @@ export default {
 
     watch(loggedIn, () => {
       if (loggedIn.value) {
-        store.dispatch("stage/joinStage");
+        store.dispatch("user/fetchCurrent").then(() => store.dispatch("stage/joinStage"));
         close();
       }
     });
