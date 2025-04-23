@@ -1,9 +1,11 @@
 <template>
-  <router-link :to="`/${stage.fileLocation}`" class="stage">
-    <img class="cover" :src="coverImage(stage.cover)" lazy />
-    <PlayerAudienceCounter :stage-url="stage.fileLocation" class="counter" />
-    <span class="name">{{ stage.name }}</span>
-  </router-link>
+    <router-link :to="`/${stage.fileLocation}`" class="stage">
+      <div class="name">
+        {{ stage.name }}
+      </div>
+      <img class="cover" :src="coverImage(stage.cover)" lazy />
+      <PlayerAudienceCounter :stage-url="stage.fileLocation" class="counter" />
+    </router-link>
 </template>
 
 <script setup>
@@ -20,10 +22,7 @@ const props = defineProps({
     type: String,
   },
 });
-console.log(
-  props.fallbackCover,
-  `/img/${props.fallbackCover}`,
-);
+console.log(props.fallbackCover, `/img/${props.fallbackCover}`);
 const coverImage = (src) =>
   src ? absolutePath(src) : `/img/${props.fallbackCover}`;
 </script>
@@ -36,7 +35,6 @@ const coverImage = (src) =>
   font-weight: bold;
   font-size: 25px;
   border: 1px solid black;
-  border-top: 10px solid #007011;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -45,6 +43,8 @@ const coverImage = (src) =>
   color: white;
   border-radius: 12px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 
   .cover {
     width: 100%;
@@ -54,9 +54,8 @@ const coverImage = (src) =>
   }
 
   .name {
-    position: absolute;
-    z-index: 10;
-    top: 0;
+    background-color: #007011;
+    width: 100%;
   }
 
   .counter {
