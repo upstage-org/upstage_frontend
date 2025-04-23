@@ -56,7 +56,7 @@ const coverImage = (src) =>
   .name {
     position: absolute;
     z-index: 10;
-    padding: 2rem;
+    top: 0;
   }
 
   .counter {
