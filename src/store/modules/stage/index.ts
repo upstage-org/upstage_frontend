@@ -108,6 +108,10 @@ export default {
     purchasePopup: {
       isActive: false,
     },
+    receiptPopup: {
+      isActive: false,
+      donationDetails: { amount: 0, date: "" },
+    },
     reloadStreams: null
   },
   getters: {
@@ -676,12 +680,24 @@ export default {
     },
     SET_PURCHASE_POPUP(state, purchase) {
       state.purchasePopup = purchase;
+      if (purchase.isActive) {
+          state.receiptPopup.donationDetails = {
+            ...purchase,
+            date: new Date().toLocaleDateString(),
+          };
+      }
     },
     ADD_TRACK(state, track) {
       state.board.tracks = [...state.board.tracks, track];
     },
     RELOAD_STREAMS(state) {
       state.reloadStreams = new Date();
+    },
+    OPEN_RECEIPT_POPUP(state, { amount, date }) {
+      state.receiptPopup.isActive = true;
+    },
+    CLOSE_RECEIPT_POPUP(state) {
+      state.receiptPopup.isActive = false;
     },
   },
   actions: {
@@ -1395,6 +1411,12 @@ export default {
     openPurchasePopup({ commit }, setting) {
       setting.isActive = true;
       commit("SET_PURCHASE_POPUP", setting);
+    },
+    openReceiptPopup({ commit }, setting) {
+      commit("OPEN_RECEIPT_POPUP", setting);
+    },
+    closeReceiptPopup({ commit }) {
+      commit("CLOSE_RECEIPT_POPUP");
     },
     addTrack({ commit }, track) {
       commit("ADD_TRACK", track);

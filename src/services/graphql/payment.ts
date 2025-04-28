@@ -27,4 +27,12 @@ export default {
             amount:${input.amount}
           })
       }`),
+  generateReceipt: (input) =>
+    studioClient.request(gql`
+      mutation{
+        generateReceipt(receivedFrom: "${input.receivedFrom}", description: "${input.description}" , amount: "${input.amount}",  date: "${input.date}") {
+          fileBase64
+          fileName
+        }
+      }`),
 };
