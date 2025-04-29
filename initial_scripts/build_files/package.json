@@ -52,6 +52,7 @@
     "moment": "^2.29.4",
     "moveable": "^0.24.5",
     "mqtt": "^4.2.6",
+    "node": "^20.14.0",
     "object-hash": "^2.1.1",
     "postcss": "^8.4.32",
     "qr-code-styling": "^1.6.0-rc.1",
