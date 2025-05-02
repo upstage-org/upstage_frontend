@@ -54,9 +54,9 @@ const onSave =(payload: any) =>{
       </a>
       <template #overlay>
         <a-menu>
-          <a :href="to('')">
+          <RouterLink to="/">
             <a-menu-item>{{ $t("foyer") }}</a-menu-item>
-          </a>
+          </RouterLink>
           <a-menu-item @click="logout">{{ $t("logout") }}</a-menu-item>
         </a-menu>
       </template>

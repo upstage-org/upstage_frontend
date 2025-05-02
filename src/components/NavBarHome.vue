@@ -72,13 +72,13 @@
 
       <div class="navbar-end">
         <template v-if="loggedIn">
-          <a
+          <RouterLink
             v-if="!isGuest"
-            href="/stages/"
+            to="/stages"
             class="button is-primary m-2"
           >
             <strong>{{ $t("studio") }}</strong>
-          </a>
+          </RouterLink>
           <button @click="logout" class="button m-2 mr-6">
             <strong>{{ $t("logout") }}</strong>
           </button>

@@ -3,7 +3,6 @@ import { useLoading } from "hooks/mutations";
 import { VNode } from "vue";
 import { ref } from "vue";
 import RichTextEditor from "components/editor/RichTextEditor.vue";
-import { boxShadow } from "html2canvas/dist/types/css/property-descriptors/box-shadow";
 import { configGraph } from 'services/graphql';
 
 const props = defineProps<{
