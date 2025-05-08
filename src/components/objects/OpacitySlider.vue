@@ -70,6 +70,7 @@ export default {
           break;
         case "speed":
           sendChangeMoveSpeed(e);
+          break;
         case "volume":
           sendChangeVolume(e);
           break;
