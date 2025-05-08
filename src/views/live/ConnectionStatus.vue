@@ -46,7 +46,7 @@
 
 <script>
 import { useStore } from "vuex";
-import anime from "animejs";
+import { animate } from "animejs";
 import { ref, computed, onMounted, inject } from "vue";
 import Popover from "components/Popover.vue";
 import Session from "./Session.vue";
@@ -69,7 +69,7 @@ export default {
     const replaying = inject("replaying");
 
     onMounted(() => {
-      anime({
+      animate({
         targets: dot.value,
         opacity: [1, 0, 1],
         duration: 2000,

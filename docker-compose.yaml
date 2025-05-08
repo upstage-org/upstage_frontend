@@ -1,6 +1,6 @@
 services:
   upstage:
-    image: node:18-bookworm
+    image: node:22-bookworm
     container_name: upstage_frontend
     volumes:
       - .:/app
@@ -9,7 +9,8 @@ services:
     working_dir: /app
     command: >
       /bin/sh -c "
-      yarn install --frozen-lockfile &&
-      yarn build &&
+      npm install -g pnpm &&
+      pnpm install --frozen-lockfile &&
+      pnpm build &&
       tail -f /dev/null
       "

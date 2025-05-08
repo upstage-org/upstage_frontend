@@ -32,7 +32,7 @@
 <script>
 import "emoji-picker-element";
 import { computed, ref } from "vue";
-import anime from "animejs";
+import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import ElasticInput from "components/form/ElasticInput.vue";
 import { useStore } from "vuex";
@@ -76,7 +76,7 @@ export default {
       el.addEventListener("emoji-click", handleEmoji);
       el.shadowRoot.querySelector("#search").placeholder =
         'Hold "Shift" key to select multiple';
-      anime({
+      animate({
         targets: el,
         scaleX: [0, 1],
         scaleY: [0, 1],

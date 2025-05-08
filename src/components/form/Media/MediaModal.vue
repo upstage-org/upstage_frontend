@@ -83,7 +83,7 @@
 </template>
 
 <script>
-import { reactive, ref } from "@vue/reactivity";
+import { reactive, ref } from "vue";
 import { useMutation, useQuery } from "services/graphql/composable";
 import { stageGraph, userGraph } from "services/graphql";
 import { computed, inject, watch } from "@vue/runtime-core";

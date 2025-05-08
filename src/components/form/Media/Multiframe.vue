@@ -2,7 +2,7 @@
 import { stageGraph } from "services/graphql";
 import { useQuery } from "services/graphql/composable";
 import { defineProps, watch } from "@vue/runtime-core";
-import { reactive } from "@vue/reactivity";
+import { reactive } from "vue";
 import Switch from "components/form/Switch.vue";
 import HorizontalField from "components/form/HorizontalField.vue";
 import MultiSelectList from "components/MultiSelectList.vue";

@@ -34,7 +34,7 @@ import { ref } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
 import { useStore } from "vuex";
-import anime from "animejs";
+import { animate } from "animejs";
 
 export default {
   props: ["object", "controlable", "active"],
@@ -215,7 +215,7 @@ export default {
         if (animation) {
           animation.pause(true);
         }
-        animation = anime({
+        animation = animate({
           targets: el.value,
           left,
           top,

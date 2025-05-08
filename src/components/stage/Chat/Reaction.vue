@@ -40,7 +40,7 @@
 <script>
 import { computed, watch } from "vue";
 import { useStore } from "vuex";
-import anime from "animejs";
+import { animate } from "animejs";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
 
@@ -69,14 +69,14 @@ export default {
     const flyingReactions = computed(() => store.state.stage.reactions);
 
     const flyin = (el) => {
-      anime({
+      animate({
         targets: el,
         translateY: [100, 0],
         scale: [1, 1.5, 1],
       });
     };
     const flyout = (el, complete) => {
-      anime({
+      animate({
         targets: el,
         scale: 0,
         rotate: 180,

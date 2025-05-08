@@ -53,7 +53,7 @@ import LoginForm from "components/LoginForm.vue";
 import InputButtonPostfix from "components/form/InputButtonPostfix.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import anime from "animejs";
+import { animate } from "animejs";
 import { message } from "ant-design-vue";
 
 export default {
@@ -67,7 +67,7 @@ export default {
     const modal = ref();
 
     onMounted(() => {
-      anime({
+      animate({
         targets: modal.value,
         rotate: ["-3deg", "3deg", "0deg"],
         duration: 100,

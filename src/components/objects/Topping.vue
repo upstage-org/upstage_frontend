@@ -25,7 +25,7 @@
 <script>
 import { computed } from "vue";
 import { useStore } from "vuex";
-import anime from "animejs";
+import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Linkify from "components/Linkify.vue";
 import { outOfViewportPosition } from "utils/common";
@@ -47,25 +47,25 @@ export default {
       let count = 0;
       while (pos && count < 5) {
         if (pos === "top") {
-          anime({
+          animate({
             targets: el,
             translateY: props.object.h + el.getBoundingClientRect().height,
             translateX: -props.object.h / 2,
             rotate: 180,
           });
-          anime({
+          animate({
             targets: el.firstElementChild,
             rotate: 180,
           });
         }
         if (pos === "left") {
-          anime({
+          animate({
             targets: el,
             translateX: -el.getBoundingClientRect().left - props.object.w / 2,
           });
         }
         if (pos === "right") {
-          anime({
+          animate({
             targets: el,
             translateX:
               (window.innerWidth || document.documentElement.clientWidth) -
@@ -79,7 +79,7 @@ export default {
       console.log(config.value?.animations?.bubbleSpeed);
       switch (config.value?.animations?.bubble) {
         case "fade":
-          anime({
+          animate({
             targets: el,
             opacity: [0, 1],
             duration,
@@ -88,7 +88,7 @@ export default {
           break;
 
         case "bounce":
-          anime({
+          animate({
             targets: el,
             scale: [0, 1],
             rotate: [180, 0],
@@ -108,7 +108,7 @@ export default {
       const duration = config.value?.animations?.bubbleSpeed ?? 1000;
       switch (config.value?.animations?.bubble) {
         case "fade":
-          anime({
+          animate({
             targets: el,
             opacity: 0,
             duration,
@@ -117,7 +117,7 @@ export default {
           break;
 
         case "bounce":
-          anime({
+          animate({
             targets: el,
             scale: [1, 0],
             rotate: [0, 180],

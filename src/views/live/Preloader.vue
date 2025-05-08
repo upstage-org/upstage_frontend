@@ -58,7 +58,7 @@
 <script>
 import { computed, inject, ref, watch, watchEffect, onUnmounted } from "vue";
 import { useStore } from "vuex";
-import anime from "animejs";
+import { animate } from "animejs";
 import { useAttribute } from "services/graphql/composable";
 
 export default {
@@ -116,7 +116,7 @@ export default {
     const ready = computed(() => store.getters["stage/ready"]);
     const clicked = ref(false); // Trick the user to click in order to play meSpeak voice
     const leave = (el, complete) => {
-      anime({
+      animate({
         targets: el,
         translateY: "-100%",
         easing: "easeOutBack",

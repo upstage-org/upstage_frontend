@@ -21,7 +21,6 @@
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import "styles/bulma.css";
-import "styles/bulma_slider.css";
 import "styles/custom.less";
 
 // Store initialization
