@@ -7,6 +7,7 @@ rm -rf /frontend_app/dist
 cp -r ./initial_scripts/build_files/* $build_dir
 cp -r ./src $build_dir
 cp -r ./public $build_dir
+cp -r ./public/favicon.ico $build_dir
 cp -r ./docker-compose.yaml $build_dir
 
 cd $build_dir
