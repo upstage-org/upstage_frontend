@@ -894,7 +894,7 @@ export default {
       }
       return object;
     },
-    shapeObject({ commit, state }, object) {
+    shapeObject({ commit, state, rootGetters }, object) {
       if (object.liveAction) {
         if (object.published) {
           mqtt.sendMessage(TOPICS.BOARD, {
@@ -903,6 +903,7 @@ export default {
           });
         } else {
           object.published = true;
+          object.displayName = rootGetters["user/nickname"];
           mqtt.sendMessage(TOPICS.BOARD, {
             type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
             object: serializeObject(object),

@@ -25,7 +25,9 @@
       <Icon src="meeting.svg" size="48" />
       <span class="tag is-light is-block stream-key">{{ data.name }}</span>
     </div>
-    <Icon v-else-if="!data.src" src='meeting.svg' size="36" />
+    <a-tooltip v-else-if="!data.src" :title=data.displayName>
+      <Icon src='meeting.svg' size="36" />
+    </a-tooltip>
     <Image v-else :src="data.src" />
     <Icon v-if="data.multi" class="is-multi" title="This is a multiframe avatar" src="multi-frame.svg" />
   </div>
