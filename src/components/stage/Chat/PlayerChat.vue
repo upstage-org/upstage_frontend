@@ -73,7 +73,7 @@ export default {
     const scrollToEnd = () => {
       animate(theContent.value, {
         scrollTop: theContent.value?.scrollHeight,
-        ease: "easeInOutQuad",
+        ease: "inOutQuad",
       });
     };
     const sendChat = () => {
@@ -106,7 +106,7 @@ export default {
       animate(el, {
         scaleY: 0,
         translateX: -200,
-        ease: "easeInOutExpo",
+        ease: "inOutExpo",
         onComplete: complete,
       });
     };

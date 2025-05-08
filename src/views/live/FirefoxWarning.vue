@@ -91,7 +91,7 @@ export default {
         animate(icon.value, {
           scale: [1, 1.5, 1],
           rotate: [45, -45, 45, -45, 0],
-          ease: "easeInOutQuad",
+          ease: "inOutQuad",
         });
       }
     }, 3000);

@@ -100,7 +100,7 @@ export default {
       if (topbar) {
         animate(topbar, {
           scrollLeft: topbar.scrollWidth,
-          ease: "easeInOutQuad",
+          ease: "inOutQuad",
         });
       }
     };

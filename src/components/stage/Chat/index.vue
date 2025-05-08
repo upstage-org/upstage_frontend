@@ -100,7 +100,7 @@ export default {
     const scrollToEnd = () => {
       animate(theContent.value, {
         scrollTop: theContent.value?.scrollHeight,
-        ease: "easeInOutQuad",
+        ease: "inOutQuad",
       });
     };
     const sendChat = () => {

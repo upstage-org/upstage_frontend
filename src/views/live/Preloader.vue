@@ -118,7 +118,7 @@ export default {
     const leave = (el, complete) => {
       animate(el, {
         translateY: "-100%",
-        easing: "easeOutBack",
+        ease: "outBack",
         onComplete: complete,
       });
     };

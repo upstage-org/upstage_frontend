@@ -72,7 +72,7 @@ export default {
         duration: 100,
         direction: "alternate",
         loop: 5,
-        ease: "easeOutBack",
+        ease: "outBack",
       });
     });
 

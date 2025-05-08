@@ -86,7 +86,7 @@ export default {
         scale: [0, 1],
         translateY: [-200, 0],
         duration: config.value.animateDuration,
-        ease: "easeInOutQuad",
+        ease: "inOutQuad",
         onComplete: complete,
       });
     };
@@ -95,7 +95,7 @@ export default {
         scale: 0,
         rotate: 180,
         duration: config.value.animateDuration,
-        ease: "easeInOutQuad",
+        ease: "inOutQuad",
         onComplete: complete,
       });
     };

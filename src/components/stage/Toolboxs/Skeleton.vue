@@ -25,6 +25,7 @@
       <Icon src="meeting.svg" size="48" />
       <span class="tag is-light is-block stream-key">{{ data.name }}</span>
     </div>
+    <Icon v-else-if="!data.src" src='meeting.svg' size="36" />
     <Image v-else :src="data.src" />
     <Icon v-if="data.multi" class="is-multi" title="This is a multiframe avatar" src="multi-frame.svg" />
   </div>
@@ -144,6 +145,8 @@ export default {
     };
 
     const dropzone = ref(false);
+
+    console.log(props.data)
 
     return {
       dragstart,
