@@ -55,7 +55,10 @@
     const response = await fetch("/version.json", { cache: "no-store" });
     const data: VersionData = await response.json();
     latestVersion.value = data.version;
- 
+    
+    if (!localStorage.getItem("appVersion") ) {
+      localStorage.setItem("appVersion", latestVersion.value);
+    }
  
     currentVersion.value = localStorage.getItem("appVersion") || latestVersion.value;
     showReloadPrompt.value = false;
