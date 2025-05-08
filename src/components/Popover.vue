@@ -17,7 +17,7 @@
 
 <script>
 import { ref } from "vue";
-import anime from "animejs";
+import { animate } from "animejs";
 export default {
   setup: () => {
     const position = ref();
@@ -33,7 +33,7 @@ export default {
     };
 
     const enter = (el, complete) => {
-      anime({
+      animate({
         targets: el,
         complete,
       });

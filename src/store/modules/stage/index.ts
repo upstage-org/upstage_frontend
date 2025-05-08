@@ -29,7 +29,7 @@ import { getViewport } from "./reactiveViewport";
 import { stageGraph } from "services/graphql";
 import { useAttribute } from "services/graphql/composable";
 import { avatarSpeak, stopSpeaking } from "services/speech";
-import anime from "animejs";
+import { animate } from "animejs";
 import { Promise } from "core-js";
 
 const mqtt = buildClient();
@@ -281,7 +281,7 @@ export default {
         ) {
           if (!state.background || state.background.id !== background.id) {
             // Not playing animation if only opacity change
-            anime({
+            animate({
               targets: "#board",
               opacity: [0, 1],
               duration: 5000,
@@ -543,7 +543,7 @@ export default {
       state.curtain = curtain;
     },
     REPLACE_SCENE(state, { payload }) {
-      anime({
+      animate({
         targets: "#live-stage",
         filter: ["brightness(0)", "brightness(1)"],
         easing: "linear",
@@ -1209,7 +1209,7 @@ export default {
       }
     },
     replaceScene({ state, commit, dispatch }, sceneId) {
-      anime({
+      animate({
         targets: "#live-stage",
         filter: "brightness(0)",
       });

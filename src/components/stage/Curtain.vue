@@ -23,7 +23,7 @@
 
 <script>
 import { computed } from "vue";
-import anime from "animejs";
+import { animate } from "animejs";
 import { useStore } from "vuex";
 export default {
   setup: () => {
@@ -39,7 +39,7 @@ export default {
       const duration = curtainSpeed.value;
       switch (config.value?.animations?.curtain) {
         case "fade":
-          anime({
+          animate({
             targets: el,
             opacity: [0, 1],
             duration,
@@ -48,7 +48,7 @@ export default {
           break;
         case "close":
           el.style.transformOrigin = "0 0";
-          anime({
+          animate({
             targets: el,
             scaleX: [0, 1],
             duration,
@@ -56,7 +56,7 @@ export default {
           });
           break;
         default:
-          anime({
+          animate({
             targets: el,
             scaleY: [0, 1],
             duration,
@@ -68,7 +68,7 @@ export default {
       const duration = curtainSpeed.value;
       switch (config.value?.animations?.curtain) {
         case "fade":
-          anime({
+          animate({
             targets: el,
             opacity: [1, 0],
             duration,
@@ -77,7 +77,7 @@ export default {
           break;
         case "close":
           el.style.transformOrigin = "0 0";
-          anime({
+          animate({
             targets: el,
             scaleX: [1, 0],
             duration,
@@ -85,7 +85,7 @@ export default {
           });
           break;
         default:
-          anime({
+          animate({
             targets: el,
             scaleY: 0,
             duration,
@@ -101,7 +101,7 @@ export default {
     const dualCurtainEnter = (el, complete) => {
       const duration = curtainSpeed.value;
       el.style.transformOrigin = "100% 0";
-      anime({
+      animate({
         targets: el,
         scaleX: [0, 1],
         duration,
@@ -112,7 +112,7 @@ export default {
     const dualCurtainLeave = (el, complete) => {
       const duration = curtainSpeed.value;
       el.style.transformOrigin = "100% 0";
-      anime({
+      animate({
         targets: el,
         scaleX: [1, 0],
         duration,

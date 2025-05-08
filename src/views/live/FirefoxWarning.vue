@@ -68,7 +68,7 @@ import { useStore } from "vuex";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
 import Copy from "components/Copy.vue";
-import anime from "animejs";
+import { animate } from "animejs";
 
 export default {
   components: { Icon, Modal, Copy },
@@ -88,7 +88,7 @@ export default {
     const icon = ref();
     const interval = setInterval(() => {
       if (icon.value) {
-        anime({
+        animate({
           targets: icon.value,
           scale: [1, 1.5, 1],
           rotate: [45, -45, 45, -45, 0],

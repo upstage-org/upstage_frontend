@@ -71,7 +71,7 @@
 
 <script>
 import { computed, onMounted, ref, watch, watchEffect } from "vue";
-import anime from "animejs";
+import { animate } from "animejs";
 import { useStore } from "vuex";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
@@ -98,7 +98,7 @@ export default {
     const message = ref("");
     const collapsed = ref(false);
     const scrollToEnd = () => {
-      anime({
+      animate({
         targets: theContent.value,
         scrollTop: theContent.value?.scrollHeight,
         easing: "easeInOutQuad",
@@ -130,7 +130,7 @@ export default {
     const fontSize = computed(() => store.state.stage.chat.fontSize);
 
     const enter = (el, complete) => {
-      anime({
+      animate({
         targets: el,
         scale: [0, 1],
         translateY: [-200, 0],
@@ -138,7 +138,7 @@ export default {
       });
     };
     const leave = (el, complete) => {
-      anime({
+      animate({
         targets: el,
         scale: 0,
         translateY: -200,
@@ -186,7 +186,7 @@ export default {
     );
     const bounceUnread = (el) => {
       {
-        anime({
+        animate({
           targets: el,
           scale: [1.2, 1],
           duration: 1000,

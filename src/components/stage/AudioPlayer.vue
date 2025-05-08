@@ -15,7 +15,7 @@
 <script>
 import { computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import anime from "animejs";
+import { animate } from "animejs";
 export default {
   setup: () => {
     const store = useStore();
@@ -58,7 +58,7 @@ export default {
     };
 
     const fadeVolume = (audio, volume) => {
-      anime({
+      animate({
         targets: audio,
         volume: volume,
         easing: "linear",

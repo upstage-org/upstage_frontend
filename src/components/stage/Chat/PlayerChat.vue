@@ -51,7 +51,7 @@
 
 <script>
 import { computed, onMounted, ref, watch } from "vue";
-import anime from "animejs";
+import { animate } from "animejs";
 import { useStore } from "vuex";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
@@ -71,7 +71,7 @@ export default {
     const chat = store.state.stage.chat;
     const message = computed(() => store.state.stage.chat.privateMessage);
     const scrollToEnd = () => {
-      anime({
+      animate({
         targets: theContent.value,
         scrollTop: theContent.value?.scrollHeight,
         easing: "easeInOutQuad",
@@ -94,7 +94,7 @@ export default {
     const fontSize = computed(() => store.state.stage.chat.playerFontSize);
 
     const enter = (el, complete) => {
-      anime({
+      animate({
         targets: el,
         scaleY: [0, 1],
         translateX: [-200, 0],
@@ -105,7 +105,7 @@ export default {
       });
     };
     const leave = (el, complete) => {
-      anime({
+      animate({
         targets: el,
         scaleY: 0,
         translateX: -200,

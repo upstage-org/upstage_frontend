@@ -18,7 +18,7 @@
 import Modal from "components/Modal.vue";
 import Upload from "components/form/Upload.vue";
 import MediaModal from "./MediaModal.vue";
-import { ref } from "@vue/reactivity";
+import { ref } from "vue";
 import { inject } from "@vue/runtime-core";
 
 export default {

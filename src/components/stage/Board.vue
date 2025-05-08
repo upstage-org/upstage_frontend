@@ -33,7 +33,7 @@ import Text from "components/objects/Text.vue";
 import Curtain from "components/stage/Curtain.vue";
 import Whiteboard from "components/stage/Whiteboard.vue";
 import Image from "../Image.vue";
-import anime from "animejs";
+import { animate } from "animejs";
 import Backdrop from "./Backdrop.vue";
 
 export default {
@@ -82,7 +82,7 @@ export default {
     };
 
     const avatarEnter = (el, complete) => {
-      anime({
+      animate({
         targets: el.querySelector(".object"),
         scale: [0, 1],
         translateY: [-200, 0],
@@ -92,7 +92,7 @@ export default {
       });
     };
     const avatarLeave = (el, complete) => {
-      anime({
+      animate({
         targets: el.querySelector(".object"),
         scale: 0,
         rotate: 180,

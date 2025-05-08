@@ -51,7 +51,7 @@ import Icon from "components/Icon.vue";
 import { computed, ref, onMounted } from "vue";
 import { useShortcut } from "../../composable";
 import { displayTimestamp } from "utils/common";
-import anime from "animejs";
+import { animate } from "animejs";
 
 export default {
   components: { Icon },
@@ -98,7 +98,7 @@ export default {
     const scrollToEnd = () => {
       const topbar = document.querySelector("#topbar");
       if (topbar) {
-        anime({
+        animate({
           targets: topbar,
           scrollLeft: topbar.scrollWidth,
           easing: "easeInOutQuad",
