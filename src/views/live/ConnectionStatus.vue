@@ -69,8 +69,7 @@ export default {
     const replaying = inject("replaying");
 
     onMounted(() => {
-      animate({
-        targets: dot.value,
+      animate(dot.value, {
         opacity: [1, 0, 1],
         duration: 2000,
         loop: true,

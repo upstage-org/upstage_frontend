@@ -69,20 +69,18 @@ export default {
     const flyingReactions = computed(() => store.state.stage.reactions);
 
     const flyin = (el) => {
-      animate({
-        targets: el,
+      animate(el, {
         translateY: [100, 0],
         scale: [1, 1.5, 1],
       });
     };
     const flyout = (el, complete) => {
-      animate({
-        targets: el,
+      animate(el, {
         scale: 0,
         rotate: 180,
         translateY: 100,
         duration: 2000,
-        complete,
+        onComplete: complete,
       });
     };
 

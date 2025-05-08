@@ -71,10 +71,9 @@ export default {
     const chat = store.state.stage.chat;
     const message = computed(() => store.state.stage.chat.privateMessage);
     const scrollToEnd = () => {
-      animate({
-        targets: theContent.value,
+      animate(theContent.value, {
         scrollTop: theContent.value?.scrollHeight,
-        easing: "easeInOutQuad",
+        ease: "easeInOutQuad",
       });
     };
     const sendChat = () => {
@@ -94,23 +93,21 @@ export default {
     const fontSize = computed(() => store.state.stage.chat.playerFontSize);
 
     const enter = (el, complete) => {
-      animate({
-        targets: el,
+      animate(el, {
         scaleY: [0, 1],
         translateX: [-200, 0],
-        complete: () => {
+        onComplete: () => {
           scrollToEnd();
           complete();
         },
       });
     };
     const leave = (el, complete) => {
-      animate({
-        targets: el,
+      animate(el, {
         scaleY: 0,
         translateX: -200,
-        easing: "easeInOutExpo",
-        complete,
+        ease: "easeInOutExpo",
+        onComplete: complete,
       });
     };
 

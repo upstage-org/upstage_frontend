@@ -58,10 +58,9 @@ export default {
     };
 
     const fadeVolume = (audio, volume) => {
-      animate({
-        targets: audio,
-        volume: volume,
-        easing: "linear",
+      animate(audio, {
+        volume,
+        ease: "linear",
       });
     };
 

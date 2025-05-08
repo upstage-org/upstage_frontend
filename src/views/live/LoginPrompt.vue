@@ -67,13 +67,12 @@ export default {
     const modal = ref();
 
     onMounted(() => {
-      animate({
-        targets: modal.value,
+      animate(modal.value, {
         rotate: ["-3deg", "3deg", "0deg"],
         duration: 100,
         direction: "alternate",
         loop: 5,
-        easing: "easeOutBack",
+        ease: "easeOutBack",
       });
     });
 

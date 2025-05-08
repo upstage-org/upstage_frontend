@@ -82,23 +82,21 @@ export default {
     };
 
     const avatarEnter = (el, complete) => {
-      animate({
-        targets: el.querySelector(".object"),
+      animate(el.querySelector(".object"), {
         scale: [0, 1],
         translateY: [-200, 0],
         duration: config.value.animateDuration,
-        easing: "easeInOutQuad",
-        complete,
+        ease: "easeInOutQuad",
+        onComplete: complete,
       });
     };
     const avatarLeave = (el, complete) => {
-      animate({
-        targets: el.querySelector(".object"),
+      animate(el.querySelector(".object"), {
         scale: 0,
         rotate: 180,
         duration: config.value.animateDuration,
-        easing: "easeInOutQuad",
-        complete,
+        ease: "easeInOutQuad",
+        onComplete: complete,
       });
     };
 

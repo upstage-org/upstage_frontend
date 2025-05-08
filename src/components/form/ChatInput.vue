@@ -76,12 +76,11 @@ export default {
       el.addEventListener("emoji-click", handleEmoji);
       el.shadowRoot.querySelector("#search").placeholder =
         'Hold "Shift" key to select multiple';
-      animate({
-        targets: el,
+      animate(el, {
         scaleX: [0, 1],
         scaleY: [0, 1],
         duration: 500,
-        complete,
+        onComplete: complete,
       });
     };
     const pickerLeave = () => {

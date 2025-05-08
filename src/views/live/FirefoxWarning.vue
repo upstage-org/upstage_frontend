@@ -88,11 +88,10 @@ export default {
     const icon = ref();
     const interval = setInterval(() => {
       if (icon.value) {
-        animate({
-          targets: icon.value,
+        animate(icon.value, {
           scale: [1, 1.5, 1],
           rotate: [45, -45, 45, -45, 0],
-          easing: "easeInOutQuad",
+          ease: "easeInOutQuad",
         });
       }
     }, 3000);

@@ -39,28 +39,25 @@ export default {
       const duration = curtainSpeed.value;
       switch (config.value?.animations?.curtain) {
         case "fade":
-          animate({
-            targets: el,
+          animate(el, {
             opacity: [0, 1],
             duration,
-            complete,
+            onComplete: complete,
           });
           break;
         case "close":
           el.style.transformOrigin = "0 0";
-          animate({
-            targets: el,
+          animate(el, {
             scaleX: [0, 1],
             duration,
-            complete,
+            onComplete: complete,
           });
           break;
         default:
-          animate({
-            targets: el,
+          animate(el, {
             scaleY: [0, 1],
             duration,
-            complete,
+            onComplete: complete,
           });
       }
     };
@@ -68,28 +65,25 @@ export default {
       const duration = curtainSpeed.value;
       switch (config.value?.animations?.curtain) {
         case "fade":
-          animate({
-            targets: el,
+          animate(el, {
             opacity: [1, 0],
             duration,
-            complete,
+            onComplete: complete,
           });
           break;
         case "close":
           el.style.transformOrigin = "0 0";
-          animate({
-            targets: el,
+          animate(el, {
             scaleX: [1, 0],
             duration,
-            complete,
+            onComplete: complete,
           });
           break;
         default:
-          animate({
-            targets: el,
+          animate(el, {
             scaleY: 0,
             duration,
-            complete,
+            onComplete: complete,
           });
       }
     };
@@ -101,22 +95,20 @@ export default {
     const dualCurtainEnter = (el, complete) => {
       const duration = curtainSpeed.value;
       el.style.transformOrigin = "100% 0";
-      animate({
-        targets: el,
+      animate(el, {
         scaleX: [0, 1],
         duration,
-        complete,
+        onComplete: complete,
       });
     };
 
     const dualCurtainLeave = (el, complete) => {
       const duration = curtainSpeed.value;
       el.style.transformOrigin = "100% 0";
-      animate({
-        targets: el,
+      animate(el, {
         scaleX: [1, 0],
         duration,
-        complete,
+        onComplete: complete,
       });
     };
 

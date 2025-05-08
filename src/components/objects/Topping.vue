@@ -47,26 +47,22 @@ export default {
       let count = 0;
       while (pos && count < 5) {
         if (pos === "top") {
-          animate({
-            targets: el,
+          animate(el, {
             translateY: props.object.h + el.getBoundingClientRect().height,
             translateX: -props.object.h / 2,
             rotate: 180,
           });
-          animate({
-            targets: el.firstElementChild,
+          animate(el.firstElementChild, {
             rotate: 180,
           });
         }
         if (pos === "left") {
-          animate({
-            targets: el,
+          animate(el, {
             translateX: -el.getBoundingClientRect().left - props.object.w / 2,
           });
         }
         if (pos === "right") {
-          animate({
-            targets: el,
+          animate(el, {
             translateX:
               (window.innerWidth || document.documentElement.clientWidth) -
               el.getBoundingClientRect().right,
@@ -79,22 +75,20 @@ export default {
       console.log(config.value?.animations?.bubbleSpeed);
       switch (config.value?.animations?.bubble) {
         case "fade":
-          animate({
-            targets: el,
+          animate(el, {
             opacity: [0, 1],
             duration,
-            complete,
+            onComplete: complete,
           });
           break;
 
         case "bounce":
-          animate({
-            targets: el,
+          animate(el,{
             scale: [0, 1],
             rotate: [180, 0],
             translateX: [0, "-50%"],
             duration,
-            complete,
+            onComplete: complete,
           });
           break;
 
@@ -108,21 +102,19 @@ export default {
       const duration = config.value?.animations?.bubbleSpeed ?? 1000;
       switch (config.value?.animations?.bubble) {
         case "fade":
-          animate({
-            targets: el,
+          animate(el,{
             opacity: 0,
             duration,
-            complete,
+            onComplete: complete,
           });
           break;
 
         case "bounce":
-          animate({
-            targets: el,
+          animate(el, {
             scale: [1, 0],
             rotate: [0, 180],
             duration,
-            complete,
+            onComplete: complete,
           });
           break;
 

@@ -33,9 +33,8 @@ export default {
     };
 
     const enter = (el, complete) => {
-      animate({
-        targets: el,
-        complete,
+      animate(el, {
+        onComplete: complete,
       });
     };
 

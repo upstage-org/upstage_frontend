@@ -98,10 +98,9 @@ export default {
     const scrollToEnd = () => {
       const topbar = document.querySelector("#topbar");
       if (topbar) {
-        animate({
-          targets: topbar,
+        animate(topbar, {
           scrollLeft: topbar.scrollWidth,
-          easing: "easeInOutQuad",
+          ease: "easeInOutQuad",
         });
       }
     };

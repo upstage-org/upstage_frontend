@@ -116,11 +116,10 @@ export default {
     const ready = computed(() => store.getters["stage/ready"]);
     const clicked = ref(false); // Trick the user to click in order to play meSpeak voice
     const leave = (el, complete) => {
-      animate({
-        targets: el,
+      animate(el, {
         translateY: "-100%",
         easing: "easeOutBack",
-        complete,
+        onComplete: complete,
       });
     };
     const backdropColor = computed(() => store.state.stage.backdropColor);

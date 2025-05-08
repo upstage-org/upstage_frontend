@@ -98,10 +98,9 @@ export default {
     const message = ref("");
     const collapsed = ref(false);
     const scrollToEnd = () => {
-      animate({
-        targets: theContent.value,
+      animate(theContent.value, {
         scrollTop: theContent.value?.scrollHeight,
-        easing: "easeInOutQuad",
+        ease: "easeInOutQuad",
       });
     };
     const sendChat = () => {
@@ -130,19 +129,17 @@ export default {
     const fontSize = computed(() => store.state.stage.chat.fontSize);
 
     const enter = (el, complete) => {
-      animate({
-        targets: el,
+      animate(el, {
         scale: [0, 1],
         translateY: [-200, 0],
-        complete,
+        onComplete: complete,
       });
     };
     const leave = (el, complete) => {
-      animate({
-        targets: el,
+      animate(el, {
         scale: 0,
         translateY: -200,
-        complete,
+        onComplete: complete,
       });
     };
 
@@ -186,8 +183,7 @@ export default {
     );
     const bounceUnread = (el) => {
       {
-        animate({
-          targets: el,
+        animate(el, {
           scale: [1.2, 1],
           duration: 1000,
         });

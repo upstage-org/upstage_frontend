@@ -281,8 +281,7 @@ export default {
         ) {
           if (!state.background || state.background.id !== background.id) {
             // Not playing animation if only opacity change
-            animate({
-              targets: "#board",
+            animate('#board', {
               opacity: [0, 1],
               duration: 5000,
             });
@@ -543,10 +542,9 @@ export default {
       state.curtain = curtain;
     },
     REPLACE_SCENE(state, { payload }) {
-      animate({
-        targets: "#live-stage",
+      animate("#live-stage", {
         filter: ["brightness(0)", "brightness(1)"],
-        easing: "linear",
+        ease: "linear",
         duration: 3000,
       });
       state.activeMovable = null;
@@ -1209,8 +1207,7 @@ export default {
       }
     },
     replaceScene({ state, commit, dispatch }, sceneId) {
-      animate({
-        targets: "#live-stage",
+      animate("#live-stage", {
         filter: "brightness(0)",
       });
       const scene = state.model.scenes.find((s) => s.id == sceneId);

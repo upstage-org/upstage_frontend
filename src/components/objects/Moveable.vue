@@ -215,8 +215,7 @@ export default {
         if (animation) {
           animation.pause(true);
         }
-        animation = animate({
-          targets: el.value,
+        animation = animate(el.value, {
           left,
           top,
           width,
@@ -227,7 +226,7 @@ export default {
           scaleY,
           ...(moveSpeed > 1000 ? { easing: "linear" } : {}),
           duration: moveSpeed ?? config.animateDuration,
-          update: () => {
+          onUpdate: () => {
             try {
               moveable.updateRect();
             } catch (error) {
