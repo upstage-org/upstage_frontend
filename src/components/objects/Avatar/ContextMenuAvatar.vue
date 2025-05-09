@@ -106,7 +106,7 @@
         <span>{{ $t("slider") }}</span>
       </p>
       <p class="control menu-group-item">
-        <a-tooltip title="Opacity slider">
+        <a-tooltip title="Opacity slider" placement="bottom">
           <button class="button is-light" :class="{
             'has-background-primary-light': sliderMode === 'opacity',
           }" @click="changeSliderMode('opacity')">
@@ -117,7 +117,7 @@
         </a-tooltip>
       </p>
       <p v-if="object.type == 'jitsi'" class="control menu-group-item">
-        <a-tooltip title="Volume">
+        <a-tooltip title="Volume" placement="bottom">
           <button class="button is-light" :class="{
             'has-background-warning-light': sliderMode === 'volume',
           }" @click="changeSliderMode('volume')">
@@ -128,7 +128,7 @@
         </a-tooltip>
       </p>
       <p class="control menu-group-item">
-        <a-tooltip title="Move speed">
+        <a-tooltip title="Move speed" placement="bottom">
           <button class="button is-light" :class="{
             'has-background-danger-light': sliderMode === 'speed',
           }" @click="changeSliderMode('speed')">
@@ -148,7 +148,7 @@
         <span>{{ $t("flip") }}</span>
       </p>
       <p class="control menu-group-item">
-        <a-tooltip title="Flip Horizontal">
+        <a-tooltip title="Flip Horizontal" placement="bottom">
           <button class="button is-light" :class="{
             'has-background-primary-light': object.scaleX === -1,
           }" @click="flipHorizontal">
@@ -157,7 +157,7 @@
         </a-tooltip>
       </p>
       <p class="control menu-group-item">
-        <a-tooltip title="Flip Vertical">
+        <a-tooltip title="Flip Vertical" placement="bottom">
           <button class="button is-light" :class="{
             'has-background-primary-light': object.scaleY === -1,
           }" @click="flipVertical">
@@ -167,7 +167,7 @@
       </p>
     </div>
     <template v-if="hasLink">
-      <a-tooltip :title="object.link.url">
+      <a-tooltip :title="object.link.url" placement="bottom">
         <a class="panel-block" @click="openLink">
           <span class="panel-icon">
             <i class="fas fa-link"></i>
@@ -192,7 +192,7 @@
     <div v-if="object.multi" class="field has-addons menu-group">
       <p class="control menu-group-item" @click="toggleAutoplayFrames()">
         <button class="button is-light">
-          <Icon :src="object.autoplayFrames > 0 ? 'pause.svg' : 'play.svg'" />
+          <Icon :src="object.autoplayFrames > 0 ? 'pause.svg' : 'play.svg'" size="24" />
         </button>
       </p>
       <p v-for="frame in object.frames" :key="frame" @click="switchFrame(frame)" class="control menu-group-item">
