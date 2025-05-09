@@ -45,6 +45,7 @@
           <button class="button is-light">
             <Icon
               :src="currentBackground.speed > 0 ? 'pause.svg' : 'play.svg'"
+              size="24" 
             />
           </button>
         </p>
