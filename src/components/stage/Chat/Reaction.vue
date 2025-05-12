@@ -20,11 +20,11 @@
       <div class="flying-reactions">
         <transition-group :css="false" @enter="flyin" @leave="flyout">
           <div v-for="react in flyingReactions" :key="react" :style="{
-    position: 'fixed',
-    left: react.x + 'px',
-    top: react.y + 'px',
-    fontSize: '42px',
-  }">
+            position: 'fixed',
+            left: react.x + 'px',
+            top: react.y + 'px',
+            fontSize: '42px',
+          }">
             {{ react.reaction }}
           </div>
         </transition-group>
@@ -72,6 +72,8 @@ export default {
       animate(el, {
         translateY: [100, 0],
         scale: [1, 1.5, 1],
+        ease: 'outExpo',
+        duration: 800
       });
     };
     const flyout = (el, complete) => {
@@ -79,7 +81,8 @@ export default {
         scale: 0,
         rotate: 180,
         translateY: 100,
-        duration: 2000,
+        ease: 'outBounce',
+        duration: 800,
         onComplete: complete,
       });
     };
