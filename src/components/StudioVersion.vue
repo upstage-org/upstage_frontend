@@ -7,12 +7,11 @@
 </template>
 
 <script>
-import packageJson from "../../package.json";
+import configs from "config";
 
 export default {
   setup: () => {
-    const { version, versionAlias } = packageJson;
-    return { release: versionAlias, version };
+    return { release: configs.ALIAS_RELEASE_VERSION, version: configs.RELEASE_VERSION };
   },
 };
 </script>

@@ -8,7 +8,9 @@ const {
   VITE_MQTT_USERNAME,
   VITE_MQTT_PASSWORD,
   VITE_JITSI_ENDPOINT,
-  VITE_STRIPE_KEY
+  VITE_STRIPE_KEY,
+  VITE_RELEASE_VERSION,
+  VITE_ALIAS_RELEASE_VERSION
 } = import.meta.env;
 
 const configs = {
@@ -67,7 +69,9 @@ const configs = {
     reconnectPeriod: 4000, // Reconnection interval
     retain: true,
   },
-  STRIPE_KEY: VITE_STRIPE_KEY
+  STRIPE_KEY: VITE_STRIPE_KEY,
+  RELEASE_VERSION: VITE_RELEASE_VERSION || '3.0.0',
+  ALIAS_RELEASE_VERSION: VITE_ALIAS_RELEASE_VERSION || 'Monteiths-3.0.0'
 };
 
 export default configs;

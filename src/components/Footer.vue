@@ -9,13 +9,13 @@
 </template>
 
 <script>
-import { version, versionAlias } from "../../package.json";
+import configs from "config";
 
 export default {
   setup: () => {
     return {
-      release: versionAlias,
-      version,
+      release: configs.ALIAS_RELEASE_VERSION,
+      version: configs.RELEASE_VERSION,
       notInIframe: window.self === window.top,
     };
   },
