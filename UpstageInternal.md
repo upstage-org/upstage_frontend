@@ -24,13 +24,13 @@ src/mails/templates/templates.py
 
 Note that for clients using our email services, we want our email addresses in the SUPPORT_EMAILS list in the back end config file, so that we can get CC-ed on all emails. If the client chooses to use their own email service instead of ours, we can remove ourselves from this list, and not receive CCs. If it's ours, we monitor it, and if it's theirs, we don't.
 
-Only internal to Upstage: 
+Only internal to UpStage: 
 
-In ```upstage_backend/app_containers/docker-compose.yaml``` Upstage has to run a fourth container
+In ```upstage_backend/app_containers/docker-compose.yaml``` UpStage has to run a fourth container
 in the app machine. This fourth container generates email tokens for approved clients who
 can send email through our system: 
 ```
-  # For Upstage internal use only.
+  # For UpStage internal use only.
   #upstage_emails:
 ```
 Uncomment these lines and

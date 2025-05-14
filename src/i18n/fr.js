@@ -205,7 +205,7 @@ export default {
   date: "Date",
   manage: "Gestion",
   registration_button: "Bouton d’enregistrement",
-  enable_upstage_donate: "Activer Donation à Upstage",
+  enable_upstage_donate: "Activer Donation à UpStage",
   shape: "Forme",
   loop: {
     on: "Boucle",

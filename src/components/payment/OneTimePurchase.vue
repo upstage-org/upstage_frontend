@@ -43,7 +43,7 @@
           class="button is-primary is-fullwidth"
           @click="openPurchasePopup()"
         >
-          <span>Donate to Upstage</span>
+          <span>Donate to UpStage</span>
         </button>
       </div>
       <div class="column"></div>
@@ -67,7 +67,7 @@ export default {
         store.dispatch("stage/openPurchasePopup", {
           type: "OneTimePurchase",
           amount: amount.value,
-          title: "Donate to Upstage",
+          title: "Donate to UpStage",
         });
         amount.value = null;
       } else {

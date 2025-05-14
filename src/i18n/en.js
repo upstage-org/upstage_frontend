@@ -184,7 +184,7 @@ export default {
   date: "Date",
   manage: "Manage",
   registration_button: "Registration Button",
-  enable_upstage_donate: "Enable Upstage Donate",
+  enable_upstage_donate: "Enable UpStage Donate",
   shape: "Shape",
   loop: {
     on: "Loop",

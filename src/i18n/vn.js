@@ -179,7 +179,7 @@ export default {
   date: "Ngày",
   manage_media: "Quản lý phương tiện",
   registration_button: "Nút đăng ký",
-  enable_upstage_donate: "Cho phép đóng góp cho Upstage",
+  enable_upstage_donate: "Cho phép đóng góp cho UpStage",
   shape: "Hình dạng",
   loop: {
     on: "Lặp lại",

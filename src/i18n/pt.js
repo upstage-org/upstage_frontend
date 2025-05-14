@@ -203,7 +203,7 @@ export default {
   date: "Data",
   manage: "Gerenciar",
   registration_button: "Botão de registro",
-  enable_upstage_donate: "Activar Doação Upstage",
+  enable_upstage_donate: "Activar Doação UpStage",
   shape: "Forma",
   loop: {
     on: "Ciclo",

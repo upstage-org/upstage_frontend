@@ -205,7 +205,7 @@ export default {
   date: "Datum",
   manage: "Administrera",
   registration_button: "Registreringsknapp",
-  enable_upstage_donate: "Aktivera Upstage Donate",
+  enable_upstage_donate: "Aktivera UpStage Donate",
   shape: "Form",
   loop: {
     on: "Loop",

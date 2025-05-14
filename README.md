@@ -1,4 +1,4 @@
-# Upstage Front End Installation 
+# UpStage Front End Installation 
 Do This After Back End Installation and Configuration. See the upstage_backend repo README for details.
 https://github.com/upstage-org/upstage_backend
 

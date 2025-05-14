@@ -205,9 +205,9 @@ export default {
           });
           loading.value = false;
           if (error) {
-            message.error("Donate to Upstage failure!");
+            message.error("Donate to UpStage failure!");
           } else {
-            message.success("Donate to Upstage success!");
+            message.success("Donate to UpStage success!");
             close();
             store.dispatch("stage/openReceiptPopup", {
               amount: amount.value,
