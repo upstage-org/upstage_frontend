@@ -19,12 +19,10 @@ const isAdmin = computed(() => store.getters["user/isAdmin"]);
 const { result, loading } = useQuery(
   gql`
   {
-    stages(input:{}) {
-        edges {
-          id
-          name
-          permission
-        }
+    getAllStages {
+        id
+        name
+        permission
       }
   }
   `,
@@ -32,8 +30,8 @@ const { result, loading } = useQuery(
   { fetchPolicy: "cache-and-network" },
 );
 const stages = computed(() => {
-  if (result.value?.stages) {
-    return result.value.stages.edges.filter((el: any) => isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
+  if (result.value?.getAllStages) {
+    return result.value.getAllStages.filter((el: any) => isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
       .map(({ id, name }: any) => ({ key: id, name }));
   }
   return [];
