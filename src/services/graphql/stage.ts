@@ -636,6 +636,11 @@ export default {
             }
           }
         }
+        getAllStages {
+            id
+            name
+            permission
+          }
         tags {
           id
           name

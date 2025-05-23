@@ -36,6 +36,11 @@ const { result: response, loading } = useQuery(gql`
         }
       }
     }
+    getAllStages {
+        id
+        name
+        permission
+    }
     tags {
       id
       name
@@ -220,7 +225,7 @@ const onVisibleDropzone = () => {
         </a-select>
         <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags" style="min-width: 160px"
           placeholder="Stages assigned" :loading="loading" v-model:value="stages" :options="result
-            ? result.stages.edges.map((e: any) => ({
+            ? result.getAllStages.map((e: any) => ({
               value: e.id,
               label: e.name,
             }))

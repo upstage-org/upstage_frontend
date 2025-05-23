@@ -57,7 +57,7 @@
                 <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags"
                   style="min-width: 160px" placeholder="Stages assigned" :loading="loading"
                   v-model:value="formData.stages" :options="result
-                    ? result.stages.edges.map((e) => ({
+                    ? result.getAllStages.map((e) => ({
                       value: e.id,
                       label: e.name,
                     }))
