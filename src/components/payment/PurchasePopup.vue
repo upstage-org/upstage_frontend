@@ -21,7 +21,7 @@
               <br />
               <div class="button-purchase">
                 <button class="button is-primary" type="submit" :class="{ 'is-loading': loading }" :disabled="loading">
-                  <span>Donate $ {{ amount }}</span>
+                  <span>Donate USD$ {{ amount }}</span>
                 </button>
               </div>
             </form>
