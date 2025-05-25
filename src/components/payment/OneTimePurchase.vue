@@ -3,7 +3,7 @@
     <div class="columns is-vcentered">
       <div class="column"></div>
       <div class="column"></div>
-      <h4 class="column is-2">Donate to UpStage:</h4>
+      <h4 class="column is-2">Donate to UpStage (amounts shown in US dollars):</h4>
       <div id="choice-buttons" class="column is-5">
         <div>
           <span class="input-symbol-dollar"></span>
@@ -43,7 +43,7 @@
           class="button is-primary is-fullwidth"
           @click="openPurchasePopup()"
         >
-          <span>Donate to UpStage</span>
+          <span>Donate to UpStage (amounts shown in US dollars)</span>
         </button>
       </div>
       <div class="column"></div>
@@ -67,7 +67,7 @@ export default {
         store.dispatch("stage/openPurchasePopup", {
           type: "OneTimePurchase",
           amount: amount.value,
-          title: "Donate to UpStage",
+          title: "Donate to UpStage (amounts shown in US dollars)",
         });
         amount.value = null;
       } else {
