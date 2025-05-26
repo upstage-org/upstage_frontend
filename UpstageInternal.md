@@ -72,7 +72,7 @@ This guide provides step-by-step instructions for backing up and restoring the d
 1. **View Configuration File**  
    Inspect the application configuration file to verify settings.  
    ```bash
-   cat /home/upstage/upstage/config/app1.py
+   cat /app_code/src/global_config/load_env.py
    ```
 
 2. **Backup the Database**  
@@ -84,7 +84,7 @@ This guide provides step-by-step instructions for backing up and restoring the d
 3. **Zip Assets**  
    Navigate to the uploads directory and create a zip archive of the assets.  
    ```bash
-   cd /home/upstage/upstage/uploads
+   cd /app_code/uploads
    zip -r ~/assets.zip assets
    ```
 
