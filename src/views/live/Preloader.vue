@@ -17,7 +17,7 @@
             <template v-if="status !== 'live' && !canPlay">
               <span v-if="status" class="tag is-dark">{{
                 status.toUpperCase()
-                }}</span>&nbsp;
+              }}</span>&nbsp;
               <span>This stage is not currently open to the public. Please come
                 back later!</span>
             </template>
@@ -74,7 +74,7 @@ export default {
       store.commit("stage/SET_PRELOADING_STATUS", false);
     const increaseProgress = () => {
       progress.value++;
-      if (progress.value === preloadableAssets.value.length - 1) {
+      if (progress.value === preloadableAssets.value.length || progress.value === preloadableAssets.value.length - 1) {
         stopLoading();
       }
     };
@@ -186,7 +186,8 @@ section {
     opacity: 0;
   }
 
-  100% {opacity: 1;
+  100% {
+    opacity: 1;
   }
 }
 </style>
