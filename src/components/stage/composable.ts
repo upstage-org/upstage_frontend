@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { onUnmounted, ref } from "vue";
 import buildClient from "services/mqtt";
-import { BACKGROUND_ACTIONS, TOPICS } from "utils/constants";
+import { BACKGROUND_ACTIONS, COLORS, TOPICS } from "utils/constants";
 import { namespaceTopic } from "store/modules/stage/reusable";
 
 export const useCounter = (stageUrl) => {
@@ -69,7 +69,7 @@ export const useHoldingShift = () => {
   return isHoldingShift;
 };
 
-export const useClearStage = (stageUrl) => {
+export const useClearStage = (stageUrl, color) => {
   const mqttClient = buildClient();
   const clearStage = async () => {
     await new Promise((resolve) => {
@@ -77,8 +77,11 @@ export const useClearStage = (stageUrl) => {
         mqttClient
           .sendMessage(
             namespaceTopic(TOPICS.BACKGROUND, stageUrl),
-            { type: BACKGROUND_ACTIONS.BLANK_SCENE },
-            true,
+            {
+              type: BACKGROUND_ACTIONS.SET_BACKDROP_COLOR,
+              color: color || COLORS.DEFAULT_BACKDROP,
+            },
+            true
           )
           .then(resolve);
       });
