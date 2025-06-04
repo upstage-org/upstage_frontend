@@ -1,12 +1,10 @@
 <script lang="ts" setup>
-import dayjs from 'dayjs';
 import {
   computed,
-  reactive,
   inject,
   Ref,
-  ComputedRef,
-  defineProps
+  defineProps,
+  defineEmits
 } from "vue";
 import { editingMediaVar, inquiryVar } from "apollo";
 import configs from "config";
@@ -21,18 +19,37 @@ import { SorterResult } from "ant-design-vue/lib/table/interface";
 import { useI18n } from "vue-i18n";
 import MediaPreview from "components/media/MediaPreview.vue";
 
-const { loading, data } = defineProps(['loading', 'data'])
-const emit = defineEmits(['viewDetail'])
+interface Props {
+  loading?: boolean;
+  data?: Media[];
+  pagination?: {
+    current: number;
+    pageSize: number;
+    total: number;
+    showQuickJumper: boolean;
+    showSizeChanger: boolean;
+  };
+  totalCount?: number;
+  viewDetailAction?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+  data: () => [],
+  viewDetailAction: 'view'
+});
+
+const emit = defineEmits<{
+  viewDetail: [item: Media];
+  change: [params: {
+    current: number;
+    pageSize: number;
+    sorter?: SorterResult<Media> | SorterResult<Media>[];
+  }];
+}>();
 
 const { t } = useI18n();
 const files = inject<Ref<UploadFile[]>>("files");
-
-const tableParams = reactive({
-  page: 1,
-  limit: 10,
-  cursor: undefined,
-  sort: "CREATED_ON_DESC",
-});
 
 const columns = computed<ColumnType<Media>[]>(() => [
   {
@@ -45,41 +62,25 @@ const columns = computed<ColumnType<Media>[]>(() => [
     title: t("name"),
     dataIndex: "name",
     key: "name",
-    sorter: {
-      compare: (a, b) => a.name.localeCompare(b.name)
-    },
+    sorter: true,
   },
   {
     title: t("type"),
     dataIndex: ["assetType", "name"],
     key: "asset_type_id",
-    sorter: {
-      compare: (a, b) => a.assetType.name.localeCompare(b.assetType.name)
-    },
+    sorter: true,
   },
   {
     title: t("owner"),
     dataIndex: "owner",
     key: "owner_id",
-    sorter: {
-      compare: (a, b) => a.owner.username.localeCompare(b.owner.username)
-    },
+    sorter: true,
   },
   {
     title: t("copyright_level"),
     dataIndex: "copyrightLevel",
     key: "copyrightLevel",
-    sorter: {
-      compare: (a, b) => {
-        const beforeValue = configs.MEDIA_COPYRIGHT_LEVELS.find(
-          (l) => l.value === a.copyrightLevel,
-        )
-        const afterValue = configs.MEDIA_COPYRIGHT_LEVELS.find(
-          (l) => l.value === b.copyrightLevel,
-        )
-        return (beforeValue?.name as string).localeCompare(afterValue?.name as string)
-      }
-    },
+    sorter: true,
   },
   {
     title: t("stages"),
@@ -91,9 +92,13 @@ const columns = computed<ColumnType<Media>[]>(() => [
     title: t("size"),
     dataIndex: "size",
     key: "size",
-    sorter: {
-      compare: (a, b) => a.size - b.size
-    },
+    sorter: true,
+  },
+  {
+    title: t("date"),
+    dataIndex: "createdOn",
+    key: "created_on",
+    sorter: true,
   },
   {
     title: `${t("manage")} ${t("media")}`,
@@ -111,34 +116,27 @@ interface Pagination {
   total: number;
 }
 
-interface Sorter {
-  column: any;
-  columnKey: string;
-  field: string;
-  order: "ascend" | "descend";
-}
-
 const handleTableChange = (
-  { current = 1, pageSize = 10 }: TablePaginationConfig,
-  _: any,
+  pagination: TablePaginationConfig,
+  filters: any,
   sorter: SorterResult<Media> | SorterResult<Media>[],
 ) => {
-  const sort = (Array.isArray(sorter) ? sorter : [sorter])
-    .sort(
-      (a, b) =>
-        (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple,
-    )
-    .map(({ columnKey, order }) =>
-      `${columnKey == 'copyrightLevel' ? 'COPYRIGHT_LEVEL' : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
-    );
-  // Object.assign(tableParams, {
-  //   page: current,
-  //   limit: pageSize,
-  //   sort,
-  // });
+  emit('change', {
+    current: pagination.current || 1,
+    pageSize: pagination.pageSize || 20,
+    sorter
+  });
 };
-const dataSource = computed(() => data ? data : []);
 
+const dataSource = computed(() => props.data || []);
+
+const paginationConfig = computed<Pagination>(() => ({
+  current: props.pagination?.current || 1,
+  pageSize: props.pagination?.pageSize || 20,
+  total: props.totalCount || props.pagination?.total || 0,
+  showQuickJumper: props.pagination?.showQuickJumper ?? true,
+  showSizeChanger: props.pagination?.showSizeChanger ?? true,
+}));
 
 const editMedia = (media: Media) => {
   editingMediaVar(media);
@@ -175,18 +173,19 @@ const filterTag = (tag: string) => {
   });
 };
 
-
 </script>
 
 <template>
   <a-layout class="w-full shadow rounded-xl bg-white overflow-hidden">
-    <a-table class="w-full overflow-auto" :columns="columns as ColumnType<Media>[]" :data-source="dataSource"
-      rowKey="id" :loading="loading" @change="handleTableChange" :pagination="{
-        showQuickJumper: true,
-        showSizeChanger: true,
-        total: dataSource.length,
-      } as Pagination
-        ">
+    <a-table 
+      class="w-full overflow-auto" 
+      :columns="columns as ColumnType<Media>[]" 
+      :data-source="dataSource"
+      rowKey="id" 
+      :loading="loading" 
+      @change="handleTableChange" 
+      :pagination="paginationConfig"
+    >
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'preview'">
           <MediaPreview v-if="record.assetType" :media="record as Media" />
