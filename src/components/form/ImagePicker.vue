@@ -19,7 +19,7 @@
                 <a-button type="primary" @click="visibleDropzone = true; onVisibleDropzone()">
                   <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
                 </a-button>
-                <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="formData.name" />
+                <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="searchInput" />
                 <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags"
                   style="min-width: 124px" placeholder="Owners" :loading="loading" v-model:value="formData.owners"
                   :options="result
@@ -81,8 +81,16 @@
             </a-space>
           </div>
         </div>
-        <StageMediaTable :data="availableImages" :loading="loadingMedia"
-          @viewDetail="(item) => select(item, closeModal)" />
+        
+        <StageMediaTable 
+          :data="availableImages" 
+          :loading="loadingMedia" 
+          :pagination="paginationConfig"
+          :totalCount="totalCount"
+          view-detail-action="select"
+          @viewDetail="(item) => select(item, closeModal)" 
+          @change="handleTableChange" 
+        />
       </div>
     </template>
   </modal>
@@ -92,21 +100,23 @@
 <script>
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween'
-import { isEmpty, assign, get } from 'lodash';
+import { assign, get, debounce } from 'lodash';
 import { editingMediaVar } from "apollo";
 import Modal from "components/Modal.vue";
 import Loading from "components/Loading.vue";
 import Asset from "components/Asset.vue";
-import { computed, provide, reactive, onMounted, inject, watch } from "vue";
+import { computed, provide, reactive, inject, watch, ref } from "vue";
 import { capitalize } from "utils/common";
 import Dropdown from "./Dropdown.vue";
-import { displayName } from "utils/common";
 import { stageGraph } from "services/graphql";
 import { useQuery } from "services/graphql/composable";
 import MediaUpload from "./Media/MediaUpload.vue";
 import MediaForm from 'components/media/MediaForm/index.vue';
 import VNodes from './VNodes';
 import StageMediaTable from './StageMediaTable.vue';
+import { useQuery as useApolloQuery } from "@vue/apollo-composable";
+import gql from "graphql-tag";
+import { permissionFragment } from "models/fragment";
 
 dayjs.extend(isBetween);
 
@@ -115,37 +125,16 @@ export default {
   emits: ["update:modelValue"],
   components: { Modal, Loading, Asset, Dropdown, MediaUpload, VNodes, MediaForm, StageMediaTable },
   setup: (props, { emit }) => {
-    const {
-      loading: loadingMedia,
-      nodes: mediaList,
-      refresh,
-    } = useQuery(stageGraph.mediaList);
     const { data, loading } = useQuery(stageGraph.getSearchOption);
-    const type_dis = ["avatar", "prop", "backdrop", "shape", "curtain"];
-    provide("refresh", refresh);
     provide("whoami", null);
     const visibleDropzone = inject("visibleDropzone");
     const result = computed(() => data?.value);
 
-
-    const onVisibleDropzone = () => {
-      editingMediaVar(undefined);
-    }
-
-    onMounted(() => {
-      refresh();
-    });
-
-    const select = (item, closeModal) => {
-      emit("update:modelValue", item.src);
-      closeModal();
-    };
-
-    const filter = reactive({
-      name: null,
-      mediaType: null,
-      owner: null,
-      stage: null,
+    const tableParams = reactive({
+      page: 1,
+      limit: 10,
+      cursor: undefined,
+      sort: "CREATED_ON_DESC",
     });
 
     const formData = reactive({
@@ -155,7 +144,121 @@ export default {
       stages: [],
       tags: [],
       dates: [],
-    })
+    });
+
+    const searchInput = ref('');
+    
+    const debouncedSearch = debounce((value) => {
+      formData.name = value;
+    }, 2000);
+
+    watch(searchInput, (newValue) => {
+      debouncedSearch(newValue);
+    });
+
+    const queryParams = computed(() => {
+      const params = {
+        ...tableParams,
+        name: formData.name || undefined,
+        owners: formData.owners.length ? formData.owners : undefined,
+        mediaTypes: formData.types.length ? formData.types : undefined,
+        stages: formData.stages.length ? formData.stages : undefined,
+        tags: formData.tags.length ? formData.tags : undefined,
+        createdBetween: formData.dates.length ? [
+          formData.dates[0].format('YYYY-MM-DD'),
+          formData.dates[1].format('YYYY-MM-DD')
+        ] : undefined,
+      };
+      
+      Object.keys(params).forEach(key => {
+        if (params[key] === undefined) {
+          delete params[key];
+        }
+      });
+      
+      return params;
+    });
+
+    const { result: mediaResult, loading: loadingMedia, fetchMore, refetch } = useApolloQuery(
+      gql`
+        query MediaTable(
+          $page: Int
+          $limit: Int
+          $name: String
+          $createdBetween: [Date]
+          $mediaTypes: [String]
+          $owners: [String]
+          $stages: [ID]
+          $tags: [String]
+          $sort: [AssetSortEnum]
+          $dormant: Boolean
+        ) {
+          media(input:{
+            page: $page
+            limit: $limit
+            name: $name
+            createdBetween: $createdBetween
+            mediaTypes: $mediaTypes
+            owners: $owners
+            stages: $stages
+            tags: $tags
+            sort: $sort
+            dormant: $dormant
+          }) {
+            totalCount
+            edges {
+              id
+              name
+              createdOn
+              size
+              description
+              fileLocation
+              dormant
+              assetType {
+                name
+              }
+              permissions {
+                ...permissionFragment
+              }
+              copyrightLevel
+              tags
+              owner {
+                username
+                displayName
+              }
+              stages {
+                name
+                fileLocation
+                id
+              }
+              privilege
+            }
+          }
+        }
+        ${permissionFragment}
+      `,
+      queryParams,
+      { notifyOnNetworkStatusChange: true }
+    );
+
+    watch(queryParams, () => {
+      refetch();
+    }, { deep: true });
+
+    watch(visibleDropzone, (visible) => {
+      if (visible) {
+        refetch();
+      }
+    });
+
+    const onVisibleDropzone = () => {
+      editingMediaVar(undefined);
+    };
+
+    const select = (item, closeModal) => {
+      emit("update:modelValue", item.src || item.fileLocation);
+      closeModal();
+    };
 
     const ranges = [
       {
@@ -180,76 +283,74 @@ export default {
       }
     ];
 
-    const hasFilter = computed(
-      () =>
-        !isEmpty(formData)
-    );
-
-    const { nodes: typesData } = useQuery(stageGraph.mediaTypeList);
-    const types = computed(() => {
-      const list = [];
-      list.push({ id: null, name: "All Types" });
-      typesData.value
-        .filter((m) => type_dis.includes(m.name))
-        .forEach((type) => list.push(type));
-      return list;
-    });
-
-    const users = computed(() => {
-      let list = [];
-      list.push({ id: null, displayName: "All Users" });
-      if (mediaList.value) {
-        mediaList.value.forEach(({ owner }) => {
-          if (!list.some((user) => user.username === owner.username)) {
-            list.push(owner);
-          }
-        });
-      }
-      return list;
-    });
-
-    const { nodes: stagesData } = useQuery(stageGraph.stageList);
-    const stages = computed(() => {
-      let list = [];
-      list.push({ id: null, name: "All Stages" });
-      if (stagesData.value) {
-        stagesData.value.forEach((stage) => list.push(stage));
-      }
-      return list;
+    const hasFilter = computed(() => {
+      return formData.name || 
+             formData.owners.length > 0 || 
+             formData.types.length > 0 || 
+             formData.stages.length > 0 || 
+             formData.tags.length > 0 || 
+             formData.dates.length > 0;
     });
 
     const availableImages = computed(() => {
-      let medias = mediaList.value;
-
-      if (medias?.length) {
-        medias = medias
-          .filter(
-            (media) =>
-              !["audio", "video"].includes(get(media, "assetType.name"))
-          )
-          .filter((media) => ![0, 3, 4].includes(media.privilege));
-      }
-
-      if (formData.name) {
-        medias = medias.filter((media) =>
-          media.name.toLowerCase().includes(formData.name.toLowerCase()),
-        );
-      }
-      if (formData.owners.length) {
-        medias = medias.filter((media) => formData.owners.includes(media.owner.displayName || media.owner.username))
-      }
-      if (formData.types.length) {
-        medias = medias.filter((media) => formData.types.includes(get(media, 'assetType.name', get(media, 'assetType'))))
-      }
-      if (formData.stages.length) {
-        medias = medias.filter((media) => formData.stages.some((stage) => media.stages.some(({ id }) => id === stage)))
-      }
-      if (formData.dates.length) {
-        medias = medias.filter((media) => dayjs(media.createdOn).isBetween(formData.dates[0], formData.dates[1]))
-      }
-      return medias;
+      if (!mediaResult.value?.media?.edges) return [];
+      
+      return mediaResult.value.media.edges
+        .filter(media => !["audio", "video"].includes(get(media, "assetType.name")))
+        .filter(media => ![0, 3, 4].includes(media.privilege))
+        .map(media => ({
+          ...media,
+          src: media.fileLocation
+        }));
     });
 
+    const totalCount = computed(() => {
+      return mediaResult.value?.media?.totalCount || 0;
+    });
+
+    const paginationConfig = computed(() => ({
+      current: tableParams.page,
+      pageSize: tableParams.limit,
+      total: totalCount.value,
+      showQuickJumper: true,
+      showSizeChanger: true,
+    }));
+
+    const handleTableChange = ({ current = 1, pageSize = 10, sorter }) => {
+      Object.assign(tableParams, {
+        page: current,
+        limit: pageSize,
+      });
+
+      if (sorter && !Array.isArray(sorter)) {
+        sorter = [sorter];
+      }
+      
+      if (sorter && sorter.length > 0) {
+        const sortOrder = sorter
+          .filter(s => s.order)
+          .map(({ columnKey, order }) => {
+            const fieldMap = {
+              'name': 'NAME',
+              'asset_type_id': 'ASSET_TYPE',
+              'owner_id': 'OWNER',
+              'copyrightLevel': 'COPYRIGHT_LEVEL',
+              'size': 'SIZE',
+              'created_on': 'CREATED_ON'
+            };
+            const field = fieldMap[columnKey] || columnKey.toUpperCase();
+            return `${field}_${order === "ascend" ? "ASC" : "DESC"}`;
+          });
+        
+        if (sortOrder.length > 0) {
+          tableParams.sort = sortOrder;
+        }
+      }
+    };
+
+    provide("refresh", () => {
+      refetch();
+    });
 
     const handleFilterOwnerName = (keyword, option) => {
       const s = keyword.toLowerCase();
@@ -258,6 +359,7 @@ export default {
         option.label.toLowerCase().includes(s)
       );
     };
+
     const handleFilterStageName = (keyword, option) => {
       return option.label.toLowerCase().includes(keyword.toLowerCase());
     };
@@ -270,7 +372,11 @@ export default {
         stages: [],
         tags: [],
         dates: [],
-      })
+      });
+      
+      searchInput.value = '';
+      
+      tableParams.page = 1;
     };
 
     return {
@@ -279,15 +385,11 @@ export default {
       dayjs,
       ranges,
       availableImages,
+      totalCount,
       select,
-      filter,
-      types,
-      users,
-      displayName,
       hasFilter,
-      mediaList,
-      stages,
       formData,
+      searchInput,
       result,
       capitalize,
       visibleDropzone,
@@ -295,6 +397,8 @@ export default {
       clearFilters,
       handleFilterOwnerName,
       handleFilterStageName,
+      paginationConfig,
+      handleTableChange,
     };
   },
 };

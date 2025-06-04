@@ -50,7 +50,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits, computed } from "vue";
+import { defineProps, defineEmits, computed, watch } from "vue";
 import Icon from "components/Icon.vue";
 import Asset from "components/Asset.vue";
 
@@ -61,7 +61,6 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["update:modelValue"]);
 
 const types = computed(() => [
   ...new Set(props.modelValue.map((media) => media.assetType)),
