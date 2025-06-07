@@ -21,7 +21,8 @@ const enterStage = (stage: Stage) => {
 const tableParams = reactive({
   page: 1,
   limit: 10,
-  sort: ["ACCESS_ASC", "LAST_ACCESS_DESC"],
+  sort: ["LAST_ACCESS_DESC"],
+  access: []
 });
 const { result: inquiryResult } = useQuery(gql`
   {
@@ -42,6 +43,7 @@ const { result, loading, fetchMore, refetch } = useQuery(
       $createdBetween: [Date]
       $owners: [String]
       $sort: [StageSortEnum]
+      $access: [String]
     ) {
       stages(input:{
         page: $page
@@ -50,6 +52,7 @@ const { result, loading, fetchMore, refetch } = useQuery(
         createdBetween: $createdBetween
         owners: $owners
         sort: $sort
+        access: $access
       }) {
         totalCount
         edges {

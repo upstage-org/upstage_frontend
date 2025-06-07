@@ -53,6 +53,7 @@ const owners = ref([]);
 const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
+const access = ref(['owner', 'editor', 'player']);
 const dates = ref<[Dayjs, Dayjs] | undefined>();
 
 const ranges = [
@@ -78,6 +79,13 @@ const ranges = [
   }
 ];
 
+const accessOptions = [
+  { value: 'owner', label: 'Owner' },
+  { value: 'editor', label: 'Editor' },
+  { value: 'player', label: 'Player' },
+  { value: 'audience', label: 'Audience' }
+];
+
 const updateInquiry = (vars: any) =>
   inquiryVar({
     ...inquiryVar(),
@@ -87,6 +95,7 @@ const updateInquiry = (vars: any) =>
 const watchInquiryVar = (vars: any) => {
   types.value = vars.mediaTypes ?? [];
   tags.value = vars.tags ?? [];
+  access.value = vars.access ?? [];
   inquiryVar.onNextChange(watchInquiryVar);
 };
 inquiryVar.onNextChange(watchInquiryVar);
@@ -97,6 +106,7 @@ watchEffect(() => {
     stages: stages.value,
     tags: tags.value,
     mediaTypes: types.value,
+    access: access.value,
   });
 });
 
@@ -112,6 +122,7 @@ watch(
     updateInquiry({ name: name.value });
   }, 500),
 );
+
 const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) => {
   updateInquiry({
     createdBetween: _dates
@@ -122,14 +133,17 @@ const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) =
       : undefined,
   });
 };
+
 const clearFilters = () => {
   name.value = "";
   owners.value = [];
   types.value = [];
   stages.value = [];
   tags.value = [];
+  access.value = [];
   dates.value = undefined;
 };
+
 const hasFilter = computed(
   () =>
     name.value ||
@@ -137,8 +151,10 @@ const hasFilter = computed(
     types.value.length ||
     stages.value.length ||
     tags.value.length ||
+    access.value.length ||
     dates.value,
 );
+
 const handleFilterOwnerName = (keyword: string, option: any) => {
   const s = keyword.toLowerCase();
   return (
@@ -175,6 +191,21 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
             <a-divider style="margin: 4px 0" />
             <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="owners = []">
               <team-outlined />&nbsp;All players
+            </div>
+          </template>
+        </a-select>
+        <a-select 
+          allowClear 
+          mode="multiple" 
+          style="min-width: 124px"
+          placeholder="Access Level" 
+          v-model:value="access" 
+          :options="accessOptions">
+          <template #dropdownRender="{ menuNode: menu }">
+            <v-nodes :vnodes="menu" />
+            <a-divider style="margin: 4px 0" />
+            <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="access = ['owner', 'editor', 'player', 'audience']">
+              <unlock-outlined />&nbsp;All Access
             </div>
           </template>
         </a-select>
