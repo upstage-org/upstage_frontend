@@ -21,7 +21,7 @@ const enterStage = (stage: Stage) => {
 const tableParams = reactive({
   page: 1,
   limit: 10,
-  sort: ["CREATED_ON_DESC"],
+  sort: ["ACCESS_ASC", "LAST_ACCESS_DESC"],
 });
 const { result: inquiryResult } = useQuery(gql`
   {
