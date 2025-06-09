@@ -6,6 +6,10 @@ import { router } from "router";
 import store from "./store";
 import "@fortawesome/fontawesome-free/css/all.css";
 import ClickOutside from "./directives/ClickOutside";
+import { createPinia } from 'pinia'
+
+const pinia = createPinia()
+
 const app = createApp(App)
   .use(store)
   .use(router)
@@ -42,4 +46,5 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+app.use(pinia)
 app.mount("#app");
