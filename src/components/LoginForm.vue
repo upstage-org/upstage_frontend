@@ -145,9 +145,8 @@ import { useStore } from "vuex";
 import Turnstile from "vue-turnstile";
 import configs from "config";
 
-const isProduction = configs.MODE === "Production"
-
-const siteKey = configs.CLOUDFLARE_CAPTCHA_SITEKEY;
+const isProduction = import.meta.env.MODE === "production";
+const siteKey = isProduction ? configs.CLOUDFLARE_CAPTCHA_SITEKEY : null;
 const token = ref("");
 
 const emit = defineEmits(["success"]);

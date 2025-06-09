@@ -2,7 +2,7 @@
 import { GraphQLClient } from "graphql-request";
 export { gql } from "graphql-request";
 import config from "config";
-import store from "store/index";
+import { useAuthStore } from "store/modules/auth";
 
 export const createClient = (namespace: any) => ({
   request: async (...params: any) => {
@@ -14,7 +14,8 @@ export const createClient = (namespace: any) => ({
       `${config.GRAPHQL_ENDPOINT}${namespace}`,
       options,
     );
-    const token = store.getters["auth/getToken"];
+    const authStore = useAuthStore();
+    const token = authStore.getToken;
     if (token) {
       client.setHeader("Authorization", `Bearer ${token}`);
     }
@@ -24,13 +25,13 @@ export const createClient = (namespace: any) => ({
       const isRefresh = error.request.query
         .trim()
         .startsWith("mutation RefreshToken");
-      const refreshToken = store.getters["auth/getRefreshToken"];
+      const refreshToken = authStore.getRefreshToken;
       if (
         !isRefresh &&
         refreshToken &&
         ["Authenticated Failed", "Signature has expired"].includes(error.response.errors[0].message)
       ) {
-        const newToken = await store.dispatch("auth/fetchRefreshToken");
+        const newToken = await authStore.fetchRefreshToken();
         client.setHeader("Authorization", `Bearer ${newToken}`);
         response = await client.request(...params);
       } else {

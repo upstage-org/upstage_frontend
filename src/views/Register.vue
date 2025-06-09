@@ -83,11 +83,11 @@ export default {
       touched.value = true;
       if (!form.username || !form.password || !form.email || (form.password || "").length < 8) return;
       if (confirmPasswordError.value) return;
-      if(form.username.length < 5) {
+      if (form.username.length < 5) {
         message.error("Make your user name at least 5 characters long");
         return;
       }
-      if (!form.token) return;
+      // if (!form.token) return;
       if (!agreed.value) {
         message.error("Please agree to the Terms & Conditions");
         return;

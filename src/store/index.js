@@ -1,22 +1,16 @@
-import { createStore } from "vuex";
-import createPersistedState from "vuex-persistedstate";
-import auth from "./modules/auth";
-import user from "./modules/user";
-import stage from "./modules/stage";
-import cache from "./modules/cache";
-import config from "./modules/config";
+import { createPinia } from 'pinia';
+import { useUserStore } from './modules/user';
+import { useStageStore } from './modules/stage';
+import { useCacheStore } from './modules/cache';
+import { useConfigStore } from './modules/config';
 
-const dataState = createPersistedState({
-  paths: ["auth"],
-});
+const pinia = createPinia();
 
-export default createStore({
-  modules: {
-    auth,
-    user,
-    stage,
-    cache,
-    config,
-  },
-  plugins: [dataState],
-});
+export {
+  useUserStore,
+  useStageStore,
+  useCacheStore,
+  useConfigStore,
+};
+
+export default pinia;
