@@ -14,7 +14,7 @@ const {
 } = import.meta.env;
 
 const configs = {
-  MODE: import.meta.env.MODE as "development" | "production",
+  MODE: import.meta.env.VITE_ENV_TYPE as "Development" | "Production",
   UPSTAGE_URL: window.location.origin,
   ALLOWED_EXTENSIONS: {
     IMAGE: ".svg,.jpg,.jpeg,.png,.gif",
