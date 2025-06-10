@@ -28,7 +28,7 @@
               </a>
               <a class="help has-text-right" @click="resetMode = true">Forgot password?</a>
             </p>
-            <turnstile v-if="siteKey" ref="captcha" :site-key="siteKey" v-model="token" />
+            <turnstile v-if="isProduction" ref="captcha" :site-key="siteKey" v-model="token" />
             <p>
               {{ $t("tos.login") }}
               <TermsOfService />
@@ -144,6 +144,8 @@ import { ref, defineEmits } from "vue";
 import { useStore } from "vuex";
 import Turnstile from "vue-turnstile";
 import configs from "config";
+
+const isProduction = configs.MODE === "Production"
 
 const siteKey = configs.CLOUDFLARE_CAPTCHA_SITEKEY;
 const token = ref("");

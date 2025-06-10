@@ -24,6 +24,8 @@ VITE_STRIPE_KEY=""
 # release version
 VITE_RELEASE_VERSION=""
 VITE_ALIAS_RELEASE_VERSION=""
+# Turn on "Production"
+VITE_ENV_TYPE=Production
 ```
 
 Advanced clients may want to edit their email templates. These can be found here:
