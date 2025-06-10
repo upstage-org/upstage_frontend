@@ -34,7 +34,7 @@
                 {{ $t("tos.register") }}
                 <TermsOfService />.
               </label>
-              <turnstile v-if="siteKey" ref="captcha" :site-key="siteKey" v-model="form.token" />
+              <turnstile v-if="isProduction" ref="captcha" :site-key="siteKey" v-model="form.token" />
             </div>
           </div>
           <footer class="card-footer">
@@ -122,6 +122,7 @@ export default {
       touched,
       agreed,
       siteKey: configs.CLOUDFLARE_CAPTCHA_SITEKEY,
+      isProduction: configs.MODE === 'Production',
       captcha,
     };
   },
