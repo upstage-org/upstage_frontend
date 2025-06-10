@@ -53,11 +53,27 @@ the front end can be fed from localhost, which is great for debugging.
 ENV_TYPE="Dev/Testing"
 ```
 
-CloudFlare is OFF if these variables are commented out:
+Behavior by ENV_TYPE:
+
+| ENV_TYPE        | CAPTCHA | CORS | Dev Tools |
+|------------------|---------|------|-----------|
+| `"Production"`   | ✅ On   | ✅ On | ❌ Off     |
+| _Anything else_  | ❌ Off  | ❌ Off | ✅ On      |
+
+- Use `"Production"` **exactly** (case-sensitive) to enable full production security settings.
+- Use any other value (e.g., `"Dev"`, `"Testing"`) to disable CAPTCHA and CORS—useful for local development.
+
+Cloudflare CAPTCHA:
+
+CAPTCHA is automatically **enabled** if `ENV_TYPE="Production"` and the following environment variables are set:
 ```
 CLOUDFLARE_CAPTCHA_SECRETKEY
 CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT
 ```
+
+To disable CAPTCHA:
+- Change `ENV_TYPE` to anything other than `"Production"` (e.g., `Dev`).
+- No need to comment out CAPTCHA keys—the app will ignore them unless in `"Production"` mode.
 
 
 # Data Restoration Guide for Upstage Application
@@ -149,4 +165,7 @@ This guide provides step-by-step instructions for backing up and restoring the d
 - If any issues arise, consult the application documentation or contact the system administrator.
 
 **End of Guide**
+
+
+
 
