@@ -38,7 +38,7 @@
       </div>
       <footer class="card-footer">
         <button type="submit" class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }" :disabled="!!siteKey && !token">
+          :class="{ 'is-loading': loading }" :disabled="!!siteKey && !token && isProduction">
           <span>{{ $t("login") }}</span>
           <span class="icon is-medium">
             <i class="fas fa-chevron-right"></i>
