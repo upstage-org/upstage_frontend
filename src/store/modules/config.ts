@@ -1,36 +1,29 @@
 // @ts-nocheck
+import { defineStore } from 'pinia';
 import { configGraph } from "services/graphql";
 
-export default {
-  namespaced: true,
-  state: {
+interface ConfigState {
+  nginx: Record<string, any>;
+  system: Record<string, any>;
+  foyer: any;
+}
+
+export const useConfigStore = defineStore('config', {
+  state: (): ConfigState => ({
     nginx: {},
     system: {},
     foyer: null,
-  },
+  }),
+
   getters: {
-    uploadLimit(state) {
-      return state.nginx.uploadLimit ?? 1024 * 1024;
-    },
-    termsOfService(state) {
-      return state.system.termsOfService?.value;
-    },
-    manual(state) {
-      return state.system.manual?.value;
-    },
-    esp(state) {
-      return state.system.esp?.value;
-    },
-    enableDonate(state) {
-      return state.system.enableDonate?.value;
-    },
-    foyer(state) {
-      return state.foyer ?? {};
-    },
-    system(state) {
-      return state.system ?? {};
-    },
-    navigations(state) {
+    uploadLimit: (state) => state.nginx.uploadLimit ?? 1024 * 1024,
+    termsOfService: (state) => state.system.termsOfService?.value,
+    manual: (state) => state.system.manual?.value,
+    esp: (state) => state.system.esp?.value,
+    enableDonate: (state) => state.system.enableDonate?.value,
+    foyer: (state) => state.foyer ?? {},
+    system: (state) => state.system ?? {},
+    navigations: (state) => {
       if (!state.foyer) {
         return [];
       }
@@ -65,18 +58,15 @@ export default {
         return navigations;
       } catch (error) {
         console.log(error);
+        return [];
       }
     },
   },
-  mutations: {
-    STORE_CONFIG(state, configs) {
-      Object.assign(state, configs);
-    },
-  },
+
   actions: {
-    async fetchConfig({ commit }) {
+    async fetchConfig() {
       const configs = await configGraph.configs();
-      commit("STORE_CONFIG", configs);
+      this.$patch(configs);
     },
   },
-};
+});

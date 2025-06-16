@@ -7,7 +7,8 @@ import PlayerManagement from "views/admin/player-management/index.vue";
 import EmailNotifications from "views/admin/email-notifications/index.vue";
 import Configuration from "views/admin/configuration/index.vue";
 import Home from "views/Home.vue";
-import store from "store";
+import { useAuthStore } from "store/modules/auth";
+import { useUserStore } from "store/modules/user";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -136,7 +137,9 @@ export const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   document.body.classList.add("waiting");
-  const loggedIn = store.getters["auth/loggedIn"];
+  const authStore = useAuthStore();
+  const userStore = useUserStore();
+  const loggedIn = authStore.loggedIn;
 
   if (to.matched.some((record) => record.meta.requireAuth) && !loggedIn) {
     next("/login");
@@ -155,19 +158,17 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.fullPath.includes("admin") && loggedIn) {
-    await store.dispatch("user/checkIsAdmin").then((isAdmin) => {
-      if (!isAdmin) {
-        next("/");
-      }
-    });
+    const isAdmin = await userStore.checkIsAdmin();
+    if (!isAdmin) {
+      next("/");
+    }
   }
 
   if (to.meta.requireAuth && loggedIn) {
-    await store.dispatch("user/checkIsGuest").then((isGuest) => {
-      if (isGuest) {
-        next("/");
-      }
-    });
+    const isGuest = await userStore.checkIsGuest();
+    if (isGuest) {
+      next("/");
+    }
   }
 
   next();

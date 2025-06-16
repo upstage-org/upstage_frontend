@@ -9,16 +9,19 @@
 <script setup lang="ts">
 import LoginForm from "components/LoginForm.vue";
 import { useRouter } from "vue-router";
-import { useStore } from "vuex";
+import { useUserStore } from "store/modules/user";
+import { useConfigStore } from "store/modules/config";
 
-const store = useStore();
+// Composables
+const userStore = useUserStore();
+const configStore = useConfigStore();
 const router = useRouter();
 
-
-const onLoginSuccess = () => {
-  store.dispatch("user/fetchCurrent");
-  store.dispatch("config/fetchConfig")
-  router.push({ name: 'Stages' })
+// Methods
+const onLoginSuccess = async () => {
+  await userStore.fetchCurrent();
+  await configStore.fetchConfig();
+  router.push({ name: 'Stages' });
 };
 </script>
 

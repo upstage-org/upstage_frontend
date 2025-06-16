@@ -1,43 +1,70 @@
 // @ts-nocheck
-import { GraphQLClient } from "graphql-request";
+import { GraphQLClient, RequestDocument, Variables } from "graphql-request";
 export { gql } from "graphql-request";
 import config from "config";
 import { useAuthStore } from "store/modules/auth";
 
-export const createClient = (namespace: any) => ({
-  request: async (...params: any) => {
-    let response = null;
-    const options = {
+interface GraphQLResponse<T = any> {
+  data?: T;
+  errors?: Array<{
+    message: string;
+    locations?: Array<{
+      line: number;
+      column: number;
+    }>;
+    path?: string[];
+  }>;
+}
+
+interface GraphQLClientOptions {
+  headers?: Record<string, string>;
+}
+
+export const createClient = (namespace: string) => ({
+  request: async <T = any, V = Variables>(
+    document: RequestDocument,
+    variables?: V,
+    options?: GraphQLClientOptions
+  ): Promise<T> => {
+    let response: GraphQLResponse<T> | null = null;
+    const clientOptions: GraphQLClientOptions = {
       headers: {},
+      ...options,
     };
+
     const client = new GraphQLClient(
       `${config.GRAPHQL_ENDPOINT}${namespace}`,
-      options,
+      clientOptions
     );
+
     const authStore = useAuthStore();
     const token = authStore.getToken;
+
     if (token) {
       client.setHeader("Authorization", `Bearer ${token}`);
     }
+
     try {
-      response = await client.request(...params);
+      response = await client.request<T, V>(document, variables);
+      return response as T;
     } catch (error: any) {
-      const isRefresh = error.request.query
-        .trim()
-        .startsWith("mutation RefreshToken");
+      const isRefresh = error.request?.query?.trim().startsWith("mutation RefreshToken");
       const refreshToken = authStore.getRefreshToken;
+
       if (
         !isRefresh &&
         refreshToken &&
-        ["Authenticated Failed", "Signature has expired"].includes(error.response.errors[0].message)
+        error.response?.errors?.[0]?.message &&
+        ["Authenticated Failed", "Signature has expired"].includes(
+          error.response.errors[0].message
+        )
       ) {
         const newToken = await authStore.fetchRefreshToken();
         client.setHeader("Authorization", `Bearer ${newToken}`);
-        response = await client.request(...params);
-      } else {
-        throw error;
+        response = await client.request<T, V>(document, variables);
+        return response as T;
       }
+      throw error;
     }
-    return response;
   },
 });

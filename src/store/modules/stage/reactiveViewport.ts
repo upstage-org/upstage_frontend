@@ -1,13 +1,17 @@
-import store from "store";
+import { useStageStore } from './index';
 
 export const getViewport = () => ({
-  width: window.innerWidth,
-  height: window.innerHeight,
+  width: window?.innerWidth,
+  height: window?.innerHeight,
 });
 
 window.addEventListener("resize", () => {
-  const oldSize = store.getters["stage/stageSize"].width;
-  store.commit("stage/UPDATE_VIEWPORT", getViewport());
-  const newSize = store.getters["stage/stageSize"].width;
-  store.commit("stage/RESCALE_OBJECTS", newSize / oldSize);
+  const stageStore = useStageStore();
+  const oldSize = stageStore.stageSize?.width;
+  stageStore.viewport = getViewport();
+  const newSize = stageStore.stageSize?.width;
+  
+  // Trigger rescale of objects based on the new size ratio
+  const scale = newSize / oldSize;
+  stageStore.rescaleObjects(scale);
 });

@@ -52,7 +52,7 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import Field from "components/form/Field.vue";
 import Password from "components/form/Password.vue";
 import TermsOfService from "components/TermsOfService.vue";
@@ -64,68 +64,79 @@ import { message } from "ant-design-vue";
 import Turnstile from "vue-turnstile";
 import configs from "config";
 
-export default {
-  components: { Field, Password, TermsOfService, Turnstile },
-  setup: () => {
-    const router = useRouter();
-    const form = reactive({});
-    const { mutation, loading } = useMutation(userGraph.createUser, form);
-    const confirmPasswordError = computed(() =>
-      form.password !== form.confirmPassword
-        ? "Confirm password mismatch"
-        : ((form.password || "").length < 8 ? "Make your password at least 8 characters long" : false),
+interface FormData {
+  username: string;
+  password: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  intro: string;
+  token: string;
+}
+
+const router = useRouter();
+const form = reactive<FormData>({
+  username: '',
+  password: '',
+  confirmPassword: '',
+  firstName: '',
+  lastName: '',
+  email: '',
+  intro: '',
+  token: ''
+});
+
+const { mutation, loading } = useMutation(userGraph.createUser, form);
+const confirmPasswordError = computed(() =>
+  form.password !== form.confirmPassword
+    ? "Confirm password mismatch"
+    : ((form.password || "").length < 8 ? "Make your password at least 8 characters long" : false)
+);
+
+const touched = ref(false);
+const agreed = ref(false);
+const captcha = ref();
+const isProduction = import.meta.env.MODE === "production";
+const siteKey = configs.CLOUDFLARE_CAPTCHA_SITEKEY;
+
+const submit = async () => {
+  touched.value = true;
+  if (!form.username || !form.password || !form.email || (form.password || "").length < 8) return;
+  if (confirmPasswordError.value) return;
+  if (form.username.length < 5) {
+    message.error("Make your user name at least 5 characters long");
+    return;
+  }
+  if (!form.token && isProduction) return;
+  if (!agreed.value) {
+    message.error("Please agree to the Terms & Conditions");
+    return;
+  }
+  try {
+    await mutation();
+    message.success(
+      "Thank you for registering. Your account needs to be approved by an Admin - please check your email."
     );
-    const touched = ref(false);
-    const agreed = ref(false);
-    const captcha = ref();
-
-    const submit = async () => {
-      touched.value = true;
-      if (!form.username || !form.password || !form.email || (form.password || "").length < 8) return;
-      if (confirmPasswordError.value) return;
-      if (form.username.length < 5) {
-        message.error("Make your user name at least 5 characters long");
-        return;
-      }
-      // if (!form.token) return;
-      if (!agreed.value) {
-        message.error("Please agree to the Terms & Conditions");
-        return;
-      }
-      try {
-        const response = await mutation();
-        message.success(
-          "Thank you for registering. Your account needs to be approved by an Admin - please check your email.",
-        );
-        router.push("/login");
-      } catch (error) {
-        captcha.value?.reset();
-        if (error.includes("upstage_user_username_key")) {
-          message.error("Username " + form.username + " already exists!");
-        } else if (error.includes("upstage_user_email_key")) {
-          if (form.email) {
-            message.error("Email " + form.email + " already exists!");
-          } else {
-            message.error("Email is required!");
-          }
+    router.push("/login");
+  } catch (error: unknown) {
+    captcha.value?.reset();
+    if (typeof error === 'string') {
+      if (error.includes("upstage_user_username_key")) {
+        message.error("Username " + form.username + " already exists!");
+      } else if (error.includes("upstage_user_email_key")) {
+        if (form.email) {
+          message.error("Email " + form.email + " already exists!");
         } else {
-          message.error(error);
+          message.error("Email is required!");
         }
+      } else {
+        message.error(error);
       }
-    };
-
-    return {
-      form,
-      loading,
-      submit,
-      confirmPasswordError,
-      touched,
-      agreed,
-      siteKey: configs.CLOUDFLARE_CAPTCHA_SITEKEY,
-      isProduction: configs.MODE === 'Production',
-      captcha,
-    };
-  },
+    } else {
+      message.error("An error occurred during registration");
+    }
+  }
 };
 </script>
 

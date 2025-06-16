@@ -168,6 +168,7 @@ export const useStageStore = defineStore('stage', {
     sessions: [],
     session: null,
     replay: {
+      isReplaying: false,
       timestamp: {
         begin: 0,
         end: 0,
@@ -203,14 +204,14 @@ export const useStageStore = defineStore('stage', {
     })),
     config: (state) => state.config,
     preloadableAssets: (state) => {
-      const assets = []
-        .concat(state.tools.avatars.filter(a => !a.multi).map((a) => a.src))
-        .concat(state.tools.avatars.filter(a => a.multi).map((a) => a.frames ?? []).flat())
-        .concat(state.tools.props.filter(a => !a.multi).map((p) => p.src))
-        .concat(state.tools.props.filter(a => a.multi).map((a) => a.frames ?? []).flat())
-        .concat(state.tools.backdrops.filter(a => !a.multi).map((b) => b.src))
-        .concat(state.tools.backdrops.filter(a => a.multi).map((a) => a.frames ?? []).flat())
-        .concat(state.tools.curtains.map((b) => b.src));
+      const assets: any[] = []
+        .concat(state?.tools?.avatars?.filter(a => !a.multi)?.map((a) => a.src) as any)
+        .concat(state?.tools?.avatars?.filter(a => a.multi)?.map((a) => a?.frames ?? []).flat() as any)
+        .concat(state?.tools?.props?.filter(a => !a.multi)?.map((p) => p.src) as any)
+        .concat(state?.tools?.props?.filter(a => a.multi)?.map((a) => a?.frames ?? []).flat() as any)
+        .concat(state?.tools?.backdrops?.filter(a => !a.multi)?.map((b) => b.src) as any)
+        .concat(state?.tools?.backdrops?.filter(a => a.multi)?.map((a) => a.frames ?? []).flat() as any)
+        .concat(state?.tools?.curtains?.map((b) => b.src) as any);
       return assets;
     },
     audios: (state) => state.tools.audios,
@@ -282,13 +283,13 @@ export const useStageStore = defineStore('stage', {
               item.src = absolutePath(item.fileLocation);
             }
             if (item.multi) {
-              item.frames = item.frames.map((src) => absolutePath(src));
+              item.frames = item.frames.map((src: string) => absolutePath(src));
             }
             const key = item.assetType?.name + 's';
-            if (!this.tools[key]) {
-              this.tools[key] = [];
+            if (!this.tools[key as keyof typeof this.tools]) {
+              this.tools[key as keyof typeof this.tools] = [];
             }
-            this.tools[key].push(item);
+            this.tools[key as keyof typeof this.tools].push(item);
           });
         } else {
           this.preloading = false;
@@ -305,9 +306,47 @@ export const useStageStore = defineStore('stage', {
     },
     cleanStage(cleanModel: boolean) {
       // Implement clean stage logic here
+      if (cleanModel) {
+        this.model = null;
+        this.tools.audios = [];
+      }
+      this.status = "OFFLINE";
+      this.replay.isReplaying = false;
+      this.background = null;
+      this.curtain = null;
+      this.backdropColor = "gray";
+      this.tools.avatars = [];
+      this.tools.props = [];
+      this.tools.backdrops = [];
+      this.tools.streams = [];
+      this.tools.curtains = [];
+      this.config = getDefaultStageConfig();
+      this.settings = getDefaultStageSettings();
+      this.board.objects = [];
+      this.board.drawings = [];
+      this.board.texts = [];
+      this.board.whiteboard = [];
+      this.chat.messages = [];
+      this.chat.privateMessages = [];
+      this.chat.color = randomColor();
     },
     setBackground(background: any) {
-      this.background = background;
+      if (
+        !this.background ||
+        !this.background.at ||
+        this.background.at < background.at
+      ) {
+        if (!this.background || this.background.id !== background.id) {
+          // Not playing animation if only opacity change
+          animate('#board', {
+            opacity: [0, 1],
+            duration: 5000,
+          });
+        }
+        this.background = background;
+      } else {
+        this.background = background;
+      }
     },
     setStatus(status: string) {
       this.status = status;
@@ -316,9 +355,24 @@ export const useStageStore = defineStore('stage', {
       this.subscribeSuccess = status;
     },
     pushChatMessage(message: any) {
+      // TODO: Implement push chat message logic here
+      // message.hash = hash(message);
+      // const lastMessage = state.chat.messages[state.chat.messages.length - 1];
+      // if (lastMessage && lastMessage.hash === message.hash) {
+      //   return;
+      // }
+      // state.chat.messages.push(message);
       this.chat.messages.push(message);
     },
-    pushPlayerChatMessage(message: any) {
+    pushPlayerChatMessage(message: any) {      
+      // TODO: Implement push player chat message logic here
+      // message.hash = hash(message);
+      // const lastMessage =
+      //   state.chat.privateMessages[state.chat.privateMessages.length - 1];
+      // if (lastMessage && lastMessage.hash === message.hash) {
+      //   return;
+      // }
+      // state.chat.privateMessages.push(message);
       this.chat.privateMessages.push(message);
     },
     clearChat() {
@@ -478,7 +532,7 @@ export const useStageStore = defineStore('stage', {
       this.isSavingScene = value;
     },
     setShowPlayerChat(value: boolean) {
-      this.showPlayerChat = value;
+      // this.showPlayerChat = value;
     },
     setShowClearChatSettings(value: boolean) {
       this.showClearChatSetting = value;
@@ -547,30 +601,30 @@ export const useStageStore = defineStore('stage', {
     shapeObject(object: any) {
       // Implement shape object logic here
     },
-    deleteObject(object: any) {
-      // Implement delete object logic here
-    },
+    // deleteObject(object: any) {
+    //   // Implement delete object logic here
+    // },
     switchFrame(object: any) {
       // Implement switch frame logic here
     },
-    sendToBack(object: any) {
-      // Implement send to back logic here
-    },
-    bringToFront(object: any) {
-      // Implement bring to front logic here
-    },
-    bringToFrontOf({ front, back }: { front: any; back: any }) {
-      // Implement bring to front of logic here
-    },
+    // sendToBack(object: any) {
+    //   // Implement send to back logic here
+    // },
+    // bringToFront(object: any) {
+    //   // Implement bring to front logic here
+    // },
+    // bringToFrontOf({ front, back }: { front: any; back: any }) {
+    //   // Implement bring to front of logic here
+    // },
     toggleAutoplayFrames(object: any) {
       // Implement toggle autoplay frames logic here
     },
     handleBoardMessage({ message }: { message: any }) {
       // Implement handle board message logic here
     },
-    setBackground(background: any) {
-      // Implement set background logic here
-    },
+    // setBackground(background: any) {
+    //   // Implement set background logic here
+    // },
     showChatBox(visible: boolean) {
       // Implement show chat box logic here
     },
@@ -580,12 +634,12 @@ export const useStageStore = defineStore('stage', {
     showReactionsBar(visible: boolean) {
       // Implement show reactions bar logic here
     },
-    setChatPosition(position: string) {
-      // Implement set chat position logic here
-    },
-    setBackdropColor(color: string) {
-      // Implement set backdrop color logic here
-    },
+    // setChatPosition(position: string) {
+    //   // Implement set chat position logic here
+    // },
+    // setBackdropColor(color: string) {
+    //   // Implement set backdrop color logic here
+    // },
     drawCurtain(curtain: any) {
       // Implement draw curtain logic here
     },
@@ -640,9 +694,9 @@ export const useStageStore = defineStore('stage', {
     async reloadMissingEvents() {
       // Implement reload missing events logic here
     },
-    replaceScene(sceneId: string) {
-      // Implement replace scene logic here
-    },
+    // replaceScene(sceneId: string) {
+    //   // Implement replace scene logic here
+    // },
     replayEvent({ topic, payload }: { topic: string; payload: any }) {
       // Implement replay event logic here
     },
@@ -679,12 +733,12 @@ export const useStageStore = defineStore('stage', {
     async sendStatistics() {
       // Implement send statistics logic here
     },
-    clearChat() {
-      // Implement clear chat logic here
-    },
-    clearPlayerChat() {
-      // Implement clear player chat logic here
-    },
+    // clearChat() {
+    //   // Implement clear chat logic here
+    // },
+    // clearPlayerChat() {
+    //   // Implement clear player chat logic here
+    // },
     removeChat(messageId: string) {
       // Implement remove chat logic here
     },
@@ -715,17 +769,17 @@ export const useStageStore = defineStore('stage', {
     openPurchasePopup(setting: any) {
       // Implement open purchase popup logic here
     },
-    openReceiptPopup(setting: any) {
-      // Implement open receipt popup logic here
-    },
-    closeReceiptPopup() {
-      // Implement close receipt popup logic here
-    },
-    addTrack(track: any) {
-      // Implement add track logic here
-    },
-    reloadStreams() {
-      // Implement reload streams logic here
-    },
+    // openReceiptPopup(setting: any) {
+    //   // Implement open receipt popup logic here
+    // },
+    // closeReceiptPopup() {
+    //   // Implement close receipt popup logic here
+    // },
+    // addTrack(track: any) {
+    //   // Implement add track logic here
+    // },
+    // reloadStreams() {
+    //   // Implement reload streams logic here
+    // },
   },
 });

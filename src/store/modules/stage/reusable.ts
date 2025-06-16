@@ -1,14 +1,16 @@
 // @ts-nocheck
 import configs from "config";
-import store from "store";
+import { useStageStore } from './index';
 
 export function toRelative(size) {
-  const stageSize = store.getters["stage/stageSize"];
+  const stageStore = useStageStore();
+  const stageSize = stageStore.stageSize;
   return size / stageSize.width;
 }
 
 export function toAbsolute(size) {
-  const stageSize = store.getters["stage/stageSize"];
+  const stageStore = useStageStore();
+  const stageSize = stageStore.stageSize;
   return size * stageSize.width;
 }
 
@@ -28,7 +30,7 @@ export function serializeObject(object) {
   object.y = toRelative(object.y);
   object.w = toRelative(object.w);
   object.h = toRelative(object.h);
-  recalcFontSize(toRelative);
+  recalcFontSize(object, toRelative);
   return object;
 }
 
@@ -40,18 +42,20 @@ export function deserializeObject(object) {
   object.y = toAbsolute(object.y);
   object.w = toAbsolute(object.w);
   object.h = toAbsolute(object.h);
-  recalcFontSize(toAbsolute);
+  recalcFontSize(object, toAbsolute);
   return object;
 }
 
 export function namespaceTopic(topicName, stageUrl) {
-  const url = stageUrl ?? store.getters["stage/url"];
+  const stageStore = useStageStore();
+  const url = stageUrl ?? stageStore.url;
   const namespace = configs.MQTT_NAMESPACE;
   return `${namespace}/${url}/${topicName}`;
 }
 
 export function unnamespaceTopic(topicName) {
-  const url = store.getters["stage/url"];
+  const stageStore = useStageStore();
+  const url = stageStore.url;
   const namespace = configs.MQTT_NAMESPACE;
   return topicName.substring(namespace.length + url.length + 2);
 }
@@ -73,6 +77,7 @@ export function getDefaultStageSettings() {
 }
 
 export function takeSnapshotFromStage() {
+  const stageStore = useStageStore();
   const {
     background,
     backdropColor,
@@ -80,12 +85,14 @@ export function takeSnapshotFromStage() {
     settings,
     audioPlayers,
     tools,
-  } = store.state.stage;
+  } = stageStore;
+  
   const board = Object.assign({}, originalBoard);
   board.objects = originalBoard.objects
     .filter((o) => o.liveAction)
     .map(serializeObject);
   board.tracks = [];
+  
   const payload = JSON.stringify({
     background,
     backdropColor,
@@ -94,11 +101,13 @@ export function takeSnapshotFromStage() {
     audioPlayers,
     audios: tools.audios,
   });
+  
   tools.audios?.forEach((audio) => {
-    store.dispatch("stage/updateAudioStatus", {
+    stageStore.updateAudioStatus({
       ...audio,
       isPlaying: false,
     });
   });
+  
   return payload;
 }

@@ -25,46 +25,55 @@
   </section>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useConfigStore } from "store/modules/config";
+import { storeToRefs } from "pinia";
 import Loading from "components/Loading.vue";
 import { absolutePath } from "utils/common";
 import Entry from "components/stage/Entry.vue";
 import MasonryWall from "@yeger/vue-masonry-wall";
-import { stageGraph } from "services/graphql";
 import { useQuery } from "@vue/apollo-composable";
 import gql from "graphql-tag";
 
-export default {
-  name: "Home",
-  components: { Loading, Entry, MasonryWall },
-  setup: () => {
-    const store = useStore();
-    const { result, loading } = useQuery(gql`
-      query ListFoyerStage {
-        foyerStageList {
-          id
-          name
-          owner {
-            displayName
-            username
-          }
-          fileLocation
-          cover
-        }
+// Types
+interface Stage {
+  id: string;
+  name: string;
+  owner: {
+    displayName: string;
+    username: string;
+  };
+  fileLocation: string;
+  cover: string;
+}
+
+interface FoyerStageList {
+  foyerStageList: Stage[];
+}
+
+// Store initialization
+const configStore = useConfigStore();
+const { foyer } = storeToRefs(configStore);
+
+// GraphQL query
+const { result, loading } = useQuery<FoyerStageList>(gql`
+  query ListFoyerStage {
+    foyerStageList {
+      id
+      name
+      owner {
+        displayName
+        username
       }
-    `, null);
-    const foyer = computed(() => store.getters["config/foyer"]);
-    const visibleStages = computed(() => result?.value?.foyerStageList || []);
-    return {
-      visibleStages,
-      loading,
-      absolutePath,
-      foyer,
-    };
-  },
-};
+      fileLocation
+      cover
+    }
+  }
+`);
+
+// Computed properties
+const visibleStages = computed(() => result.value?.foyerStageList || []);
 </script>
 
 <style scoped lang="scss">
@@ -130,8 +139,6 @@ export default {
 
   .describe {
     position: relative;
-
-
   }
 
   .brushstroke {

@@ -19,19 +19,19 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
-import { useStore } from "vuex";
 import { useRoute } from "vue-router";
+import { useUserStore } from "store/modules/user";
+import { useConfigStore } from "store/modules/config";
 import "styles/bulma.css";
 import "styles/bulma_slider.css";
 import "styles/custom.less";
 
-
 // Store initialization
-const store = useStore();
-store.dispatch("user/fetchCurrent");
-store.dispatch("config/fetchConfig");
+const userStore = useUserStore();
+const configStore = useConfigStore();
+userStore.fetchCurrent();
+configStore.fetchConfig();
 const route = useRoute();
-
 
 // Version state
 interface VersionData {
@@ -41,12 +41,10 @@ const currentVersion = ref<string | null>(null);
 const latestVersion = ref<string | null>(null);
 const showReloadPrompt = ref<boolean>(false);
 
-
 const hasShowPrompt = computed(() => {
   const isExcludedRoute = ["Live"].includes(route.name as string);
-  return showReloadPrompt.value && !isExcludedRoute
+  return showReloadPrompt.value && !isExcludedRoute;
 });
-
 
 // Check version
 const checkVersion = async (): Promise<void> => {
@@ -62,7 +60,6 @@ const checkVersion = async (): Promise<void> => {
     currentVersion.value = localStorage.getItem("appVersion") || latestVersion.value;
     showReloadPrompt.value = false;
 
-
     if (latestVersion.value && latestVersion.value !== currentVersion.value) {
       showReloadPrompt.value = true;
     }
@@ -71,7 +68,6 @@ const checkVersion = async (): Promise<void> => {
   }
 };
 
-
 const reloadPage = () => {
   if (latestVersion.value) {
     localStorage.setItem("appVersion", latestVersion.value);
@@ -79,19 +75,16 @@ const reloadPage = () => {
   }
 };
 
-
 const notifyServiceWorker = () => {
   if (navigator.serviceWorker?.controller) {
     navigator.serviceWorker.controller.postMessage({ type: "CHECK_UPDATE" });
   }
 };
 
-
 onMounted(() => {
   caches.keys()
     .then((keyList) => Promise.all(keyList.map((key) => caches.delete(key))))
     .catch((err) => console.error("Cache clear failed:", err));
-
 
   checkVersion();
   setInterval(() => {
@@ -108,29 +101,24 @@ onMounted(() => {
     }
   });
 
-
   window.addEventListener("newVersionAvailable", () => {
     checkVersion();
   });
 });
 </script>
 
-
 <style lang="scss">
 html {
   overflow-y: auto !important;
 }
 
-
 body.waiting * {
   cursor: wait !important;
 }
 
-
 .is-fullwidth {
   width: 100%;
 }
-
 
 @media screen and (max-width: 768px) {
   .is-fullwidth-mobile {
@@ -138,33 +126,27 @@ body.waiting * {
   }
 }
 
-
 .is-fullheight {
   height: 100%;
 }
-
 
 .clickable {
   pointer-events: all !important;
   cursor: pointer;
 }
 
-
 [contenteditable] {
   -webkit-user-select: text !important;
   user-select: text !important;
-
 
   * {
     font-family: inherit;
   }
 }
 
-
 .root {
   padding: 0px !important;
 }
-
 
 .reload-prompt {
   position: fixed;
