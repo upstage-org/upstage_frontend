@@ -3,15 +3,12 @@ import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
 import gql from "graphql-tag";
-import { StudioGraph, UploadFile } from "models/studio";
 import { editingMediaVar, inquiryVar } from "apollo";
-import moment, { Moment } from "moment";
-import configs from "config";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import { useStore } from "vuex";
+import { useUserStore } from "store/modules/user";
 
 const { result: response, loading } = useQuery(gql`
   {
@@ -53,8 +50,9 @@ const { result: response, loading } = useQuery(gql`
     }
   }
 `);
-const store = useStore();
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+
+const userStore = useUserStore();
+const isAdmin = computed(() => userStore.isAdmin);
 const result = computed(() => response?.value);
 
 const sharedAuth = getSharedAuth();

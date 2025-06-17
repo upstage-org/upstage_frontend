@@ -16,7 +16,7 @@ import {
   BACKGROUND_ACTIONS,
   COLORS,
   DRAW_ACTIONS,
-} from 'utils/constants';
+} from 'constants/index';
 import {
   deserializeObject,
   recalcFontSize,
@@ -262,7 +262,6 @@ export const useStageStore = defineStore('stage', {
     },
     whiteboard: (state) => state.board.whiteboard,
     jitsiTracks: (state) => state.board.tracks,
-    reloadStreams: (state) => state.reloadStreams,
     activeObject: (state) => state.board.objects.find((o) => o.id === state.activeMovable),
   },
   actions: {
@@ -514,7 +513,7 @@ export const useStageStore = defineStore('stage', {
     setReplay(replay: any) {
       this.replay = replay;
     },
-    setActiveMovable(id: string) {
+    setActiveMovable(id: string | null) {
       this.activeMovable = id;
     },
     updateAudioPlayerStatus({ index, ...status }: { index: number; [key: string]: any }) {

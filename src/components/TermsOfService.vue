@@ -10,20 +10,13 @@
   </Modal>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
 import Modal from "components/Modal.vue";
-import { useStore } from "vuex";
+import { useConfigStore } from "store/modules/config";
 
-export default {
-  components: { Modal },
-  setup: () => {
-    const store = useStore();
-    const url = computed(() => store.getters["config/termsOfService"]);
-
-    return { url };
-  },
-};
+const configStore = useConfigStore();
+const url = computed(() => configStore.termsOfService);
 </script>
 
 <style lang="scss">
@@ -31,10 +24,12 @@ export default {
   .modal-card-title {
     margin-bottom: 0 !important;
   }
+
   .modal-card-body {
     padding: 0;
     display: flex;
   }
+
   iframe {
     width: 100%;
     height: 80vh;

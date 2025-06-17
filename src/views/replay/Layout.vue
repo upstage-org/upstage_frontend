@@ -12,7 +12,10 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
+import { computed, provide, onMounted } from "vue";
+import { useRoute } from "vue-router";
+import { useStageStore } from "store/modules/stage";
 import Logo from "components/Logo.vue";
 import Chat from "components/stage/Chat/index.vue";
 import Board from "components/stage/Board.vue";
@@ -20,50 +23,39 @@ import AudioPlayer from "components/stage/AudioPlayer.vue";
 import Preloader from "views/live/Preloader.vue";
 import ConnectionStatus from "views/live/ConnectionStatus.vue";
 import Controls from "./Controls.vue";
-import { useStore } from "vuex";
-import { computed, provide } from "vue";
-import { useRoute } from "vue-router";
-export default {
-  components: {
-    Logo,
-    Preloader,
-    Chat,
-    Board,
-    AudioPlayer,
-    ConnectionStatus,
-    Controls,
-  },
-  setup: () => {
-    const store = useStore();
-    const ready = computed(
-      () => store.state.stage.model && !store.state.stage.preloading,
-    );
 
-    const route = useRoute();
-    store.dispatch("stage/loadStage", {
-      url: route.params.url,
-      recordId: route.params.id,
-    });
+const route = useRoute();
+const stageStore = useStageStore();
 
-    provide("replaying", true);
+// Computed properties
+const ready = computed(() => stageStore.model && !stageStore.preloading);
 
-    return {
-      ready,
-    };
-  },
-};
+// Provide replay context to child components
+provide("replaying", true);
+
+// Load stage data when component is mounted
+onMounted(() => {
+  stageStore.loadStage({
+    url: route.params.url as string,
+    recordId: route.params.id as string,
+  });
+});
 </script>
 
 <style lang="scss">
 #main-content {
   min-height: calc(100vh - 120px);
 }
+
 #live-stage {
   *:not(input, textarea) {
-    -webkit-user-select: none; /* Safari */
-    user-select: none; /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */
+    -webkit-user-select: none;
+    /* Safari */
+    user-select: none;
+    /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */
   }
 }
+
 #live-logo {
   position: fixed;
   right: 0px;

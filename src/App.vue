@@ -30,7 +30,6 @@ import "styles/custom.less";
 const userStore = useUserStore();
 const configStore = useConfigStore();
 userStore.fetchCurrent();
-configStore.fetchConfig();
 const route = useRoute();
 
 // Version state
@@ -81,7 +80,8 @@ const notifyServiceWorker = () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await configStore.fetchConfig();
   caches.keys()
     .then((keyList) => Promise.all(keyList.map((key) => caches.delete(key))))
     .catch((err) => console.error("Cache clear failed:", err));

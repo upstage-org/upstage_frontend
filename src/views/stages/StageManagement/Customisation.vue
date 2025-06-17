@@ -1,10 +1,6 @@
 <template>
-  <SaveButton
-    class="mb-4"
-    :loading="saving"
-    @click="saveCustomisation"
-    :disabled="!selectedRatio.width || !selectedRatio.height"
-  />
+  <SaveButton class="mb-4" :loading="saving" @click="saveCustomisation"
+    :disabled="!selectedRatio.width || !selectedRatio.height" />
   <table class="is-fullwidth" cellspacing="5">
     <tbody>
       <tr>
@@ -14,55 +10,32 @@
         <td width="100%">
           <div>
             <HorizontalField title="Speech bubble">
-              <Dropdown
-                v-model="animations.bubble"
-                :data="['fade', 'bounce']"
-                :render-label="capitalize"
-              />
+              <Dropdown v-model="animations.bubble" :data="['fade', 'bounce']" :render-label="capitalize" />
             </HorizontalField>
             <HorizontalField title="Speed">
               <div class="speed-slider">
                 <span class="mr-2">{{ $t("slow") }}</span>
-                <input
-                  class="slider is-fullwidth"
-                  step="0.01"
-                  min="0.1"
-                  max="1"
-                  :value="1000 / animations.bubbleSpeed"
-                  @change="animations.bubbleSpeed = 1000 / $event.target.value"
-                  type="range"
-                />
+                <input class="slider is-fullwidth" step="0.01" min="0.1" max="1" :value="1000 / animations.bubbleSpeed"
+                  @change="animations.bubbleSpeed = 1000 / $event.target.value" type="range" />
                 <span class="ml-2">{{ $t("fast") }}</span>
               </div>
             </HorizontalField>
             <HorizontalField title="Curtain">
-              <Dropdown
-                v-model="animations.curtain"
-                :data="[
-                  { value: 'drop', label: 'Drops down and lifts up' },
-                  { value: 'fade', label: 'Fades in and out' },
-                  {
-                    value: 'close',
-                    label:
-                      'Closes from the sides in and opens from the middle out',
-                  },
-                ]"
-                :render-value="(item) => item.value"
-                :render-label="(item) => item.label"
-              />
+              <Dropdown v-model="animations.curtain" :data="[
+                { value: 'drop', label: 'Drops down and lifts up' },
+                { value: 'fade', label: 'Fades in and out' },
+                {
+                  value: 'close',
+                  label:
+                    'Closes from the sides in and opens from the middle out',
+                },
+              ]" :render-value="(item) => item.value" :render-label="(item) => item.label" />
             </HorizontalField>
             <HorizontalField title="Speed">
               <div class="speed-slider">
                 <span class="mr-2">{{ $t("slow") }}</span>
-                <input
-                  class="slider is-fullwidth"
-                  step="0.01"
-                  min="0.1"
-                  max="1"
-                  :value="5000 / animations.curtainSpeed"
-                  @change="animations.curtainSpeed = 5000 / $event.target.value"
-                  type="range"
-                />
+                <input class="slider is-fullwidth" step="0.01" min="0.1" max="1" :value="5000 / animations.curtainSpeed"
+                  @change="animations.curtainSpeed = 5000 / $event.target.value" type="range" />
                 <span class="ml-2">{{ $t("fast") }}</span>
               </div>
             </HorizontalField>
@@ -74,77 +47,56 @@
           <h3 class="title">{{ $t("default_backgroundcolor") }}</h3>
         </td>
         <td>
-          <ColorPicker
-            v-model="defaultcolor"
-            @update:modelValue="sendBackdropColor"
-          />
+          <ColorPicker v-model="defaultcolor" @update:modelValue="sendBackdropColor" />
         </td>
       </tr>
       <tr>
         <td>
           <h3 class="title">
             Stage Ratio
-            <span v-if="selectedRatio"
-              >: {{ selectedRatio.width }}/{{ selectedRatio.height }}</span
-            >
+            <span v-if="selectedRatio">: {{ selectedRatio.width }}/{{ selectedRatio.height }}</span>
           </h3>
         </td>
         <td>
           <div class="columns">
             <div class="column is-3">
-              <Selectable
-                :selected="
-                  selectedRatio.width == 4 && selectedRatio.height == 3
-                "
-                @select="
+              <Selectable :selected="selectedRatio.width == 4 && selectedRatio.height == 3
+                " @select="
                   selectedRatio.width = 4;
-                  selectedRatio.height = 3;
-                "
-              >
+                selectedRatio.height = 3;
+                ">
                 <div class="box size-option" style="padding-bottom: 75%">
                   <div>4/3</div>
                 </div>
               </Selectable>
             </div>
             <div class="column is-3">
-              <Selectable
-                :selected="
-                  selectedRatio.width == 16 && selectedRatio.height == 9
-                "
-                @select="
+              <Selectable :selected="selectedRatio.width == 16 && selectedRatio.height == 9
+                " @select="
                   selectedRatio.width = 16;
-                  selectedRatio.height = 9;
-                "
-              >
+                selectedRatio.height = 9;
+                ">
                 <div class="box size-option" style="padding-bottom: 56.25%">
                   <div>16/9</div>
                 </div>
               </Selectable>
             </div>
             <div class="column is-3">
-              <Selectable
-                :selected="
-                  selectedRatio.width == 2 && selectedRatio.height == 1
-                "
-                @select="
+              <Selectable :selected="selectedRatio.width == 2 && selectedRatio.height == 1
+                " @select="
                   selectedRatio.width = 2;
-                  selectedRatio.height = 1;
-                "
-              >
+                selectedRatio.height = 1;
+                ">
                 <div class="box size-option" style="padding-bottom: 50%">
                   <div>2/1</div>
                 </div>
               </Selectable>
             </div>
             <div class="column is-3">
-              <div
-                class="box size-option has-primary-background"
-                :style="{
-                  'padding-bottom': `${
-                    (selectedRatio.height * 100) / selectedRatio.width
+              <div class="box size-option has-primary-background" :style="{
+                'padding-bottom': `${(selectedRatio.height * 100) / selectedRatio.width
                   }%`,
-                }"
-              >
+              }">
                 <div>
                   <div>Custom ratio:</div>
                   <div class="custom-ratio">
@@ -177,7 +129,7 @@ import ColorPicker from "components/form/ColorPicker.vue";
 import { useStore } from "vuex";
 import buildClient from "services/mqtt";
 import { namespaceTopic } from "store/modules/stage/reusable";
-import { BACKGROUND_ACTIONS, TOPICS } from "utils/constants";
+import { BACKGROUND_ACTIONS, TOPICS } from "constants/index";
 
 export default {
   components: { Selectable, SaveButton, HorizontalField, Dropdown, Switch },
@@ -226,16 +178,16 @@ export default {
             type: "setBackdropColor",
             color: defaultcolor.value,
           }),
-          { qos: 1, retain: false },
-          (error, res) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(res);
-              mqtt.disconnect();
-            }
+        { qos: 1, retain: false },
+        (error, res) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(res);
+            mqtt.disconnect();
           }
-        );
+        }
+      );
     };
 
     const sendBackdropColor = (color) => {
@@ -262,7 +214,7 @@ export default {
   padding: 0;
   position: relative;
 
-  > div {
+  >div {
     position: absolute;
     left: 50%;
     top: 50%;

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { router } from '../../router';
 import { userGraph } from 'services/graphql';
 import { displayName, logout as doLogout } from 'utils/auth';
-import { ROLES } from 'utils/constants';
+import { ROLES } from 'constants';
 import { message } from 'ant-design-vue';
 import { useAuthStore } from './auth';
 

@@ -1,10 +1,6 @@
 <template>
-  <button
-    v-if="clearChatVisibility"
-    class="chat-setting button is-rounded is-outlined"
-    @click="clearChat"
-    :class="{ 'is-loading': clearing }"
-  >
+  <button v-if="clearChatVisibility" class="chat-setting button is-rounded is-outlined" @click="clearChat"
+    :class="{ 'is-loading': clearing }">
     <span class="icon">
       <Icon src="clear.svg" size="20" />
     </span>
@@ -16,7 +12,7 @@ import { ref } from "vue";
 import { message } from "ant-design-vue";
 import Icon from "components/Icon.vue";
 import buildClient from "services/mqtt";
-import { TOPICS } from "utils/constants";
+import { TOPICS } from "constants/index";
 import { namespaceTopic } from "store/modules/stage/reusable";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";

@@ -10,25 +10,30 @@ import { useI18n } from "vue-i18n";
 import { capitalize } from "utils/common";
 import { message } from "ant-design-vue";
 import { FetchResult } from "@apollo/client/core";
-import store from "store";
+import { useUserStore } from "store/modules/user";
 import PlayerAudienceCounter from "components/stage/PlayerAudienceCounter.vue";
 
 const { t } = useI18n();
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const userStore = useUserStore();
+const isAdmin = computed(() => userStore.isAdmin);
+
 const enterStage = (stage: Stage) => {
   window.open(`/${stage.fileLocation}`, "_blank");
 };
+
 const tableParams = reactive({
   page: 1,
   limit: 10,
   sort: ["LAST_ACCESS_DESC"],
   access: []
 });
+
 const { result: inquiryResult } = useQuery(gql`
   {
     inquiry @client
   }
 `);
+
 const params = computed(() => ({
   ...tableParams,
   ...inquiryResult.value.inquiry,
@@ -131,7 +136,6 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     sorter: {
       multiple: 2,
     },
-    //defaultSortOrder: "descend",
   },
   //    {
   //        title: t("recorded"),
@@ -201,6 +205,7 @@ const handleTableChange = (
     sort,
   });
 };
+
 const dataSource = computed(() => {
   return result.value ? result.value.stages.edges : []
 });
@@ -220,6 +225,7 @@ const {
     }
   }
 `);
+
 const handleChangeStatus = async (record: Stage) => {
   await updateStatus({
     id: record.id,
@@ -239,6 +245,7 @@ const {
     }
   `,
 );
+
 const handleChangeVisibility = async (record: Stage) => {
   await updateVisibility({
     id: record.id,
@@ -265,8 +272,7 @@ onVisibilityUpdated(handleUpdate);
         showQuickJumper: true,
         showSizeChanger: true,
         total: result ? result.stages.totalCount : 0,
-      } as Pagination
-        ">
+      } as Pagination">
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'cover'">
           <a-image :src="text ? absolutePath(text) : '/img/greencurtain.jpg'" class="w-24 max-h-24 object-contain" />
@@ -325,6 +331,7 @@ onVisibilityUpdated(handleUpdate);
     <slot></slot>
   </a-layout>
 </template>
+
 <style scoped>
 .emptyImg {
   width: 50px;

@@ -4,7 +4,7 @@ import { message } from "ant-design-vue";
 import gql from "graphql-tag";
 import { computed, inject, PropType, ref } from "vue";
 import { Media, Stage, AssignedStage } from "models/studio";
-import store from "store";
+import { useUserStore } from "store/modules/user";
 import MediaPreview from "./MediaPreview.vue";
 
 const props = defineProps({
@@ -13,9 +13,10 @@ const props = defineProps({
     required: true,
   },
 });
-const stages = ref<string[]>([]);
+const stages = ref<any[]>([]);
 const visible = ref(false);
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const userStore = useUserStore();
+const isAdmin = computed(() => userStore.isAdmin);
 const note = computed(() => {
   try {
     const description = JSON.parse(props.media.description);
@@ -123,6 +124,6 @@ const handleOk = async () => {
         Save
       </a-button>
     </div>
-    <br/>
+    <br />
   </a-modal>
 </template>

@@ -3,8 +3,8 @@ import { defineStore } from 'pinia';
 import { configGraph } from "services/graphql";
 
 interface ConfigState {
-  nginx: Record<string, any>;
-  system: Record<string, any>;
+  nginx: any;
+  system: any;
   foyer: any;
 }
 
@@ -12,7 +12,7 @@ export const useConfigStore = defineStore('config', {
   state: (): ConfigState => ({
     nginx: {},
     system: {},
-    foyer: null,
+    foyer: {},
   }),
 
   getters: {
@@ -21,8 +21,6 @@ export const useConfigStore = defineStore('config', {
     manual: (state) => state.system.manual?.value,
     esp: (state) => state.system.esp?.value,
     enableDonate: (state) => state.system.enableDonate?.value,
-    foyer: (state) => state.foyer ?? {},
-    system: (state) => state.system ?? {},
     navigations: (state) => {
       if (!state.foyer) {
         return [];
@@ -66,7 +64,9 @@ export const useConfigStore = defineStore('config', {
   actions: {
     async fetchConfig() {
       const configs = await configGraph.configs();
-      this.$patch(configs);
+      this.nginx = configs?.nginx;
+      this.system = configs?.system;
+      this.foyer = configs?.foyer;
     },
   },
 });

@@ -1,11 +1,7 @@
 <template>
   <Object :object="object">
     <template #menu="slotProps">
-      <MenuContent
-        :object="object"
-        :closeMenu="slotProps.closeMenu"
-        v-model:active="active"
-      />
+      <MenuContent :object="object" :closeMenu="slotProps.closeMenu" v-model:active="active" />
     </template>
     <template #render>
       <canvas ref="el"></canvas>
@@ -13,25 +9,26 @@
   </Object>
 </template>
 
-<script>
+<script setup lang="ts">
+import { computed, ref } from "vue";
 import Object from "./Object.vue";
 import MenuContent from "./Avatar/ContextMenuAvatar.vue";
-import { useStore } from "vuex";
 import { useDrawing } from "components/stage/Toolboxs/tools/Draw/composable";
-import { computed } from "vue";
+import { useUserStore } from "store/modules/user";
+import { ObjectProps } from "interfaces";
 
-export default {
-  props: ["object"],
-  components: { Object, MenuContent },
-  setup: (props) => {
-    const store = useStore();
+interface Props {
+  object: ObjectProps;
+}
 
-    const drawing = computed(() => ({ ...props.object }));
-    const { el } = useDrawing(drawing);
+const props = defineProps<Props>();
+const active = ref(false);
 
-    return { el, store };
-  },
-};
+// Use Pinia stores
+const userStore = useUserStore();
+
+const drawing = computed(() => ({ ...props.object }));
+const { el } = useDrawing(drawing);
 </script>
 
 <style></style>

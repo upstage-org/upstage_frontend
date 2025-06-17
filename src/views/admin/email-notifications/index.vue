@@ -15,7 +15,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Header from "components/Header.vue";
 import { userGraph, configGraph } from "services/graphql";
-import { ROLES } from "utils/constants";
+import { ROLES } from "constants/index";
 import { useQuery } from "@vue/apollo-composable";
 import gql from "graphql-tag";
 import store from "store";
@@ -202,12 +202,12 @@ const { proceed, loading } = useLoading(
             notFoundContent: '',
             searchPlaceholder: 'Search by email or name',
           }" :list-style="{
-              flex: '1',
-              height: '300px',
-            }" :titles="[' available', ' selected']" v-model:target-keys="receiverEmails" :data-source="dataSource"
+            flex: '1',
+            height: '300px',
+          }" :titles="[' available', ' selected']" v-model:target-keys="receiverEmails" :data-source="dataSource"
             show-search :filter-option="(keyword, option) =>
-                option.title?.toLowerCase().includes(keyword.toLowerCase()) ??
-                false
+              option.title?.toLowerCase().includes(keyword.toLowerCase()) ??
+              false
               ">
             <template #render="item">
               <a-space class="flex justify-between">

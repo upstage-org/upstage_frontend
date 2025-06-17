@@ -1,7 +1,7 @@
 // @ts-nocheck
 import Cookies from "js-cookie";
 import { computed } from "vue";
-import { ROLES } from "./constants";
+import { ROLES } from "../constants";
 import { titleCase } from "./common";
 import { useAuthStore } from "store/modules/auth";
 
