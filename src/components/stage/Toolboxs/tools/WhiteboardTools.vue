@@ -1,16 +1,10 @@
 <template>
-  <canvas
-    ref="el"
-    class="drawing"
-    :width="stageSize.width"
-    :height="stageSize.height"
-    :style="{
-      cursor,
-      top: stageSize.top + 'px',
-      left: stageSize.left + 'px',
-      'pointer-events': none,
-    }"
-  >
+  <canvas ref="el" class="drawing" :width="stageSize.width" :height="stageSize.height" :style="{
+    cursor,
+    top: stageSize.top + 'px',
+    left: stageSize.left + 'px',
+    pointerEvents: 'none',
+  }">
     Your browser does not support the HTML5 canvas tag.
   </canvas>
   <div class="drawing-tool">
@@ -21,32 +15,17 @@
   </div>
   <div class="drawing-tool" style="width: 200px">
     <div class="size-preview">
-      <div
-        class="dot"
-        :style="{
-          width: size + 'px',
-          height: size + 'px',
-          'background-color': color,
-        }"
-        @click="mode = 'draw'"
-      />
+      <div class="dot" :style="{
+        width: size + 'px',
+        height: size + 'px',
+        'background-color': color,
+      }" @click="mode = 'draw'" />
     </div>
-    <input
-      class="slider is-fullwidth m-0 is-dark"
-      step="1"
-      min="1"
-      max="200"
-      type="range"
-      v-model="size"
-    />
+    <input class="slider is-fullwidth m-0 is-dark" step="1" min="1" max="200" type="range" v-model="size" />
   </div>
-  <div
-    class="drawing-tool"
-    @click="toggleErase"
-    :class="{
-      active: mode === 'erase',
-    }"
-  >
+  <div class="drawing-tool" @click="toggleErase" :class="{
+    active: mode === 'erase',
+  }">
     <div class="icon is-large">
       <Icon size="36" src="erase.svg" />
     </div>
@@ -66,76 +45,68 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "../../../../store/modules/stage";
 import ColorPicker from "components/form/ColorPicker.vue";
 import Icon from "components/Icon.vue";
 import { useDrawable } from "./Draw/composable";
 
-export default {
-  components: { ColorPicker, Icon },
-  setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const isDrawing = computed(() => {
-      return store.state.stage.preferences.isDrawing;
-    });
-    const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } =
-      useDrawable();
+interface DrawCommand {
+  size: number;
+  x: number;
+  y: number;
+  lines: Array<{
+    x: number;
+    y: number;
+    fromX: number;
+    fromY: number;
+  }>;
+}
 
-    onMounted(() => {
-      store.commit("stage/UPDATE_IS_DRAWING", true);
-    });
+const store = useStageStore();
+const stageSize = computed(() => store.stageSize);
+const isDrawing = computed(() => store.preferences.isDrawing);
 
-    onUnmounted(() => {
-      store.commit("stage/UPDATE_IS_DRAWING", false);
-    });
+const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } = useDrawable();
 
-    watch(history, (val) => {
-      if (history.length) {
-        let command = val[0];
-        const ratio = 1 / stageSize.value.height;
-        command = {
-          ...command,
-          size: command.size * ratio,
-          x: command.x * ratio,
-          y: command.y * ratio,
-          lines: command.lines.map((line) => ({
-            x: line.x * ratio,
-            y: line.y * ratio,
-            fromX: line.fromX * ratio,
-            fromY: line.fromY * ratio,
-          })),
-        };
-        store.dispatch("stage/sendDrawWhiteboard", command);
-        clearCanvas(true);
-      }
-    });
+onMounted(() => {
+  store.updateIsDrawing(true);
+});
 
-    const undo = () => {
-      store.dispatch("stage/sendUndoWhiteboard");
-      clearCanvas(true);
+onUnmounted(() => {
+  store.updateIsDrawing(false);
+});
+
+watch(history, (val) => {
+  if (history.length) {
+    const command = val[0] as DrawCommand;
+    const ratio = 1 / stageSize.value.height;
+    const scaledCommand: DrawCommand = {
+      ...command,
+      size: command.size * ratio,
+      x: command.x * ratio,
+      y: command.y * ratio,
+      lines: command.lines.map((line) => ({
+        x: line.x * ratio,
+        y: line.y * ratio,
+        fromX: line.fromX * ratio,
+        fromY: line.fromY * ratio,
+      })),
     };
+    store.sendDrawWhiteboard(scaledCommand);
+    clearCanvas(true);
+  }
+});
 
-    const clear = () => {
-      store.dispatch("stage/sendClearWhiteboard");
-      clearCanvas(true);
-    };
+const undo = () => {
+  store.sendUndoWhiteboard();
+  clearCanvas(true);
+};
 
-    return {
-      isDrawing,
-      color,
-      size,
-      el,
-      clear,
-      undo,
-      toggleErase,
-      mode,
-      cursor,
-      stageSize,
-    };
-  },
+const clear = () => {
+  store.sendClearWhiteboard();
+  clearCanvas(true);
 };
 </script>
 
@@ -144,16 +115,19 @@ export default {
   position: fixed;
   z-index: 1000;
 }
+
 .drawing-tool {
   z-index: 1001;
   position: relative;
   vertical-align: top;
 }
+
 .size-preview {
   display: flex;
   width: 100%;
   height: 48px;
 }
+
 .dot {
   margin: auto;
   background-color: black;

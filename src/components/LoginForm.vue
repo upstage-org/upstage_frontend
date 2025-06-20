@@ -123,8 +123,7 @@
           </span>
         </button>
         <button v-else type="submit" class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }" :disabled="!password || !passwordConfirm || password !== passwordConfirm
-            ">
+          :class="{ 'is-loading': loading }" :disabled="!password || !passwordConfirm || password !== passwordConfirm">
           <span>{{ $t("finish") }}</span>
           <span class="icon is-medium">
             <i class="fas fa-chevron-right"></i>
@@ -135,7 +134,7 @@
   </form>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { message } from "ant-design-vue";
 import TermsOfService from "components/TermsOfService.vue";
 import { userGraph } from "services/graphql";
@@ -145,89 +144,117 @@ import { useAuthStore } from "store/modules/auth";
 import Turnstile from "vue-turnstile";
 import configs from "config";
 
+interface LoginUser {
+  username: string;
+  password: string;
+  token?: string;
+}
+
+interface GraphQLResponse {
+  requestPasswordReset?: {
+    message: string;
+  };
+  verifyPasswordReset?: {
+    message: string;
+  };
+  resetPassword?: {
+    message: string;
+  };
+}
+
 const isProduction = import.meta.env.MODE === "production";
 const siteKey = isProduction ? configs.CLOUDFLARE_CAPTCHA_SITEKEY : null;
 const token = ref("");
 
-const emit = defineEmits(["success"]);
+const emit = defineEmits<{
+  (e: 'success'): void;
+}>();
+
 const showPassword = ref(false);
 const username = ref("");
 const password = ref("");
 const loading = ref(false);
-const store = useAuthStore();
+const authStore = useAuthStore();
 const resetMode = ref(false);
 
 const toggleShowPassword = () => {
   showPassword.value = !showPassword.value;
 };
-const submit = () => {
-  const user = {
+
+const submit = async () => {
+  const user: LoginUser = {
     username: username.value.trim(),
     password: password.value,
-    ...token.value ? { token: token.value } : {}
+    ...(token.value ? { token: token.value } : {})
   };
   loading.value = true;
-  store
-    .login(user)
-    .then(() => {
-      emit("success");
-    })
-    .finally(() => {
-      loading.value = false;
-    });
+  try {
+    await authStore.login(user);
+    emit("success");
+  } finally {
+    loading.value = false;
+  }
 };
 
 const { save: step1 } = useMutation(userGraph.requestPasswordReset);
 const resetStep = ref(1);
 const requestPasswordReset = async () => {
   loading.value = true;
-  await step1(
-    (res) => {
-      message.success(res.requestPasswordReset.message);
-      //username.value = res.requestPasswordReset.username;
-      resetStep.value = 2;
-    },
-    {
-      usernameOrEmail: username.value.trim(),
-    },
-  );
-  loading.value = false;
+  try {
+    await step1(
+      (res: GraphQLResponse) => {
+        message.success(res.requestPasswordReset?.message || '');
+        resetStep.value = 2;
+      },
+      {
+        usernameOrEmail: username.value.trim(),
+      },
+    );
+  } finally {
+    loading.value = false;
+  }
 };
 
 const otp = ref("");
 const { save: step2 } = useMutation(userGraph.verifyPasswordReset);
 const verifyOTP = async () => {
   loading.value = true;
-  await step2(
-    (res) => {
-      message.success(res.verifyPasswordReset.message);
-      resetStep.value = 3;
-    },
-    {
-      token: otp.value.trim(),
-      email: username.value.trim(),
-    },
-  );
-  loading.value = false;
+  try {
+    await step2(
+      (res: GraphQLResponse) => {
+        message.success(res.verifyPasswordReset?.message || '');
+        resetStep.value = 3;
+      },
+      {
+        token: otp.value.trim(),
+        email: username.value.trim(),
+      },
+    );
+  } finally {
+    loading.value = false;
+  }
 };
 
 const { save: step3 } = useMutation(userGraph.passwordReset);
 const passwordConfirm = ref("");
 const processPasswordReset = async () => {
   loading.value = true;
-  await step3(
-    (res) => {
-      message.success(res.resetPassword.message);
-      resetStep.value = 1;
-      resetMode.value = false;
-    },
-    {
-      token: otp.value.trim(),
-      email: username.value.trim(),
-      password: password.value,
-    },
-  );
-  loading.value = false;
+  try {
+    await step3(
+      (res: GraphQLResponse) => {
+        message.success(res.resetPassword?.message || '');
+        resetStep.value = 1;
+        resetMode.value = false;
+      },
+      {
+        token: otp.value.trim(),
+        email: username.value.trim(),
+        password: password.value,
+      },
+    );
+  } finally {
+    loading.value = false;
+  }
 };
 
 const resetPassword = () => {
@@ -241,7 +268,6 @@ const resetPassword = () => {
     processPasswordReset();
   }
 };
-
 </script>
 
 <style></style>

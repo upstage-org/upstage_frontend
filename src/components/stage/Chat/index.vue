@@ -2,23 +2,21 @@
   <transition :css="false" @enter="enter" @leave="leave">
     <div id="chatbox" :key="chatPosition" v-show="chatVisibility" class="card is-light"
       :class="{ collapsed, dark: chatDarkMode }" :style="{
-    opacity,
-    fontSize,
-    width: `calc(20% + 3*${fontSize}`,
-    height: `calc(100vh - ${stageSize.height}px - 64px)`,
-    left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
-  }">
+        opacity,
+        fontSize,
+        width: `calc(20% + 3*${fontSize}`,
+        height: `calc(100vh - ${stageSize.height}px - 64px)`,
+        left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
+      }">
       <transition @enter="bounceUnread">
         <a-tooltip :title="`${unreadMessages} new message${unreadMessages > 1 ? 's' : ''
-    }`">
+          }`">
           <span v-if="collapsed && unreadMessages" :key="unreadMessages" class="unread clickable tag is-danger is-small"
-            @click="collapsed = false"
-            style="position: absolute;
+            @click="collapsed = false" style="position: absolute;
             left: 12px;
             top: 6px;
             background-color: #f14668 !important;
-            "
-            >{{ unreadMessages }}</span>
+            ">{{ unreadMessages }}</span>
         </a-tooltip>
       </transition>
       <div class="actions">
@@ -49,12 +47,14 @@
             <Reaction :custom-emoji="true" />
             <div class="font-size-controls">
               <a-tooltip title="Increase font size">
-                <button class="button is-small is-rounded mx-1" @click="increateFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
+                <button class="button is-small is-rounded mx-1" @click="increaseFontSize()"
+                  style="width: 24px; height:24px; padding:0px; padding-top:4px;">
                   ➕
                 </button>
               </a-tooltip>
               <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded mx-1" @click="decreaseFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
+                <button class="button is-small is-rounded mx-1" @click="decreaseFontSize()"
+                  style="width: 24px; height:24px; padding:0px; padding-top:4px;">
                   ➖
                 </button>
               </a-tooltip>
@@ -69,151 +69,130 @@
   </transition>
 </template>
 
-<script>
-import { computed, onMounted, ref, watch, watchEffect } from "vue";
-import { animate } from "animejs";
-import { useStore } from "vuex";
-import ChatInput from "components/form/ChatInput.vue";
-import Icon from "components/Icon.vue";
-import Reaction from "./Reaction.vue";
-import Messages from "./Messages.vue";
-import ClearChat from "./ClearChat.vue";
+<script setup lang="ts">
+import { ref, computed, onMounted, watch, watchEffect } from 'vue'
+import { animate } from 'animejs'
+import { useChatStore } from 'stores/chat'
+import { useStageStore } from 'stores/stage'
+import { useUserStore } from 'stores/user'
+import ChatInput from 'components/form/ChatInput.vue'
+import Icon from 'components/Icon.vue'
+import Reaction from './Reaction.vue'
+import Messages from './Messages.vue'
+import ClearChat from './ClearChat.vue'
 
-export default {
-  components: { ChatInput, Reaction, Icon, Messages, ClearChat },
-  setup: () => {
-    const theContent = ref();
-    const store = useStore();
-    const chatVisibility = computed(
-      () => store.state.stage.settings.chatVisibility,
-    );
-    const chatDarkMode = computed(
-      () => store.state.stage.settings.chatDarkMode,
-    );
+// Store instances
+const chatStore = useChatStore()
+const stageStore = useStageStore()
+const userStore = useUserStore()
 
-    store.dispatch("stage/loadPermission");
+// Refs
+const theContent = ref<HTMLElement | null>(null)
+const message = ref('')
+const collapsed = ref(false)
 
-    const messages = computed(() => store.state.stage.chat.messages);
-    const loadingUser = computed(() => store.state.user.loadingUser);
-    const message = ref("");
-    const collapsed = ref(false);
-    const scrollToEnd = () => {
-      animate(theContent.value, {
-        scrollTop: theContent.value?.scrollHeight,
-        ease: "inOutQuad",
-      });
-    };
-    const sendChat = () => {
-      if (message.value.trim() && !loadingUser.value) {
-        store.dispatch("stage/sendChat", { message: message.value });
-        message.value = "";
-        scrollToEnd();
-      }
-    };
-    onMounted(scrollToEnd);
-    watch(messages.value, scrollToEnd);
-    watch(collapsed, (val) => {
-      if (!val) {
-        setTimeout(() => {
-          scrollToEnd();
-        });
-      }
-    });
+// Computed
+const messages = computed(() => chatStore.messages)
+const loadingUser = computed(() => userStore.loadingUser)
+const opacity = computed(() => chatStore.opacity)
+const fontSize = computed(() => chatStore.fontSize)
+const chatVisibility = computed(() => chatStore.chatVisibility)
+const chatDarkMode = computed(() => chatStore.chatDarkMode)
+const chatPosition = computed(() => chatStore.chatPosition)
+const unreadMessages = computed(() => chatStore.unreadMessages)
+const canPlay = computed(() => stageStore.canPlay)
+const stageSize = computed(() => stageStore.stageSize)
 
-    const openChatSetting = () =>
-      store.dispatch("stage/openSettingPopup", {
-        type: "ChatParameters",
-      });
+// Methods
+const scrollToEnd = () => {
+  if (theContent.value) {
+    animate(theContent.value, {
+      scrollTop: theContent.value.scrollHeight,
+      ease: 'inOutQuad',
+    })
+  }
+}
 
-    const opacity = computed(() => store.state.stage.chat.opacity);
-    const fontSize = computed(() => store.state.stage.chat.fontSize);
+const sendChat = () => {
+  if (message.value.trim() && !loadingUser.value) {
+    chatStore.sendChat(message.value)
+    message.value = ''
+    scrollToEnd()
+  }
+}
 
-    const enter = (el, complete) => {
-      animate(el, {
-        scale: [0, 1],
-        translateY: [-200, 0],
-        onComplete: complete,
-      });
-    };
-    const leave = (el, complete) => {
-      animate(el, {
-        scale: 0,
-        translateY: -200,
-        onComplete: complete,
-      });
-    };
+const openChatSetting = () => {
+  stageStore.openSettingPopup({ type: 'ChatParameters' })
+}
 
-    const increateFontSize = () => {
-      let incValue = fontSize.value?.replace("px", "");
-      incValue++;
-      const parameters = {
-        opacity: store.state.stage.chat.opacity,
-        fontSize: `${incValue}px`,
-      };
-      store.commit("stage/SET_CHAT_PARAMETERS", parameters);
-      setTimeout(
-        () => (theContent.value.scrollTop = theContent.value.scrollHeight),
-      );
-    };
+const enter = (el: Element, complete: () => void) => {
+  animate(el, {
+    scale: [0, 1],
+    translateY: [-200, 0],
+    onComplete: complete,
+  })
+}
 
-    const decreaseFontSize = () => {
-      let decValue = fontSize.value?.replace("px", "");
-      decValue > 1 && decValue--;
-      const parameters = {
-        opacity: store.state.stage.chat.opacity,
-        fontSize: `${decValue}px`,
-      };
-      store.commit("stage/SET_CHAT_PARAMETERS", parameters);
-    };
-    const chatPosition = computed(() => store.state.stage.chatPosition);
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+const leave = (el: Element, complete: () => void) => {
+  animate(el, {
+    scale: 0,
+    translateY: -200,
+    onComplete: complete,
+  })
+}
 
-    watchEffect(() => {
-      if (!collapsed.value) {
-        messages.value.forEach((message) => {
-          if (!message.read) {
-            message.read = true;
-          }
-        });
-      }
-    });
-    const unreadMessages = computed(
-      () => messages.value.filter((message) => !message.read).length,
-    );
-    const bounceUnread = (el) => {
-      {
-        animate(el, {
-          scale: [1.2, 1],
-          duration: 1000,
-        });
-      }
-    };
+const increaseFontSize = () => {
+  let incValue = parseInt(fontSize.value)
+  incValue++
+  chatStore.setChatParameters({
+    opacity: opacity.value,
+    fontSize: `${incValue}px`,
+  })
+  setTimeout(() => {
+    if (theContent.value) {
+      theContent.value.scrollTop = theContent.value.scrollHeight
+    }
+  })
+}
 
-    return {
-      messages,
-      message,
-      sendChat,
-      theContent,
-      loadingUser,
-      openChatSetting,
-      collapsed,
-      opacity,
-      fontSize,
-      chatVisibility,
-      chatDarkMode,
-      enter,
-      leave,
-      increateFontSize,
-      decreaseFontSize,
-      chatPosition,
-      canPlay,
-      stageSize,
-      unreadMessages,
-      bounceUnread,
-    };
-  },
-};
+const decreaseFontSize = () => {
+  let decValue = parseInt(fontSize.value)
+  if (decValue > 1) {
+    decValue--
+    chatStore.setChatParameters({
+      opacity: opacity.value,
+      fontSize: `${decValue}px`,
+    })
+  }
+}
+
+const bounceUnread = (el: Element) => {
+  animate(el, {
+    scale: [1.2, 1],
+    duration: 1000,
+  })
+}
+
+// Lifecycle hooks
+onMounted(() => {
+  scrollToEnd()
+  stageStore.loadPermission()
+})
+
+// Watchers
+watch(messages, scrollToEnd)
+
+watch(collapsed, (val) => {
+  if (!val) {
+    setTimeout(scrollToEnd)
+  }
+})
+
+watchEffect(() => {
+  if (!collapsed.value) {
+    chatStore.markMessagesAsRead()
+  }
+})
 </script>
 
 <style lang="scss" scoped>

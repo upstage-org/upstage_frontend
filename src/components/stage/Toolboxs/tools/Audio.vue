@@ -1,5 +1,5 @@
 <template>
-  <div v-for="(audio, i) in audios" :key="audio" class="audio has-text-centered"
+  <div v-for="(audio, i) in audios" :key="audio.file" class="audio has-text-centered"
     :class="{ 'is-playing': audio.isPlaying }" @mouseenter="i > audios.length - 3 ? scrollToEnd() : null">
     <div>
       <div class="audio-name">
@@ -30,14 +30,15 @@
             <Icon size="24" src="voice-setting.svg" />
           </div>
           <input class="slider is-fullwidth is-dark my-0" step="0.01" min="0" max="1" v-model="audio.volume"
-            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)" type="range" />
+            @change="(e: Event) => setVolume(audio, Number((e.target as HTMLInputElement).value))" type="range" />
         </div>
         <input class="slider is-fullwidth is-primary mt-0" min="0" :max="audioPlayers[i]?.duration"
-          :value="audioPlayers[i]?.currentTime ?? 0" @change="seek(audio, $event)" type="range" />
+          :value="audioPlayers[i]?.currentTime ?? 0"
+          @change="(e: Event) => seek(audio, Number((e.target as HTMLInputElement).value))" type="range" />
         <div class="addon">
           <span v-if="audio.isPlaying">{{
             displayTimestamp(audioPlayers[i]?.currentTime ?? 0)
-          }}</span>
+            }}</span>
           <span v-else>{{ displayTimestamp(audioPlayers[i]?.duration) }}</span>
         </div>
       </div>
@@ -45,79 +46,66 @@
   </div>
 </template>
 
-<script>
-import { useStore } from "vuex";
-import Icon from "components/Icon.vue";
-import { computed, ref, onMounted } from "vue";
-import { useShortcut } from "../../composable";
-import { displayTimestamp } from "utils/common";
-import { animate } from "animejs";
+<script setup lang="ts">
+import { computed, onMounted } from 'vue'
+import Icon from 'components/Icon.vue'
+import { useAudioStore } from 'stores/audio'
+import { displayTimestamp } from 'utils/common'
+import { animate } from 'animejs'
+import { useShortcut } from '../../composable'
 
-export default {
-  components: { Icon },
-  setup: () => {
-    const store = useStore();
-    const audios = ref(store.getters["stage/audios"] || []);
-    const audioPlayers = computed(() => store.state.stage.audioPlayers);
+interface Audio {
+  file: string
+  name: string
+  isPlaying: boolean
+  currentTime: number
+  volume: number
+  loop: boolean
+  saken?: boolean
+}
 
-    const togglePlaying = (audio, currentTime) => {
-      audio.isPlaying = !audio.isPlaying;
-      audio.currentTime = currentTime;
-      audio.saken = true;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-    const stopAudio = (audio) => {
-      audio.currentTime = 0;
-      audio.saken = true;
-      audio.isPlaying = false;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-    const toggleLoop = (audio, currentTime) => {
-      audio.loop = !audio.loop;
-      audio.currentTime = currentTime;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-    const seek = (audio, e) => {
-      audio.currentTime = e.target.value;
-      audio.saken = true;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-    const setVolume = (audio, e) => {
-      //audio.volume = e.target.value;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
+const audioStore = useAudioStore()
+const audios = computed(() => audioStore.audios)
+const audioPlayers = computed(() => audioStore.audioPlayers)
 
-    useShortcut((e) => {
-      if (isFinite(e.key)) {
-        const i = e.key - 1;
-        if (audios.value.length > i && i >= 0) {
-          togglePlaying(audios.value[i]);
-        }
-      }
-    });
-    const scrollToEnd = () => {
-      const topbar = document.querySelector("#topbar");
-      if (topbar) {
-        animate(topbar, {
-          scrollLeft: topbar.scrollWidth,
-          ease: "inOutQuad",
-        });
-      }
-    };
+const togglePlaying = (audio: Audio, currentTime?: number) => {
+  audioStore.togglePlaying(audio, currentTime)
+}
 
-    return {
-      audios,
-      togglePlaying,
-      stopAudio,
-      toggleLoop,
-      setVolume,
-      audioPlayers,
-      seek,
-      displayTimestamp,
-      scrollToEnd,
-    };
-  },
-};
+const stopAudio = (audio: Audio) => {
+  audioStore.stopAudio(audio)
+}
+
+const toggleLoop = (audio: Audio, currentTime?: number) => {
+  audioStore.toggleLoop(audio, currentTime)
+}
+
+const seek = (audio: Audio, time: number) => {
+  audioStore.seek(audio, time)
+}
+
+const setVolume = (audio: Audio, volume: number) => {
+  audioStore.setVolume(audio, volume)
+}
+
+const scrollToEnd = () => {
+  const topbar = document.querySelector('#topbar')
+  if (topbar) {
+    animate(topbar, {
+      scrollLeft: topbar.scrollWidth,
+      ease: 'inOutQuad',
+    })
+  }
+}
+
+useShortcut((e: KeyboardEvent) => {
+  if (isFinite(Number(e.key))) {
+    const i = Number(e.key) - 1
+    if (audios.value.length > i && i >= 0) {
+      togglePlaying(audios.value[i])
+    }
+  }
+})
 </script>
 
 <style scoped lang="scss">

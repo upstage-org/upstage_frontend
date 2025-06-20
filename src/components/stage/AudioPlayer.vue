@@ -1,5 +1,5 @@
 <template>
-  <audio v-for="audio in audios" :key="audio" :ref="setRef" preload="auto">
+  <audio v-for="(audio, index) in audioStore.audios" :key="index" :ref="setRef" preload="auto">
     <source :src="audio.src" type="audio/mpeg" />
     <source :src="audio.src" type="audio/ogg" />
     <source :src="audio.src" type="audio/wav" />
@@ -12,90 +12,76 @@
   </audio>
 </template>
 
-<script>
-import { computed, onMounted, watch } from "vue";
-import { useStore } from "vuex";
-import { animate } from "animejs";
-export default {
-  setup: () => {
-    const store = useStore();
-    const stopAudio = (audio) => {
-      store.dispatch("stage/updateAudioStatus", {
-        ...audio,
-        isPlaying: false,
-        currentTime: 0,
-      });
-    };
-    const audios = store.getters["stage/audios"];
-    let refs = [];
-    const setRef = (el) => {
-      const index = refs.length;
-      refs.push(el);
-      if (el) {
-        el.addEventListener("ended", function () {
-          const audio = audios[refs.indexOf(el)];
-          if (audio.loop) {
-            el.currentTime = 0;
-            el.play();
-          } else {
-            stopAudio(audios[refs.indexOf(el)]);
-            el.currentTime = 0;
-          }
-        });
-        el.addEventListener("loadedmetadata", function () {
-          store.commit("stage/UPDATE_AUDIO_PLAYER_STATUS", {
-            index,
-            duration: el.duration,
-          });
-        });
-        el.addEventListener("timeupdate", function () {
-          store.commit("stage/UPDATE_AUDIO_PLAYER_STATUS", {
-            index,
-            currentTime: el.currentTime,
-          });
-        });
+<script setup lang="ts">
+import { onMounted, watch } from 'vue'
+import { useAudioStore } from '../../stores/audio'
+import type { AudioState } from '../../stores/audio'
+
+const audioStore = useAudioStore()
+let refs: HTMLAudioElement[] = []
+
+const stopAudio = (audio: AudioState, index: number) => {
+  audioStore.updateAudioStatus({
+    ...audio,
+    index,
+    isPlaying: false,
+    currentTime: 0
+  })
+}
+
+const setRef = (el: any) => {
+  if (!el || !(el instanceof HTMLAudioElement)) return
+
+  const index = refs.length
+  refs.push(el)
+
+  el.addEventListener('ended', () => {
+    const audio = audioStore.audios[index]
+    if (audio.loop) {
+      el.currentTime = 0
+      el.play()
+    } else {
+      stopAudio(audio, index)
+      el.currentTime = 0
+    }
+  })
+
+  el.addEventListener('loadedmetadata', () => {
+    audioStore.updateAudioPlayerStatus({
+      index,
+      duration: el.duration
+    })
+  })
+
+  el.addEventListener('timeupdate', () => {
+    audioStore.updateAudioPlayerStatus({
+      index,
+      currentTime: el.currentTime
+    })
+  })
+}
+
+const handleAudioChange = () => {
+  audioStore.audios.forEach((audio: AudioState, i: number) => {
+    if (audio.changed) {
+      if (audio.isPlaying) {
+        refs[i].playbackRate = audioStore.speed
+        refs[i].play()
+      } else {
+        refs[i].pause()
       }
-    };
-
-    const fadeVolume = (audio, volume) => {
-      animate(audio, {
-        volume,
-        ease: "linear",
-      });
-    };
-
-    const speed = computed(() => {
-      if (store.state.stage.replay.isReplaying) {
-        return Math.min(store.state.stage.replay.speed, 8);
+      if (audio.saken) {
+        refs[i].currentTime = audio.currentTime ?? 0
       }
-      return 1;
-    });
+      audioStore.fadeVolume(refs[i], audio.volume ?? 1)
+      audio.changed = false
+      audio.saken = false
+    }
+  })
+}
 
-    const handleAudioChange = () => {
-      audios.forEach((audio, i) => {
-        if (audio.changed) {
-          if (audio.isPlaying) {
-            refs[i].playbackRate = speed.value;
-            refs[i].play();
-          } else {
-            refs[i].pause();
-          }
-          if (audio.saken) {
-            refs[i].currentTime = audio.currentTime ?? 0;
-          }
-          fadeVolume(refs[i], audio.volume ?? 1);
-          audio.changed = false;
-          audio.saken = false;
-        }
-      });
-    };
-
-    watch(audios, handleAudioChange);
-    onMounted(handleAudioChange);
-
-    return { audios, setRef };
-  },
-};
+watch(() => audioStore.audios, handleAudioChange)
+onMounted(handleAudioChange)
 </script>
 
 <style scoped>

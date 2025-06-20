@@ -17,9 +17,9 @@
   </transition>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
+import { useSettingPopupStore } from "store/settingPopup";
 import ChatBox from "./settings/ChatBox.vue";
 import ChatParameters from "./settings/ChatParameters.vue";
 import VoiceParameters from "./settings/VoiceParameters.vue";
@@ -28,31 +28,19 @@ import Icon from "components/Icon.vue";
 import VolumeParameters from "./settings/VolumeParameters.vue";
 import CreateRoom from "./settings/CreateRoom.vue";
 
-export default {
-  components: {
-    ChatParameters,
-    VoiceParameters,
-    Icon,
-    ChatBox,
-    SaveScene,
-    VolumeParameters,
-    CreateRoom,
-  },
-  setup: () => {
-    const store = useStore();
-    const isActive = computed(() => store.state.stage.settingPopup.isActive);
-    const type = computed(() => store.state.stage.settingPopup.type);
-    const title = computed(() => store.state.stage.settingPopup.title);
-    const simple = computed(() => store.state.stage.settingPopup.simple);
-    const modal = ref();
+const store = useSettingPopupStore();
+const modal = ref();
 
-    const close = () => {
-      store.dispatch("stage/closeSettingPopup");
-    };
-    return { isActive, close, modal, type, title, simple };
-  },
+const isActive = computed(() => store.isActive);
+const type = computed(() => store.type);
+const title = computed(() => store.title);
+const simple = computed(() => store.simple);
+
+const close = () => {
+  store.closeSettingPopup();
 };
 </script>
+
 <style scoped lang="scss">
 .fade-enter-active,
 .fade-leave-active {
@@ -63,6 +51,7 @@ export default {
 .fade-leave-to {
   opacity: 0;
 }
+
 .card-header-icon {
   position: absolute;
   right: 0;

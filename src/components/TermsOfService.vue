@@ -14,9 +14,10 @@
 import { computed } from "vue";
 import Modal from "components/Modal.vue";
 import { useConfigStore } from "store/modules/config";
+import { storeToRefs } from "pinia";
 
 const configStore = useConfigStore();
-const url = computed(() => configStore.termsOfService);
+const { termsOfService: url } = storeToRefs(configStore);
 </script>
 
 <style lang="scss">

@@ -38,10 +38,7 @@
   </div>
   <div>
     <div class="icon is-large">
-      <ColorPicker
-        v-model="backdropColor"
-        @update:modelValue="sendBackdropColor"
-      />
+      <ColorPicker v-model="backdropColor" @update:modelValue="sendBackdropColor" />
     </div>
     <span class="tag is-light is-block p-0 long-label">{{
       $t("background_colour")
@@ -71,76 +68,48 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import Icon from "components/Icon.vue";
 import ColorPicker from "components/form/ColorPicker.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "../../../../store/modules/stage";
 import { computed } from "vue";
 import { message } from "ant-design-vue";
-export default {
-  components: { Icon, ColorPicker },
-  setup: () => {
-    const store = useStore();
-    const chatVisibility = computed(
-      () => store.state.stage.settings.chatVisibility,
-    );
-    const chatDarkMode = computed(
-      () => store.state.stage.settings.chatDarkMode,
-    );
-    const reactionVisibility = computed(
-      () => store.state.stage.settings.reactionVisibility,
-    );
 
-    const showChat = (value) => {
-      store.dispatch("stage/showChatBox", value);
-    };
+const store = useStageStore();
 
-    const enableDarkModeChat = (value) => {
-      store.dispatch("stage/enableDarkModeChat", value);
-    };
+const chatVisibility = computed(() => store.settings.chatVisibility);
+const chatDarkMode = computed(() => store.settings.chatDarkMode);
+const reactionVisibility = computed(() => store.settings.reactionVisibility);
+const backdropColor = computed(() => store.backdropColor);
+const chatPosition = computed(() => store.chatPosition);
 
-    const showReactions = (value) => {
-      store.dispatch("stage/showReactionsBar", value);
-    };
+const showChat = (value: boolean) => {
+  store.showChatBox(value);
+};
 
-    const clearChat = () => {
-      store.dispatch("stage/clearChat").then(() => {
-        message.success("Chat cleared successfully!");
-      });
-    };
+const enableDarkModeChat = (value: boolean) => {
+  store.enableDarkModeChat(value);
+};
 
-    const backdropColor = computed(() => store.state.stage.backdropColor);
-    const sendBackdropColor = (color) => {
-      store.dispatch("stage/setBackdropColor", color);
-    };
+const showReactions = (value: boolean) => {
+  store.showReactionsBar(value);
+};
 
-    const chatPosition = computed(() => store.state.stage.chatPosition);
-    const toggleChatPosition = () => {
-      store.dispatch(
-        "stage/setChatPosition",
-        chatPosition.value === "left" ? "right" : "left",
-      );
-    };
+const clearChat = () => {
+  store.clearChat();
+  message.success("Chat cleared successfully!");
+};
 
-    const masqueradeAudience = () => {
-      store.commit("stage/TOGGLE_MASQUERADING");
-    };
+const sendBackdropColor = (color: string) => {
+  store.setBackdropColor(color);
+};
 
-    return {
-      showChat,
-      chatVisibility,
-      chatDarkMode,
-      enableDarkModeChat,
-      showReactions,
-      reactionVisibility,
-      clearChat,
-      sendBackdropColor,
-      backdropColor,
-      chatPosition,
-      toggleChatPosition,
-      masqueradeAudience,
-    };
-  },
+const toggleChatPosition = () => {
+  store.setChatPosition(chatPosition.value === "left" ? "right" : "left");
+};
+
+const masqueradeAudience = () => {
+  store.toggleMasquerading();
 };
 </script>
 

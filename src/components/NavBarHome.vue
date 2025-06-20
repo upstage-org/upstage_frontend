@@ -46,7 +46,7 @@
           <RouterLink v-if="!isGuest" to="/stages" class="button is-primary m-2">
             <strong>{{ $t("studio") }}</strong>
           </RouterLink>
-          <button @click="logout" class="button m-2 mr-6">
+          <button @click="handleLogout" class="button m-2 mr-6">
             <strong>{{ $t("logout") }}</strong>
           </button>
         </template>
@@ -65,9 +65,9 @@
 
 <script setup lang="ts">
 import { computed, ref, type Ref } from "vue";
-import { loggedIn, logout } from "utils/auth";
 import { useConfigStore } from "store/modules/config";
 import { useUserStore } from "store/modules/user";
+import { useAuthStore } from "store/modules/auth";
 import { storeToRefs } from "pinia";
 import Logo from "./Logo.vue";
 import LanguageSelector from "./LanguageSelector.vue";
@@ -88,6 +88,7 @@ interface Menu {
 // Store initialization
 const configStore = useConfigStore();
 const userStore = useUserStore();
+const authStore = useAuthStore();
 
 // Refs
 const expanded = ref(false);
@@ -95,6 +96,7 @@ const expanded = ref(false);
 // Computed properties
 const { navigations } = storeToRefs(configStore) as { navigations: Ref<Menu[]> };
 const { isAdmin, isGuest } = storeToRefs(userStore);
+const loggedIn = computed(() => userStore.whoami !== null);
 const showRegistration = computed(() => configStore.foyer?.showRegistration?.value ?? false);
 
 // Methods
@@ -105,6 +107,10 @@ const isShow = (seeByAdmin: boolean) => {
     return true;
   }
   return !seeByAdmin;
+};
+
+const handleLogout = () => {
+  authStore.logout();
 };
 </script>
 

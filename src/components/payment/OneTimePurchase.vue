@@ -25,24 +25,12 @@
         </div>
         <div>
           <span class="input-symbol-dollar"></span>
-          <input
-            ref="custom_amount"
-            type="number"
-            step="0.01"
-            min="0"
-            max="999999.99"
-            class="button payment-button"
-            placeholder="Custom"
-            @input="amount = $event.target.value"
-            v-model="amount"
-          />
+          <input ref="custom_amount" type="number" step="0.01" min="0" max="999999.99" class="button payment-button"
+            placeholder="Custom" @input="handleInput" v-model="amount" />
         </div>
       </div>
       <div class="column">
-        <button
-          class="button is-primary is-fullwidth"
-          @click="openPurchasePopup()"
-        >
+        <button class="button is-primary is-fullwidth" @click="handlePurchase">
           <span>Donate to UpStage (amounts shown in US dollars)</span>
         </button>
       </div>
@@ -52,43 +40,45 @@
   </div>
 </template>
 
-<script>
-import { ref } from "vue";
-import { useStore } from "vuex";
-import { message } from "ant-design-vue";
+<script setup lang="ts">
+import { ref } from 'vue'
+import { message } from 'ant-design-vue'
+import { usePaymentStore } from '../../stores/payment'
 
-export default {
-  setup: () => {
-    const store = useStore();
-    const amount = ref(null);
+const paymentStore = usePaymentStore()
+const amount = ref<number | null>(null)
 
-    const openPurchasePopup = () => {
-      if (amount.value && amount.value != 0) {
-        store.dispatch("stage/openPurchasePopup", {
-          type: "OneTimePurchase",
-          amount: amount.value,
-          title: "Donate to UpStage (amounts shown in US dollars)",
-        });
-        amount.value = null;
-      } else {
-        message.warning("Please select amount to donate!");
-      }
-    };
+const handleInput = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  amount.value = parseFloat(target.value)
+}
 
-    return { amount, openPurchasePopup };
-  },
-};
+const handlePurchase = () => {
+  if (amount.value && amount.value !== 0) {
+    paymentStore.openPurchasePopup(
+      'OneTimePurchase',
+      amount.value,
+      'Donate to UpStage (amounts shown in US dollars)'
+    )
+    amount.value = null
+  } else {
+    message.warning('Please select amount to donate!')
+  }
+}
 </script>
+
 <style lang="scss" scoped>
 .payment {
   width: 90%;
   margin-left: 5%;
+
   h4 {
     font-size: 1.25em;
     font-weight: 400;
     text-align: center;
     align-items: center;
   }
+
   .button {
     position: inherit;
   }

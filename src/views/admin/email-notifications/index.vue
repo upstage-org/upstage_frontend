@@ -19,6 +19,8 @@ import { ROLES } from "constants/index";
 import { useQuery } from "@vue/apollo-composable";
 import gql from "graphql-tag";
 import store from "store";
+import { useConfigStore } from "store/modules/config";
+import { storeToRefs } from "pinia";
 
 const { t } = useI18n();
 
@@ -35,7 +37,8 @@ const directToEmails = ref<string[]>([]);
 const customRecipients = ref<string[]>([]);
 
 const filterRole = ref<number | undefined>();
-const system = computed(() => store.getters["config/system"]);
+const configStore = useConfigStore();
+const { system } = storeToRefs(configStore);
 
 const addCustomRecipient = () => {
   const email = prompt("Enter email: ");

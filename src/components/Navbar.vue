@@ -1,4 +1,4 @@
-<script lang="ts" setup>
+<script setup lang="ts">
 import Notifications from "components/Notifications.vue";
 import LanguageSelector from "components/LanguageSelector.vue";
 import configs from "config";
@@ -6,12 +6,13 @@ import logo from "assets/upstage.png";
 import StudioVersion from "./StudioVersion.vue";
 import PlayerForm from "views/admin/player-management/PlayerForm.vue";
 import { useUserStore } from "store/modules/user";
+import { useAuthStore } from "store/modules/auth";
 import { userGraph } from "services/graphql";
 import { computed } from "vue";
-import { loggedIn, logout } from "utils/auth";
 import { ROLES, ROLES_LABELS } from "constants/user";
 
 const userStore = useUserStore();
+const authStore = useAuthStore();
 const whoami = computed(() => userStore.whoami);
 const loading = computed(() => userStore.loadingUser);
 
@@ -29,6 +30,10 @@ const to = (path: string) => `${configs.UPSTAGE_URL}/${path}`;
 
 const onSave = async (payload: any) => {
   await userStore.updateUserProfile(payload);
+};
+
+const handleLogout = () => {
+  authStore.logout();
 };
 </script>
 
@@ -60,7 +65,7 @@ const onSave = async (payload: any) => {
           <RouterLink to="/">
             <a-menu-item>{{ $t("foyer") }}</a-menu-item>
           </RouterLink>
-          <a-menu-item @click="logout">{{ $t("logout") }}</a-menu-item>
+          <a-menu-item @click="handleLogout">{{ $t("logout") }}</a-menu-item>
         </a-menu>
       </template>
     </a-dropdown>

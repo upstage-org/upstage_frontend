@@ -1,5 +1,5 @@
 <template>
-    <div v-if="objects.find(el => el.type == 'jitsi')" id="reload-stream">
+    <div v-if="hasJitsiStream" id="reload-stream">
         <a-tooltip title="Refresh streams">
             <button class="button is-small refresh-icon clickable" @mousedown="onReload">
                 <i class="fas fa-sync"></i>
@@ -8,22 +8,21 @@
     </div>
 </template>
 
-<script>
-import { useStore } from "vuex";
-import { computed } from "vue";
+<script setup lang="ts">
+import { useStageStore } from 'store/modules/stage';
+import { storeToRefs } from 'pinia';
+import { computed } from 'vue';
 
-export default {
-    components: {},
-    setup: () => {
-        const store = useStore();
-        const objects = computed(() => store.getters["stage/objects"]);
-        const onReload = () => store.dispatch("stage/reloadStreams");
-        return {
-            objects,
-            onReload
-        };
-    },
-};
+interface StageObject {
+    type: string;
+    [key: string]: any;
+}
+
+const stageStore = useStageStore();
+const { objects } = storeToRefs(stageStore);
+
+const hasJitsiStream = computed(() => objects.value.some((obj: StageObject) => obj.type === 'jitsi'));
+const onReload = () => stageStore.reloadStreams();
 </script>
 
 <style scoped lang="scss">

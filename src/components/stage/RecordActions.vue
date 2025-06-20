@@ -10,17 +10,17 @@
   <div v-else-if="stage.activeRecording" class="field has-addons">
     <p class="control">
       <a-tooltip title="Stop recording">
-        <button @click="saveRecording" class="button is-small is-light is-danger">
+        <button @click="handleSaveRecording" class="button is-small is-light is-danger">
           <Loading v-if="saving" height="24px" />
           <span v-else class="icon is-small">
             <i class="fas fa-stop"></i>
           </span>
-          <span>{{ label }}</span>
+          <span>{{ recordingLabel }}</span>
         </button>
       </a-tooltip>
     </p>
     <p class="control">
-      <CustomConfirm @confirm="(complete) => deleteRecording(complete)" :loading="deleting">
+      <CustomConfirm @confirm="handleDeleteRecording" :loading="deleting">
         <template #trigger>
           <button class="button is-small is-light is-dark">
             <span class="icon is-small">
@@ -35,7 +35,7 @@
     </p>
   </div>
   <template v-else>
-    <CustomConfirm @confirm="(complete) => startRecording(complete)" :loading="loading">
+    <CustomConfirm @confirm="handleStartRecording" :loading="loading">
       <Field v-model="form.name" label="Name" placeholder="Give your recording a name" required />
       <p>
         <i class="fas fa-exclamation-triangle has-text-warning"></i>
@@ -68,107 +68,50 @@
   </template>
 </template>
 
-<script>
-import CustomConfirm from "components/CustomConfirm.vue";
-import Loading from "components/Loading.vue";
-import Field from "components/form/Field.vue";
-import { reactive, ref } from "vue";
-import { useMutation } from "services/graphql/composable";
-import { stageGraph } from "services/graphql";
-import Icon from "components/Icon.vue";
-import { computed } from "vue";
-import humanizeDuration from "humanize-duration";
-import moment from "moment";
-import { useStore } from "vuex";
-import { notification } from "utils/notification";
-import { useClearStage } from "./composable";
+<script setup lang="ts">
+import { reactive, computed } from 'vue'
+import CustomConfirm from 'components/CustomConfirm.vue'
+import Loading from 'components/Loading.vue'
+import Field from 'components/form/Field.vue'
+import Icon from 'components/Icon.vue'
+import { useRecordingStore } from 'stores/recording'
 
-export default {
-  components: { Confirm, Field, Icon, Loading },
-  props: ["stage"],
-  setup: (props) => {
-    const store = useStore();
-    const refresh = () => store.dispatch("cache/fetchStages");
+const props = defineProps<{
+  stage: {
+    id: string
+    fileLocation: string
+    activeRecording: any
+  }
+}>()
 
-    const form = reactive({
-      name: "",
-    });
+const recordingStore = useRecordingStore()
+const form = reactive({
+  name: '',
+})
 
-    const clearStage = useClearStage(props.stage.fileLocation);
+const { loading, saving, deleting, saved, getRecordingDuration } = recordingStore
 
-    const loading = ref(false);
-    const { save } = useMutation(stageGraph.startRecording);
-    const startRecording = async (complete) => {
-      loading.value = true;
-      await clearStage();
-      await save("Recording started!", props.stage.id, form.name);
-      refresh();
-      complete();
-      loading.value = false;
-    };
+const recordingLabel = computed(() => {
+  const recording = props.stage.activeRecording
+  if (recording) {
+    return `${recording.name} - ${getRecordingDuration(recording)}`
+  }
+  return ''
+})
 
-    const now = ref(moment());
-    const interval = setInterval(() => (now.value = moment()), 1000);
+const handleStartRecording = async (complete: () => void) => {
+  await recordingStore.startRecording(props.stage.id, form.name, props.stage.fileLocation)
+  complete()
+}
 
-    const label = computed(() => {
-      const recording = props.stage.activeRecording;
-      if (recording) {
-        const name = recording.name;
-        const from = moment.utc(recording.createdOn);
-        const duration = humanizeDuration(
-          now.value.diff(from, "milliseconds"),
-          {
-            round: true,
-          },
-        );
-        return `${name} - ${duration}`;
-      }
-      return "";
-    });
+const handleSaveRecording = async () => {
+  await recordingStore.saveRecording(props.stage.activeRecording.id)
+}
 
-    const { loading: deleting, save: deleteMutation } = useMutation(
-      stageGraph.deletePerformance,
-    );
-    const deleteRecording = async (complete) => {
-      await deleteMutation(
-        "Recording deleted successfully!",
-        props.stage.activeRecording.id,
-      );
-      Object.assign(props.stage, {
-        activeRecording: null,
-      });
-      refresh();
-      complete();
-    };
-
-    const saved = ref(false);
-    const { loading: saving, save: saveMutation } = useMutation(
-      stageGraph.saveRecording,
-    );
-    const saveRecording = async () => {
-      await saveMutation(() => {
-        notification.success("Recording saved successfully!");
-        saved.value = props.stage.activeRecording;
-        clearInterval(interval);
-        Object.assign(props.stage, {
-          activeRecording: null,
-        });
-      }, props.stage.activeRecording.id);
-    };
-
-    return {
-      form,
-      startRecording,
-      loading,
-      label,
-      deleteRecording,
-      deleting,
-      saveRecording,
-      saving,
-      saved,
-    };
-  },
-};
+const handleDeleteRecording = async (complete: () => void) => {
+  await recordingStore.deleteRecording(props.stage.activeRecording.id)
+  complete()
+}
 </script>
 
 <style scoped>

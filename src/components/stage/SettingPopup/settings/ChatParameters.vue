@@ -8,7 +8,7 @@
         <li :class="{ 'is-active': currentTab === 'params' }" @click="currentTab = 'params'">
           <a>{{ $t("parameters") }}</a>
         </li>
-        <li v-if="downloadChatVisibility" :class="{ 'is-active': currentTab === 'download' }"
+        <li v-if="showDownloadChatSetting" :class="{ 'is-active': currentTab === 'download' }"
           @click="currentTab = 'download'">
           <a>{{ $t("download_chat") }}</a>
         </li>
@@ -18,7 +18,7 @@
   <div class="card-content">
     <div class="content" v-if="currentTab === 'nickname'">
       <HorizontalField title="Nickname">
-        <input class="input" type="text" :placeholder="nickname" v-model="form.nickname" @keyup.enter="saveNickname" />
+        <input class="input" type="text" :placeholder="chatname" v-model="form.nickname" @keyup.enter="saveNickname" />
       </HorizontalField>
       <SaveButton @click="saveNickname" :loading="loading" />
     </div>
@@ -66,159 +66,134 @@
   </div>
 </template>
 
-<script>
-import { computed, reactive, ref } from "vue";
-import { useStore } from "vuex";
-import HorizontalField from "components/form/HorizontalField.vue";
-import Field from "components/form/Field.vue";
-import SaveButton from "components/form/SaveButton.vue";
-import DownloadButton from "components/form/DownloadButton.vue";
-import { message } from "ant-design-vue";
-import Switch from "components/form/Switch.vue";
+<script setup lang="ts">
+import { ref, reactive } from 'vue'
+import { useUserStore } from '../../../../stores/user'
+import { useStageStore } from '../../../../stores/stage'
+import { message } from 'ant-design-vue'
+import HorizontalField from '@/components/form/HorizontalField.vue'
+import Field from '@/components/form/Field.vue'
+import SaveButton from '@/components/form/SaveButton.vue'
+import DownloadButton from '@/components/form/DownloadButton.vue'
+import Switch from '@/components/form/Switch.vue'
 
-export default {
-  components: { HorizontalField, Field, SaveButton, Switch, DownloadButton },
-  setup: (props, { emit }) => {
-    const form = reactive({});
-    const loading = ref(false);
-    const store = useStore();
-    const nickname = computed(() => store.getters["user/chatname"]);
-    const downloadOptions = ref({
-      audienceChat: false,
-      playerChat: false,
-    });
+interface ChatMessage {
+  user: string
+  message: string
+  clear?: boolean
+}
 
-    const chats = computed(() => store.state.stage.chat);
-    const downloadChatVisibility = computed(
-      () => store.state.stage.showDownloadChatSetting,
-    );
-    const stageUrl = store.getters["stage/url"];
+interface PrivateMessage {
+  user: string
+  message: string
+  clearPlayerChat?: boolean
+}
 
-    const saveNickname = () => {
-      loading.value = true;
-      store.dispatch("user/saveNickname", form).then((nickname) => {
-        emit("close");
-        loading.value = false;
-        message.success("You new nickname is: " + nickname);
-        loading.value = false;
-      });
-    };
+const emit = defineEmits(['close'])
 
-    const makeTextFile = function (content) {
-      let textFile;
-      const data = new Blob(content, { type: "text/plain" });
-      if (textFile !== null) {
-        window.URL.revokeObjectURL(textFile);
-      }
-      textFile = window.URL.createObjectURL(data);
-      return textFile;
-    };
+const userStore = useUserStore()
+const stageStore = useStageStore()
 
-    const downloadChatLog = () => {
-      if (downloadOptions.value.audienceChat) {
-        let link = document.createElement("a");
-        let content = [];
-        link.setAttribute(
-          "download",
-          `${stageUrl}-Audience-chat-${timeStamp()}.txt`,
-        );
-        content = chats.value.messages.map((item) => {
-          let line = "";
-          if (item.clear) {
-            line = "---------------- Clear Chat ----------------";
-          } else {
-            line = `${item.user}: ${item.message}`;
-          }
-          return `${line}\r\n`;
-        });
-        link.href = makeTextFile(content);
-        document.body.appendChild(link);
-        window.requestAnimationFrame(function () {
-          const event = new MouseEvent("click");
-          link.dispatchEvent(event);
-          document.body.removeChild(link);
-        });
-      }
+const form = reactive({ nickname: '' })
+const loading = ref(false)
+const currentTab = ref('nickname')
+const downloadOptions = ref({
+  audienceChat: false,
+  playerChat: false,
+})
 
-      if (downloadOptions.value.playerChat) {
-        let link = document.createElement("a");
-        let content = [];
-        link.setAttribute(
-          "download",
-          `${stageUrl}-Player-chat-${timeStamp()}.txt`,
-        );
-        content = chats.value.privateMessages.map((item) => {
-          let line = "";
-          if (item.clearPlayerChat) {
-            line = "---------------- Clear Chat ----------------";
-          } else {
-            line = `${item.user}: ${item.message}`;
-          }
-          return `${line}\r\n`;
-        });
-        link.href = makeTextFile(content);
-        document.body.appendChild(link);
-        window.requestAnimationFrame(function () {
-          const event = new MouseEvent("click");
-          link.dispatchEvent(event);
-          document.body.removeChild(link);
-        });
-      }
-      emit("close");
-      message.success("Download success");
-    };
+const chatname = userStore.chatname
+const showDownloadChatSetting = stageStore.showDownloadChatSetting
+const stageUrl = stageStore.url
+const chats = stageStore.chat
 
-    const padTo2Digits = (num) => {
-      return num.toString().padStart(2, "0");
-    };
-    const formatDate = (date) => {
-      return (
-        [padTo2Digits(date.getHours()), padTo2Digits(date.getMinutes())].join(
-          "",
-        ) +
-        "-" +
-        [
-          padTo2Digits(date.getDate()),
-          padTo2Digits(date.getMonth() + 1),
-          date.getFullYear(),
-        ].join("")
-      );
-    };
-    const timeStamp = () => {
-      const date = new Date();
-      return formatDate(date);
-    };
+const parameters = reactive({
+  opacity: stageStore.chat.opacity,
+  fontSize: stageStore.chat.fontSize,
+})
 
-    const changeFontSize = (value) => {
-      parameters.fontSize = value.replace(/^\D+/g, "") + "px";
-    };
+const saveNickname = async () => {
+  loading.value = true
+  try {
+    const nickname = await userStore.saveNickname(form)
+    emit('close')
+    message.success("Your new nickname is: " + nickname)
+  } finally {
+    loading.value = false
+  }
+}
 
-    const currentTab = ref("nickname");
-    const parameters = reactive({
-      opacity: store.state.stage.chat.opacity,
-      fontSize: store.state.stage.chat.fontSize,
-    });
-    const saveParameters = () => {
-      store.commit("stage/SET_CHAT_PARAMETERS", parameters);
-      emit("close");
-      message.success("Chat parameters saved successfully!");
-    };
+const makeTextFile = (content: string[]) => {
+  const data = new Blob(content, { type: "text/plain" })
+  return window.URL.createObjectURL(data)
+}
 
-    return {
-      nickname,
-      saveNickname,
-      loading,
-      form,
-      currentTab,
-      parameters,
-      downloadOptions,
-      downloadChatVisibility,
-      downloadChatLog,
-      saveParameters,
-      changeFontSize,
-    };
-  },
-};
+const padTo2Digits = (num: number) => {
+  return num.toString().padStart(2, "0")
+}
+
+const formatDate = (date: Date) => {
+  return (
+    [padTo2Digits(date.getHours()), padTo2Digits(date.getMinutes())].join("") +
+    "-" +
+    [
+      padTo2Digits(date.getDate()),
+      padTo2Digits(date.getMonth() + 1),
+      date.getFullYear(),
+    ].join("")
+  )
+}
+
+const timeStamp = () => {
+  const date = new Date()
+  return formatDate(date)
+}
+
+const downloadChatLog = () => {
+  if (downloadOptions.value.audienceChat) {
+    const link = document.createElement("a")
+    const content = chats.messages.map((item: ChatMessage) => {
+      const line = item.clear ? "---------------- Clear Chat ----------------" : `${item.user}: ${item.message}`
+      return `${line}\r\n`
+    })
+    link.setAttribute("download", `${stageUrl}-Audience-chat-${timeStamp()}.txt`)
+    link.href = makeTextFile(content)
+    document.body.appendChild(link)
+    window.requestAnimationFrame(() => {
+      const event = new MouseEvent("click")
+      link.dispatchEvent(event)
+      document.body.removeChild(link)
+    })
+  }
+
+  if (downloadOptions.value.playerChat) {
+    const link = document.createElement("a")
+    const content = chats.privateMessages.map((item: PrivateMessage) => {
+      const line = item.clearPlayerChat ? "---------------- Clear Chat ----------------" : `${item.user}: ${item.message}`
+      return `${line}\r\n`
+    })
+    link.setAttribute("download", `${stageUrl}-Player-chat-${timeStamp()}.txt`)
+    link.href = makeTextFile(content)
+    document.body.appendChild(link)
+    window.requestAnimationFrame(() => {
+      const event = new MouseEvent("click")
+      link.dispatchEvent(event)
+      document.body.removeChild(link)
+    })
+  }
+  emit("close")
+  message.success("Download success")
+}
+
+const changeFontSize = (value: string) => {
+  parameters.fontSize = value.replace(/^\D+/g, "") + "px"
+}
+
+const saveParameters = () => {
+  stageStore.setChatParameters(parameters)
+  emit("close")
+  message.success("Chat parameters saved successfully!")
+}
 </script>
 
 <style>

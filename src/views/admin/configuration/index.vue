@@ -7,17 +7,17 @@ import { h, computed } from "vue";
 import { useAsyncState } from "@vueuse/core";
 import { Skeleton, Space } from "ant-design-vue";
 import Header from "components/Header.vue";
-import { useStore } from "vuex";
-const store = useStore();
+import { useConfigStore } from "store/modules/config";
+import { storeToRefs } from "pinia";
+
+const configStore = useConfigStore();
+const { foyer, system } = storeToRefs(configStore);
 const route = useRoute();
 const activeKey = ref(route.query.tab === "system" ? "system" : "foyer");
 const { t } = useI18n();
 
-const foyer = computed(() => store.getters["config/foyer"]);
-const system = computed(() => store.getters["config/system"]);
-
 const foyerConfigs = () =>
-foyer && system
+  foyer.value && system.value
     ? [
       h(Entry, {
         label: t("title"),
@@ -60,7 +60,7 @@ About
     : [h(Skeleton)];
 
 const systemConfigs = () =>
-  system
+  system.value
     ? [
       h(Entry, {
         label: t("tos.terms_of_service"),
@@ -72,7 +72,7 @@ const systemConfigs = () =>
         name: "MANUAL",
         defaultValue: system.value.manual?.value ?? "",
         async refresh() {
-          await store.dispatch("config/fetchConfig");
+          await configStore.fetchConfig();
         },
       }),
       h(Entry, {

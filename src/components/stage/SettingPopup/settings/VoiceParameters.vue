@@ -4,83 +4,74 @@
   </div>
   <div class="card-content voice-parameters">
     <a-form-item label="Voice" :labelCol="{ span: 4 }" class="mb-2">
-      <a-select v-model:value="parameters.voice" placeholder="No voice" :options="voices" />
+      <a-select v-model:value="voiceStore.currentVoice.voice" placeholder="No voice" :options="voiceStore.voices" />
     </a-form-item>
 
-    <template v-if="parameters.voice">
+    <template v-if="voiceStore.currentVoice.voice">
       <a-form-item label="Variant" :labelCol="{ span: 4 }" class="mb-2">
-        <a-select v-model:value="parameters.variant" :options="variants" />
+        <a-select v-model:value="voiceStore.currentVoice.variant" :options="voiceStore.variants" />
       </a-form-item>
 
       <a-form-item label="Pitch" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.pitch" :max="50" />
+        <a-slider v-model:value="voiceStore.currentVoice.pitch" :max="50" />
       </a-form-item>
 
       <a-form-item label="Rate" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.speed" :max="175" />
+        <a-slider v-model:value="voiceStore.currentVoice.speed" :max="175" />
       </a-form-item>
       <a-form-item label="Volume" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.amplitude" />
+        <a-slider v-model:value="voiceStore.currentVoice.amplitude" />
       </a-form-item>
 
       <a-form-item label="Test voice" :labelCol="{ span: 4 }" class="mb-2">
-        <a-input-search :placeholder="defaultTestMessage" v-model:value="test" @search="testVoice">
+        <a-input-search :placeholder="defaultTestMessage" v-model:value="voiceStore.testMessage"
+          @search="voiceStore.testVoice">
           <template #enterButton>
             <sound-outlined />
           </template>
         </a-input-search>
       </a-form-item>
-
     </template>
     <SaveButton v-if="!modelValue" @click="save" />
   </div>
 </template>
 
-<script>
-import { computed, reactive, ref } from "vue";
-import SaveButton from "components/form/SaveButton.vue";
-import { useStore } from "vuex";
-import { avatarSpeak } from "services/speech";
-import {
-  getDefaultVariant,
-  getVariantList,
-  getVoiceList,
-} from "services/speech/voice";
+<script setup lang="ts">
+import { computed, onMounted } from 'vue'
+import SaveButton from 'components/form/SaveButton.vue'
+import { useVoiceStore } from 'stores/voice'
+import { useStageStore } from 'store'
 
-export default {
-  components: {
-    SaveButton,
-  },
-  props: ["modelValue"],
-  emits: ["close", "update:modelValue"],
-  setup: (props, { emit }) => {
-    const store = useStore();
-    const currentAvatar = computed(() => store.getters["stage/currentAvatar"]);
-    const voices = getVoiceList();
-    const variants = getVariantList();
-    const parameters = reactive(
-      props.modelValue ? props.modelValue : currentAvatar.value?.voice,
-    );
-    if (!parameters.variant) {
-      parameters.variant = getDefaultVariant();
-    }
-    const test = ref("Welcome to UpStage!");
-    const testVoice = () => {
-      avatarSpeak({ voice: parameters }, test.value);
-    };
+const props = defineProps<{
+  modelValue?: any
+}>()
 
-    const save = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...currentAvatar.value,
-          voice: parameters,
-        })
-        .then(() => emit("close"));
-    };
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'update:modelValue', value: any): void
+}>()
 
-    return { save, parameters, voices, variants, test, testVoice };
-  },
-};
+const stageStore = useStageStore()
+const voiceStore = useVoiceStore()
+const currentAvatar = computed(() => stageStore.currentAvatar)
+
+const defaultTestMessage = 'Welcome to UpStage!'
+
+onMounted(() => {
+  if (props.modelValue) {
+    voiceStore.updateVoice(props.modelValue)
+  } else if (currentAvatar.value?.voice) {
+    voiceStore.updateVoice(currentAvatar.value.voice)
+  }
+})
+
+const save = () => {
+  stageStore.shapeObject({
+    ...currentAvatar.value,
+    voice: voiceStore.currentVoice,
+  })
+  emit("close")
+}
 </script>
 
 <style lang="scss">

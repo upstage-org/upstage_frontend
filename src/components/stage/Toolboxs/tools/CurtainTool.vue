@@ -5,48 +5,34 @@
     </div>
     <span class="tag is-light is-block">{{ $t("no_curtain") }}</span>
   </div>
-  <div
-    v-for="curtain in curtains"
-    :key="curtain"
-    :class="{
-      active: curtain.src === currentCurtain,
-    }"
-  >
+  <div v-for="curtain in curtains" :key="curtain" :class="{
+    active: curtain.src === currentCurtain,
+  }">
     <Skeleton :data="curtain" nodrop>
-      <Image
-        :src="curtain.src"
-        :title="curtain.name"
-        @click="toggleCurtain(curtain.src)"
-      />
+      <Image :src="curtain.src" :title="curtain.name" @click="toggleCurtain(curtain.src)" />
     </Skeleton>
   </div>
 </template>
 
-<script>
-import { useStore } from "vuex";
-import Image from "components/Image.vue";
-import Icon from "components/Icon.vue";
-import { computed } from "vue";
-import Skeleton from "../Skeleton.vue";
+<script setup lang="ts">
+import { computed } from 'vue'
+import Image from "components/Image.vue"
+import Icon from "components/Icon.vue"
+import Skeleton from "../Skeleton.vue"
+import { useStageStore } from 'store'
 
-export default {
-  components: { Image, Icon, Skeleton },
-  setup: () => {
-    const store = useStore();
-    const curtains = store.state.stage.tools.curtains;
+const stageStore = useStageStore()
 
-    const currentCurtain = computed(() => store.state.stage.curtain);
-    const toggleCurtain = (curtain) => {
-      if (currentCurtain.value === curtain) {
-        store.dispatch("stage/drawCurtain", null);
-      } else {
-        store.dispatch("stage/drawCurtain", curtain);
-      }
-    };
+const curtains = computed(() => stageStore.tools.curtains)
+const currentCurtain = computed(() => stageStore.curtain)
 
-    return { curtains, toggleCurtain, currentCurtain };
-  },
-};
+const toggleCurtain = (curtain: string | null) => {
+  if (currentCurtain.value === curtain) {
+    stageStore.drawCurtain(null)
+  } else {
+    stageStore.drawCurtain(curtain)
+  }
+}
 </script>
 
 <style scoped lang="scss"></style>

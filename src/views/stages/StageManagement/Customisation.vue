@@ -10,7 +10,7 @@
         <td width="100%">
           <div>
             <HorizontalField title="Speech bubble">
-              <Dropdown v-model="animations.bubble" :data="['fade', 'bounce']" :render-label="capitalize" />
+              <Dropdown v-model="animations.bubble" :data="['fade', 'bounce']" />
             </HorizontalField>
             <HorizontalField title="Speed">
               <div class="speed-slider">
@@ -60,33 +60,30 @@
         <td>
           <div class="columns">
             <div class="column is-3">
-              <Selectable :selected="selectedRatio.width == 4 && selectedRatio.height == 3
-                " @select="
-                  selectedRatio.width = 4;
-                selectedRatio.height = 3;
-                ">
+              <Selectable :selected="selectedRatio.width == 4 && selectedRatio.height == 3" @select="
+                selectedRatio.width = 4;
+              selectedRatio.height = 3;
+              ">
                 <div class="box size-option" style="padding-bottom: 75%">
                   <div>4/3</div>
                 </div>
               </Selectable>
             </div>
             <div class="column is-3">
-              <Selectable :selected="selectedRatio.width == 16 && selectedRatio.height == 9
-                " @select="
-                  selectedRatio.width = 16;
-                selectedRatio.height = 9;
-                ">
+              <Selectable :selected="selectedRatio.width == 16 && selectedRatio.height == 9" @select="
+                selectedRatio.width = 16;
+              selectedRatio.height = 9;
+              ">
                 <div class="box size-option" style="padding-bottom: 56.25%">
                   <div>16/9</div>
                 </div>
               </Selectable>
             </div>
             <div class="column is-3">
-              <Selectable :selected="selectedRatio.width == 2 && selectedRatio.height == 1
-                " @select="
-                  selectedRatio.width = 2;
-                selectedRatio.height = 1;
-                ">
+              <Selectable :selected="selectedRatio.width == 2 && selectedRatio.height == 1" @select="
+                selectedRatio.width = 2;
+              selectedRatio.height = 1;
+              ">
                 <div class="box size-option" style="padding-bottom: 50%">
                   <div>2/1</div>
                 </div>
@@ -94,8 +91,7 @@
             </div>
             <div class="column is-3">
               <div class="box size-option has-primary-background" :style="{
-                'padding-bottom': `${(selectedRatio.height * 100) / selectedRatio.width
-                  }%`,
+                'padding-bottom': `${(selectedRatio.height * 100) / selectedRatio.width}%`,
               }">
                 <div>
                   <div>Custom ratio:</div>
@@ -114,97 +110,24 @@
   </table>
 </template>
 
-<script>
-import { reactive, ref } from "vue";
-import Selectable from "components/Selectable.vue";
-import SaveButton from "components/form/SaveButton.vue";
-import { message } from "ant-design-vue";
-import { capitalize, inject } from "vue";
-import HorizontalField from "components/form/HorizontalField.vue";
-import Dropdown from "components/form/Dropdown.vue";
-import Switch from "components/form/Switch.vue";
-import { useAttribute, useMutation } from "services/graphql/composable";
-import { stageGraph } from "services/graphql";
-import ColorPicker from "components/form/ColorPicker.vue";
-import { useStore } from "vuex";
-import buildClient from "services/mqtt";
-import { namespaceTopic } from "store/modules/stage/reusable";
-import { BACKGROUND_ACTIONS, TOPICS } from "constants/index";
+<script setup>
+import Selectable from 'components/Selectable.vue';
+import SaveButton from 'components/form/SaveButton.vue';
+import HorizontalField from 'components/form/HorizontalField.vue';
+import Dropdown from 'components/form/Dropdown.vue';
+import ColorPicker from 'components/form/ColorPicker.vue';
+import { useStageStore } from 'store/modules/stage';
 
-export default {
-  components: { Selectable, SaveButton, HorizontalField, Dropdown, Switch },
-  setup: () => {
-    const stage = inject("stage");
-    const refresh = inject("refresh");
-    const store = useStore();
-    const config = useAttribute(stage, "config", true).value ?? {
-      ratio: {
-        width: 16,
-        height: 9,
-      },
-      animations: {
-        bubble: "fade",
-        curtain: "drop",
-        bubbleSpeed: 1000,
-        curtainSpeed: 5000,
-      },
-      defaultcolor: "#30AC45",
-    };
+const store = useStageStore();
 
-    const selectedRatio = reactive(config.ratio);
-    const animations = reactive(config.animations);
-    const defaultcolor = ref(config.defaultcolor || "#30AC45");
-
-    const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
-    const saveCustomisation = async () => {
-      const config = JSON.stringify({
-        ratio: selectedRatio,
-        animations,
-        defaultcolor: defaultcolor.value,
-      });
-      await save(
-        () => {
-          message.success("Customisation saved!");
-          refresh(stage.value.id);
-        },
-        stage.value.id,
-        config
-      );
-      const mqtt = buildClient();
-      const client = mqtt.connect();
-      client.publish(namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
-        JSON.stringify(
-          {
-            type: "setBackdropColor",
-            color: defaultcolor.value,
-          }),
-        { qos: 1, retain: false },
-        (error, res) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(res);
-            mqtt.disconnect();
-          }
-        }
-      );
-    };
-
-    const sendBackdropColor = (color) => {
-      defaultcolor.value = color;
-    };
-
-    return {
-      selectedRatio,
-      saving,
-      saveCustomisation,
-      animations,
-      capitalize,
-      defaultcolor,
-      sendBackdropColor,
-    };
-  },
-};
+const {
+  selectedRatio,
+  animations,
+  defaultcolor,
+  saving,
+  saveCustomisation,
+  sendBackdropColor,
+} = store;
 </script>
 
 <style lang="scss" scoped>

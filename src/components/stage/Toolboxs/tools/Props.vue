@@ -4,18 +4,13 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
+import { computed } from "vue";
 import Skeleton from "../Skeleton.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "store";
 
-export default {
-  components: { Skeleton },
-  setup: () => {
-    const store = useStore();
-    const props = store.state.stage.tools.props;
-    return { props };
-  },
-};
+const stageStore = useStageStore();
+const props = computed(() => stageStore.tools.props);
 </script>
 
 <style scoped lang="scss"></style>

@@ -7,11 +7,11 @@
     }" @click="openChatBox"><a-tooltip :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname
       }`">
         <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
-          <Icon src="my-avatar.svg" style="width: 16px; height: 16px;"/>
+          <Icon src="my-avatar.svg" style="width: 16px; height: 16px;" />
         </span>
       </a-tooltip>
       <transition @enter="enter" @leave="leave" :css="false" appear>
-        <blockquote v-if="object.speak" class="bubble" tabindex="-1" :key="object.speak"
+        <blockquote v-if="object.speak" class="bubble" tabindex="-1" :key="JSON.stringify(object.speak)"
           :class="object.speak.behavior ?? 'speak'" :style="bubbleStyle">
           <div class="py-2 px-4">
             <Linkify>{{ object.speak.message }}</Linkify>
@@ -22,145 +22,152 @@
   </teleport>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useUserStore } from "store/modules/user";
+import { useStageStore } from "store/modules/stage";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Linkify from "components/Linkify.vue";
 import { outOfViewportPosition } from "utils/common";
 
-export default {
-  props: ["object", "active"],
-  components: { Icon, Linkify },
-  setup: (props) => {
-    const store = useStore();
-    const isHolding = computed(
-      () => props.object.id === store.state.user.avatarId,
-    );
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
+interface ObjectProps {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  name?: string;
+  holder?: { nickname: string };
+  speak?: {
+    message: string;
+    behavior?: string;
+  };
+  [key: string]: any;
+}
 
-    const config = computed(() => store.getters["stage/config"]);
+interface Props {
+  object: ObjectProps;
+  active: boolean;
+}
 
-    const enter = (el, complete) => {
-      let pos = outOfViewportPosition(el);
-      let count = 0;
-      while (pos && count < 5) {
-        if (pos === "top") {
-          animate(el, {
-            translateY: props.object.h + el.getBoundingClientRect().height,
-            translateX: -props.object.h / 2,
-            rotate: 180,
-          });
-          animate(el.firstElementChild, {
-            rotate: 180,
-          });
-        }
-        if (pos === "left") {
-          animate(el, {
-            translateX: -el.getBoundingClientRect().left - props.object.w / 2,
-          });
-        }
-        if (pos === "right") {
-          animate(el, {
-            translateX:
-              (window.innerWidth || document.documentElement.clientWidth) -
-              el.getBoundingClientRect().right,
-          });
-        }
-        pos = outOfViewportPosition(el);
-        count++;
-      }
-      const duration = config.value?.animations?.bubbleSpeed ?? 1000;
-      console.log(config.value?.animations?.bubbleSpeed);
-      switch (config.value?.animations?.bubble) {
-        case "fade":
-          animate(el, {
-            opacity: [0, 1],
-            duration,
-            onComplete: complete,
-          });
-          break;
+const props = defineProps<Props>();
 
-        case "bounce":
-          animate(el,{
-            scale: [0, 1],
-            rotate: [180, 0],
-            translateX: [0, "-50%"],
-            duration,
-            onComplete: complete,
-          });
-          break;
+// Pinia stores
+const userStore = useUserStore();
+const stageStore = useStageStore();
 
-        default:
-          complete();
-          break;
-      }
-    };
+const isHolding = computed(() => props.object.id === userStore.avatarId);
+const canPlay = computed(() => stageStore.canPlay);
+const config = computed(() => stageStore.config);
+const stageSize = computed(() => stageStore.stageSize);
 
-    const leave = (el, complete) => {
-      const duration = config.value?.animations?.bubbleSpeed ?? 1000;
-      switch (config.value?.animations?.bubble) {
-        case "fade":
-          animate(el,{
-            opacity: 0,
-            duration,
-            onComplete: complete,
-          });
-          break;
+const enter = (el: Element, complete: () => void) => {
+  let pos = outOfViewportPosition(el);
+  let count = 0;
+  while (pos && count < 5) {
+    if (pos === "top") {
+      animate(el, {
+        translateY: props.object.h + el.getBoundingClientRect().height,
+        translateX: -props.object.h / 2,
+        rotate: 180,
+      });
+      animate(el.firstElementChild as Element, {
+        rotate: 180,
+      });
+    }
+    if (pos === "left") {
+      animate(el, {
+        translateX: -el.getBoundingClientRect().left - props.object.w / 2,
+      });
+    }
+    if (pos === "right") {
+      animate(el, {
+        translateX:
+          (window.innerWidth || document.documentElement.clientWidth) -
+          el.getBoundingClientRect().right,
+      });
+    }
+    pos = outOfViewportPosition(el);
+    count++;
+  }
+  const duration = config.value?.animations?.bubbleSpeed ?? 1000;
+  console.log(config.value?.animations?.bubbleSpeed);
+  switch (config.value?.animations?.bubble) {
+    case "fade":
+      animate(el, {
+        opacity: [0, 1],
+        duration,
+        onComplete: complete,
+      });
+      break;
 
-        case "bounce":
-          animate(el, {
-            scale: [1, 0],
-            rotate: [0, 180],
-            duration,
-            onComplete: complete,
-          });
-          break;
+    case "bounce":
+      animate(el, {
+        scale: [0, 1],
+        rotate: [180, 0],
+        translateX: [0, "-50%"],
+        duration,
+        onComplete: complete,
+      });
+      break;
 
-        default:
-          complete();
-          break;
-      }
-    };
-
-    const openChatBox = () => {
-      if (isHolding.value) {
-        store.dispatch("stage/openSettingPopup", {
-          type: "ChatBox",
-          simple: true,
-        });
-      }
-    };
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const bubbleStyle = computed(() => {
-      if (!props.object.speak?.message) {
-        return {};
-      }
-      let length = props.object.speak.message.length;
-      if (length < 5) {
-        length = 5;
-      }
-      if (["shout"].includes(props.object.speak.behavior)) {
-        length *= 1.4;
-      }
-      const width = Math.sqrt(length * 2.5);
-      const height = Math.max(2.5, width * 0.8);
-      return { width: width + "rem", height: height + "rem" };
-    });
-
-    return {
-      enter,
-      leave,
-      isHolding,
-      canPlay,
-      openChatBox,
-      stageSize,
-      max: Math.max,
-      bubbleStyle,
-    };
-  },
+    default:
+      complete();
+      break;
+  }
 };
+
+const leave = (el: Element, complete: () => void) => {
+  const duration = config.value?.animations?.bubbleSpeed ?? 1000;
+  switch (config.value?.animations?.bubble) {
+    case "fade":
+      animate(el, {
+        opacity: 0,
+        duration,
+        onComplete: complete,
+      });
+      break;
+
+    case "bounce":
+      animate(el, {
+        scale: [1, 0],
+        rotate: [0, 180],
+        duration,
+        onComplete: complete,
+      });
+      break;
+
+    default:
+      complete();
+      break;
+  }
+};
+
+const openChatBox = () => {
+  if (isHolding.value) {
+    stageStore.openSettingPopup({
+      type: "ChatBox",
+      simple: true,
+    });
+  }
+};
+
+const bubbleStyle = computed(() => {
+  if (!props.object.speak?.message) {
+    return {};
+  }
+  let length = props.object.speak.message.length;
+  if (length < 5) {
+    length = 5;
+  }
+  if (["shout"].includes(props.object.speak.behavior || "")) {
+    length *= 1.4;
+  }
+  const width = Math.sqrt(length * 2.5);
+  const height = Math.max(2.5, width * 0.8);
+  return { width: width + "rem", height: height + "rem" };
+});
 </script>
 
 <style scoped lang="scss">

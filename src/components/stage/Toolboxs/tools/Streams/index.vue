@@ -1,8 +1,5 @@
 <template>
-  <div
-    v-for="video in videos"
-    :key="video"
-  >
+  <div v-for="video in videos" :key="video.url">
     <img class="overlay" src="/img/videoloading.gif" />
     <div style="z-index: 1;">
       <Skeleton :data="video">
@@ -12,38 +9,24 @@
   </div>
 </template>
 
-<script>
-import { computed, onMounted } from "vue";
-import { useStore } from "vuex";
+<script setup lang="ts">
+import { computed } from "vue";
+import { useVideoStore } from "stores/videos";
 import Skeleton from "../../Skeleton.vue";
 import Icon from "components/Icon.vue";
 import Loading from "components/Loading.vue";
 
-export default {
-  components: {
-    Skeleton,
-    Icon,
-    Loading,
-  },
-  setup: () => {
-    const store = useStore();
-
-    const videos = computed(() => {
-      const res = [...(store.state.stage.tools?.videos || [])];
-      return res;
-    });
-
-    return { videos };
-  },
-};
+const videoStore = useVideoStore();
+const videos = computed(() => videoStore.getVideos);
 </script>
 
 <style lang="scss" scoped>
 @mixin gradientText($from, $to) {
-    background: linear-gradient(to top, $from, $to);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  background: linear-gradient(to top, $from, $to);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
+
 .fas.fa-plus {
   @include gradientText(#30ac45, #6fb1fc);
 }
@@ -59,6 +42,7 @@ video {
 .pending-stream {
   cursor: not-allowed;
 }
+
 .overlay {
   position: absolute;
   width: 40%;

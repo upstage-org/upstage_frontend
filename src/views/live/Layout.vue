@@ -33,10 +33,11 @@ import Preloader from "./Preloader.vue";
 import LoginPrompt from "./LoginPrompt.vue";
 import ConnectionStatus from "./ConnectionStatus.vue";
 import MasqueradingStatus from "./MasqueradingStatus.vue";
-import { useStore } from "vuex";
-import { computed, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
-import { loggedIn } from "utils/auth";
+import { computed, onMounted, onUnmounted } from "vue";
+import { useStageStore } from "store/modules/stage";
+import { storeToRefs } from "pinia";
+import { useUserStore } from "store/modules/user";
 
 export default {
   components: {
@@ -54,29 +55,28 @@ export default {
     Shell
   },
   setup: () => {
-    const store = useStore();
-    const ready = computed(() => store.getters["stage/ready"]);
-
     const route = useRoute();
-    store.dispatch("stage/loadStage", { url: route.params.url }).then(() => {
-      store.dispatch("stage/connect");
+    const stageStore = useStageStore();
+    const userStore = useUserStore();
+    const { ready, canPlay } = storeToRefs(stageStore);
+
+    onMounted(async () => {
+      await stageStore.loadStage({ url: route.params.url });
+      stageStore.connect();
     });
 
     onUnmounted(() => {
-      store.dispatch("stage/disconnect");
+      stageStore.disconnect();
     });
 
-    window.addEventListener("beforeunload", () => {
-      store.dispatch("stage/disconnect");
-    });
-
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
+    const loggedIn = computed(() => userStore.whoami !== null);
+    const studioEndpoint = "/stages/";
 
     return {
       ready,
       canPlay,
       loggedIn,
-      studioEndpoint: "/stages/",
+      studioEndpoint,
     };
   },
 };

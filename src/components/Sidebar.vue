@@ -13,14 +13,14 @@ import {
 import configs from "config";
 import { useUserStore } from "store/modules/user";
 import { useConfigStore } from "store/modules/config";
+import { storeToRefs } from "pinia";
 
 const router = useRouter();
 const userStore = useUserStore();
 const configStore = useConfigStore();
 
-const whoami = computed(() => userStore.whoami);
-const saving = computed(() => userStore.loadingUser);
-const system = computed(() => configStore.system);
+const { whoami, loadingUser: saving } = storeToRefs(userStore);
+const { system } = storeToRefs(configStore);
 
 const isAdmin = computed(
   () =>

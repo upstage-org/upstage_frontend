@@ -11,86 +11,107 @@
     @mouseup.stop="keepActive" />
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
-export default {
-  props: ["active", "object", "sliderMode"],
-  emits: ["update:active"],
-  setup: (props, { emit }) => {
-    const store = useStore();
-    const maxFrameSpeed = 50;
-    const maxMoveSpeed = 1000;
-    const value = computed(() => {
-      switch (props.sliderMode) {
-        case "speed":
-          return props.object.moveSpeed == 0
-            ? 0
-            : maxMoveSpeed / props.object.moveSpeed;
-        case "volume":
-          return props.object.volume;
-        default:
-          return props.object.opacity;
-      }
-    });
+import { useUserStore } from "store/modules/user";
+import { useStageStore } from "store/modules/stage";
 
-    const sendChangeOpacity = (e) => {
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        opacity: e.target.value,
-      });
-    };
+interface ObjectProps {
+  id: string;
+  opacity: number;
+  volume: number;
+  moveSpeed: number;
+  type: string;
+  h: number;
+  [key: string]: any;
+}
 
-    const calcMoveSpeed = (e) =>
-      e.target.value == 0 ? 10000 : maxMoveSpeed / e.target.value;
+interface Props {
+  active: boolean;
+  object: ObjectProps;
+  sliderMode: string;
+}
 
-    const sendChangeMoveSpeed = (e) => {
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        moveSpeed: calcMoveSpeed(e),
-      });
-    };
+const props = defineProps<Props>();
+const emit = defineEmits<{
+  (e: 'update:active', value: boolean): void;
+}>();
 
-    const keepActive = () => {
-      emit("update:active", true);
-    };
+// Pinia stores
+const userStore = useUserStore();
+const stageStore = useStageStore();
 
-    const sendChangeVolume = (e) => {
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        volume: e.target.value,
-      });
-    };
+const maxFrameSpeed = 50;
+const maxMoveSpeed = 1000;
 
-    const handleChange = (e) => {
-      keepActive();
-      switch (props.sliderMode) {
-        case "opacity":
-          sendChangeOpacity(e);
-          break;
-        case "speed":
-          sendChangeMoveSpeed(e);
-          break;
-        case "volume":
-          sendChangeVolume(e);
-          break;
-      }
-    };
+const value = computed(() => {
+  switch (props.sliderMode) {
+    case "speed":
+      return props.object.moveSpeed == 0
+        ? 0
+        : maxMoveSpeed / props.object.moveSpeed;
+    case "volume":
+      return props.object.volume;
+    default:
+      return props.object.opacity;
+  }
+});
 
-    const isHolding = computed(
-      () => props.object.id === store.state.user.avatarId,
-    );
-    const holdable = computed(() => ["avatar"].includes(props.object.type));
-    const activeMovable = computed(() => store.getters["stage/activeMovable"]);
-    const showSlider = computed(
-      () =>
-        (isHolding.value || !holdable.value) &&
-        activeMovable.value === props.object.id,
-    );
-
-    return { keepActive, handleChange, value, isHolding, showSlider };
-  },
+const sendChangeOpacity = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  stageStore.shapeObject({
+    ...props.object,
+    opacity: parseFloat(target.value),
+  });
 };
+
+const calcMoveSpeed = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  return target.value == "0" ? 10000 : maxMoveSpeed / parseFloat(target.value);
+};
+
+const sendChangeMoveSpeed = (e: Event) => {
+  stageStore.shapeObject({
+    ...props.object,
+    moveSpeed: calcMoveSpeed(e),
+  });
+};
+
+const keepActive = () => {
+  emit("update:active", true);
+};
+
+const sendChangeVolume = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  stageStore.shapeObject({
+    ...props.object,
+    volume: parseFloat(target.value),
+  });
+};
+
+const handleChange = (e: Event) => {
+  keepActive();
+  switch (props.sliderMode) {
+    case "opacity":
+      sendChangeOpacity(e);
+      break;
+    case "speed":
+      sendChangeMoveSpeed(e);
+      break;
+    case "volume":
+      sendChangeVolume(e);
+      break;
+  }
+};
+
+const isHolding = computed(() => props.object.id === userStore.avatarId);
+const holdable = computed(() => ["avatar"].includes(props.object.type));
+const activeMovable = computed(() => stageStore.activeMovable);
+const showSlider = computed(
+  () =>
+    (isHolding.value || !holdable.value) &&
+    activeMovable.value === props.object.id,
+);
 </script>
 
 <style>

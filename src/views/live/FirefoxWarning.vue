@@ -1,10 +1,7 @@
 <template>
   <Modal v-if="visible" v-model="open">
     <template #trigger>
-      <span
-        class="tag is-small is-warning clickable"
-        style="vertical-align: top"
-      >
+      <span class="tag is-small is-warning clickable" style="vertical-align: top">
         <span class="icon" ref="icon">
           <Icon src="firefox-logo.svg" />
         </span>
@@ -32,10 +29,7 @@
               not impact on performance or security of Firefox.
             </div>
             <div class="column">
-              <img
-                :src="`${publicPath}/instruction/firefox/1.2.png`"
-                alt="Step 1.2"
-              />
+              <img :src="`${publicPath}/instruction/firefox/1.2.png`" alt="Step 1.2" />
             </div>
           </div>
         </div>
@@ -62,46 +56,42 @@
   </Modal>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "store/modules/stage";
+import { storeToRefs } from "pinia";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
 import Copy from "components/Copy.vue";
 import { animate } from "animejs";
 
-export default {
-  components: { Icon, Modal, Copy },
-  setup: () => {
-    const store = useStore();
-    const isFirefox = navigator.userAgent.indexOf("Firefox") != -1;
-    const status = computed(() => store.state.stage.status);
-    const visible = computed(
-      () =>
-        isFirefox &&
-        (status.value === "CONNECTING" || status.value === "OFFLINE"),
-    );
-    const open = ref(true);
+const stageStore = useStageStore();
+const { status } = storeToRefs(stageStore);
+const isFirefox = navigator.userAgent.indexOf("Firefox") != -1;
+const visible = computed(
+  () =>
+    isFirefox &&
+    (status.value === "CONNECTING" || status.value === "OFFLINE"),
+);
+const open = ref(true);
+const publicPath = "/";
 
-    const reload = () => window.location.reload();
+const reload = () => window.location.reload();
 
-    const icon = ref();
-    const interval = setInterval(() => {
-      if (icon.value) {
-        animate(icon.value, {
-          scale: [1, 1.5, 1],
-          rotate: [45, -45, 45, -45, 0],
-          ease: "inOutQuad",
-        });
-      }
-    }, 3000);
-
-    onUnmounted(() => {
-      clearInterval(interval);
+const icon = ref();
+const interval = setInterval(() => {
+  if (icon.value) {
+    animate(icon.value, {
+      scale: [1, 1.5, 1],
+      rotate: [45, -45, 45, -45, 0],
+      ease: "inOutQuad",
     });
-    return { isFirefox, status, reload, visible, icon, open, publicPath: "/" };
-  },
-};
+  }
+}, 3000);
+
+onUnmounted(() => {
+  clearInterval(interval);
+});
 </script>
 
 <style></style>

@@ -44,48 +44,36 @@
   </div>
 </template>
 
-<script>
-import { useStore } from "vuex";
-import { animate } from "animejs";
-import { ref, computed, onMounted, inject } from "vue";
-import Popover from "components/Popover.vue";
-import Session from "./Session.vue";
-import ReloadStream from "./ReloadStream.vue";
+<script setup lang="ts">
+import { ref, computed, onMounted, inject } from 'vue'
+import { animate } from 'animejs'
+import { useStageStore } from '../../stores/stage'
+import Popover from '../../components/Popover.vue'
+import Session from './Session.vue'
+import ReloadStream from './ReloadStream.vue'
 
-export default {
-  components: { Popover, Session, ReloadStream },
-  setup: () => {
-    const store = useStore();
-    const dot = ref();
-    const status = computed(() => {
-      if (store.state.stage?.model?.status == 'rehearsal') {
-        return 'REHEARSAL'
-      }
-      return store.state.stage.status
-    });
-    const players = computed(() => store.getters["stage/players"]);
-    const audiences = computed(() => store.getters["stage/audiences"]);
-    const masquerading = computed(() => store.state.stage.masquerading);
-    const replaying = inject("replaying");
+const stageStore = useStageStore()
+const dot = ref<HTMLElement | null>(null)
+const replaying = inject<boolean>('replaying')
 
-    onMounted(() => {
-      animate(dot.value, {
-        opacity: [1, 0, 1],
-        duration: 2000,
-        loop: true,
-      });
-    });
+const status = computed(() => {
+  if (stageStore.model?.status === 'rehearsal') {
+    return 'REHEARSAL'
+  }
+  return stageStore.status
+})
 
-    return {
-      status,
-      dot,
-      players,
-      audiences,
-      replaying,
-      masquerading
-    };
-  },
-};
+const { players, audiences, masquerading } = stageStore
+
+onMounted(() => {
+  if (dot.value) {
+    animate(dot.value, {
+      opacity: [1, 0, 1],
+      duration: 2000,
+      loop: true,
+    })
+  }
+})
 </script>
 
 <style scoped lang="scss">

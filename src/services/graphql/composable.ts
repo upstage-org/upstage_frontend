@@ -1,124 +1,83 @@
 // @ts-nocheck
-import store from "store";
-import { computed, reactive, ref } from "vue";
-import hash from "object-hash";
+import { ref, computed } from "vue";
+import { useCacheStore } from "store/modules/cache";
 import { message } from "ant-design-vue";
 import { configGraph } from "services/graphql";
 import { logout } from "utils/auth";
 
-export const useRequest = (service, ...params) => {
+const cacheStore = useCacheStore();
+
+export function useRequest<T>(request: (variables?: any) => Promise<T>) {
   const loading = ref(false);
-  const data = ref();
-  const nodes = computed(() => {
-    if (!data.value) return null;
-    const value = Object.values(data.value)[0];
-    return Array.isArray(value) ? value : [value];
-  });
-  const pushNode = (node, reverse) => {
-    if (data.value) {
-      const key = Object.keys(data.value)[0];
-      let edges = data.value[key].edges;
-      if (reverse) {
-        edges.unshift({ node });
-      } else {
-        edges.push({ node });
-      }
-      data.value = { [key]: { edges } };
-    }
-  };
-  const popNode = (selector) => {
-    if (data.value) {
-      const key = Object.keys(data.value)[0];
-      let edges = data.value[key].edges;
-      const position = edges.findIndex((edge) => selector(edge.node));
-      edges.splice(position, 1);
-      data.value = { [key]: { edges } };
-    }
-  };
-  const totalCount = computed(() => {
-    if (!data.value) return 0;
-    const key = Object.keys(data.value)[0];
-    return data.value[key].totalCount;
-  });
-  const cacheKeys = reactive([]);
+  const error = ref<Error | null>(null);
+  const nodes = ref<T | null>(null);
 
-  const fetch = async (...newParams) => {
+  const refresh = async (variables?: any) => {
+    loading.value = true;
+    error.value = null;
     try {
-      const payload = newParams.length ? newParams : params;
-      const cacheKey = hash({ service, payload });
-      const cached = store.state.cache.graphql[cacheKey];
-      if (cached) {
-        data.value = cached;
-      } else {
-        loading.value = true;
-        data.value = await service(...payload);
-        if (data.value) {
-          store.commit("cache/SET_GRAPHQL_CACHE", {
-            key: cacheKey,
-            value: data.value,
-          });
-          cacheKeys.push(cacheKey);
-        }
-      }
-      return data.value;
-    } catch (error) {
-      if (error.response.errors[0].message == "Invalid refresh token") {
-        logout();
-      }
-      throw error.response.errors[0].message;
+      const result = await request(variables);
+      nodes.value = result;
+      return result;
+    } catch (e) {
+      error.value = e as Error;
+      throw e;
     } finally {
       loading.value = false;
     }
-  };
-  const refetch = async (...newParams) => {
-    try {
-      const payload = newParams.length ? newParams : params;
-      const cacheKey = hash({ service, payload });
-      const cached = store.state.cache.graphql[cacheKey];
-      loading.value = true;
-      data.value = await service(...payload);
-      if (data.value) {
-        store.commit("cache/SET_GRAPHQL_CACHE", {
-          key: cacheKey,
-          value: data.value,
-        });
-        cacheKeys.push(cacheKey);
-      }
-      return data.value;
-    } catch (error) {
-      if (error.response.errors[0].message == "Invalid refresh token") {
-        logout();
-      }
-      throw error.response.errors[0].message;
-    } finally {
-      loading.value = false;
-    }
-  };
-
-  const clearCache = () => {
-    cacheKeys.push(hash({ service, payload: params }));
-    store.commit("cache/CLEAR_GRAPHQL_CACHES", { keys: cacheKeys });
-    cacheKeys.length = 0;
-  };
-
-  const refresh = (...params) => {
-    clearCache();
-    return fetch(...params);
   };
 
   return {
     loading,
-    data,
+    error,
     nodes,
-    totalCount,
-    fetch,
-    clearCache,
     refresh,
-    pushNode,
-    popNode,
-    refetch
   };
-};
+}
+
+export function useAttribute<T extends { value: any }>(
+  object: T,
+  key: string,
+  isJson = false
+) {
+  const value = computed(() => {
+    if (!object.value) return null;
+    const attr = object.value.attributes?.find((a: any) => a.name === key);
+    if (!attr) return null;
+    if (isJson) {
+      try {
+        return JSON.parse(attr.description);
+      } catch {
+        return null;
+      }
+    }
+    return attr.description;
+  });
+
+  return {
+    value,
+  };
+}
+
+export function useGraphqlCache<T>(cacheKey: string) {
+  const cached = cacheStore.graphql[cacheKey];
+  if (cached) {
+    return cached as T;
+  }
+  return null;
+}
+
+export function setGraphqlCache<T>(cacheKey: string, value: T) {
+  cacheStore.setGraphqlCache(cacheKey, value);
+}
+
+export function clearGraphqlCaches(cacheKeys: string[]) {
+  cacheStore.clearGraphqlCaches(cacheKeys);
+}
+
+export function clearAllGraphqlCaches() {
+  cacheStore.clearAllGraphqlCaches();
+}
 
 export const useMutation = (...params) => {
   const { refresh, ...rest } = useRequest(...params);
@@ -160,18 +119,6 @@ export const useFirst = (nodes) => {
     () => (nodes.value && nodes.value.length && nodes.value[0]) ?? {},
   );
 };
-
-export function useAttribute(node, attributeName, isJson) {
-  return computed(() => {
-    let value = node.value?.attributes?.find(
-      (a) => a.name === attributeName,
-    )?.description;
-    if (isJson && value) {
-      value = JSON.parse(value);
-    }
-    return value;
-  });
-}
 
 export function useOwners(nodes) {
   return computed(() => {

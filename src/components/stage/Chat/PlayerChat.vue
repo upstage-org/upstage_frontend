@@ -1,10 +1,10 @@
 <template>
   <transition :css="false" @enter="enter" @leave="leave">
-    <div id="player-chatbox" ref="theChatbox" v-show="playerChatVisibility" class="card is-light"
+    <div id="player-chatbox" ref="theChatbox" v-show="showPlayerChat" class="card is-light"
       :class="{ collapsed, 'is-movingable': isMovingable }" :style="{
-    opacity,
-    fontSize,
-  }">
+        opacity,
+        fontSize: playerFontSize,
+      }">
       <div class="actions">
         <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
           <span class="icon">
@@ -21,27 +21,27 @@
         <ClearChat option="player-chat" />
       </div>
       <div class="card-content" ref="theContent">
-        <Messages :messages="messages" :style="{ fontSize }" />
+        <Messages :messages="privateMessages" :style="{ fontSize: playerFontSize }" />
       </div>
       <footer class="card-footer">
         <div class="card-footer-item">
           <div class="is-fullwidth my-1 reaction-bar">
             <div class="font-size-controls">
               <a-tooltip title="Increase font size">
-                <button class="button is-small is-rounded mx-1" @click="increateFontSize()">
+                <button class="button is-small is-rounded mx-1" @click="increaseFontSize">
                   ➕
                 </button>
               </a-tooltip>
               <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded" @click="decreaseFontSize()">
+                <button class="button is-small is-rounded" @click="decreaseFontSize">
                   ➖
                 </button>
               </a-tooltip>
             </div>
           </div>
           <div class="control has-icons-right is-fullwidth">
-            <ChatInput v-model="chat.privateMessage" placeholder="Type message" :loading="loadingUser"
-              :disabled="isMovingable" @submit="sendChat" />
+            <ChatInput v-model="privateMessage" placeholder="Type message" :loading="loadingUser"
+              :disabled="isMovingable" @keyup.enter="handleSendChat" />
           </div>
         </div>
       </footer>
@@ -49,159 +49,142 @@
   </transition>
 </template>
 
-<script>
-import { computed, onMounted, ref, watch } from "vue";
-import { animate } from "animejs";
-import { useStore } from "vuex";
-import ChatInput from "components/form/ChatInput.vue";
-import Icon from "components/Icon.vue";
-import Messages from "./Messages.vue";
-import Moveable from "moveable";
-import ClearChat from "./ClearChat.vue";
+<script setup lang="ts">
+import { ref, onMounted, watch } from 'vue'
+import { animate } from 'animejs'
+import Moveable from 'moveable'
+import { useChatStore } from 'stores/chat'
+import ChatInput from 'components/form/ChatInput.vue'
+import Icon from 'components/Icon.vue'
+import Messages from './Messages.vue'
+import ClearChat from './ClearChat.vue'
+import { storeToRefs } from 'pinia'
 
-export default {
-  components: { ChatInput, Icon, Messages, ClearChat },
-  setup: () => {
-    const theChatbox = ref();
-    const theContent = ref();
-    const store = useStore();
+// Refs
+const theChatbox = ref()
+const theContent = ref()
+const isMovingable = ref(false)
+const collapsed = ref(false)
 
-    const messages = computed(() => store.state.stage.chat.privateMessages);
-    const loadingUser = computed(() => store.state.user.loadingUser);
-    const chat = store.state.stage.chat;
-    const message = computed(() => store.state.stage.chat.privateMessage);
-    const scrollToEnd = () => {
-      animate(theContent.value, {
-        scrollTop: theContent.value?.scrollHeight,
-        ease: "inOutQuad",
-      });
-    };
-    const sendChat = () => {
-      if (message.value.trim() && !loadingUser.value) {
-        store.dispatch("stage/sendChat", {
-          message: message.value,
-          isPrivate: true,
-        });
-        chat.privateMessage = "";
-        scrollToEnd();
-      }
-    };
-    watch(messages.value, scrollToEnd);
-    onMounted(scrollToEnd);
+// Store
+const chatStore = useChatStore()
+const {
+  sendChat: storeSendChat,
+  setPlayerChatParameters,
+  togglePlayerChat } = chatStore
+const {
+  privateMessages,
+  privateMessage,
+  opacity,
+  playerFontSize,
+  showPlayerChat,
+} = storeToRefs(chatStore)
 
-    const opacity = computed(() => store.state.stage.chat.opacity);
-    const fontSize = computed(() => store.state.stage.chat.playerFontSize);
+// Computed
+const loadingUser = ref(false) // TODO: Move to user store
 
-    const enter = (el, complete) => {
-      animate(el, {
-        scaleY: [0, 1],
-        translateX: [-200, 0],
-        onComplete: () => {
-          scrollToEnd();
-          complete();
-        },
-      });
-    };
-    const leave = (el, complete) => {
-      animate(el, {
-        scaleY: 0,
-        translateX: -200,
-        ease: "inOutExpo",
-        onComplete: complete,
-      });
-    };
+// Methods
+const scrollToEnd = () => {
+  animate(theContent.value, {
+    scrollTop: theContent.value?.scrollHeight,
+    ease: 'inOutQuad',
+  })
+}
 
-    const moveable = new Moveable(document.body, {
-      draggable: true,
-      resizable: true,
-      origin: false,
-    });
+const handleSendChat = () => {
+  if (privateMessage.value && !loadingUser.value) {
+    storeSendChat(privateMessage.value, true)
+    scrollToEnd()
+  }
+}
 
-    onMounted(() => {
-      moveable.on("drag", ({ target, left, top, height }) => {
-        target.style.left = `${left}px`;
-        if (
-          top + height + 8 <
-          (window.innerHeight || document.documentElement.clientHeight)
-        ) {
-          target.style.top = `${top}px`;
-        }
-      });
-      moveable.on(
-        "resize",
-        ({ target, width, height, drag: { left, top } }) => {
-          // console.log(left, top);
-          if (width > 100) {
-            target.style.width = `${width}px`;
-          }
-          if (height > 160) {
-            target.style.height = `${height}px`;
-          }
-          target.style.left = `${left}px`;
-          target.style.top = `${top}px`;
-        },
-      );
-    });
+const enter = (el: HTMLElement, complete: () => void) => {
+  animate(el, {
+    scaleY: [0, 1],
+    translateX: [-200, 0],
+    onComplete: () => {
+      scrollToEnd()
+      complete()
+    },
+  })
+}
 
-    const isMovingable = ref(false);
-    const toggleMoveable = () => {
-      moveable.setState({
-        target: isMovingable.value ? null : theChatbox.value,
-      });
-      isMovingable.value = !isMovingable.value;
-    };
+const leave = (el: HTMLElement, complete: () => void) => {
+  animate(el, {
+    scaleY: 0,
+    translateX: -200,
+    ease: 'inOutExpo',
+    onComplete: complete,
+  })
+}
 
-    const playerChatVisibility = computed(
-      () => store.state.stage.showPlayerChat,
-    );
-    const minimiseToToolbox = () => {
-      store.dispatch("stage/showPlayerChat", false);
-      moveable.setState({ target: null });
-      isMovingable.value = false;
-    };
+const moveable = new Moveable(document.body, {
+  draggable: true,
+  resizable: true,
+  origin: false,
+})
 
-    const increateFontSize = () => {
-      let incValue = fontSize.value?.replace("px", "");
-      incValue++;
-      const parameters = {
-        playerFontSize: `${incValue}px`,
-      };
-      store.commit("stage/SET_PLAYER_CHAT_PARAMETERS", parameters);
-      setTimeout(
-        () => (theContent.value.scrollTop = theContent.value.scrollHeight),
-      );
-    };
+const toggleMoveable = () => {
+  moveable.setState({
+    target: isMovingable.value ? null : theChatbox.value,
+  })
+  isMovingable.value = !isMovingable.value
+}
 
-    const decreaseFontSize = () => {
-      let decValue = fontSize.value?.replace("px", "");
-      decValue > 1 && decValue--;
-      const parameters = {
-        playerFontSize: `${decValue}px`,
-      };
-      store.commit("stage/SET_PLAYER_CHAT_PARAMETERS", parameters);
-    };
+const minimiseToToolbox = () => {
+  togglePlayerChat(false)
+  moveable.setState({ target: null })
+  isMovingable.value = false
+}
 
-    return {
-      messages,
-      message,
-      sendChat,
-      theChatbox,
-      theContent,
-      loadingUser,
-      opacity,
-      fontSize,
-      playerChatVisibility,
-      enter,
-      leave,
-      toggleMoveable,
-      isMovingable,
-      minimiseToToolbox,
-      chat,
-      increateFontSize,
-      decreaseFontSize,
-    };
-  },
-};
+const increaseFontSize = () => {
+  let incValue = parseInt(playerFontSize.value)
+  incValue++
+  setPlayerChatParameters({
+    playerFontSize: `${incValue}px`
+  })
+  setTimeout(() => {
+    if (theContent.value) {
+      theContent.value.scrollTop = theContent.value.scrollHeight
+    }
+  })
+}
+
+const decreaseFontSize = () => {
+  let decValue = parseInt(playerFontSize.value)
+  if (decValue > 1) {
+    decValue--
+    setPlayerChatParameters({
+      playerFontSize: `${decValue}px`
+    })
+  }
+}
+
+// Lifecycle
+onMounted(() => {
+  scrollToEnd()
+
+  moveable.on('drag', ({ target, left, top, height }) => {
+    target.style.left = `${left}px`
+    if (top + height + 8 < (window.innerHeight || document.documentElement.clientHeight)) {
+      target.style.top = `${top}px`
+    }
+  })
+
+  moveable.on('resize', ({ target, width, height, drag: { left, top } }) => {
+    if (width > 100) {
+      target.style.width = `${width}px`
+    }
+    if (height > 160) {
+      target.style.height = `${height}px`
+    }
+    target.style.left = `${left}px`
+    target.style.top = `${top}px`
+  })
+})
+
+// Watchers
+watch(privateMessages, scrollToEnd)
 </script>
 
 <style lang="scss" scoped>
