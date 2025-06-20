@@ -5,31 +5,23 @@
       <span class="panel-icon">
         <Icon src="chat.svg" />
         <span v-if="unread" class="unread tag is-danger is-small">{{
-      unread
-    }}</span>
+          unread
+          }}</span>
       </span>
     </a>
   </a-tooltip>
 </template>
 
-<script>
+<script setup lang="ts">
 import Icon from "components/Icon.vue";
-import { useStore } from "vuex";
-import { computed } from "vue";
-export default {
-  components: { Icon },
-  setup: () => {
-    const store = useStore();
-    const showPlayerChat = computed(() => store.state.stage.showPlayerChat);
-    const togglePlayerChat = () => {
-      store.dispatch("stage/showPlayerChat", !showPlayerChat.value);
-    };
-    const unread = computed(
-      () => store.getters["stage/unreadPrivateMessageCount"],
-    );
+import { useStageStore } from 'store';
+import { storeToRefs } from 'pinia';
 
-    return { showPlayerChat, togglePlayerChat, unread };
-  },
+const stageStore = useStageStore();
+const { showPlayerChat, unreadPrivateMessageCount: unread } = storeToRefs(stageStore);
+
+const togglePlayerChat = () => {
+  stageStore.showPlayerChat(!showPlayerChat.value);
 };
 </script>
 

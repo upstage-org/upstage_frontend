@@ -15,17 +15,17 @@
 </template>
 
 <script setup>
-import { useStore } from "vuex";
+import { useStageStore } from "store/modules/stage";
 import Icon from "components/Icon.vue";
 import Skeleton from "../../Skeleton.vue";
 import { computed } from "vue";
 import Yourself from "components/objects/MeetingObject/Yourself.vue";
 
-const store = useStore();
-const rooms = computed(() => store.state.stage.tools.meetings);
+const stageStore = useStageStore();
+const rooms = computed(() => stageStore.tools.meetings);
 
 const createRoom = () => {
-  store.dispatch("stage/openSettingPopup", {
+  stageStore.openSettingPopup({
     type: "CreateRoom",
   });
 };

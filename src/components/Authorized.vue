@@ -1,16 +1,12 @@
-<script lang="ts" setup>
+<script setup lang="ts">
 import { useMutation } from "@vue/apollo-composable";
 import configs from "config";
 import gql from "graphql-tag";
 import { Auth } from "models/config";
-import { getSharedAuth, setSharedAuth } from "utils/common";
+import { useAuthStore } from "store/modules/auth";
 import { ref } from "vue";
 
-const auth = ref<{ refresh_token: string; token: string }>();
-
-const sharedState = getSharedAuth();
-auth.value = sharedState;
-
+const authStore = useAuthStore();
 const isDev = import.meta.env.DEV;
 
 const { mutate, loading } = useMutation<
@@ -24,6 +20,7 @@ const { mutate, loading } = useMutation<
     }
   }
 `);
+
 const handleQuickLogin = async () => {
   const username = prompt("Username:", "nguyenhongphat0")?.trim();
   if (username) {
@@ -34,13 +31,10 @@ const handleQuickLogin = async () => {
         password,
       });
       if (res && res.data) {
-        const sharedAuth = {
-          token: res.data.authUser.accessToken,
-          refresh_token: res.data.authUser.refreshToken ?? "",
+        await authStore.login({
           username,
-        };
-        setSharedAuth(sharedAuth);
-        auth.value = sharedAuth;
+          password,
+        });
       }
     }
   }

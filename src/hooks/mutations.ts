@@ -1,10 +1,29 @@
 // @ts-nocheck
 import { message } from "ant-design-vue";
 import { ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "store/modules/stage";
 import { userGraph } from "services/graphql";
 
-const store = useStore();
+const stageStore = useStageStore();
+const loading = ref(false);
+
+export function useMutations() {
+  const mutate = async (mutation: any, variables: any) => {
+    loading.value = true;
+    try {
+      const result = await mutation(variables);
+      return result;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  return {
+    loading,
+    mutate,
+  };
+}
+
 export function useLoading<T extends unknown[], U>(
   operation: (...params: T) => Promise<U>,
   messages?: {

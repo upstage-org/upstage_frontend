@@ -3,6 +3,7 @@ import configs from "config";
 import { SharedAuth, SharedConfigs } from "models/config";
 import { User as LegacyUser } from "models/studio";
 import { message } from "ant-design-vue";
+import { useAuthStore } from "store/modules/auth";
 
 export function absolutePath(path: string) {
   return `${configs.STATIC_ASSETS_ENDPOINT}${path}`;
@@ -10,19 +11,22 @@ export function absolutePath(path: string) {
 
 export function getSharedAuth(): SharedAuth | undefined {
   try {
-    const sharedStateJSON = localStorage.getItem("vuex");
-    if (sharedStateJSON) {
-      const sharedState = JSON.parse(sharedStateJSON);
-      return sharedState.auth;
-    }
+    const authStore = useAuthStore();
+    return {
+      token: authStore.token,
+      refresh_token: authStore.refresh_token,
+      username: authStore.username
+    };
   } catch (error) {
     console.log("No shared auth found. Try login using dashboard first!");
   }
 }
 
 export function setSharedAuth(auth: SharedAuth) {
-  const vuex = JSON.parse(localStorage.getItem("vuex") || "{}");
-  localStorage.setItem("vuex", JSON.stringify({ ...vuex, auth }));
+  const authStore = useAuthStore();
+  authStore.setToken(auth.token);
+  authStore.setRefreshToken(auth.refresh_token);
+  authStore.setUsername(auth.username);
 }
 
 export function humanFileSize(bytes: number, si = false, dp = 1) {
@@ -213,6 +217,7 @@ export function outOfViewportPosition(el) {
   }
   return false;
 }
+
 export function throttle(callback, limit) {
   let wait = false;
   return function (...args) {

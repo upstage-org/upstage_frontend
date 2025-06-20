@@ -1,5 +1,5 @@
 <template>
-  <TopBar :tool="tool" />
+  <TopBar :tool="toolboxStore.activeTool" />
   <nav id="toolbox" class="panel">
     <div class="panel-body">
       <PanelItem name="Audio" icon="audio.svg" />
@@ -23,38 +23,17 @@
   </nav>
 </template>
 
-<script>
-import { computed, provide, ref } from "vue";
+<script setup lang="ts">
+import { provide } from "vue";
 import TopBar from "./TopBar.vue";
 import PanelItem from "./PanelItem.vue";
 import PlayerChatTool from "./PlayerChatTool.vue";
-import { useStore } from "vuex";
+import { useToolboxStore } from "store/modules/toolbox";
 
-export default {
-  components: { TopBar, PanelItem, PlayerChatTool },
-  setup: () => {
-    const tool = ref();
-    const store = useStore();
-    const changeTool = (newTool) => {
-      if (tool.value === newTool) {
-        tool.value = undefined;
-      } else {
-        tool.value = newTool;
-      }
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
-    };
-    provide("tool", tool);
-    provide("changeTool", changeTool);
+const toolboxStore = useToolboxStore();
 
-    const isScene = computed(() => tool.value === "Scene");
-
-    return {
-      tool,
-      changeTool,
-      isScene,
-    };
-  },
-};
+provide("tool", toolboxStore.activeTool);
+provide("changeTool", toolboxStore.changeTool);
 </script>
 
 <style lang="scss">

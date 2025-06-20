@@ -83,187 +83,155 @@
   </template>
 </template>
 
-<script>
+<script setup lang="ts">
 import Dropdown from "components/form/Dropdown.vue";
 import Field from "components/form/Field.vue";
 import ColorPicker from "components/form/ColorPicker.vue";
 import ContextMenu from "components/ContextMenu.vue";
 import Skeleton from "../Skeleton.vue";
 import Icon from "components/Icon.vue";
-import { useStore } from "vuex";
+import { useTextStore } from "store/modules/text";
+import { useStageStore } from "store";
 import { computed, onUnmounted, ref } from "vue";
 import { v4 as uuidv4 } from "uuid";
 
-export default {
-  components: { Dropdown, Field, ColorPicker, Skeleton, Icon, ContextMenu },
-  setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const isWriting = computed(() => store.state.stage.preferences.isWriting);
-    const options = store.state.stage.preferences.text;
-    const fontFamilies = [
-      "Josefin Sans",
-      "Arial",
-      "Times New Roman",
-      "Helvetica",
-      "Times",
-      "Courier New",
-      "Verdana",
-      "Courier",
-      "Arial Narrow",
-      "Candara",
-      "Geneva",
-      "Calibri",
-      "Optima",
-      "Cambria",
-      "Garamond",
-      "Perpetua",
-      "Monaco",
-      "Didot",
-      "Brush Script MT",
-      "Lucida Bright",
-      "Copperplate",
-      "Roboto", // Opensource fonts
-      "Open Sans",
-      "Lato",
-      "Roboto Condensed",
-      "Oswald",
-      "Poppins",
-      "Roboto Mono",
-      "PT Sans",
-      "Ubuntu",
-      "Playfair Display",
-      "PT Serif",
-      "Fira Sans",
-      "Bebas Neue",
-      "Anton",
-      "Lobster",
-      "Varela Round",
-      "Arvo",
-      "Pacifico",
-      "Asap",
-      "Overpass",
-      "Abril Fatface",
-    ];
-    const changeFontSize = (value) => {
-      options.fontSize = value.replace(/^\D+/g, "") + "px";
-    };
+const textStore = useTextStore();
+const stageStore = useStageStore();
 
-    const createText = () => {
-      store.commit("stage/UPDATE_IS_WRITING", true);
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
-      onClickWriting({
-        clientX: window.innerWidth / 2 - 200,
-        clientY: window.innerHeight / 2 - 50,
-      });
-    };
+const stageSize = computed(() => stageStore.stageSize);
+const isWriting = computed(() => textStore.isWriting);
+const options = computed(() => textStore.options);
+const savedTexts = computed(() => textStore.texts);
 
-    const cancelWriting = () => {
-      store.commit("stage/UPDATE_IS_WRITING", false);
-    };
+const fontFamilies = [
+  "Josefin Sans",
+  "Arial",
+  "Times New Roman",
+  "Helvetica",
+  "Times",
+  "Courier New",
+  "Verdana",
+  "Courier",
+  "Arial Narrow",
+  "Candara",
+  "Geneva",
+  "Calibri",
+  "Optima",
+  "Cambria",
+  "Garamond",
+  "Perpetua",
+  "Monaco",
+  "Didot",
+  "Brush Script MT",
+  "Lucida Bright",
+  "Copperplate",
+  "Roboto",
+  "Open Sans",
+  "Lato",
+  "Roboto Condensed",
+  "Oswald",
+  "Poppins",
+  "Roboto Mono",
+  "PT Sans",
+  "Ubuntu",
+  "Playfair Display",
+  "PT Serif",
+  "Fira Sans",
+  "Bebas Neue",
+  "Anton",
+  "Lobster",
+  "Varela Round",
+  "Arvo",
+  "Pacifico",
+  "Asap",
+  "Overpass",
+  "Abril Fatface",
+];
 
-    const el = ref();
-    const onClickWriting = (e) => {
-      const { width, height } = el.value.getBoundingClientRect() ?? {};
-      const x = e.clientX - stageSize.value.left - width / 2;
-      const y = e.clientY - stageSize.value.top - height / 2;
-      store.commit("stage/UPDATE_TEXT_OPTIONS", {
-        left: x + "px",
-        top: y + "px",
-        x,
-        y,
-      });
-      el.value.focus();
-    };
+const el = ref();
 
-    const saveText = async () => {
-      const { width, height } = el.value.getBoundingClientRect() ?? {};
-      store.commit("stage/UPDATE_IS_WRITING", false);
-      const textId = uuidv4();
-      store.dispatch("stage/addText", {
-        ...options,
-        content: el.value.innerHTML,
-        w: width + 10,
-        h: height + 10,
-        textId,
-      });
-    };
-
-    const toggleBold = () => {
-      let fontWeight;
-      if (!options.fontWeight) {
-        fontWeight = "bold";
-      }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { fontWeight });
-    };
-
-    const toggleItalic = () => {
-      let fontStyle;
-      if (!options.fontStyle) {
-        fontStyle = "italic";
-      }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { fontStyle });
-    };
-
-    const toggleUnderline = () => {
-      let textDecoration;
-      if (!options.textDecoration) {
-        textDecoration = "underline";
-      }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { textDecoration });
-    };
-
-    const savedTexts = computed(() => store.state.stage.board.texts);
-    const fontDropdownOpen = (visible) => {
-      const topbar = document.querySelector("#topbar");
-      if (topbar) {
-        topbar.style.overflow = visible
-          ? "visible"
-          : "auto";
-      }
-    };
-
-    onUnmounted(() => {
-      const topbar = document.querySelector("#topbar");
-      if (topbar) {
-        topbar.style.overflow = "auto";
-      }
-    });
-
-    const deleteTextPermanently = (text) => {
-      store.commit("stage/POP_TEXT", text.textId);
-      store.getters["stage/objects"]
-        .filter((o) => o.textId === text.textId)
-        .forEach((o) => {
-          store.dispatch("stage/deleteObject", o);
-        });
-    };
-    onUnmounted(() => {
-      const topbar = document.querySelector("#topbar");
-      if (topbar)
-        topbar.style.overflow = "auto";
-    });
-
-    return {
-      stageSize,
-      options,
-      fontFamilies,
-      createText,
-      isWriting,
-      cancelWriting,
-      onClickWriting,
-      saveText,
-      el,
-      toggleBold,
-      toggleItalic,
-      toggleUnderline,
-      changeFontSize,
-      savedTexts,
-      fontDropdownOpen,
-      deleteTextPermanently,
-    };
-  },
+const changeFontSize = (value: string) => {
+  textStore.updateTextOptions({
+    fontSize: value.replace(/^\D+/g, "") + "px"
+  });
 };
+
+const createText = () => {
+  textStore.updateIsWriting(true);
+  stageStore.setActiveMovable(null);
+  onClickWriting({
+    clientX: (window?.innerWidth ?? 0) / 2 - 200,
+    clientY: (window?.innerHeight ?? 0) / 2 - 50,
+  } as MouseEvent);
+};
+
+const cancelWriting = () => {
+  textStore.updateIsWriting(false);
+};
+
+const onClickWriting = (e: MouseEvent) => {
+  const { width, height } = el.value.getBoundingClientRect() ?? {};
+  const x = e.clientX - stageSize.value.left - width / 2;
+  const y = e.clientY - stageSize.value.top - height / 2;
+  textStore.updateTextOptions({
+    left: x + "px",
+    top: y + "px",
+    x,
+    y,
+  });
+  el.value.focus();
+};
+
+const saveText = async () => {
+  const { width, height } = el.value.getBoundingClientRect() ?? {};
+  textStore.updateIsWriting(false);
+  const textId = uuidv4();
+  textStore.addText({
+    ...options.value,
+    content: el.value.innerHTML,
+    w: width + 10,
+    h: height + 10,
+    textId,
+  });
+};
+
+const toggleBold = () => {
+  const fontWeight = !options.value.fontWeight ? "bold" : undefined;
+  textStore.updateTextOptions({ fontWeight });
+};
+
+const toggleItalic = () => {
+  const fontStyle = !options.value.fontStyle ? "italic" : undefined;
+  textStore.updateTextOptions({ fontStyle });
+};
+
+const toggleUnderline = () => {
+  const textDecoration = !options.value.textDecoration ? "underline" : undefined;
+  textStore.updateTextOptions({ textDecoration });
+};
+
+const fontDropdownOpen = (visible: boolean) => {
+  const topbar = document.querySelector("#topbar");
+  if (topbar) {
+    (topbar as HTMLElement).style.overflow = visible ? "visible" : "auto";
+  }
+};
+
+const deleteTextPermanently = (text: any) => {
+  textStore.deleteText(text.textId);
+  stageStore.objects
+    .filter((o) => o.textId === text.textId)
+    .forEach((o) => {
+      stageStore.deleteObject(o);
+    });
+};
+
+onUnmounted(() => {
+  const topbar = document.querySelector("#topbar");
+  if (topbar) {
+    (topbar as HTMLElement).style.overflow = "auto";
+  }
+});
 </script>
 
 <style lang="scss">
@@ -287,6 +255,7 @@ export default {
   >div {
     width: 100%;
     overflow: hidden;
+
     p {
       font-size: 12px !important;
       transform: none !important;

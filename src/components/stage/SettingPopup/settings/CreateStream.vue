@@ -11,39 +11,35 @@
       </HorizontalField>
       <SaveButton :disabled="!form.name.trim()">{{
         $t("new_stream")
-      }}</SaveButton>
+        }}</SaveButton>
     </form>
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
-import { useStore } from "vuex";
-import { reactive, computed } from "vue";
 import HorizontalField from "components/form/HorizontalField.vue";
-export default {
-  components: { Field, SaveButton, HorizontalField },
-  emits: ["close"],
-  setup: (_, { emit }) => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+import { useStageStore } from 'store';
+import { reactive, computed } from 'vue';
 
-    const form = reactive({ name: "" });
-    const createRoom = async () => {
-      store.commit("stage/CREATE_STREAM", {
-        type: "stream",
-        jitsi: true,
-        name: form.name,
-        description: store.state.user.user?.email,
-        w: stageSize.value.width / 2,
-        h: stageSize.value.height / 2,
-      });
-      emit("close");
-    };
+const emit = defineEmits(['close']);
+const stageStore = useStageStore();
 
-    return { form, createRoom };
-  },
+const form = reactive({ name: "" });
+
+const createRoom = async () => {
+  const streamConfig = {
+    type: "stream",
+    jitsi: true,
+    name: form.name,
+    description: '', // You might want to get this from a user store
+    w: stageStore.stageSize.width / 2,
+    h: stageStore.stageSize.height / 2,
+  };
+
+  stageStore.createStream(streamConfig);
+  emit("close");
 };
 </script>
 

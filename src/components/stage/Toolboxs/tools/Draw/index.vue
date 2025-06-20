@@ -1,16 +1,9 @@
 <template>
-  <canvas
-    ref="el"
-    v-show="isDrawing"
-    class="drawing"
-    :width="stageSize.width"
-    :height="stageSize.height"
-    :style="{
-      cursor,
-      top: stageSize.top + 'px',
-      left: stageSize.left + 'px',
-    }"
-  >
+  <canvas ref="el" v-show="isDrawing" class="drawing" :width="stageSize.width" :height="stageSize.height" :style="{
+    cursor,
+    top: stageSize.top + 'px',
+    left: stageSize.left + 'px',
+  }">
     Your browser does not support the HTML5 canvas tag.
   </canvas>
   <template v-if="isDrawing">
@@ -22,32 +15,17 @@
     </div>
     <div class="drawing-tool" style="width: 200px">
       <div class="size-preview">
-        <div
-          class="dot"
-          :style="{
-            width: size + 'px',
-            height: size + 'px',
-            'background-color': color,
-          }"
-          @click="mode = 'draw'"
-        />
+        <div class="dot" :style="{
+          width: size + 'px',
+          height: size + 'px',
+          'background-color': color,
+        }" @click="mode = 'draw'" />
       </div>
-      <input
-        class="slider is-fullwidth m-0 is-dark"
-        step="1"
-        min="1"
-        max="200"
-        type="range"
-        v-model="size"
-      />
+      <input class="slider is-fullwidth m-0 is-dark" step="1" min="1" max="200" type="range" v-model="size" />
     </div>
-    <div
-      class="drawing-tool"
-      @click="toggleErase"
-      :class="{
-        active: mode === 'erase',
-      }"
-    >
+    <div class="drawing-tool" @click="toggleErase" :class="{
+      active: mode === 'erase',
+    }">
       <div class="icon is-large">
         <Icon size="36" src="erase.svg" />
       </div>
@@ -101,10 +79,7 @@
           <Skeleton :data="drawing" />
         </template>
         <template #context>
-          <a
-            class="panel-block has-text-danger"
-            @click="deleteDrawingPermanently(drawing)"
-          >
+          <a class="panel-block has-text-danger" @click="deleteDrawingPermanently(drawing)">
             <span class="panel-icon">
               <Icon src="remove.svg" />
             </span>
@@ -116,9 +91,9 @@
   </template>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "../../../../../store/modules/stage";
 import { useDrawable } from "./composable";
 import ColorPicker from "components/form/ColorPicker.vue";
 import Icon from "components/Icon.vue";
@@ -126,77 +101,61 @@ import ContextMenu from "components/ContextMenu.vue";
 import Skeleton from "../../Skeleton.vue";
 import { v4 as uuidv4 } from "uuid";
 
-export default {
-  components: { Skeleton, ColorPicker, Icon, ContextMenu },
-  setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const drawings = computed(() => store.state.stage.board.drawings);
-    const isDrawing = computed(() => {
-      return store.state.stage.preferences.isDrawing;
+interface Drawing {
+  drawingId: string;
+  [key: string]: any;
+}
+
+const store = useStageStore();
+const stageSize = computed(() => store.stageSize);
+const drawings = computed(() => store.board.drawings);
+const isDrawing = computed(() => store.preferences.isDrawing);
+
+const {
+  el,
+  cursor,
+  getDrawedArea,
+  clearCanvas,
+  undo,
+  toggleErase,
+  color,
+  size,
+  mode,
+  history,
+} = useDrawable();
+
+const create = () => {
+  store.setActiveMovable(null);
+  store.updateIsDrawing(true);
+  clearCanvas(true);
+};
+
+const cancel = () => {
+  store.updateIsDrawing(false);
+};
+
+const save = (type: string) => {
+  const area = getDrawedArea();
+  if (area) {
+    const drawingId = uuidv4();
+    const commands = [...history];
+    store.addDrawing({
+      ...area,
+      commands,
+      type,
+      drawingId,
     });
-    const {
-      el,
-      cursor,
-      getDrawedArea,
-      clearCanvas,
-      undo,
-      toggleErase,
-      color,
-      size,
-      mode,
-      history,
-    } = useDrawable();
-    const create = () => {
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
-      store.commit("stage/UPDATE_IS_DRAWING", true);
-      clearCanvas(true);
-    };
-    const cancel = () => {
-      store.commit("stage/UPDATE_IS_DRAWING", false);
-    };
-    const save = (type) => {
-      const area = getDrawedArea();
-      if (area) {
-        const drawingId = uuidv4();
-        const commands = [...history];
-        store.dispatch("stage/addDrawing", {
-          ...area,
-          commands,
-          type,
-          drawingId,
-        });
-      }
-      cancel();
-    };
+  }
+  cancel();
+};
 
-    const deleteDrawingPermanently = (drawing) => {
-      store.commit("stage/POP_DRAWING", drawing.drawingId);
-      store.getters["stage/objects"]
-        .filter((o) => o.drawingId === drawing.drawingId)
-        .forEach((o) => {
-          store.dispatch("stage/deleteObject", o);
-        });
-    };
-
-    return {
-      isDrawing,
-      drawings,
-      color,
-      size,
-      create,
-      save,
-      cancel,
-      el,
-      clearCanvas,
-      undo,
-      toggleErase,
-      mode,
-      cursor,
-      stageSize,
-      deleteDrawingPermanently,
-    };
-  },
+const deleteDrawingPermanently = (drawing: Drawing) => {
+  store.popDrawing(drawing.drawingId);
+  store.objects
+    .filter((o) => o.drawingId === drawing.drawingId)
+    .forEach((o) => {
+      store.deleteObject(o);
+    });
 };
 </script>
 
@@ -206,16 +165,19 @@ export default {
   z-index: 1000;
   background-color: hsla(142, 52%, 96%, 0.8);
 }
+
 .drawing-tool {
   z-index: 1001;
   position: relative;
   vertical-align: top;
 }
+
 .size-preview {
   display: flex;
   width: 100%;
   height: 48px;
 }
+
 .dot {
   margin: auto;
   background-color: black;

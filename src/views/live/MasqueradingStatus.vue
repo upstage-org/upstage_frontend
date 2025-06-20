@@ -6,22 +6,17 @@
   </a-tooltip>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "store/modules/stage";
+import { storeToRefs } from "pinia";
 import Icon from "components/Icon.vue";
 
-export default {
-  components: { Icon },
-  setup: () => {
-    const store = useStore();
-    const masquerading = computed(() => store.state.stage.masquerading);
-    const exitAudienceView = () => {
-      store.commit("stage/TOGGLE_MASQUERADING");
-    };
+const stageStore = useStageStore();
+const { masquerading } = storeToRefs(stageStore);
 
-    return { masquerading, exitAudienceView };
-  },
+const exitAudienceView = () => {
+  stageStore.toggleMasquerading();
 };
 </script>
 

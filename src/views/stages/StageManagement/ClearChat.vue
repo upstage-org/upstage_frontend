@@ -1,9 +1,5 @@
 <template>
-  <button
-    class="button ml-2 is-warning"
-    @click="clearChat"
-    :class="{ 'is-loading': clearing }"
-  >
+  <button class="button ml-2 is-warning" @click="clearChat" :class="{ 'is-loading': clearing }">
     Clear Chat
   </button>
 </template>
@@ -12,11 +8,11 @@
 import { inject, ref } from "vue";
 import { message } from "ant-design-vue";
 import buildClient from "services/mqtt";
-import { TOPICS } from "utils/constants";
+import { TOPICS } from "constants/index";
 import { namespaceTopic } from "store/modules/stage/reusable";
 
 const mqttClient = buildClient();
-
+constants
 export default {
   setup: () => {
     const stage = inject("stage");

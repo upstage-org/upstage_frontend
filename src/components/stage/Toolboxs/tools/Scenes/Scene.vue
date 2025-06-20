@@ -1,22 +1,17 @@
 <template>
-  <div @click="switchScene">
+  <div @click="handleSwitchScene">
     <ContextMenu style="width: 100%; height: 100%; padding: 0" prevent-clicking>
       <template #trigger>
         <Skeleton :data="scene" nodrop>
-          <div
-            class="p-2 is-fullwidth is-flex is-flex-direction-column is-justify-content-space-between"
-            :title="scene.name"
-          >
-            <Image
-              :src="scene.scenePreview"
-              style="height: auto; border-radius: 4px"
-            />
+          <div class="p-2 is-fullwidth is-flex is-flex-direction-column is-justify-content-space-between"
+            :title="scene.name">
+            <Image :src="scene.scenePreview" style="height: auto; border-radius: 4px" />
             <span class="tag mt-1 is-block">{{ scene.name }}</span>
           </div>
         </Skeleton>
       </template>
       <template #context>
-        <a class="panel-block has-text-danger" @click="deleteScene">
+        <a class="panel-block has-text-danger" @click="handleDeleteScene">
           <span class="panel-icon">
             <Icon src="remove.svg" />
           </span>
@@ -27,50 +22,34 @@
   </div>
 </template>
 
-<script>
-import Icon from "components/Icon.vue";
-import Image from "components/Image.vue";
-import ContextMenu from "components/ContextMenu.vue";
-import { useStore } from "vuex";
-import { useMutation } from "services/graphql/composable";
-import { stageGraph } from "services/graphql";
-import { message } from "ant-design-vue";
-import Skeleton from "../../Skeleton.vue";
+<script setup lang="ts">
+import { defineProps } from 'vue'
+import Icon from "components/Icon.vue"
+import Image from "components/Image.vue"
+import ContextMenu from "components/ContextMenu.vue"
+import Skeleton from "../../Skeleton.vue"
+import { useScenesStore } from 'stores/scenes'
 
-export default {
-  components: { Icon, Image, ContextMenu, Skeleton },
-  props: ["scene"],
-  setup: (props) => {
-    const store = useStore();
-    const switchScene = () => {
-      store.dispatch("stage/switchScene", props.scene.id);
-      const audios = JSON.parse(props.scene.payload).audios;
-      const audioPlayers = JSON.parse(props.scene.payload).audioPlayers;
-      audios.forEach((audio, index) => {
-        audio.currentTime = audioPlayers[index].currentTime;
-        audio.changed = true;
-        audio.saken = true;
-        store.dispatch("stage/updateAudioStatus", audio);
-      });
-    };
+interface Scene {
+  id: string
+  name: string
+  scenePreview: string
+  payload: string
+}
 
-    const { mutation } = useMutation(stageGraph.deleteScene, props.scene.id);
-    const deleteScene = async () => {
-      const result = await mutation();
-      if (result.deleteScene) {
-        const { success } = result.deleteScene;
-        if (success) {
-          message.success(result.deleteScene.message);
-          store.dispatch("stage/loadScenes");
-        } else {
-          message.error(result.deleteScene.message);
-        }
-      }
-    };
+const props = defineProps<{
+  scene: Scene
+}>()
 
-    return { switchScene, deleteScene };
-  },
-};
+const scenesStore = useScenesStore()
+
+const handleSwitchScene = () => {
+  scenesStore.switchScene(props.scene.id)
+}
+
+const handleDeleteScene = () => {
+  scenesStore.deleteScene(props.scene.id)
+}
 </script>
 
 <style scoped>

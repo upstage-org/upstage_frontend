@@ -1,62 +1,76 @@
-// @ts-nocheck
+import { defineStore } from 'pinia';
 import { stageGraph } from "services/graphql";
 import { useRequest } from "services/graphql/composable";
 
-export default {
-  namespaced: true,
-  state: {
+interface Stage {
+  id: string;
+  visibility: boolean;
+  attributes: Array<{
+    name: string;
+    description: string;
+  }>;
+  [key: string]: any;
+}
+
+interface CacheState {
+  graphql: Record<string, any>;
+  stageList: Stage[] | null;
+}
+
+export const useCacheStore = defineStore('cache', {
+  state: (): CacheState => ({
     graphql: {},
     stageList: null,
-  },
+  }),
+
   getters: {
-    loadingStages(state) {
-      return state.stageList === null;
-    },
-    visibleStages(state) {
-      return state.stageList ? state.stageList.filter((s) => s.visibility) : [];
-    },
+    loadingStages: (state) => state.stageList === null,
+    visibleStages: (state) => state.stageList ? state.stageList.filter((s) => s.visibility) : [],
   },
-  mutations: {
-    SET_GRAPHQL_CACHE(state, { key, value }) {
-      state.graphql[key] = value;
+
+  actions: {
+    setGraphqlCache(key: string, value: any) {
+      this.graphql[key] = value;
     },
-    CLEAR_GRAPHQL_CACHES(state, { keys }) {
+
+    clearGraphqlCaches(keys: string[]) {
       keys.forEach((key) => {
-        delete state.graphql[key];
+        delete this.graphql[key];
       });
     },
-    CLEAR_ALL_GRAPHQL_CACHES(state) {
-      Object.keys(state.graphql).forEach((key) => {
-        delete state.graphql[key];
+
+    clearAllGraphqlCaches() {
+      Object.keys(this.graphql).forEach((key) => {
+        delete this.graphql[key];
       });
     },
-    SET_STAGE_LIST(state, list) {
-      state.stageList = list;
+
+    setStageList(list: Stage[] | null) {
+      this.stageList = list;
     },
-    UPDATE_STAGE_VISIBILITY(state, { stageId, visibility }) {
-      const stage = (state.stageList || []).find((s) => s.id === stageId);
+
+    updateStageVisibility(stageId: string, visibility: boolean) {
+      const stage = (this.stageList || []).find((s) => s.id === stageId);
       if (stage) {
         stage.visibility = visibility;
       }
     },
-  },
-  actions: {
-    async fetchStages({ commit }) {
+
+    async fetchStages() {
       try {
-        // commit('SET_STAGE_LIST', null)
         const { nodes, refresh } = useRequest(stageGraph.stageList);
         await refresh();
         if (nodes.value) {
-          nodes.value.forEach((node) => {
+          nodes.value.forEach((node: Stage) => {
             node.attributes.forEach(
-              (attr) => (node[attr.name] = attr.description),
+              (attr: { name: string; description: string }) => (node[attr.name] = attr.description),
             );
           });
         }
-        commit("SET_STAGE_LIST", nodes);
+        this.setStageList(nodes.value as Stage[]);
       } catch {
-        commit("SET_STAGE_LIST", []);
+        this.setStageList([]);
       }
     },
   },
-};
+});

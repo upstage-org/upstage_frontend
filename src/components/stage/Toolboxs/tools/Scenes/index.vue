@@ -1,7 +1,7 @@
 <template>
   <BlankScene />
   <Scene v-for="scene in scenes" :key="scene.id" :scene="scene" />
-  <div v-if="saving">
+  <div v-if="isSaving">
     <Loading height="64px" />
   </div>
   <div v-else @click="saveScene" class="is-pulled-left">
@@ -12,42 +12,39 @@
   </div>
 </template>
 
-<script>
-import { useStore } from "vuex";
+<script setup lang="ts">
+import { computed } from "vue";
 import Icon from "components/Icon.vue";
 import Loading from "components/Loading.vue";
-import { computed } from "vue";
 import Scene from "./Scene.vue";
 import BlankScene from "./BlankScene.vue";
+import { useScenesStore } from "stores/scenes";
+import { useStageStore } from "store";
 
-export default {
-  components: { Icon, Loading, BlankScene, Scene },
-  setup: () => {
-    const store = useStore();
+const scenesStore = useScenesStore();
+const stageStore = useStageStore();
 
-    const saving = computed(() => store.state.stage.isSavingScene);
+const isSaving = computed(() => stageStore.isSavingScene);
+const scenes = computed(() => scenesStore.scenes);
 
-    const scenes = computed(() => store.state.stage.model.scenes);
-    const saveScene = () => {
-      store.dispatch("stage/openSettingPopup", {
-        type: "SaveScene",
-      });
-    };
-
-    return { saving, scenes, saveScene };
-  },
+const saveScene = () => {
+  stageStore.openSettingPopup({
+    type: "SaveScene",
+  });
 };
 </script>
 
 <style lang="scss" scoped>
 @mixin gradientText($from, $to) {
-    background: linear-gradient(to top, $from, $to);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  background: linear-gradient(to top, $from, $to);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
+
 .fas.fa-plus {
   @include gradientText(#30ac45, #6fb1fc);
 }
+
 video {
   height: 100%;
 }

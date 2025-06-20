@@ -7,26 +7,20 @@
     </a-layout>
 </template>
 
-<script>
+<script setup lang="ts">
 import Sidebar from "components/Sidebar.vue";
 import Footer from "components/Footer.vue";
 import OneTimePurchase from "components/payment/OneTimePurchase.vue";
 import PurchasePopup from "components/payment/PurchasePopup.vue";
-import { useStore } from "vuex";
 import { ref, watchEffect } from "vue";
 import { useRoute } from "vue-router";
+import { useConfigStore } from "store/modules/config";
 
-export default {
-    components: { Footer, OneTimePurchase, PurchasePopup },
-    setup: () => {
-        const store = useStore();
-        const enableDonate = ref(false);
-        const route = useRoute();
-        watchEffect(() => {
-            enableDonate.value = store.getters["config/enableDonate"];
-        });
+const configStore = useConfigStore();
+const enableDonate = ref(false);
+const route = useRoute();
+watchEffect(() => {
+    enableDonate.value = configStore.enableDonate;
+});
 
-        return { enableDonate, route };
-    },
-};
 </script>

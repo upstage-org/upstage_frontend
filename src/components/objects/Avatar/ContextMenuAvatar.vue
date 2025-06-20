@@ -29,13 +29,13 @@
       </a>
     </template>
     <div v-if="object.type == 'video'">
-      <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
+      <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo">
         <span class="panel-icon">
           <i class="fas fa-pause"></i>
         </span>
         <span>{{ $t("pause") }}</span>
       </a>
-      <a v-else class="panel-block" @click="playVideo(slotProps)">
+      <a v-else class="panel-block" @click="playVideo">
         <span class="panel-icon">
           <i class="fas fa-play"></i>
         </span>
@@ -47,7 +47,7 @@
         </span>
         <span>{{ $t("restart") }}</span>
       </a>
-      <a class="panel-block" @click="openVolumePopup(slotProps)">
+      <a class="panel-block" @click="openVolumePopup">
         <span class="panel-icon">
           <Icon src="voice-setting.svg" />
         </span>
@@ -96,7 +96,6 @@
       <input class="input anmation-input" type="number" step="0.5" min="0" :value="animationSpeed"
         @input="handleChangeAnimationSpeed" placeholder="seconds" />
     </div>
-
 
     <div class="field has-addons menu-group">
       <p class="control menu-group-title">
@@ -204,240 +203,190 @@
   </div>
 </template>
 
-<script>
-import { useStore } from "vuex";
-import { computed, inject, ref } from "vue";
+<script setup lang="ts">
+import { computed, inject, ref, type Ref } from "vue";
 import Icon from "components/Icon.vue";
+import { useStageStore } from "store/modules/stage";
+import { useUserStore } from "store/modules/user";
 
-export default {
-  props: [
-    "object",
-    "closeMenu",
-    "active",
-    "sliderMode",
-    "setSliderMode",
-    "keepActive",
-  ],
-  emits: ["update:active", "hold"],
-  components: { Icon },
-  setup: (props, { emit }) => {
-    const store = useStore();
+const props = defineProps<{
+  object: any;
+  closeMenu?: () => void;
+  active?: boolean;
+  sliderMode?: string;
+  setSliderMode?: (mode: string) => void;
+  keepActive?: (val: boolean) => void;
+}>();
+const emit = defineEmits(["update:active", "hold"]);
 
-    const holdAvatar = () => {
-      store.dispatch("user/setAvatarId", props.object.id).then(props.closeMenu);
-    };
+const stageStore = useStageStore();
+const userStore = useUserStore();
 
-    const releaseAvatar = () => {
-      store.dispatch("user/setAvatarId", null).then(props.closeMenu);
-    };
+const holdable = inject("holdable") ?? ref(false);
+const isWearing = inject("isWearing") as Ref<boolean> | undefined;
+const currentAvatar = computed(() => stageStore.currentAvatar);
+const isHolding = computed(() => props.object.holder && props.object.holder.id === stageStore.session?.id);
 
-    const deleteObject = () => {
-      store.dispatch("stage/deleteObject", props.object).then(props.closeMenu);
-    };
+const holdAvatar = () => {
+  userStore.setAvatarId(props.object.id ?? "");
+  props.closeMenu && props.closeMenu();
+};
 
-    const switchFrame = (frame) => {
-      store.dispatch("stage/switchFrame", {
-        ...props.object,
-        src: frame,
-      });
-    };
+const releaseAvatar = () => {
+  userStore.setAvatarId("");
+  props.closeMenu && props.closeMenu();
+};
 
-    const flipHorizontal = () => {
-      const scaleX = -1 * (props.object.scaleX ?? 1);
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        scaleX,
-      });
-    };
+const deleteObject = () => {
+  stageStore.deleteObject(props.object);
+  props.closeMenu && props.closeMenu();
+};
 
-    const flipVertical = () => {
-      const scaleY = -1 * (props.object.scaleY ?? 1);
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        scaleY,
-      });
-    };
+const switchFrame = (frame: string) => {
+  stageStore.switchFrame({
+    ...props.object,
+    src: frame,
+  });
+};
 
-    const toggleAutoplayFrames = () => {
-      store
-        .dispatch("stage/toggleAutoplayFrames", {
-          ...props.object,
-          ...props.object.autoplayFrames ? {
-            autoplayFrames: null,
-            lastAutoplayFrames: props.object.autoplayFrames
-          } : {
-            autoplayFrames: props.object.lastAutoplayFrames || 1
-          }
-        })
-        .then(() => {
-          emit("update:active", true);
-        });
-    };
+const flipHorizontal = () => {
+  const scaleX = -1 * (props.object.scaleX ?? 1);
+  stageStore.shapeObject({
+    ...props.object,
+    scaleX,
+  });
+};
 
-    const changeNickname = () =>
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "ChatParameters",
-        })
-        .then(props.closeMenu);
+const flipVertical = () => {
+  const scaleY = -1 * (props.object.scaleY ?? 1);
+  stageStore.shapeObject({
+    ...props.object,
+    scaleY,
+  });
+};
 
-    const bringToFront = () => {
-      store.dispatch("stage/bringToFront", props.object).then(props.closeMenu);
-    };
-
-    const sendToBack = () => {
-      store.dispatch("stage/sendToBack", props.object).then(props.closeMenu);
-    };
-
-    const changeSliderMode = (mode) => {
-      props.setSliderMode(mode);
-      emit("update:active", true);
-      props.keepActive(true);
-    };
-
-    const holdable = inject("holdable") ?? ref();
-    const isHolding = computed(
-      () =>
-        props.object.holder &&
-        props.object.holder.id === store.state.stage.session,
-    );
-
-    const openVoiceSetting = () => {
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "VoiceParameters",
-        })
-        .then(props.closeMenu);
-    };
-
-    const isWearing = inject("isWearing");
-    const currentAvatar = computed(() => store.getters["stage/currentAvatar"]);
-
-    const wearCostume = () => {
-      if (currentAvatar.value) {
-        store
-          .dispatch("stage/shapeObject", {
-            ...props.object,
-            rotate: 0,
-            wornBy: currentAvatar.value.id,
-          })
-          .then(props.closeMenu);
+const toggleAutoplayFrames = () => {
+  stageStore.toggleAutoplayFrames({
+    ...props.object,
+    ...(props.object.autoplayFrames
+      ? {
+        autoplayFrames: null,
+        lastAutoplayFrames: props.object.autoplayFrames,
       }
-    };
+      : {
+        autoplayFrames: props.object.lastAutoplayFrames || 1,
+      }),
+  });
+  emit("update:active", true);
+};
 
-    const takeOffCostume = () => {
-      if (isWearing.value) {
-        store
-          .dispatch("stage/shapeObject", {
-            ...props.object,
-            wornBy: null,
-          })
-          .then(props.closeMenu);
-      }
-    };
+const changeNickname = () => {
+  stageStore.openSettingPopup({ type: "ChatParameters" });
+  props.closeMenu && props.closeMenu();
+};
 
-    const deletePermanently = () => {
-      if (props.object.drawingId) {
-        store
-          .dispatch("stage/deleteObject", props.object)
-          .then(props.closeMenu);
-        store.commit("stage/POP_DRAWING", props.object.drawingId);
-      }
-      if (props.object.textId) {
-        store
-          .dispatch("stage/deleteObject", props.object)
-          .then(props.closeMenu);
-        store.commit("stage/POP_TEXT", props.object.textId);
-      }
-    };
+const bringToFront = () => {
+  stageStore.bringToFront(props.object);
+  props.closeMenu && props.closeMenu();
+};
 
-    const hasLink = computed(() => props.object.link && props.object.link.url);
-    const openLink = () => {
-      const { url, blank } = props.object.link;
-      window.open(url, blank ? "_blank" : "_self").focus();
-    };
+const sendToBack = () => {
+  stageStore.sendToBack(props.object);
+  props.closeMenu && props.closeMenu();
+};
 
-    const animationSpeed = computed(() => {
-      return props.object.autoplayFrames || "";
+const changeSliderMode = (mode: string) => {
+  props.setSliderMode && props.setSliderMode(mode);
+  emit("update:active", true);
+  props.keepActive && props.keepActive(true);
+};
+
+const openVoiceSetting = () => {
+  stageStore.openSettingPopup({ type: "VoiceParameters" });
+  props.closeMenu && props.closeMenu();
+};
+
+const wearCostume = () => {
+  if (currentAvatar.value) {
+    stageStore.shapeObject({
+      ...props.object,
+      rotate: 0,
+      wornBy: currentAvatar.value.id,
     });
-    const handleChangeAnimationSpeed = (e) => {
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        autoplayFrames: e.target.value,
-      });
-    };
+    props.closeMenu && props.closeMenu();
+  }
+};
 
-    const pauseVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          isPlaying: false,
-        })
-        .then(props.closeMenu);
-    }
-    const playVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          isPlaying: true,
-        })
-        .then(props.closeMenu);
-    }
-    const openVolumePopup = () => {
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "VolumeParameters",
-        })
-        .then(props.closeMenu);
-    }
-    const toggleVideoLoop = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          loop: !props.object.loop,
-        })
-        .then(props.closeMenu);
-    }
-    const restartVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          replayed: (props.object.replayed || 0) + 1,
-        })
-        .then(props.closeMenu);
-    }
-    return {
-      switchFrame,
-      holdAvatar,
-      releaseAvatar,
-      deleteObject,
-      changeNickname,
-      bringToFront,
-      sendToBack,
-      toggleAutoplayFrames,
-      changeSliderMode,
-      openVoiceSetting,
-      wearCostume,
-      takeOffCostume,
-      currentAvatar,
-      isWearing,
-      isHolding,
-      holdable,
-      deletePermanently,
-      flipHorizontal,
-      flipVertical,
-      hasLink,
-      openLink,
+const takeOffCostume = () => {
+  if (isWearing?.value) {
+    stageStore.shapeObject({
+      ...props.object,
+      wornBy: null,
+    });
+    props.closeMenu && props.closeMenu();
+  }
+};
 
-      animationSpeed,
-      handleChangeAnimationSpeed,
-      pauseVideo,
-      playVideo,
-      openVolumePopup,
-      toggleVideoLoop,
-      restartVideo
-    };
-  },
+const deletePermanently = () => {
+  if (props.object.drawingId) {
+    stageStore.deleteObject(props.object);
+    // If you have a Pinia action for POP_DRAWING, call it here
+  }
+  if (props.object.textId) {
+    stageStore.deleteObject(props.object);
+    // If you have a Pinia action for POP_TEXT, call it here
+  }
+  props.closeMenu && props.closeMenu();
+};
+
+const hasLink = computed(() => props.object.link && props.object.link.url);
+const openLink = () => {
+  const { url, blank } = props.object.link;
+  window.open(url, blank ? "_blank" : "_self")?.focus();
+};
+
+const animationSpeed = computed(() => {
+  return props.object.autoplayFrames || "";
+});
+const handleChangeAnimationSpeed = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  stageStore.shapeObject({
+    ...props.object,
+    autoplayFrames: target.value,
+  });
+};
+
+const pauseVideo = () => {
+  stageStore.shapeObject({
+    ...props.object,
+    isPlaying: false,
+  });
+  props.closeMenu && props.closeMenu();
+};
+const playVideo = () => {
+  stageStore.shapeObject({
+    ...props.object,
+    isPlaying: true,
+  });
+  props.closeMenu && props.closeMenu();
+};
+const openVolumePopup = () => {
+  stageStore.openSettingPopup({ type: "VolumeParameters" });
+  props.closeMenu && props.closeMenu();
+};
+const toggleVideoLoop = () => {
+  stageStore.shapeObject({
+    ...props.object,
+    loop: !props.object.loop,
+  });
+  props.closeMenu && props.closeMenu();
+};
+const restartVideo = () => {
+  stageStore.shapeObject({
+    ...props.object,
+    replayed: (props.object.replayed || 0) + 1,
+  });
+  props.closeMenu && props.closeMenu();
 };
 </script>
 

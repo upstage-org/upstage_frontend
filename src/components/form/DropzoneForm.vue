@@ -1,6 +1,6 @@
 <script setup>
 import { defineEmits, ref } from "vue";
-import { imageExtensions } from "utils/constants";
+import { imageExtensions } from "constants/index";
 
 const emit = defineEmits(["change"]);
 
@@ -34,15 +34,8 @@ const drop = (event) => {
 
 <template>
   <div @dragover="dragover" @dragleave="dragleave" @drop="drop">
-    <input
-      ref="el"
-      type="file"
-      multiple
-      id="dropzone"
-      @change="onChange"
-      :accept="imageExtensions"
-      style="display: none"
-    />
+    <input ref="el" type="file" multiple id="dropzone" @change="onChange" :accept="imageExtensions"
+      style="display: none" />
     <label for="dropzone">
       <slot>
         <div class="button is-dark upload-frame">
@@ -61,6 +54,7 @@ const drop = (event) => {
   width: 100%;
   height: 100px;
 }
+
 .active {
   transform: scale(1.2);
   transition-duration: 0.5s;

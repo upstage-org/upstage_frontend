@@ -2,9 +2,8 @@
 import { useQuery } from "@vue/apollo-composable";
 import gql from "graphql-tag";
 import { ref, computed, watchEffect, PropType } from "vue";
-import { StudioGraph } from "models/studio";
 import { TransferItem } from "ant-design-vue/lib/transfer";
-import store from "store";
+import { useUserStore } from "store/modules/user";
 
 const props = defineProps({
   modelValue: {
@@ -14,7 +13,8 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["update:modelValue"]);
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const userStore = useUserStore();
+const isAdmin = computed(() => userStore.isAdmin);
 
 const { result, loading } = useQuery(
   gql`

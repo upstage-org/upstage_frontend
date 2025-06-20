@@ -42,8 +42,8 @@
                 ? 'fas fa-times'
                 : 'fas'
             " :help="!form.fileLocation &&
-                `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
-                " :error="urlError" :disabled="!!stage.id" class="half-flex" maxlength="20" />
+              `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
+              " :error="urlError" :disabled="!!stage.id" class="half-flex" maxlength="20" />
       </div>
     </div>
 
@@ -112,8 +112,8 @@
           'Player access',
           'Player and edit access',
         ]" :data="users" :owner="owner" :renderLabel="displayName" :renderValue="(item) => item.id" :renderKeywords="(item) =>
-            `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
-            " v-model="playerAccess" />
+          `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
+          " v-model="playerAccess" />
       </div>
     </div>
 
@@ -130,188 +130,94 @@
   </div>
 </template>
 
-<script>
-import {
-  useAttribute,
-  useMutation,
-  useQuery,
-  useRequest,
-} from "services/graphql/composable";
-import { stageGraph, userGraph } from "services/graphql";
-import { inject, reactive, ref, watch, computed, provide } from "vue";
+<script setup>
+import { useAttribute, useQuery } from "services/graphql/composable";
+import { userGraph } from "services/graphql";
+import { inject, watch, computed, provide } from "vue";
 import Field from "components/form/Field.vue";
 import ImagePicker from "components/form/ImagePicker.vue";
 import MultiTransferAccessColumn from "components/MultiTransferAccessColumn.vue";
-import { useRouter } from "vue-router";
-import { displayName, debounce } from "utils/common";
+import { displayName } from "utils/common";
 import ClearChatInStage from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
 import DuplicateStage from "components/stage/DuplicateStage.vue";
 import DeleteStage from "components/stage/DeleteStage.vue";
-import { useStore } from "vuex";
 import Switch from "components/form/Switch.vue";
-import { message } from "ant-design-vue";
-import { handleError } from 'utils/common';
+import { useUserStore } from "store/modules/user";
+import { useStageManagementStore } from "store/modules/stageManagement";
+import { debounce } from "utils/common";
 
-export default {
-  components: {
-    Field,
-    ClearChatInStage,
-    SweepStage,
-    MultiTransferAccessColumn,
-    ImagePicker,
-    DuplicateStage,
-    DeleteStage,
-    Switch,
-  },
-  setup: () => {
-    const store = useStore();
-    const whoami = computed(() => store.getters["user/whoami"]);
-    const router = useRouter();
-    const stage = inject("stage");
-    const clearCache = inject("clearCache");
+const stage = inject("stage");
+const clearCache = inject("clearCache");
+const userStore = useUserStore();
+const stageManagementStore = useStageManagementStore();
 
-    const form = reactive({
-      fileLocation: "",
-      ...stage.value,
-      ownerId: stage.value.owner?.id,
-      status: useAttribute(stage, "status").value ?? "rehearsal",
-      cover: useAttribute(stage, "cover").value,
-    });
+// Initialize form with stage data
+stageManagementStore.setForm({
+  fileLocation: "",
+  ...stage.value,
+  ownerId: stage.value.owner?.id,
+  status: useAttribute(stage, "status").value ?? "rehearsal",
+  cover: useAttribute(stage, "cover").value,
+});
 
-    const playerAccess = ref(
-      useAttribute(stage, "playerAccess", true).value ?? [],
-    );
+// Initialize player access
+const playerAccess = computed({
+  get: () => stageManagementStore.playerAccess,
+  set: (val) => stageManagementStore.setPlayerAccess(val)
+});
 
-    watch(playerAccess, (val) => {
-      form.playerAccess = JSON.stringify(val);
-    });
-
-    const { nodes } = useQuery(userGraph.userList);
-    const users = computed(() =>
-      nodes.value
-        ? nodes.value.filter((u) => {
-          if (stage.value && stage.value.owner) {
-            return u.username !== stage.value.owner.username;
-          }
-          return u.username !== whoami?.value.username;
-        })
-        : [],
-    );
-
-    const owner = computed(() =>
-      nodes.value
-        ? nodes.value.find((u) => {
-          if (stage.value && stage.value.owner) {
-            return u.username === stage.value.owner.username;
-          }
-          return u.username === whoami?.value.username;
-        })
-        : [],
-    );
-
-    const { loading, mutation } = useMutation(
-      stage.value.id ? stageGraph.updateStage : stageGraph.createStage,
-      form,
-    );
-    const createStage = async () => {
-      try {
-        const stage = await mutation();
-        message.success("Stage created successfully!");
-        store.dispatch("cache/fetchStages");
-        router.push(`/stages/stage-management/${stage.id}/`);
-      } catch (error) {
-        message.error(error);
+// Fetch users list
+const { nodes } = useQuery(userGraph.userList);
+const users = computed(() =>
+  nodes.value
+    ? nodes.value.filter((u) => {
+      if (stage.value && stage.value.owner) {
+        return u.username !== stage.value.owner.username;
       }
-    };
-    const updateStage = async () => {
-      try {
-        await mutation();
-        message.success("Stage updated successfully!");
-        store.commit("cache/UPDATE_STAGE_VISIBILITY", {
-          stageId: form.id,
-          visibility: form.visibility,
-        });
-        console.log(clearCache);
-        clearCache();
-      } catch (error) {
-        handleError(error);
+      return u.username !== userStore.whoami?.username;
+    })
+    : [],
+);
+
+const owner = computed(() =>
+  nodes.value
+    ? nodes.value.find((u) => {
+      if (stage.value && stage.value.owner) {
+        return u.username === stage.value.owner.username;
       }
-    };
+      return u.username === userStore.whoami?.username;
+    })
+    : [],
+);
 
-    const preservedPaths = [
-      "backstage",
-      "login",
-      "register",
-      "static",
-      "studio",
-      "replay",
-      "api",
-    ];
-    const urlValid = ref(!!stage.value.id);
-    const { loading: validatingURL, fetch } = useRequest(stageGraph.stageList);
+// Computed properties
+const form = computed(() => stageManagementStore.form);
+const loading = computed(() => stageManagementStore.loading);
+const validatingURL = computed(() => stageManagementStore.validatingURL);
+const urlValid = computed(() => stageManagementStore.urlValid);
 
-    const validRegex = /^[a-zA-Z0-9-_]*$/;
-    const checkURL = debounce(async () => {
-      const url = form.fileLocation.trim();
-      if (!url || !validRegex.test(url) || preservedPaths.includes(url)) {
-        urlValid.value = false;
-        return;
-      }
-      const response = await fetch({
-        fileLocation: url,
-      });
-      urlValid.value = true;
-      if (response.stages.length) {
-        const existingStage = response.stages[0];
-        if (existingStage.fileLocation !== stage.value.fileLocation) {
-          urlValid.value = false;
-        }
-      }
-    }, 500);
-
-    const urlError = computed(() => {
-      if (!validRegex.test(form.fileLocation)) {
-        return "URL cannot contain special characters or spaces!";
-      }
-      if (preservedPaths.includes(form.fileLocation.trim())) {
-        return `These URL are not allowed: ${preservedPaths.join(", ")}`;
-      }
-      if (!urlValid.value && form.fileLocation) {
-        return "This URL already existed!";
-      }
-      return null;
-    });
-
-    const afterDelete = () => {
-      store.dispatch("cache/fetchStages");
-      router.push("/stages");
-    };
-
-    const afterDuplicate = () => {
-      store.dispatch("cache/fetchStages");
-    };
-
-    provide("afterDuplicate", afterDuplicate);
-
-    return {
-      form,
-      stage,
-      createStage,
-      updateStage,
-      loading,
-      users,
-      owner,
-      displayName,
-      checkURL,
-      validatingURL,
-      urlValid,
-      playerAccess,
-      afterDelete,
-      urlError,
-    };
-  },
+// Methods
+const createStage = () => stageManagementStore.createStage();
+const updateStage = async () => {
+  const success = await stageManagementStore.updateStage();
+  if (success && clearCache) {
+    clearCache();
+  }
 };
+
+const checkURL = debounce(async () => {
+  await stageManagementStore.checkURL(form.value.fileLocation, stage.value?.fileLocation);
+}, 500);
+
+const urlError = computed(() =>
+  stageManagementStore.getUrlError(form.value.fileLocation)
+);
+
+const afterDelete = () => stageManagementStore.afterDelete();
+const afterDuplicate = () => stageManagementStore.afterDuplicate();
+
+provide("afterDuplicate", afterDuplicate);
 </script>
 
 <style scoped>

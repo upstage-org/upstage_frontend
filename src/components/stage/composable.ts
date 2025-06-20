@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { onUnmounted, ref } from "vue";
 import buildClient from "services/mqtt";
-import { BACKGROUND_ACTIONS, COLORS, TOPICS } from "utils/constants";
+import { BACKGROUND_ACTIONS, COLORS, TOPICS } from "constants/index";
 import { namespaceTopic } from "store/modules/stage/reusable";
 
 export const useCounter = (stageUrl) => {

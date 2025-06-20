@@ -17,7 +17,7 @@
             <template v-if="status !== 'live' && !canPlay">
               <span v-if="status" class="tag is-dark">{{
                 status.toUpperCase()
-              }}</span>&nbsp;
+                }}</span>&nbsp;
               <span>This stage is not currently open to the public. Please come
                 back later!</span>
             </template>
@@ -56,22 +56,24 @@
 </template>
 
 <script>
-import { computed, inject, ref, watch, watchEffect, onUnmounted } from "vue";
-import { useStore } from "vuex";
+import { computed, inject, ref, watch, watchEffect, onUnmounted, onMounted } from "vue";
+import { useStageStore } from "store/modules/stage";
+import { storeToRefs } from "pinia";
 import { animate } from "animejs";
 import { useAttribute } from "services/graphql/composable";
 
 export default {
   setup: () => {
-    const store = useStore();
-    const preloading = computed(() => store.state.stage.preloading);
-    const preloadableAssets = computed(
-      () => store.getters["stage/preloadableAssets"],
-    );
-    const model = computed(() => store.state.stage.model);
+    const stageStore = useStageStore();
+    const { preloading, model, backdropColor, masquerading } = storeToRefs(stageStore);
+
+    const preloadableAssets = computed(() => stageStore.preloadableAssets);
+    const ready = computed(() => stageStore.ready);
+    const canPlay = computed(() => stageStore.canPlay);
+
     const progress = ref(0);
     const stopLoading = () =>
-      store.commit("stage/SET_PRELOADING_STATUS", false);
+      stageStore.setPreloadingStatus(false);
     const increaseProgress = () => {
       progress.value++;
       if (progress.value === preloadableAssets.value.length || progress.value === preloadableAssets.value.length - 1) {
@@ -113,7 +115,6 @@ export default {
     });
 
     const replaying = inject("replaying");
-    const ready = computed(() => store.getters["stage/ready"]);
     const clicked = ref(false); // Trick the user to click in order to play meSpeak voice
     const leave = (el, complete) => {
       animate(el, {
@@ -122,10 +123,11 @@ export default {
         onComplete: complete,
       });
     };
-    const backdropColor = computed(() => store.state.stage.backdropColor);
 
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const masquerading = computed(() => store.state.stage.masquerading);
+    onMounted(() => {
+      stageStore.setPreloadingStatus(false);
+    });
+
     return {
       model,
       preloadableAssets,

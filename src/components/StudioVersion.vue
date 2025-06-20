@@ -6,12 +6,9 @@
   </span>
 </template>
 
-<script>
+<script setup lang="ts">
 import configs from "config";
 
-export default {
-  setup: () => {
-    return { release: configs.ALIAS_RELEASE_VERSION, version: configs.RELEASE_VERSION };
-  },
-};
+const release = configs.ALIAS_RELEASE_VERSION;
+const version = configs.RELEASE_VERSION;
 </script>

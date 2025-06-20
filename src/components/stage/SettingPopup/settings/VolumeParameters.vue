@@ -5,48 +5,39 @@
   <div class="card-content voice-parameters">
     <div class="content">
       <HorizontalField title="Volume">
-        <a-slider v-model:value="parameters.volume" :min="0" :max="100" />
+        <a-slider v-model:value="volume" :min="0" :max="100" />
       </HorizontalField>
       <SaveButton @click="saveVolume" :loading="loading" />
     </div>
   </div>
 </template>
 
-<script>
-import { reactive, computed } from "vue";
-import { useStore } from "vuex";
-import HorizontalField from "components/form/HorizontalField.vue";
-import SaveButton from "components/form/SaveButton.vue";
+<script setup lang="ts">
+import { computed, onMounted } from 'vue';
+import { useStageStore } from 'store';
+import { useVolumeStore } from 'store/modules/volume';
+import HorizontalField from '@/components/form/HorizontalField.vue';
+import SaveButton from '@/components/form/SaveButton.vue';
 
-export default {
-  components: {
-    HorizontalField,
-    SaveButton,
-  },
-  props: ["modelValue"],
-  emits: ["close", "update:modelValue"],
-  setup: (props, { emit }) => {
-    const store = useStore();
-    const currentAvatar = computed(() => store.getters["stage/activeObject"]);
-    const parameters = reactive({
-      volume: currentAvatar.value?.volume,
-    });
-    const saveVolume = () => {
-      let video = document.getElementById("video" + currentAvatar.value.id);
-      video.volume = parameters.volume / 100;
-      store
-        .dispatch("stage/shapeObject", {
-          ...currentAvatar.value,
-          volume: parameters.volume,
-        })
-        .then(() => emit("close"));
-    };
+const stageStore = useStageStore();
+const volumeStore = useVolumeStore();
 
-    return {
-      saveVolume,
-      parameters,
-    };
-  },
+const volume = computed({
+  get: () => volumeStore.volume,
+  set: (value: number) => volumeStore.setVolume(value)
+});
+
+const loading = computed(() => volumeStore.loading);
+
+onMounted(() => {
+  const currentAvatar = stageStore.activeObject;
+  if (currentAvatar?.volume !== undefined) {
+    volumeStore.setVolume(currentAvatar.volume);
+  }
+});
+
+const saveVolume = async () => {
+  await volumeStore.updateVolume(volume.value);
 };
 </script>
 

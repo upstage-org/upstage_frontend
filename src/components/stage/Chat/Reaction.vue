@@ -37,77 +37,64 @@
   </div>
 </template>
 
-<script>
-import { computed, watch } from "vue";
-import { useStore } from "vuex";
+<script setup lang="ts">
+import { computed } from "vue";
 import { animate } from "animejs";
+import { useReactionsStore } from "store/reactions";
+import { useUserStore } from "store";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
 
-export default {
-  components: { ChatInput, Icon },
-  props: ["customEmoji"],
-  setup: () => {
-    const store = useStore();
-    const reactionVisibility = computed(
-      () => store.state.stage.settings.reactionVisibility,
-    );
-    watch(reactionVisibility, console.log);
-    const nickname = computed(() => {
-      const nickname = store.getters["user/nickname"];
-      if (nickname.length > 15) {
-        return nickname.slice(0, 10) + "...";
-      }
-      return nickname;
-    });
+const props = defineProps<{
+  customEmoji?: boolean;
+}>();
 
-    const reactions = ["❤️", "🤣", "🙌", "👏"];
-    const sendReaction = (react) => {
-      store.dispatch("stage/sendReaction", react);
-    };
+const reactionsStore = useReactionsStore();
+const userStore = useUserStore();
 
-    const flyingReactions = computed(() => store.state.stage.reactions);
+const reactionVisibility = computed(() => reactionsStore.settings.reactionVisibility);
+const nickname = computed(() => {
+  const nickname = userStore.nickname;
+  if (nickname.length > 15) {
+    return nickname.slice(0, 10) + "...";
+  }
+  return nickname;
+});
 
-    const flyin = (el) => {
-      animate(el, {
-        translateY: [100, 0],
-        scale: [1, 1.5, 1],
-        ease: 'outExpo',
-        duration: 800
-      });
-    };
-    const flyout = (el, complete) => {
-      animate(el, {
-        scale: 0,
-        rotate: 180,
-        translateY: 100,
-        ease: 'outBounce',
-        duration: 800,
-        onComplete: complete,
-      });
-    };
+const reactions = ["❤️", "🤣", "🙌", "👏"];
+const flyingReactions = computed(() => reactionsStore.reactions);
 
-    const sendCustomReaction = (e) => {
-      sendReaction(e);
-    };
+const sendReaction = (react: string) => {
+  reactionsStore.sendReaction(react);
+};
 
-    const openChatSetting = () =>
-      store.dispatch("stage/openSettingPopup", {
-        type: "ChatParameters",
-      });
+const flyin = (el: Element) => {
+  animate(el, {
+    translateY: [100, 0],
+    scale: [1, 1.5, 1],
+    ease: 'outExpo',
+    duration: 800
+  });
+};
 
-    return {
-      reactions,
-      sendReaction,
-      flyingReactions,
-      flyin,
-      flyout,
-      sendCustomReaction,
-      reactionVisibility,
-      nickname,
-      openChatSetting,
-    };
-  },
+const flyout = (el: Element, complete: () => void) => {
+  animate(el, {
+    scale: 0,
+    rotate: 180,
+    translateY: 100,
+    ease: 'outBounce',
+    duration: 800,
+    onComplete: complete,
+  });
+};
+
+const sendCustomReaction = (e: string) => {
+  sendReaction(e);
+};
+
+const openChatSetting = () => {
+  // TODO: Implement chat settings popup
+  console.log('Open chat settings');
 };
 </script>
 

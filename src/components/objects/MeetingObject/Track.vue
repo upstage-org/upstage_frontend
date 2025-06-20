@@ -1,25 +1,28 @@
-<script lang="jsx">
-import { onMounted, onUnmounted, ref } from "vue";
+<template>
+  <video v-if="isVideo" autoplay ref="el"></video>
+  <audio v-else autoplay ref="el"></audio>
+</template>
 
-export default {
-  props: {
-    track: Object,
-  },
-  setup(props) {
-    const el = ref();
-    onMounted(() => {
-      props.track.attach(el.value);
-    });
-    onUnmounted(() => {
-      props.track.detach();
-    });
-    if (props.track.getType() === "video") {
-      return () => <video autoplay ref={el}></video>;
-    } else {
-      return () => <audio autoplay ref={el}></audio>;
-    }
-  },
-};
+<script setup>
+import { onMounted, onUnmounted, ref, computed } from "vue";
+
+const props = defineProps({
+  track: {
+    type: Object,
+    required: true
+  }
+});
+
+const el = ref();
+const isVideo = computed(() => props.track.getType() === "video");
+
+onMounted(() => {
+  props.track.attach(el.value);
+});
+
+onUnmounted(() => {
+  props.track.detach();
+});
 </script>
 
 <style scoped>

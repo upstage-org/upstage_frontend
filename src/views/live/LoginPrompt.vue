@@ -14,32 +14,19 @@
             <label class="label" style="font-weight: normal">
               Choose a nickname if you want one:
             </label>
-            <InputButtonPostfix
-              v-model="nickname"
-              placeholder="Guest"
-              icon="fas fa-sign-in-alt"
-              title="Choose a nickname"
-              @ok="enterAsAudience"
-            />
+            <InputButtonPostfix v-model="nickname" placeholder="Guest" icon="fas fa-sign-in-alt"
+              title="Choose a nickname" @ok="enterAsAudience" />
           </div>
         </div>
       </div>
     </div>
-    <button
-      v-if="showLoginForm"
-      class="button is-light is-outlined mt-4"
-      @click="showLoginForm = false"
-    >
+    <button v-if="showLoginForm" class="button is-light is-outlined mt-4" @click="showLoginForm = false">
       <span class="icon">
         <i class="fas fa-chevron-left"></i>
       </span>
       <span>{{ $t("enter_as_audience") }}</span>
     </button>
-    <button
-      v-else
-      class="button is-light is-outlined mt-4"
-      @click="showLoginForm = true"
-    >
+    <button v-else class="button is-light is-outlined mt-4" @click="showLoginForm = true">
       <span>{{ $t("player_login") }}</span>
       <span class="icon">
         <i class="fas fa-chevron-right"></i>
@@ -48,83 +35,77 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
+import { onMounted, ref, watch } from "vue";
+import { message } from "ant-design-vue";
+import { animate } from "animejs";
 import LoginForm from "components/LoginForm.vue";
 import InputButtonPostfix from "components/form/InputButtonPostfix.vue";
-import { computed, onMounted, ref, watch } from "vue";
-import { useStore } from "vuex";
-import { animate } from "animejs";
-import { message } from "ant-design-vue";
+import { useAuthStore } from "../../store/auth";
+import { useUserStore } from "../../store/user";
+import { useStageStore } from "../../store/stage";
 
-export default {
-  components: { LoginForm, InputButtonPostfix },
-  setup: () => {
-    const store = useStore();
-    const loggedIn = computed(() => store.getters["auth/loggedIn"]);
-    const showing = ref(!loggedIn.value);
-    const showLoginForm = ref(false);
-    const nickname = ref();
-    const modal = ref();
+const authStore = useAuthStore();
+const userStore = useUserStore();
+const stageStore = useStageStore();
 
-    onMounted(() => {
-      animate(modal.value, {
-        rotate: ["-3deg", "3deg", "0deg"],
-        duration: 100,
-        direction: "alternate",
-        loop: 5,
-        ease: "outBack",
-      });
-    });
+const showing = ref(!authStore.loggedIn);
+const showLoginForm = ref(false);
+const nickname = ref();
+const modal = ref();
 
-    watch(loggedIn, () => {
-      if (loggedIn.value) {
-        store.dispatch("user/fetchCurrent").then(() => store.dispatch("stage/joinStage"));
-        close();
-      }
-    });
+onMounted(() => {
+  animate(modal.value, {
+    rotate: ["-3deg", "3deg", "0deg"],
+    duration: 100,
+    direction: "alternate",
+    loop: 5,
+    ease: "outBack",
+  });
+});
 
-    const close = () => (showing.value = false);
+watch(() => authStore.loggedIn, (newValue) => {
+  if (newValue) {
+    userStore.fetchCurrent().then(() => stageStore.joinStage());
+    close();
+  }
+});
 
-    const enterAsAudience = () => {
-      if (!showLoginForm.value) {
-        store
-          .dispatch("user/saveNickname", { nickname: nickname.value })
-          .then((nickname = "Guest") => {
-            message.success(
-              "Welcome to the stage! Your nickname is " + nickname + "!",
-            );
-            close();
-          });
-      }
-    };
+const close = () => (showing.value = false);
 
-    const onLoginSuccess = () => {
-      store.dispatch("stage/reloadPermission");
-    };
+const enterAsAudience = async () => {
+  if (!showLoginForm.value) {
+    try {
+      const savedNickname = await userStore.saveNickname(nickname.value);
+      message.success(
+        "Welcome to the stage! Your nickname is " + savedNickname + "!"
+      );
+      close();
+    } catch (error) {
+      message.error("Failed to enter as audience");
+    }
+  }
+};
 
-    return {
-      showing,
-      close,
-      modal,
-      showLoginForm,
-      nickname,
-      enterAsAudience,
-      onLoginSuccess,
-    };
-  },
+const onLoginSuccess = () => {
+  stageStore?.reloadPermission();
 };
 </script>
+
 <style scoped lang="scss">
 .modal-close {
   position: relative;
 }
+
 .modal-content {
   max-width: 500px;
 }
+
 @media only screen and (orientation: portrait) {
   .modal {
     zoom: 3;
   }
+
   .modal-content {
     max-width: unset;
     width: 100%;

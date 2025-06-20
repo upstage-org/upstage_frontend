@@ -4,6 +4,26 @@ import { createClient } from "./graphql";
 import { studioClient } from './';
 import _ from 'lodash';
 
+interface LoginResponse {
+  login: {
+    user_id: string;
+    access_token: string;
+    refresh_token: string;
+    role: string;
+    first_name: string;
+    groups: Array<{ id: string; name: string }>;
+    username: string;
+    title: string;
+  };
+}
+
+interface RefreshTokenResponse {
+  refreshToken: {
+    access_token: string;
+    refresh_token: string;
+  };
+}
+
 export const userFragment = gql`
   fragment userFragment on User {
     id
@@ -21,8 +41,8 @@ export const userFragment = gql`
 `;
 
 export default {
-  login: (variables) =>
-    studioClient.request(
+  login: (variables: { username: string; password: string; token?: string }) =>
+    studioClient.request<LoginResponse>(
       gql`
         mutation login(
           $username: String!
@@ -50,8 +70,8 @@ export default {
       `,
       variables,
     ),
-  refreshUser: (variables, headers) =>
-    studioClient.request(
+  refreshUser: (variables: { refreshToken: string }, headers: { "X-Access-Token": string }) =>
+    studioClient.request<RefreshTokenResponse>(
       gql`
           mutation {
               refreshToken {

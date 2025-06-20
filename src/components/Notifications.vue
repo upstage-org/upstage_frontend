@@ -1,14 +1,11 @@
-<script lang="ts" setup>
+<script setup lang="ts">
 import { useQuery } from "@vue/apollo-composable";
 import gql from "graphql-tag";
 import { absolutePath } from "utils/common";
 import { useConfirmPermission } from "components/media/MediaForm/composable";
 import { inquiryVar } from "apollo";
 import { Media } from "models/studio";
-import {
-  computed,
-  watch,
-} from "vue";
+import { computed, watch } from "vue";
 
 const { result, loading, refetch } = useQuery(gql`
   query Notifications {
@@ -51,6 +48,7 @@ watch(editingMediaResult, () => {
 
 const notifications = computed(() => result.value?.notifications || []);
 const { mutate: confirmPermission } = useConfirmPermission();
+
 const refresh = () => {
   refetch();
   inquiryVar({

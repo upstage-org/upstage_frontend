@@ -1,37 +1,24 @@
 <template>
   <div v-for="object in objects" :key="object.id">
-    <Icon
-      class="current-avatar"
-      v-if="object.holder"
-      :style="{
-        filter: `grayscale(${object.id === currentAvatar ? 0 : 1})`,
-      }"
-      src="my-avatar.svg"
-    />
-    <Skeleton
-      :real="true"
-      :data="object"
-      :ghost="object.holder && object.id !== currentAvatar"
-    />
+    <Icon class="current-avatar" v-if="object.holder" :style="{
+      filter: `grayscale(${object.id === currentAvatar ? 0 : 1})`,
+    }" src="my-avatar.svg" />
+    <Skeleton :real="true" :data="object" :ghost="object.holder && object.id !== currentAvatar" />
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "../../../../store/stage";
+import { useUserStore } from "../../../../store/user";
 import Skeleton from "../Skeleton.vue";
 import Icon from "components/Icon.vue";
 
-export default {
-  components: { Skeleton, Icon },
-  setup() {
-    const store = useStore();
-    const objects = computed(() => store.getters["stage/objects"]);
-    const currentAvatar = computed(() => store.state.user.avatarId);
+const stageStore = useStageStore();
+const userStore = useUserStore();
 
-    return { objects, currentAvatar };
-  },
-};
+const objects = computed(() => stageStore.getObjects);
+const currentAvatar = computed(() => userStore.avatarId);
 </script>
 
 <style lang="scss" scoped>

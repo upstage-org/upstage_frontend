@@ -4,64 +4,24 @@
   }" :transition="transitionDuration" :no-fallback="true" fit="cover" />
 </template>
 
-<script>
-import { computed, reactive } from "vue";
-import { watch } from "vue";
-import { useStore } from "vuex";
+<script setup lang="ts">
+import { computed } from "vue";
 import Image from "../Image.vue";
+import { useBackgroundStore } from "../../store/background";
 
-export default {
-  components: { Image },
-  setup: () => {
-    const store = useStore();
-    const background = computed(() => store.state.stage.background);
-    const backgroundOpacity = computed(
-      () => store.state.stage.background?.opacity ?? 1,
-    );
-    const transitionDuration = computed(
-      () => (store.state.stage.background?.speed || 0) * 1000,
-    );
+const backgroundStore = useBackgroundStore();
 
-    const frameAnimation = reactive({
-      interval: null,
-      currentFrame: null,
-    });
-    const src = computed(() => {
-      if (!background.value) {
-        return null;
-      }
-      if (background.value.multi && background.value.speed > 0) {
-        return frameAnimation.currentFrame;
-      } else {
-        return background.value.currentFrame ?? background.value.src;
-      }
-    });
+const backgroundOpacity = computed(() => backgroundStore.backgroundOpacity);
+const transitionDuration = computed(() => backgroundStore.transitionDuration);
+const src = computed(() => {
+  const background = backgroundStore.background;
+  if (!background) return null;
 
-    watch(
-      background,
-      (value) => {
-        if (!value) return;
-        const { speed, frames, currentFrame } = value;
-        if (currentFrame) {
-          frameAnimation.currentFrame = currentFrame;
-        }
-        clearInterval(frameAnimation.interval);
-        if (frames) {
-          frameAnimation.interval = setInterval(() => {
-            let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
-            if (nextFrame >= frames.length) {
-              nextFrame = 0;
-            }
-            frameAnimation.currentFrame = frames[nextFrame];
-          }, parseFloat(speed || 0) * 1000);
-        }
-      },
-      { immediate: true },
-    );
-
-    return { backgroundOpacity, transitionDuration, src };
-  },
-};
+  if (background.multi && background.speed && background.speed > 0) {
+    return backgroundStore.currentFrame;
+  }
+  return background.currentFrame ?? background.src;
+});
 </script>
 
 <style scoped>

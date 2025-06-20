@@ -15,10 +15,12 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Header from "components/Header.vue";
 import { userGraph, configGraph } from "services/graphql";
-import { ROLES } from "utils/constants";
+import { ROLES } from "constants/index";
 import { useQuery } from "@vue/apollo-composable";
 import gql from "graphql-tag";
 import store from "store";
+import { useConfigStore } from "store/modules/config";
+import { storeToRefs } from "pinia";
 
 const { t } = useI18n();
 
@@ -35,7 +37,8 @@ const directToEmails = ref<string[]>([]);
 const customRecipients = ref<string[]>([]);
 
 const filterRole = ref<number | undefined>();
-const system = computed(() => store.getters["config/system"]);
+const configStore = useConfigStore();
+const { system } = storeToRefs(configStore);
 
 const addCustomRecipient = () => {
   const email = prompt("Enter email: ");
@@ -202,12 +205,12 @@ const { proceed, loading } = useLoading(
             notFoundContent: '',
             searchPlaceholder: 'Search by email or name',
           }" :list-style="{
-              flex: '1',
-              height: '300px',
-            }" :titles="[' available', ' selected']" v-model:target-keys="receiverEmails" :data-source="dataSource"
+            flex: '1',
+            height: '300px',
+          }" :titles="[' available', ' selected']" v-model:target-keys="receiverEmails" :data-source="dataSource"
             show-search :filter-option="(keyword, option) =>
-                option.title?.toLowerCase().includes(keyword.toLowerCase()) ??
-                false
+              option.title?.toLowerCase().includes(keyword.toLowerCase()) ??
+              false
               ">
             <template #render="item">
               <a-space class="flex justify-between">
