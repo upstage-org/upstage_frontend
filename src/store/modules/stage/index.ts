@@ -112,7 +112,8 @@ export default {
       isActive: false,
       donationDetails: { amount: 0, date: "" },
     },
-    reloadStreams: null
+    reloadStreams: null,
+    enabledLiveStreaming: true
   },
   getters: {
     ready(state) {
@@ -207,6 +208,9 @@ export default {
     activeObject(state) {
       return state.board.objects.find((o) => o.id == state.activeMovable);
     },
+    enabledLiveStreaming(stage) {
+      return stage.enabledLiveStreaming
+    }
   },
   mutations: {
     SET_MODEL(state, model) {
@@ -241,7 +245,8 @@ export default {
         if (config) {
           Object.assign(state.config, config);
           state.config.ratio = config.ratio.width / config.ratio.height;
-          state.backdropColor = state.config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
+          state.backdropColor = config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
+          state.enabledLiveStreaming = typeof (config?.enabledLiveStreaming) ===  'boolean' ? config?.enabledLiveStreaming : true
         }
         const cover = useAttribute({ value: model }, "cover", false).value;
         state.model.cover = cover && absolutePath(cover);
@@ -1036,6 +1041,7 @@ export default {
       });
     },
     setBackdropColor(action, color) {
+      console.log("SET_BACKDROP_COLOR", color)
       mqtt.sendMessage(TOPICS.BACKGROUND, {
         type: BACKGROUND_ACTIONS.SET_BACKDROP_COLOR,
         color,

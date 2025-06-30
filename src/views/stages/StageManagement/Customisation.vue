@@ -71,6 +71,17 @@
       </tr>
       <tr>
         <td>
+          <h3 class="title">{{ $t("live_streaming") }}</h3>
+        </td>
+        <td>
+          <Switch
+            v-model="enabledLiveStreaming"
+            :label="enabledLiveStreaming ? 'Enabled' : 'Disabled'"
+          />
+        </td>
+      </tr>
+      <tr>
+        <td>
           <h3 class="title">{{ $t("default_backgroundcolor") }}</h3>
         </td>
         <td>
@@ -180,7 +191,7 @@ import { namespaceTopic } from "store/modules/stage/reusable";
 import { BACKGROUND_ACTIONS, TOPICS } from "utils/constants";
 
 export default {
-  components: { Selectable, SaveButton, HorizontalField, Dropdown, Switch },
+  components: { Selectable, SaveButton, HorizontalField, Dropdown, Switch, ColorPicker },
   setup: () => {
     const stage = inject("stage");
     const refresh = inject("refresh");
@@ -197,18 +208,21 @@ export default {
         curtainSpeed: 5000,
       },
       defaultcolor: "#30AC45",
+      enabledLiveStreaming: true,
     };
 
     const selectedRatio = reactive(config.ratio);
     const animations = reactive(config.animations);
     const defaultcolor = ref(config.defaultcolor || "#30AC45");
+    const enabledLiveStreaming = ref(config.enabledLiveStreaming ?? true);
 
     const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
     const saveCustomisation = async () => {
-      const config = JSON.stringify({
+      const configData = JSON.stringify({
         ratio: selectedRatio,
         animations,
         defaultcolor: defaultcolor.value,
+        enabledLiveStreaming: enabledLiveStreaming.value,
       });
       await save(
         () => {
@@ -216,7 +230,7 @@ export default {
           refresh(stage.value.id);
         },
         stage.value.id,
-        config
+        configData
       );
       const mqtt = buildClient();
       const client = mqtt.connect();
@@ -250,6 +264,7 @@ export default {
       capitalize,
       defaultcolor,
       sendBackdropColor,
+      enabledLiveStreaming,
     };
   },
 };

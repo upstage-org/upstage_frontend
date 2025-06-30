@@ -8,7 +8,7 @@
       <PanelItem name="Avatars" icon="avatar.svg" />
       <PanelItem name="Props" icon="prop.svg" />
       <PanelItem name="Streams" label="Video" icon="stream.svg" />
-      <PanelItem name="Meeting" label="Streams" icon="meeting.svg" />
+      <PanelItem v-if="enabledLiveStreaming" name="Meeting" label="Streams" icon="meeting.svg" />
       <PanelItem name="Whiteboard" icon="whiteboard.svg" label="Live drawing" />
       <PanelItem name="Draw" icon="object-drawing.svg" label="Object drawing" />
       <PanelItem name="Text" icon="text.svg" />
@@ -24,7 +24,7 @@
 </template>
 
 <script>
-import { computed, provide, ref } from "vue";
+import { computed, provide, ref, watch } from "vue";
 import TopBar from "./TopBar.vue";
 import PanelItem from "./PanelItem.vue";
 import PlayerChatTool from "./PlayerChatTool.vue";
@@ -47,11 +47,13 @@ export default {
     provide("changeTool", changeTool);
 
     const isScene = computed(() => tool.value === "Scene");
+    const enabledLiveStreaming = computed(() => store.getters["stage/enabledLiveStreaming"]);
 
     return {
       tool,
       changeTool,
       isScene,
+      enabledLiveStreaming
     };
   },
 };

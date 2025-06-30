@@ -142,6 +142,7 @@ export default {
   download_all_player_chat: "Download All Player Chat",
   archive_performance: "Archive Performance",
   auto_recorded: "Auto recorded",
+  live_streaming: "Enable Streaming",
   all_of_its_replay_and_chat: "all of its replay and chat",
   save_stage: "Save Stage",
   delete_stage: "Delete Stage",
