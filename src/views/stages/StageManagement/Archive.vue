@@ -191,8 +191,12 @@ export default {
         const messages = session.messages.filter((m) => !m.clear);
         if (messages.length) {
           session.begin = messages[0].at;
-          session.end = messages[messages.length - 1].at;
-          session.duration = session.end - session.begin;
+          for (const m of messages) {
+            if (m.at) {
+              session.end = m.at
+              session.duration = m.at - session.begin;
+            }
+          }
         } else {
           session.chatless = true;
           session.duration = 0;

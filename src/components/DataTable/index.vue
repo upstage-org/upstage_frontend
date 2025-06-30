@@ -117,9 +117,7 @@ export default {
   methods: {
     moment,
     fromNow(date) {
-      return moment(date)
-        .subtract(this.now.getTimezoneOffset(), "minute")
-        .fromNow();
+      return  moment(date).fromNow();
     },
     sort(header) {
       if (header.sortable) {
