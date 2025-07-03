@@ -48,6 +48,19 @@ const { result: editingMediaResult, refetch } = useQuery<{
     editingMedia @client
   }
 `);
+const { result: usersResult } = useQuery<{ users: User[] }>(gql`
+  query {
+    users {
+      id
+      username
+      firstName
+      lastName
+      email
+    }
+  }
+`);
+
+const users = computed(() => usersResult.value?.users || []);
 
 watch(editingMediaResult, () => {
   if (editingMediaResult.value) {
@@ -377,6 +390,13 @@ const onUpdateStatus = async () => {
     message.error("Error!");
   }
 };
+
+const getUserDisplayName = (user: User) => {
+  if (user.firstName && user.lastName) {
+    return `${user.firstName} ${user.lastName}`;
+  }
+  return user.username || user.email;
+};
 </script>
 
 <template>
@@ -627,6 +647,24 @@ const onUpdateStatus = async () => {
               tab="Link"
             >
               <PropLink :link="link" />
+            </a-tab-pane>
+            <a-tab-pane key="changeowner" tab="Change Owner">
+              <div class="p-4">
+                <a-form-item label="New Owner">
+                  <a-select
+                    v-model:value="owner"
+                    placeholder="Select new owner"
+                    :loading="!users.length"
+                    show-search
+                    :filter-option="false"
+                    :options="users.map(user => ({
+                      value: user.username,
+                      label: getUserDisplayName(user),
+                      key: user.id
+                    }))"
+                  />
+                </a-form-item>
+              </div>
             </a-tab-pane>
           </a-tabs>
         </div>
