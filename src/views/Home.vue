@@ -10,7 +10,7 @@
         </div> -->
         <div class="describe">
           <h1 class="title" v-html="foyer.title?.value" />
-          <h2 v-if="foyer.description" class="subtitle" v-html="foyer.description.value" />
+          <div v-if="foyer.description" class="subtitle" v-html="foyer.description.value" />
         </div>
         <Loading v-if="loading" />
         <div v-else class="stages my-4 pt-6">
@@ -98,7 +98,7 @@ export default {
 
   .subtitle {
     padding: 0.5em;
-    max-width: 800px;
+    // max-width: 800px;
     margin: auto;
     white-space: pre-wrap;
 
@@ -116,6 +116,29 @@ export default {
       opacity: 0.5;
       max-height: 250px;
     }
+
+    :deep(span strong) {
+      color: inherit !important;
+    }
+
+    :deep(a) {
+      color: #007011 !important;
+      text-decoration: none;
+
+      &:hover {
+        color: #007011 !important;
+        text-decoration: underline;
+      }
+    }
+
+    :deep(*[style]) {
+      all: revert;
+    }
+  }
+
+  .subtitle strong {
+    color: initial !important;
+    font-weight: 600;
   }
 
   .filters {
