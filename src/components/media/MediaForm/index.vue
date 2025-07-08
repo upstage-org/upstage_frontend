@@ -62,6 +62,37 @@ const { result: usersResult } = useQuery<{ users: User[] }>(gql`
 
 const users = computed(() => usersResult.value?.users || []);
 
+// Add these reactive variables for filtering
+const searchValue = ref('');
+const filteredUsers = computed(() => {
+  if (!searchValue.value) {
+    return users.value;
+  }
+  
+  const search = searchValue.value.toLowerCase();
+  return users.value.filter(user => {
+    const displayName = getUserDisplayName(user).toLowerCase();
+    const username = user.username?.toLowerCase() || '';
+    const email = user.email?.toLowerCase() || '';
+    
+    return displayName.includes(search) || 
+           username.includes(search) || 
+           email.includes(search);
+  });
+});
+
+// Handle search input
+const handleSearch = (value: string) => {
+  searchValue.value = value;
+};
+
+// Clear search when dropdown closes
+const handleDropdownVisibleChange = (open: boolean) => {
+  if (!open) {
+    searchValue.value = '';
+  }
+};
+
 watch(editingMediaResult, () => {
   if (editingMediaResult.value) {
     const { editingMedia } = editingMediaResult.value;
@@ -657,7 +688,9 @@ const getUserDisplayName = (user: User) => {
                     :loading="!users.length"
                     show-search
                     :filter-option="false"
-                    :options="users.map(user => ({
+                    @search="handleSearch"
+                    @dropdown-visible-change="handleDropdownVisibleChange"
+                    :options="filteredUsers.map(user => ({
                       value: user.username,
                       label: getUserDisplayName(user),
                       key: user.id

@@ -139,14 +139,13 @@ emoji-picker {
 
   position: absolute;
   bottom: 40px;
-  right: 0;
   z-index: 1000;
   overflow: hidden;
   border-radius: 8px;
   box-shadow:
     0 0.5em 1em -0.125em rgba(10, 10, 10, 0.1),
     0 0px 0 1px rgba(10, 10, 10, 0.02);
-  transform-origin: bottom right;
+  transform-origin: bottom left;
 }
 
 .emoji-picker-wrapper {

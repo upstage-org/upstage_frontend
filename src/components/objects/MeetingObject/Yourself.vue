@@ -30,6 +30,16 @@ export default {
             tracks.push(t);
             if (t.type === "video") {
               t.attach(el.value);
+              
+              if (el.value) {
+                el.value.disablePictureInPicture = true;
+                
+                el.value.addEventListener('enterpictureinpicture', (e) => {
+                  e.preventDefault();
+                  console.log('Picture-in-Picture đã bị chặn');
+                });
+              }
+              
               el.value.addEventListener("loadedmetadata", () => {
                 const width = el.value.videoWidth;
                 const height = el.value.videoHeight;
@@ -64,8 +74,29 @@ export default {
     const nickname = computed(() => store.getters["user/nickname"]);
 
     const loadeddata = () => {
-      loading.value=false;
+      loading.value = false;
+      
+      if (el.value) {
+        el.value.disablePictureInPicture = true;
+      }
     }
+
+    const disableAllPictureInPicture = () => {
+      if (el.value) {
+        el.value.disablePictureInPicture = true;
+      }
+      
+      document.querySelectorAll('video').forEach(video => {
+        video.disablePictureInPicture = true;
+      });
+    };
+
+    watch(el, (newEl) => {
+      if (newEl) {
+        newEl.disablePictureInPicture = true;
+      }
+    });
+
     return {
       blocked,
       data,
@@ -74,26 +105,55 @@ export default {
       el,
       nickname,
       loading,
-      loadeddata
+      loadeddata,
+      disableAllPictureInPicture
     }
   },
 };
 </script>
+
 <template>
-  <div >
+  <div>
     <img v-if="loading" class="overlay" src="/img/videoloading.gif" />
     <Skeleton v-if="!blocked" :data="data" class="p-2" :onDragstart="join" style="flex-direction: column;">
-      <video :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"
-        :onClick="join" autoplay ref="el"  @loadeddata="loadeddata"></video>
+      <video 
+        :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"
+        :onClick="join" 
+        autoplay 
+        ref="el"  
+        @loadeddata="loadeddata"
+        disablePictureInPicture
+        @contextmenu.prevent
+        controlslist="nodownload nofullscreen noremoteplayback">
+      </video>
       <span class="tag">{{ nickname }}</span>
     </Skeleton>
   </div>
 </template>
+
 <style scoped>
 video {
   width: 100px;
   border-radius: 8px;
 }
+
+video::-webkit-media-controls-picture-in-picture-button {
+  display: none !important;
+}
+
+video::-moz-media-controls-picture-in-picture-button {
+  display: none !important;
+}
+
+video {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
 .overlay {
   position: absolute;
   width: 40%;
