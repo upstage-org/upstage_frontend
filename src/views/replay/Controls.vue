@@ -54,7 +54,7 @@
         {{ displayTimestamp(timestamp.current - timestamp.begin) }}
       </div>
       <div class="card-footer-item">
-        <input type="range" class="slider is-fullwidth my-2" style="width: 250px" :min="timestamp.begin"
+        <input type="range" class="slider is-fullwidth my-2" :style="{ width: '250px' }" :min="timestamp.begin"
           :max="timestamp.end" :value="timestamp.current" @change="seek" />
         <EventIndicator />
       </div>
@@ -65,7 +65,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import Dropdown from "components/form/Dropdown.vue";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
@@ -114,7 +114,7 @@ export default {
 
     const collapsed = ref(false);
 
-    useShortcut((e) => {
+    useShortcut((e: KeyboardEvent) => {
       if (e.keyCode == 27) {
         collapsed.value = !collapsed.value;
       }

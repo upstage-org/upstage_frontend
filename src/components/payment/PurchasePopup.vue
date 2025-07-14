@@ -105,15 +105,12 @@
 
 <script setup>
 import { ref, onBeforeMount, watch } from 'vue'
-import { usePaymentStore } from '@/stores/payment'
+import { usePayment } from 'composables/usePayment'
 import Icon from 'components/Icon.vue'
 import { StripeElements, StripeElement } from 'vue-stripe-js'
 import { message } from 'ant-design-vue'
 import config from 'config'
 
-const paymentStore = usePaymentStore()
-
-// Destructure store state and actions
 const {
   isPurchasePopupActive,
   isReceiptPopupActive,
@@ -132,7 +129,7 @@ const {
   getPaymentSecret,
   generateReceipt,
   initializeStripe
-} = paymentStore
+} = usePayment()
 
 // Component refs
 const elementsComponent = ref()

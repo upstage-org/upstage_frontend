@@ -5,12 +5,11 @@ import { message } from "ant-design-vue";
 import { configGraph } from "services/graphql";
 import { logout } from "utils/auth";
 
-const cacheStore = useCacheStore();
-
 export function useRequest<T>(request: (variables?: any) => Promise<T>) {
   const loading = ref(false);
   const error = ref<Error | null>(null);
   const nodes = ref<T | null>(null);
+  const cacheStore = useCacheStore();
 
   const refresh = async (variables?: any) => {
     loading.value = true;

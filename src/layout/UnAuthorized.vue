@@ -18,7 +18,8 @@ import { storeToRefs } from "pinia";
 
 // Store initialization
 const configStore = useConfigStore();
-const { enableDonate } = storeToRefs(configStore);
+// const { enableDonate } = storeToRefs(configStore);
+const enableDonate = true;
 </script>
 
 <style>

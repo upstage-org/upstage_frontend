@@ -43,9 +43,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { usePaymentStore } from '../../stores/payment'
+import { usePayment } from 'composables/usePayment'
 
-const paymentStore = usePaymentStore()
+const { openPurchasePopup } = usePayment()
 const amount = ref<number | null>(null)
 
 const handleInput = (event: Event) => {
@@ -54,8 +54,8 @@ const handleInput = (event: Event) => {
 }
 
 const handlePurchase = () => {
-  if (amount.value && amount.value !== 0) {
-    paymentStore.openPurchasePopup(
+  if (amount.value && amount.value > 0) {
+    openPurchasePopup(
       'OneTimePurchase',
       amount.value,
       'Donate to UpStage (amounts shown in US dollars)'

@@ -1,13 +1,10 @@
 // @ts-nocheck
 import { message } from "ant-design-vue";
 import { ref } from "vue";
-import { useStageStore } from "store/modules/stage";
 import { userGraph } from "services/graphql";
 
-const stageStore = useStageStore();
-const loading = ref(false);
-
 export function useMutations() {
+  const loading = ref(false);
   const mutate = async (mutation: any, variables: any) => {
     loading.value = true;
     try {

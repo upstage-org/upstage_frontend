@@ -107,6 +107,9 @@ interface StageState {
   masquerading: boolean;
   purchasePopup: {
     isActive: boolean;
+    title: string;
+    amount: number;
+    description: string;
   };
   receiptPopup: {
     isActive: boolean;
@@ -188,6 +191,9 @@ export const useStageStore = defineStore('stage', {
     masquerading: false,
     purchasePopup: {
       isActive: false,
+      title: '',
+      amount: 0,
+      description: '',
     },
     receiptPopup: {
       isActive: false,
@@ -763,10 +769,23 @@ export const useStageStore = defineStore('stage', {
       // Implement send clear whiteboard logic here
     },
     closePurchasePopup() {
-      // Implement close purchase popup logic here
+      this.resetPurchasePopup()
+    },
+    resetPurchasePopup() {
+      this.purchasePopup = {
+        isActive: false,
+        title: '',
+        amount: 0,
+        description: '',
+      };
     },
     openPurchasePopup(setting: any) {
-      // Implement open purchase popup logic here
+      setting.isActive = true;
+      this.purchasePopup = setting;
+      this.receiptPopup.donationDetails = {
+        ...setting,
+        date: new Date().toLocaleDateString(),
+      };
     },
     // openReceiptPopup(setting: any) {
     //   // Implement open receipt popup logic here
