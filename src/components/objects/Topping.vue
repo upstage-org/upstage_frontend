@@ -41,7 +41,7 @@
 </template>
 
 <script>
-import { computed } from "vue";
+import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
@@ -59,6 +59,21 @@ export default {
     const canPlay = computed(() => store.getters["stage/canPlay"]);
 
     const config = computed(() => store.getters["stage/config"]);
+
+    const now = ref(Date.now());
+    let timer = null;
+
+    onMounted(() => {
+      timer = setInterval(() => {
+        now.value = Date.now();
+      }, 1000);
+    });
+
+    onUnmounted(() => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    });
 
     const enter = (el, complete) => {
       let pos = outOfViewportPosition(el);
@@ -186,7 +201,7 @@ export default {
       stageSize,
       max: Math.max,
       bubbleStyle,
-      shouldShowBubble
+      shouldShowBubble,
     };
   },
 };
