@@ -1,18 +1,36 @@
 <template>
   <teleport to="body">
-    <div class="avatar-topping" :style="{
-      left: stageSize.left + object.x + object.w / 2 + 'px',
-      top:
-        stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',
-    }" @click="openChatBox"><a-tooltip :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname
-      }`">
-        <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
-          <Icon src="my-avatar.svg" style="width: 16px; height: 16px;"/>
+    <div
+      class="avatar-topping"
+      :style="{
+        left: stageSize.left + object.x + object.w / 2 + 'px',
+        top:
+          stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',
+      }"
+      @click="openChatBox"
+    >
+      <a-tooltip
+        :title="`${object.name ? object.name + ' held by' : 'Held by'} ${
+          object.holder?.nickname
+        }`"
+      >
+        <span
+          v-if="object.holder && canPlay"
+          class="icon marker"
+          :class="{ inactive: !isHolding }"
+        >
+          <Icon src="my-avatar.svg" style="width: 16px; height: 16px" />
         </span>
       </a-tooltip>
       <transition @enter="enter" @leave="leave" :css="false" appear>
-        <blockquote v-if="object.speak" class="bubble" tabindex="-1" :key="object.speak"
-          :class="object.speak.behavior ?? 'speak'" :style="bubbleStyle">
+        <blockquote
+          v-if="shouldShowBubble"
+          class="bubble"
+          tabindex="-1"
+          :key="object.speak"
+          :class="object.speak.behavior ?? 'speak'"
+          :style="bubbleStyle"
+        >
           <div class="py-2 px-4">
             <Linkify>{{ object.speak.message }}</Linkify>
           </div>
@@ -23,7 +41,7 @@
 </template>
 
 <script>
-import { computed,ref, onMounted, onUnmounted } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
@@ -36,7 +54,7 @@ export default {
   setup: (props) => {
     const store = useStore();
     const isHolding = computed(
-      () => props.object.id === store.state.user.avatarId,
+      () => props.object.id === store.state.user.avatarId
     );
     const canPlay = computed(() => store.getters["stage/canPlay"]);
 
@@ -83,7 +101,7 @@ export default {
           break;
 
         case "bounce":
-          animate(el,{
+          animate(el, {
             scale: [0, 1],
             rotate: [180, 0],
             translateX: [0, "-50%"],
@@ -102,7 +120,7 @@ export default {
       const duration = config.value?.animations?.bubbleSpeed ?? 1000;
       switch (config.value?.animations?.bubble) {
         case "fade":
-          animate(el,{
+          animate(el, {
             opacity: 0,
             duration,
             onComplete: complete,
@@ -133,38 +151,10 @@ export default {
       }
     };
     const stageSize = computed(() => store.getters["stage/stageSize"]);
-
-    const now = ref(Date.now());
-    let timer = null;
-
-    onMounted(() => {
-      timer = setInterval(() => {
-        now.value = Date.now();
-      }, 1000);
-    });
-
-    onUnmounted(() => {
-      if (timer) clearInterval(timer);
-    });
-
-
     const bubbleStyle = computed(() => {
       if (!props.object.speak?.message) {
         return {};
       }
-
-      const BUBBLE_TIMEOUT = 5000;
-      const currentTime = now.value;
-      const speechTime = props.object.speak.at;
-
-      console.log((currentTime - speechTime) )
-      debugger
-      
-      if ((currentTime - speechTime) >= BUBBLE_TIMEOUT) {
-        return {};
-      }
-
-
       let length = props.object.speak.message.length;
       if (length < 5) {
         length = 5;
@@ -174,8 +164,17 @@ export default {
       }
       const width = Math.sqrt(length * 2.5);
       const height = Math.max(2.5, width * 0.8);
-      debugger;
       return { width: width + "rem", height: height + "rem" };
+    });
+
+    const shouldShowBubble = computed(() => {
+      if (!props.object.speak?.message) return false;
+
+      const BUBBLE_TIMEOUT = 5000;
+      const currentTime = now.value;
+      const speechTime = props.object.speak.at;
+
+      return currentTime - speechTime < BUBBLE_TIMEOUT;
     });
 
     return {
@@ -187,6 +186,7 @@ export default {
       stageSize,
       max: Math.max,
       bubbleStyle,
+      shouldShowBubble
     };
   },
 };
