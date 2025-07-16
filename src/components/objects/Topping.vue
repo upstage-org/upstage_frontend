@@ -156,6 +156,7 @@ export default {
       }
       const width = Math.sqrt(length * 2.5);
       const height = Math.max(2.5, width * 0.8);
+      debugger;
       return { width: width + "rem", height: height + "rem" };
     });
 
