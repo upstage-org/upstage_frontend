@@ -137,6 +137,16 @@ export default {
       if (!props.object.speak?.message) {
         return {};
       }
+
+      const BUBBLE_TIMEOUT = 5000;
+      const currentTime = Date.now();
+      const speechTime = props.object.speak.at;
+      
+      if ((currentTime - speechTime) >= BUBBLE_TIMEOUT) {
+        return {};
+      }
+
+
       let length = props.object.speak.message.length;
       if (length < 5) {
         length = 5;
