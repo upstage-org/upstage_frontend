@@ -23,7 +23,7 @@
 </template>
 
 <script>
-import { computed } from "vue";
+import { computed,ref, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
@@ -133,14 +133,32 @@ export default {
       }
     };
     const stageSize = computed(() => store.getters["stage/stageSize"]);
+
+    const now = ref(Date.now());
+    let timer = null;
+
+    onMounted(() => {
+      timer = setInterval(() => {
+        now.value = Date.now();
+      }, 1000);
+    });
+
+    onUnmounted(() => {
+      if (timer) clearInterval(timer);
+    });
+
+
     const bubbleStyle = computed(() => {
       if (!props.object.speak?.message) {
         return {};
       }
 
       const BUBBLE_TIMEOUT = 5000;
-      const currentTime = Date.now();
+      const currentTime = now.value;
       const speechTime = props.object.speak.at;
+
+      console.log((currentTime - speechTime) )
+      debugger
       
       if ((currentTime - speechTime) >= BUBBLE_TIMEOUT) {
         return {};
