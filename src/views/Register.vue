@@ -87,7 +87,10 @@ export default {
         message.error("Make your user name at least 5 characters long");
         return;
       }
-      if (!form.token) return;
+      if (configs.MODE === 'Production' && !form.token) {
+        return
+      }
+      else form["token"] = null
       if (!agreed.value) {
         message.error("Please agree to the Terms & Conditions");
         return;
