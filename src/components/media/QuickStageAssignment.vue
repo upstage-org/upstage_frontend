@@ -6,6 +6,7 @@ import { computed, inject, PropType, ref } from "vue";
 import { Media, Stage, AssignedStage } from "models/studio";
 import store from "store";
 import MediaPreview from "./MediaPreview.vue";
+import { uniq } from 'lodash'
 
 const props = defineProps({
   media: {
@@ -80,10 +81,14 @@ const { mutate } = useMutation<
 const refresh = inject("refresh", () => { });
 
 const handleOk = async () => {
+  const remainIds = result.value.stages.edges
+    .filter((el: any) => {
+      return !(isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
+    }).map((el: AssignedStage) => el.id);
   const stageIds: any = stages.value;
   await mutate({
     assetId: props.media.id,
-    stageIds: stageIds,
+    stageIds: uniq([...remainIds, ...stageIds]) as [string]
   });
   message.success(
     `${props.media.name} had been assigned successfully!`,
@@ -123,6 +128,6 @@ const handleOk = async () => {
         Save
       </a-button>
     </div>
-    <br/>
+    <br />
   </a-modal>
 </template>
