@@ -142,13 +142,28 @@ export default {
                 Form.Item,
                 {
                   label: t("display_name"),
-                  help: "In stage chat nickname",
+                  help: "On-stage nickname, visible in chat and player-audience counter.",
                 },
                 () => [
                   h(Input, {
                     value: values.displayName ?? "",
                     "onUpdate:value": (value: string) =>
                       (values.displayName = value),
+                  }),
+                ],
+              ),
+              h(
+                Form.Item,
+                {
+                  label: 'Username',
+                  help: "Your username cannot be changed.",
+                },
+                () => [
+                  h(Input, {
+                    disabled: true,
+                    value: values.username ?? "",
+                    "onUpdate:value": (value: string) =>
+                      (values.username = value),
                   }),
                 ],
               ),

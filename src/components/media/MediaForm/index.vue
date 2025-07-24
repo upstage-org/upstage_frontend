@@ -423,10 +423,10 @@ const onUpdateStatus = async () => {
 };
 
 const getUserDisplayName = (user: User) => {
-  if (user.firstName && user.lastName) {
-    return `${user.firstName} ${user.lastName}`;
+  if (user.displayName) {
+    return user.displayName;
   }
-  return user.username || user.email;
+  return user.username;
 };
 </script>
 
