@@ -17,7 +17,7 @@
       </div>
       <small v-if="item.description" class="has-text-dark">{{
         item.description
-      }}</small>
+        }}</small>
       <small v-else class="has-text-dark">
         <span v-if="item.recording">{{ $t("recorded") }}</span>
         <span v-else>{{ $t("auto_recorded") }}</span>
@@ -29,7 +29,7 @@
       <Modal>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="chat.svg" style="width: 16px; height: 16px;"/>
+            <Icon src="chat.svg" style="width: 16px; height: 16px;" />
           </button>
         </template>
         <template #header>
@@ -41,14 +41,14 @@
         </template>
       </Modal>
       <button class="button is-light" @click="downloadChatLog('public', item)">
-        <Icon src="download.svg" style="width: 16px; height: 16px;"/>
+        <Icon src="download.svg" style="width: 16px; height: 16px;" />
       </button>
     </template>
     <template #private-chat="{ item }">
       <Modal>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="chat.svg" style="width: 16px; height: 16px;"/>
+            <Icon src="chat.svg" style="width: 16px; height: 16px;" />
           </button>
         </template>
         <template #header>
@@ -60,7 +60,7 @@
         </template>
       </Modal>
       <button class="button is-light" @click="downloadChatLog('private', item)">
-        <Icon src="download.svg" style="width: 16px; height: 16px;"/>
+        <Icon src="download.svg" style="width: 16px; height: 16px;" />
       </button>
     </template>
     <template #replay="{ item }">
@@ -80,21 +80,21 @@
         </template>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="edit.svg" style="width: 16px; height: 16px;"/>
+            <Icon src="edit.svg" style="width: 16px; height: 16px;" />
           </button>
         </template>
       </CustomConfirm>
       <CustomConfirm @confirm="(complete) => deletePerformance(item, complete)" :loading="deleting">
         <template #trigger>
           <button class="button is-light is-danger">
-            <Icon src="delete.svg" style="width: 16px; height: 16px;"/>
+            <Icon src="delete.svg" style="width: 16px; height: 16px;" />
           </button>
         </template>
         <div class="has-text-centered">
           Deleting this performance will also delete
           <span class="has-text-danger">{{
             $t("all_of_its_replay_and_chat")
-          }}</span>. This cannot be undone!
+            }}</span>. This cannot be undone!
           <strong>Are you sure you want to continue?</strong>
         </div>
       </CustomConfirm>
@@ -190,12 +190,17 @@ export default {
       res.forEach((session) => {
         const messages = session.messages.filter((m) => !m.clear);
         if (messages.length) {
-          session.begin = messages[0].at;
+          session.begin = null
           for (const m of messages) {
             if (m.at) {
+              if (!session.begin) {
+                session.begin = m.at
+              }
               session.end = m.at
               session.duration = m.at - session.begin;
             }
+
+
           }
         } else {
           session.chatless = true;

@@ -12,6 +12,7 @@ import {
   watch,
   reactive,
   ComputedRef,
+  nextTick,
 } from "vue";
 import { SlickList, SlickItem } from "vue-slicksort";
 import {
@@ -199,6 +200,7 @@ const handleClose = () => {
     if (editingMediaResult.value) {
       editingMediaVar(undefined);
       files.value = [];
+      editingMediaResult.value = undefined
       refetch();
     } else {
       Modal.confirm({
@@ -211,6 +213,7 @@ const handleClose = () => {
         ),
         onOk() {
           files.value = [];
+          editingMediaResult.value = undefined
         },
         okButtonProps: {
           danger: true,
@@ -280,6 +283,7 @@ const { progress, saveMedia, saving } = useSaveMedia(
   (id) => {
     if (files && refresh) {
       editingMediaVar(undefined);
+      editingMediaResult.value = undefined
       files.value = [];
       refresh();
     }
@@ -317,6 +321,17 @@ watch(files as Ref, ([firstFile]) => {
 
 const visibleDropzone = inject<Ref<boolean>>("visibleDropzone");
 const composingMode = inject<Ref<boolean>>("composingMode");
+
+const modalVisible = computed(() => !!(files?.value?.length && !composingMode?.value));
+
+watch(modalVisible, (newVisible, oldVisible) => {
+  if (oldVisible && !newVisible) {
+    nextTick(() => {
+      editingMediaVar(undefined);
+      refetch();
+    });
+  }
+});
 
 watch(visibleDropzone as Ref, (val) => {
   if (files?.value && files.value.length === 0 && val) {
