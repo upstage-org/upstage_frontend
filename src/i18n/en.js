@@ -149,6 +149,7 @@ export default {
   create_stage: "Create Stage",
   stage_name: "Stage Name",
   player_access: "Player access",
+  assign_owner: "Assign owner",
   cover_image: "Cover image",
   exit_reorder_mode: "Exit Reorder Mode",
   reorder_mode: "Reorder Mode",

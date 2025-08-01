@@ -42,8 +42,8 @@
                 ? 'fas fa-times'
                 : 'fas'
             " :help="!form.fileLocation &&
-                `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
-                " :error="urlError" :disabled="!!stage.id" class="half-flex" maxlength="20" />
+              `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
+              " :error="urlError" :disabled="!!stage.id" class="half-flex" maxlength="20" />
       </div>
     </div>
 
@@ -97,6 +97,27 @@
         </p>
       </div>
     </div>
+    <div class="field is-horizontal" v-if="stage">
+      <div class="field-label">
+        <label class="label">{{ $t("assign_owner") }}</label>
+      </div>
+      <div class="field-body">
+        <div class="field is-narrow">
+          <div class="control">
+            <a-select v-model:value="form.owner" placeholder="Select stage owner" :loading="loadingUsers" show-search
+              :filter-option="false" @search="handleOwnerSearch" @dropdown-visible-change="handleOwnerDropdownChange"
+              style="width: 300px" :options="filteredOwnerUsers.map(user => ({
+                value: user.id,
+                label: getOwnerDisplayName(user),
+                key: user.id
+              }))" />
+          </div>
+        </div>
+        <p class="help">
+          Select the user who will own and manage this stage.
+        </p>
+      </div>
+    </div>
 
     <div class="field is-horizontal">
       <div class="field-label is-normal">
@@ -110,10 +131,10 @@
         <MultiTransferAccessColumn :columns="[
           'Audience access only',
           'Player access',
-          'Player and edit access',
+          'Player and edit access'
         ]" :data="users" :owner="owner" :renderLabel="displayName" :renderValue="(item) => item.id" :renderKeywords="(item) =>
-            `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
-            " v-model="playerAccess" />
+          `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
+          " v-model="playerAccess" />
       </div>
     </div>
 
@@ -174,7 +195,7 @@ export default {
     const form = reactive({
       fileLocation: "",
       ...stage.value,
-      ownerId: stage.value.owner?.id,
+      owner: stage.value.owner?.id,
       status: useAttribute(stage, "status").value ?? "rehearsal",
       cover: useAttribute(stage, "cover").value,
     });
@@ -187,7 +208,7 @@ export default {
       form.playerAccess = JSON.stringify(val);
     });
 
-    const { nodes } = useQuery(userGraph.userList);
+    const { nodes, loading: loadingUsers } = useQuery(userGraph.userList);
     const users = computed(() =>
       nodes.value
         ? nodes.value.filter((u) => {
@@ -209,6 +230,76 @@ export default {
         })
         : [],
     );
+
+    const ownerSearchValue = ref('');
+    const allUsers = computed(() => nodes.value || []);
+
+    const filteredOwnerUsers = computed(() => {
+      if (!ownerSearchValue.value) {
+        return allUsers.value;
+      }
+
+      const search = ownerSearchValue.value.toLowerCase();
+      return allUsers.value.filter(user => {
+        const displayName = getOwnerDisplayName(user).toLowerCase();
+        const username = user.username?.toLowerCase() || '';
+        const email = user.email?.toLowerCase() || '';
+        const firstName = user.firstName?.toLowerCase() || '';
+        const lastName = user.lastName?.toLowerCase() || '';
+
+        return displayName.includes(search) ||
+          username.includes(search) ||
+          email.includes(search) ||
+          firstName.includes(search) ||
+          lastName.includes(search);
+      });
+    });
+
+    const handleOwnerSearch = (value) => {
+      ownerSearchValue.value = value;
+    };
+
+    const handleOwnerDropdownChange = (open) => {
+      if (!open) {
+        ownerSearchValue.value = '';
+      }
+    };
+
+    const getOwnerDisplayName = (user) => {
+      if (user.displayName) {
+        return user.displayName;
+      }
+      return user.username;
+    };
+
+    watch(whoami, () => {
+      if (whoami.value && !stage.value.id) {
+        form.owner = whoami.value.id;
+      }
+    }, { immediate: true });
+
+    watch(() => form.owner, (newOwnerId, oldOwnerId) => {
+      if (oldOwnerId && newOwnerId !== oldOwnerId && whoami.value) {
+        if (newOwnerId !== whoami.value.id) {
+          const currentPlayerAccess = [...playerAccess.value];
+
+          while (currentPlayerAccess.length < 2) {
+            currentPlayerAccess.push([]);
+          }
+
+          const currentUserIdStr = String(whoami.value.id);
+
+          const userAlreadyInAccess = currentPlayerAccess.some(accessLevel =>
+            accessLevel.some(userId => userId === currentUserIdStr)
+          );
+
+          if (!userAlreadyInAccess) {
+            currentPlayerAccess[1].push(currentUserIdStr);
+            playerAccess.value = currentPlayerAccess;
+          }
+        }
+      }
+    });
 
     const { loading, mutation } = useMutation(
       stage.value.id ? stageGraph.updateStage : stageGraph.createStage,
@@ -300,6 +391,7 @@ export default {
       createStage,
       updateStage,
       loading,
+      loadingUsers,
       users,
       owner,
       displayName,
@@ -309,6 +401,12 @@ export default {
       playerAccess,
       afterDelete,
       urlError,
+      allUsers,
+      filteredOwnerUsers,
+      handleOwnerSearch,
+      handleOwnerDropdownChange,
+      getOwnerDisplayName,
+      ownerSearchValue,
     };
   },
 };
@@ -318,5 +416,21 @@ export default {
 .half-flex {
   flex: none;
   flex-basis: 50%;
+}
+
+:deep(.ant-select) {
+  max-width: 300px;
+}
+
+:deep(.ant-select .ant-select-selector) {
+  border: 1px solid #dbdbdb;
+  border-radius: 4px;
+  padding: 8px 12px;
+  min-height: 40px;
+}
+
+:deep(.ant-select-focused .ant-select-selector) {
+  border-color: #3273dc;
+  box-shadow: 0 0 0 2px rgba(50, 115, 220, 0.25);
 }
 </style>

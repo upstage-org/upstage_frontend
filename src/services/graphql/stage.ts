@@ -89,9 +89,11 @@ export default {
           $name: String
           $fileLocation: String
           $status: String
+          $owner: ID,
+          $playerAccess: String
         ) {
           createStage(
-            input: { name: $name, fileLocation: $fileLocation, status: $status }
+            input: { name: $name, fileLocation: $fileLocation, status: $status, owner: $owner, playerAccess: $playerAccess }
           ) {
             id
           }
@@ -117,6 +119,7 @@ export default {
           $visibility: Boolean
           $cover: String
           $playerAccess: String
+          $owner: ID
         ) {
           updateStage(
             input: {
@@ -128,6 +131,7 @@ export default {
               visibility: $visibility
               cover: $cover
               playerAccess: $playerAccess
+              owner: $owner
             }
           ) {
             ...stageFragment
