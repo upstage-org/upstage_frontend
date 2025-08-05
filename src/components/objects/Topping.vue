@@ -1,36 +1,19 @@
 <template>
   <teleport to="body">
-    <div
-      class="avatar-topping"
-      :style="{
-        left: stageSize.left + object.x + object.w / 2 + 'px',
-        top:
-          stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',
-      }"
-      @click="openChatBox"
-    >
-      <a-tooltip
-        :title="`${object.name ? object.name + ' held by' : 'Held by'} ${
-          object.holder?.nickname
-        }`"
-      >
-        <span
-          v-if="object.holder && canPlay"
-          class="icon marker"
-          :class="{ inactive: !isHolding }"
-        >
+    <div class="avatar-topping" :style="{
+      left: stageSize.left + object.x + object.w / 2 + 'px',
+      top:
+        stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',
+    }" @click="openChatBox">
+      <a-tooltip :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname
+        }`">
+        <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
           <Icon src="my-avatar.svg" style="width: 16px; height: 16px" />
         </span>
       </a-tooltip>
       <transition @enter="enter" @leave="leave" :css="false" appear>
-        <blockquote
-          v-if="shouldShowBubble"
-          class="bubble"
-          tabindex="-1"
-          :key="object.speak"
-          :class="object.speak.behavior ?? 'speak'"
-          :style="bubbleStyle"
-        >
+        <blockquote v-if="shouldShowBubble" class="bubble" tabindex="-1" :key="object.speak"
+          :class="object.speak.behavior ?? 'speak'" :style="bubbleStyle">
           <div class="py-2 px-4">
             <Linkify>{{ object.speak.message }}</Linkify>
           </div>
@@ -184,6 +167,12 @@ export default {
 
     const shouldShowBubble = computed(() => {
       if (!props.object.speak?.message) return false;
+
+      const isReplayMode = window.location.pathname.includes('/replay/');
+
+      if (isReplayMode) {
+        return true;
+      }
 
       const BUBBLE_TIMEOUT = 5000;
       const currentTime = now.value;
