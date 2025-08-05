@@ -2,12 +2,6 @@
   <section id="welcome" class="hero is-fullheight foyer-background">
     <div class="hero-body">
       <div class="container">
-        <!-- <div v-if="!loading">
-          <img src="/img/foyer-background.png" class="brushstroke" style="top: 56px; right: -180px;" />
-          <img src="/img/foyer-background.png" class="brushstroke" style="top: 47px; right: 47px;" />
-          <img src="/img/foyer-background.png" class="brushstroke" style="top: 110px; right: -20px;" />
-          <img src="/img/foyer-background.png" class="brushstroke" style="top: 11px; right: -277px;" />
-        </div> -->
         <div class="describe">
           <h1 class="title" v-html="foyer.title?.value" />
           <div v-if="foyer.description" class="subtitle" v-html="foyer.description.value" />
@@ -78,7 +72,7 @@ export default {
   .title {
     color: black;
     text-shadow: -3px 0 #007011;
-    font-size: 50px;
+    font-size: 50px !important;
 
     &:after {
       content: "";
@@ -98,9 +92,38 @@ export default {
 
   .subtitle {
     padding: 0.5em;
-    // max-width: 800px;
     margin: auto;
     white-space: pre-wrap;
+
+    :deep(h1) {
+      font-size: 1.5rem !important;
+      margin: 0.5rem 0;
+      font-weight: 600;
+    }
+
+    :deep(p) {
+      font-size: 1rem !important;
+      margin: 0.5rem 0;
+    }
+
+    :deep(span) {
+      font-size: inherit !important;
+    }
+
+    :deep(a) {
+      color: #007011 !important;
+      font-size: inherit !important;
+      text-decoration: none;
+
+      &:hover {
+        color: #007011 !important;
+        text-decoration: underline;
+      }
+    }
+
+    :deep(*[style*="font-size"]) {
+      font-size: inherit !important;
+    }
 
     >:after {
       content: "";
@@ -118,21 +141,7 @@ export default {
     }
 
     :deep(span strong) {
-      color: inherit !important;
-    }
-
-    :deep(a) {
-      color: #007011 !important;
-      text-decoration: none;
-
-      &:hover {
-        color: #007011 !important;
-        text-decoration: underline;
-      }
-    }
-
-    :deep(*[style]) {
-      all: revert;
+      font-size: inherit !important;
     }
   }
 
@@ -153,8 +162,6 @@ export default {
 
   .describe {
     position: relative;
-
-
   }
 
   .brushstroke {
