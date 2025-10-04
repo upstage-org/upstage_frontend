@@ -18,6 +18,12 @@
             <Icon src="prop.svg" size="20" />
           </span>
         </button>
+        <button class="chat-setting button is-rounded is-outlined drag-icon-button"
+          @mousedown.prevent="startDrag">
+          <span class="icon">
+            <Icon src="movement-slider.svg" size="20" />
+          </span>
+        </button>
         <ClearChat option="player-chat" />
       </div>
       <div class="card-content" ref="theContent">
@@ -143,12 +149,25 @@ export default {
       );
     });
 
+    const collapsed = ref(false);
     const isMovingable = ref(false);
+    const canDrag = ref(false);
+    
     const toggleMoveable = () => {
       moveable.setState({
         target: isMovingable.value ? null : theChatbox.value,
       });
       isMovingable.value = !isMovingable.value;
+    };
+    
+    const toggleDragMode = () => {
+      canDrag.value = !canDrag.value;
+      
+      // Disable moveable mode when enabling drag mode
+      if (canDrag.value && isMovingable.value) {
+        isMovingable.value = false;
+        moveable.setState({ target: null });
+      }
     };
 
     const playerChatVisibility = computed(
@@ -181,6 +200,44 @@ export default {
       store.commit("stage/SET_PLAYER_CHAT_PARAMETERS", parameters);
     };
 
+    // Click and drag functionality
+    const startDrag = (e) => {
+      e.preventDefault();
+      
+      const chatbox = theChatbox.value;
+      if (!chatbox) return;
+      
+      
+      // Get current computed styles
+      const rect = chatbox.getBoundingClientRect();
+      let startX = e.clientX - rect.left;
+      let startY = e.clientY - rect.top;
+      
+      const handleMouseMove = (moveEvent) => {
+        const newX = moveEvent.clientX - startX;
+        const newY = moveEvent.clientY - startY;
+        
+        // Boundary checks
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const clampedX = Math.max(0, Math.min(newX, windowWidth - rect.width));
+        const clampedY = Math.max(0, Math.min(newY, windowHeight - rect.height));
+        
+        chatbox.style.left = `${clampedX}px`;
+        chatbox.style.top = `${clampedY}px`;
+        chatbox.style.position = 'fixed';
+        
+      };
+      
+      const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    };
+
     return {
       messages,
       message,
@@ -199,6 +256,8 @@ export default {
       chat,
       increateFontSize,
       decreaseFontSize,
+      startDrag,
+      collapsed,
     };
   },
 };
@@ -259,6 +318,19 @@ export default {
       .button.is-rounded {
         width: 16px;
       }
+    }
+  }
+
+  .drag-icon-button {
+    cursor: grab;
+    
+    &:active {
+      cursor: grabbing;
+      background-color: rgba(255, 0, 0, 0.2) !important;
+    }
+    
+    &:hover {
+      background-color: rgba(255, 0, 0, 0.1) !important;
     }
   }
 }
