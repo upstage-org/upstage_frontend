@@ -9,7 +9,7 @@ services:
     working_dir: /app
     command: >
       /bin/sh -c "
-      npm install -g pnpm &&
+      npm install -g npm pnpm &&
       pnpm install --frozen-lockfile &&
       pnpm build &&
       tail -f /dev/null
