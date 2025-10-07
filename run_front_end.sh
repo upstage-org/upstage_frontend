@@ -15,5 +15,11 @@ cp -r ./docker-compose.yaml $build_dir
 
 cd $build_dir
 
+echo "This build may take up to three minutes. It may be necessary to run 'docker compose rm -f' after the 'docker compose down' command to do a deep cleanup between builds."
+
+echo "Building..."
+
 docker compose down
 docker compose up -d
+
+echo "Done"
