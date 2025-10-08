@@ -83,8 +83,8 @@ export default {
       touched.value = true;
       if (!form.username || !form.password || !form.email || (form.password || "").length < 8) return;
       if (confirmPasswordError.value) return;
-      if(form.username.length < 5) {
-        message.error("Make your user name at least 5 characters long");
+      if(form.username.length < 2) {
+        message.error("Make your user name at least 2 characters long");
         return;
       }
       if (configs.MODE === 'Production' && !form.token) {
