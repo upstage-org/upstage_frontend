@@ -90,7 +90,9 @@ export default {
       if (configs.MODE === 'Production' && !form.token) {
         return
       }
-      else form["token"] = null
+      if (configs.MODE !== 'Production') {
+        form["token"] = null
+      }
       if (!agreed.value) {
         message.error("Please agree to the Terms & Conditions");
         return;
