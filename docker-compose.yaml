@@ -12,6 +12,7 @@ services:
       export CI=true &&
       npm install -g npm@latest pnpm@10.28.1 &&
       pnpm install --no-frozen-lockfile &&
+      npx update-browserslist-db@latest --yes &&
       pnpm build &&
       tail -f /dev/null
       "
