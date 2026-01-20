@@ -35,51 +35,44 @@ export default defineConfig({
         manualChunks(id) {
           // Node modules chunking
           if (id.includes('node_modules')) {
-            // Vue core and Ant Design Vue must be together to avoid initialization order issues
-            // Check Vue first, then Ant Design Vue
-            if (id.includes('/vue/') || id.includes('\\vue\\') || id.includes('@vue/')) {
+            // CRITICAL: All Vue-dependent libraries must be in vue-core to avoid initialization issues
+            // Check in order of dependency to ensure proper initialization
+            
+            // 1. Vue core libraries (must be first)
+            if (id.includes('/vue/') || id.includes('\\vue\\') || 
+                id.includes('@vue/runtime') || id.includes('@vue/reactivity') ||
+                id.includes('@vue/shared') || id.includes('vue-demi')) {
               return 'vue-core';
             }
             
-            // Ant Design Vue - keep with Vue core
-            if (id.includes('ant-design-vue') || id.includes('@ant-design')) {
+            // 2. Vue ecosystem that depends on Vue core
+            if (id.includes('vue-router') || id.includes('vuex') ||
+                id.includes('@vue/apollo') || id.includes('@vueuse') ||
+                id.includes('vue-i18n') || id.includes('ant-design-vue') ||
+                id.includes('@ant-design')) {
               return 'vue-core';
             }
             
-            // Vue ecosystem (router, vuex, etc.)
-            if (id.includes('vue-router') || id.includes('vuex')) {
-              return 'vue-ecosystem';
-            }
-            
-            // @vue/apollo-composable needs Vue, so keep with Vue core
-            if (id.includes('@vue/apollo-composable')) {
+            // 3. Vue-related utilities and plugins
+            if (id.includes('@tiptap/vue') || id.includes('vue-slicksort') ||
+                id.includes('vue-stripe') || id.includes('vue-turnstile') ||
+                id.includes('vue-masonry') || id.includes('unplugin-vue')) {
               return 'vue-core';
             }
             
-            // GraphQL and Apollo - keep all Apollo Client modules together (including subpath exports)
-            // This ensures /core, /link/*, etc. all stay in the same chunk
-            if (id.includes('@apollo/client') || id.includes('apollo-client')) {
-              return 'graphql-vendor';
-            }
-            
-            // Other GraphQL libraries
-            if (id.includes('/graphql/') || id.includes('\\graphql\\') || 
+            // 4. GraphQL and Apollo - keep all Apollo Client modules together
+            if (id.includes('@apollo/client') || id.includes('apollo-client') ||
+                id.includes('/graphql/') || id.includes('\\graphql\\') || 
                 id.includes('graphql-tag') || id.includes('graphql-request')) {
               return 'graphql-vendor';
             }
             
-            // TipTap editor
-            if (id.includes('@tiptap') || id.includes('/tiptap/') || id.includes('\\tiptap\\')) {
+            // 5. TipTap editor (non-Vue parts)
+            if (id.includes('@tiptap') && !id.includes('@tiptap/vue')) {
               return 'tiptap-vendor';
             }
             
-            // Large UI libraries - keep moveable with vendor to avoid initialization issues
-            // Moveable depends on utilities that might be in vendor chunk
-            // if (id.includes('moveable') || id.includes('@daybrush')) {
-            //   return 'moveable-vendor';
-            // }
-            
-            // Utilities
+            // 6. Utilities (non-Vue dependent)
             if (id.includes('/lodash/') || id.includes('\\lodash\\') || 
                 id.includes('/axios/') || id.includes('\\axios\\') ||
                 id.includes('/dayjs/') || id.includes('\\dayjs\\') ||
@@ -87,27 +80,23 @@ export default defineConfig({
               return 'utils-vendor';
             }
             
-            // Media libraries
+            // 7. Media libraries
             if (id.includes('html2canvas') || id.includes('flv.js') || id.includes('qr-code')) {
               return 'media-vendor';
             }
             
-            // Stripe
+            // 8. Stripe
             if (id.includes('stripe') || id.includes('@stripe')) {
               return 'stripe-vendor';
             }
             
-            // MQTT
+            // 9. MQTT
             if (id.includes('mqtt')) {
               return 'mqtt-vendor';
             }
             
-            // VueUse
-            if (id.includes('@vueuse')) {
-              return 'vueuse-vendor';
-            }
-            
-            // All other node_modules go into vendor chunk
+            // 10. All other node_modules go into vendor chunk
+            // This includes moveable, @daybrush, and other libraries
             return 'vendor';
           }
         },
