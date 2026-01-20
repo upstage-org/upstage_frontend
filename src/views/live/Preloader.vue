@@ -116,11 +116,21 @@ export default {
     const ready = computed(() => store.getters["stage/ready"]);
     const clicked = ref(false); // Trick the user to click in order to play meSpeak voice
     const leave = (el, complete) => {
-      animate(el, {
-        translateY: "-100%",
-        ease: "outBack",
-        onComplete: complete,
-      });
+      if (!el || !(el instanceof HTMLElement)) {
+        if (complete) complete();
+        return;
+      }
+      try {
+        animate(el, {
+          translateY: "-100%",
+          ease: "outBack",
+          onComplete: complete,
+        });
+      } catch (error) {
+        // Silently handle animation errors if element is not accessible
+        console.debug("Animation skipped:", error);
+        if (complete) complete();
+      }
     };
     const backdropColor = computed(() => store.state.stage.backdropColor);
 

@@ -710,12 +710,10 @@ export default {
       client.on("connect", () => {
         commit("SET_STATUS", "LIVE");
         dispatch("reloadMissingEvents");
-        // Add small delay to ensure client is fully connected before subscribing
-        setTimeout(() => {
-          dispatch("subscribe").catch((error) => {
-            console.warn("Failed to subscribe to MQTT topics:", error);
-          });
-        }, 100);
+        // Subscribe - errors are handled gracefully in the subscribe function
+        dispatch("subscribe").catch(() => {
+          // Errors are already handled in mqtt.subscribe - this is just to prevent unhandled promise rejection
+        });
         dispatch("joinStage");
       });
       client.on("error", () => {
@@ -747,14 +745,21 @@ export default {
       mqtt
         .subscribe(topics)
         .then((res) => {
-          commit("SET_SUBSCRIBE_STATUS", true);
-          console.log("Subscribed to topics: ", res);
+          // Only set status if we actually got a response (not empty array from error handling)
+          if (res && res.length > 0) {
+            commit("SET_SUBSCRIBE_STATUS", true);
+            console.log("Subscribed to topics: ", res);
+          }
+          // If res is empty array, it means subscribe was deferred due to disconnecting state
+          // MQTT library will automatically retry on reconnect, so we don't need to do anything
         })
         .catch((error) => {
-          // Silently handle disconnecting errors - they're expected during reconnection
-          if (!error.message?.includes("disconnecting")) {
+          // Only log non-disconnecting errors
+          const errorMsg = error?.message || error?.toString() || "";
+          if (!errorMsg.includes("disconnecting") && !errorMsg.includes("client disconnecting")) {
             console.warn("MQTT subscribe error:", error);
           }
+          // For disconnecting errors, MQTT library will auto-retry on reconnect
         });
     },
     async disconnect({ dispatch }) {

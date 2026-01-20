@@ -201,6 +201,11 @@ export default {
     watch(
       () => props.object,
       () => {
+        // Check if element exists before animating
+        if (!el.value || !(el.value instanceof HTMLElement)) {
+          return;
+        }
+        
         const {
           x: left,
           y: top,
@@ -215,25 +220,30 @@ export default {
         if (animation) {
           animation.pause(true);
         }
-        animation = animate(el.value, {
-          left,
-          top,
-          width,
-          height,
-          rotate,
-          opacity,
-          scaleX,
-          scaleY,
-          ...(moveSpeed > 1000 ? { easing: "linear" } : {}),
-          duration: moveSpeed ?? config.animateDuration,
-          onUpdate: () => {
-            try {
-              moveable.updateRect();
-            } catch (error) {
-              // pass
-            }
-          },
-        });
+        try {
+          animation = animate(el.value, {
+            left,
+            top,
+            width,
+            height,
+            rotate,
+            opacity,
+            scaleX,
+            scaleY,
+            ...(moveSpeed > 1000 ? { easing: "linear" } : {}),
+            duration: moveSpeed ?? config.animateDuration,
+            onUpdate: () => {
+              try {
+                moveable.updateRect();
+              } catch (error) {
+                // pass
+              }
+            },
+          });
+        } catch (error) {
+          // Silently handle animation errors if element is not accessible
+          console.debug("Animation skipped:", error);
+        }
       },
       { deep: true },
     );

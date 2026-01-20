@@ -87,12 +87,17 @@ export default {
 
     const icon = ref();
     const interval = setInterval(() => {
-      if (icon.value) {
-        animate(icon.value, {
-          scale: [1, 1.5, 1],
-          rotate: [45, -45, 45, -45, 0],
-          ease: "inOutQuad",
-        });
+      if (icon.value && icon.value instanceof HTMLElement) {
+        try {
+          animate(icon.value, {
+            scale: [1, 1.5, 1],
+            rotate: [45, -45, 45, -45, 0],
+            ease: "inOutQuad",
+          });
+        } catch (error) {
+          // Silently handle animation errors if element is not accessible
+          console.debug("Animation skipped:", error);
+        }
       }
     }, 3000);
 

@@ -47,7 +47,7 @@
 <script>
 import { useStore } from "vuex";
 import { animate } from "animejs";
-import { ref, computed, onMounted, inject } from "vue";
+import { ref, computed, onMounted, inject, nextTick, watch } from "vue";
 import Popover from "components/Popover.vue";
 import Session from "./Session.vue";
 import ReloadStream from "./ReloadStream.vue";
@@ -68,11 +68,31 @@ export default {
     const masquerading = computed(() => store.state.stage.masquerading);
     const replaying = inject("replaying");
 
+    const startAnimation = () => {
+      if (dot.value && dot.value instanceof HTMLElement) {
+        try {
+          animate(dot.value, {
+            opacity: [1, 0, 1],
+            duration: 2000,
+            loop: true,
+          });
+        } catch (error) {
+          // Silently handle animation errors if element is not accessible
+          console.debug("Animation skipped:", error);
+        }
+      }
+    };
+
     onMounted(() => {
-      animate(dot.value, {
-        opacity: [1, 0, 1],
-        duration: 2000,
-        loop: true,
+      nextTick(() => {
+        startAnimation();
+      });
+    });
+
+    // Watch for status changes to restart animation when element becomes visible
+    watch([status, masquerading], () => {
+      nextTick(() => {
+        startAnimation();
       });
     });
 
