@@ -78,12 +78,27 @@ export default {
       
       if (!element) return;
       
-      // Check if element is actually in the DOM and visible
+      // Check if element is actually in the DOM
       if (!element.isConnected || !document.body.contains(element)) return;
+      
+      // Check if element is visible (not hidden by v-show or CSS)
+      const computedStyle = window.getComputedStyle(element);
+      if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden' || computedStyle.opacity === '0') {
+        return;
+      }
       
       // Check if element has dimensions (is visible, not hidden by v-show)
       const rect = element.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return;
+      
+      // Additional check: element must be visible in viewport
+      if (rect.top < 0 || rect.left < 0) return;
+      
+      // Verify the element is actually the one we want to animate
+      // Check if it's the correct icon element (fa-circle, not fa-circle-o)
+      if (!element.classList || !element.classList.contains('fa-circle')) {
+        return;
+      }
       
       try {
         animate(element, {
@@ -94,23 +109,32 @@ export default {
       } catch (error) {
         // Silently handle animation errors if element is not accessible
         // Don't log to avoid console noise
+        return;
       }
     };
 
     onMounted(() => {
       nextTick(() => {
-        startAnimation();
+        // Only start animation if the element should be visible
+        const isConnected = status.value !== 'OFFLINE' || masquerading.value;
+        if (isConnected || replaying?.value) {
+          startAnimation();
+        }
       });
     });
 
     // Watch for status changes to restart animation when element becomes visible
     watch([status, masquerading], () => {
-      // Add a small delay to ensure v-show has updated the DOM
+      // Add a delay to ensure v-show has updated the DOM and element is accessible
       setTimeout(() => {
         nextTick(() => {
-          startAnimation();
+          // Only start animation if the element should be visible
+          const isConnected = status.value !== 'OFFLINE' || masquerading.value;
+          if (isConnected || replaying?.value) {
+            startAnimation();
+          }
         });
-      }, 50);
+      }, 100);
     });
 
     return {
