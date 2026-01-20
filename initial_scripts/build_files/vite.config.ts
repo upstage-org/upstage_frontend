@@ -35,24 +35,20 @@ export default defineConfig({
         manualChunks(id) {
           // Node modules chunking
           if (id.includes('node_modules')) {
-            // Vue core (must check first before other vue packages)
-            if (id.includes('/vue/') || id.includes('\\vue\\')) {
+            // Vue core and Ant Design Vue must be together to avoid initialization order issues
+            // Check Vue first, then Ant Design Vue
+            if (id.includes('/vue/') || id.includes('\\vue\\') || id.includes('@vue/')) {
+              return 'vue-core';
+            }
+            
+            // Ant Design Vue - keep with Vue core
+            if (id.includes('ant-design-vue') || id.includes('@ant-design')) {
               return 'vue-core';
             }
             
             // Vue ecosystem (router, vuex, etc.)
             if (id.includes('vue-router') || id.includes('vuex')) {
               return 'vue-ecosystem';
-            }
-            
-            // Vue composables and runtime
-            if (id.includes('@vue/')) {
-              return 'vue-core';
-            }
-            
-            // Ant Design Vue
-            if (id.includes('ant-design-vue') || id.includes('@ant-design')) {
-              return 'ant-design-vue';
             }
             
             // GraphQL and Apollo
