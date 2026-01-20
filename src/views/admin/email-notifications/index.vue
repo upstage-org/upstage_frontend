@@ -16,7 +16,7 @@ import { useI18n } from "vue-i18n";
 import Header from "components/Header.vue";
 import { userGraph, configGraph } from "services/graphql";
 import { ROLES } from "utils/constants";
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 import store from "store";
 
@@ -45,7 +45,7 @@ const addCustomRecipient = () => {
         receiverEmails.value = receiverEmails.value.concat(email);
       }
       if (
-        !receivers?.value?.adminPlayers?.edges.some(
+        !(receivers?.value as any)?.adminPlayers?.edges.some(
           (e: any) => e?.email === email
         )
       ) {
@@ -75,7 +75,7 @@ const { result: receivers, loading: isReady } = useQuery(
     }
   `,
   {},
-  { notifyOnNetworkStatusChange: true }
+  { notifyOnNetworkStatusChange: true } as any
 );
 
 const dataSource = computed<TransferItem[]>(() => {
@@ -85,7 +85,7 @@ const dataSource = computed<TransferItem[]>(() => {
       title: email,
     }))
     .concat(
-      receivers.value?.adminPlayers?.edges
+      (receivers.value as any)?.adminPlayers?.edges
         .filter((user: any) =>
           filterRole.value
             ? String(user.role) == String(filterRole.value)
@@ -116,7 +116,7 @@ const { proceed, loading } = useLoading(
       throw "Please provide a body for your email";
     }
     const visibleReceivers = receiverEmails.value.filter((email) =>
-      receivers.value.adminPlayers?.edges.some(
+      (receivers.value as any).adminPlayers?.edges.some(
         (edge: any) => edge?.email === email
       )
     );

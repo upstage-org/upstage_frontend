@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch, watchEffect, onMounted, computed } from "vue";
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import { useDebounceFn } from "@vueuse/core";
 import gql from "graphql-tag";
 import { StudioGraph } from "models/studio";

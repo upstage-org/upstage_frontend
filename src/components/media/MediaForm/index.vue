@@ -36,7 +36,7 @@ import {
   getDefaultAvatarVoice,
   getDefaultVariant,
 } from "services/speech/voice";
-import { useMutation, useQuery } from "@vue/apollo-composable";
+import { useMutation, useQuery } from "@vue3-apollo/core";
 import { message } from "ant-design-vue";
 
 const model = defineModel()
@@ -238,8 +238,8 @@ const { result, loading } = useQuery<StudioGraph>(
       }
     }
   `,
-  null,
-  { fetchPolicy: "cache-only" }
+  {},
+  { fetchPolicy: "cache-only" } as any
 );
 const mediaTypes = computed(() => {
   if (result.value?.mediaTypes) {
@@ -394,8 +394,8 @@ const onDelete = async () => {
   const res = await deleteMedia({
     id: editingMediaResult.value?.editingMedia?.id,
   });
-  if (res?.data.deleteMedia) {
-    message.success(res?.data.deleteMedia.message);
+  if ((res as any)?.data?.deleteMedia) {
+    message.success((res as any)?.data?.deleteMedia?.message);
     refresh();
     handleClose();
   } else {
@@ -425,8 +425,8 @@ const onUpdateStatus = async () => {
       ? "Active"
       : "Dormant",
   });
-  if (res?.data.updateMediaStatus) {
-    message.success(res?.data.updateMediaStatus.message);
+  if ((res as any)?.data?.updateMediaStatus) {
+    message.success((res as any)?.data?.updateMediaStatus?.message);
     editingMediaVar({
       ...editingMediaVar()!,
       dormant: !editingMediaResult.value?.editingMedia.dormant,

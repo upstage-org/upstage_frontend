@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import { useDebounceFn } from "@vueuse/core";
 import gql from "graphql-tag";
 import { StudioGraph, UploadFile } from "models/studio";
@@ -194,8 +194,8 @@ const onVisibleDropzone = () => {
         </a-button>
         <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="name" />
         <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags" style="min-width: 124px"
-          placeholder="Owners" :loading="loading" v-model:value="owners" :options="result
-            ? result.users.map((e: any) => ({
+          placeholder="Owners" :loading="loading" v-model:value="owners"           :options="(result as any)
+            ? (result as any).users.map((e: any) => ({
               value: e.username,
               label: e.displayName || e.username,
             }))
@@ -210,8 +210,8 @@ const onVisibleDropzone = () => {
           </template>
         </a-select>
         <a-select allowClear showArrow filterOption mode="tags" style="min-width: 128px" placeholder="Media types"
-          :loading="loading" v-model:value="types" :options="result
-            ? result.mediaTypes
+          :loading="loading" v-model:value="types"           :options="(result as any)
+            ? (result as any).mediaTypes
               .filter(
                 (e: any) =>
                   !['shape', 'media'].includes(e.name.toLowerCase()),
@@ -224,8 +224,8 @@ const onVisibleDropzone = () => {
             ">
         </a-select>
         <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags" style="min-width: 160px"
-          placeholder="Stages assigned" :loading="loading" v-model:value="stages" :options="result
-            ? result.getAllStages.map((e: any) => ({
+          placeholder="Stages assigned" :loading="loading" v-model:value="stages"           :options="(result as any)
+            ? (result as any).getAllStages.map((e: any) => ({
               value: e.id,
               label: e.name,
             }))
@@ -233,8 +233,8 @@ const onVisibleDropzone = () => {
             ">
         </a-select>
         <a-select allowClear showArrow mode="tags" style="min-width: 160px" placeholder="Tags" :loading="loading"
-          v-model:value="tags" :options="result
-            ? result.tags.map((e: any) => ({
+          v-model:value="tags"           :options="(result as any)
+            ? (result as any).tags.map((e: any) => ({
               value: e.name,
               label: e.name,
             }))

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 import { absolutePath } from "utils/common";
 import { useConfirmPermission } from "components/media/MediaForm/composable";
@@ -49,7 +49,7 @@ watch(editingMediaResult, () => {
   }
 });
 
-const notifications = computed(() => result.value?.notifications || []);
+const notifications = computed(() => (result.value as any)?.notifications || []);
 const { mutate: confirmPermission } = useConfirmPermission();
 const refresh = () => {
   refetch();

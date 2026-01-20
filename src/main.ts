@@ -6,10 +6,17 @@ import { router } from "router";
 import store from "./store";
 import "@fortawesome/fontawesome-free/css/all.css";
 import ClickOutside from "./directives/ClickOutside";
+import { apolloPlugin } from "@vue3-apollo/core";
+import { apolloClient } from "./apollo";
 const app = createApp(App)
   .use(store)
   .use(router)
   .use(i18n)
+  .use(apolloPlugin as any, {
+    clients: {
+      default: apolloClient,
+    },
+  })
   .directive("click-outside", ClickOutside);
 
 if ("serviceWorker" in navigator) {

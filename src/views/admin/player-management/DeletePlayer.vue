@@ -5,7 +5,7 @@ import { h } from "vue";
 import { DeleteOutlined } from "@ant-design/icons-vue";
 import { PropType } from "vue";
 import gql from "graphql-tag";
-import { useMutation } from "@vue/apollo-composable";
+import { useMutation } from "@vue3-apollo/core";
 
 export default {
   props: {

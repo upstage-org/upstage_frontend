@@ -1,4 +1,4 @@
-import { useMutation } from "@vue/apollo-composable";
+import { useMutation } from "@vue3-apollo/core";
 import { message } from "ant-design-vue";
 import gql from "graphql-tag";
 import { ref, computed } from "vue";

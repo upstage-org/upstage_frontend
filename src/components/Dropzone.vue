@@ -2,7 +2,7 @@
 import { ref, provide, watch, Ref, defineModel } from "vue";
 import configs from "config";
 import { message } from "ant-design-vue";
-import { useLazyQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 import { uploadDefault } from "models/studio";
 import i18n from "../i18n";
@@ -12,10 +12,10 @@ import {
   StudioGraph,
   UploadFile,
 } from "models/studio";
-import { useQuery } from "@vue/apollo-composable";
 
 const model = defineModel()
-const { load, refetch } = useLazyQuery<StudioGraph>(
+const enabled = ref(false);
+const { result: whoAmIResult, refetch: loadWhoAmI } = useQuery<StudioGraph>(
   gql`
     query WhoAmI {
       whoami {
@@ -25,9 +25,28 @@ const { load, refetch } = useLazyQuery<StudioGraph>(
   `,
   {},
   {
+    enabled,
     fetchPolicy: "network-only",
-  },
+  } as any,
 );
+
+const load = async () => {
+  if (!enabled.value) {
+    enabled.value = true;
+    // Wait for the query to complete
+    return new Promise<any>((resolve) => {
+      const unwatch = watch(whoAmIResult, (result: any) => {
+        if (result?.whoami) {
+          unwatch();
+          resolve({ data: { whoami: result.whoami } });
+        }
+      }, { immediate: true });
+    });
+  } else {
+    const result = await loadWhoAmI();
+    return (result as any) ? { data: { whoami: (result as any).whoami } } : null;
+  }
+};
 const { result: editingMediaResult, refetch: reload } = useQuery<{ editingMedia: Media }>(gql`
   {
     editingMedia @client
@@ -55,7 +74,7 @@ watch(visible as Ref, (val) => {
 
 const handleUpload = async (file: UploadFile) => {
   let fileType = file.file.type;
-  const profile = (await (load as any)()) || (await refetch());
+  const profile = await load();
   const uploadLimit = (profile?.data || profile?.whoami).uploadLimit ?? uploadDefault;
 
   if (!fileType.includes("video")) {

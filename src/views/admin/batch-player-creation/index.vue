@@ -8,7 +8,7 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons-vue";
 import { computed } from "vue";
-import { useMutation } from "@vue/apollo-composable";
+import { useMutation } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 import { inquiryVar } from "apollo";
 

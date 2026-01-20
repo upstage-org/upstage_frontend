@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useMutation, useQuery } from "@vue/apollo-composable";
+import { useMutation, useQuery } from "@vue3-apollo/core";
 import { message } from "ant-design-vue";
 import gql from "graphql-tag";
 import { computed, inject, PropType, ref } from "vue";
@@ -45,7 +45,7 @@ const { result, loading } = useQuery(
       }
     }
   `,
-  null,
+  {},
   {
 
   },
@@ -54,7 +54,7 @@ const { result, loading } = useQuery(
 const dataSource = computed(() => {
   if (result.value) {
     const options =
-      result.value.stages.edges
+      (result.value as any).stages.edges
         .filter((el: any) => {
           return isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner")
         });
@@ -81,7 +81,7 @@ const { mutate } = useMutation<
 const refresh = inject("refresh", () => { });
 
 const handleOk = async () => {
-  const remainIds = result.value.stages.edges
+  const remainIds = (result.value as any).stages.edges
     .filter((el: any) => {
       return !(isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
     }).map((el: AssignedStage) => el.id);
