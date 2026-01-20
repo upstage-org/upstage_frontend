@@ -73,10 +73,11 @@ export default defineConfig({
               return 'tiptap-vendor';
             }
             
-            // Large UI libraries
-            if (id.includes('moveable') || id.includes('@daybrush')) {
-              return 'moveable-vendor';
-            }
+            // Large UI libraries - keep moveable with vendor to avoid initialization issues
+            // Moveable depends on utilities that might be in vendor chunk
+            // if (id.includes('moveable') || id.includes('@daybrush')) {
+            //   return 'moveable-vendor';
+            // }
             
             // Utilities
             if (id.includes('/lodash/') || id.includes('\\lodash\\') || 

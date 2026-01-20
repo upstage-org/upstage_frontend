@@ -1,13 +1,14 @@
 import { createStore } from "vuex";
-import createPersistedState from "vuex-persistedstate";
+import VuexPersistence from "vuex-persist";
 import auth from "./modules/auth";
 import user from "./modules/user";
 import stage from "./modules/stage";
 import cache from "./modules/cache";
 import config from "./modules/config";
 
-const dataState = createPersistedState({
-  paths: ["auth"],
+const vuexLocal = new VuexPersistence({
+  storage: window.localStorage,
+  reducer: (state) => ({ auth: state.auth }),
 });
 
 export default createStore({
@@ -18,5 +19,5 @@ export default createStore({
     cache,
     config,
   },
-  plugins: [dataState],
+  plugins: [vuexLocal.plugin],
 });
