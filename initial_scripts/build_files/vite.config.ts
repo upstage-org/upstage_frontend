@@ -51,8 +51,20 @@ export default defineConfig({
               return 'vue-ecosystem';
             }
             
-            // GraphQL and Apollo
-            if (id.includes('@apollo') || id.includes('/graphql/') || id.includes('\\graphql\\')) {
+            // @vue/apollo-composable needs Vue, so keep with Vue core
+            if (id.includes('@vue/apollo-composable')) {
+              return 'vue-core';
+            }
+            
+            // GraphQL and Apollo - keep all Apollo Client modules together (including subpath exports)
+            // This ensures /core, /link/*, etc. all stay in the same chunk
+            if (id.includes('@apollo/client') || id.includes('apollo-client')) {
+              return 'graphql-vendor';
+            }
+            
+            // Other GraphQL libraries
+            if (id.includes('/graphql/') || id.includes('\\graphql\\') || 
+                id.includes('graphql-tag') || id.includes('graphql-request')) {
               return 'graphql-vendor';
             }
             
