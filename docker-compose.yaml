@@ -10,7 +10,9 @@ services:
     command: >
       /bin/sh -c "
       export CI=true &&
-      npm install -g npm@latest pnpm@10.28.1 &&
+      corepack enable &&
+      corepack prepare pnpm@10.28.1 --activate &&
+      npm install -g npm@latest &&
       pnpm install --no-frozen-lockfile &&
       npx update-browserslist-db@latest --yes &&
       pnpm build &&

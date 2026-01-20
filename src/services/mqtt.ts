@@ -27,19 +27,33 @@ export default function buildClient() {
       });
     },
     subscribe(topics, stageUrl) {
+      // Check if client exists and is in a valid state
+      if (!this.client) {
+        return Promise.reject(new Error("MQTT client not initialized"));
+      }
+      
+      // Check if client is connected and not disconnecting
+      if (this.client.disconnecting || !this.client.connected) {
+        return Promise.reject(new Error("MQTT client is disconnecting or not connected"));
+      }
+      
       const namespacedTopics = {};
       Object.keys(topics).forEach(
         (key) =>
           (namespacedTopics[namespaceTopic(key, stageUrl)] = topics[key]),
       );
       return new Promise((resolve, reject) => {
-        this.client.subscribe(namespacedTopics, (error, res) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(res);
-          }
-        });
+        try {
+          this.client.subscribe(namespacedTopics, (error, res) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(res);
+            }
+          });
+        } catch (error) {
+          reject(error);
+        }
       });
     },
     sendMessage(topic, payload, namespaced, retain = false) {

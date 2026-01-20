@@ -710,7 +710,12 @@ export default {
       client.on("connect", () => {
         commit("SET_STATUS", "LIVE");
         dispatch("reloadMissingEvents");
-        dispatch("subscribe");
+        // Add small delay to ensure client is fully connected before subscribing
+        setTimeout(() => {
+          dispatch("subscribe").catch((error) => {
+            console.warn("Failed to subscribe to MQTT topics:", error);
+          });
+        }, 100);
         dispatch("joinStage");
       });
       client.on("error", () => {
@@ -745,7 +750,12 @@ export default {
           commit("SET_SUBSCRIBE_STATUS", true);
           console.log("Subscribed to topics: ", res);
         })
-        .catch((error) => console.log(error));
+        .catch((error) => {
+          // Silently handle disconnecting errors - they're expected during reconnection
+          if (!error.message?.includes("disconnecting")) {
+            console.warn("MQTT subscribe error:", error);
+          }
+        });
     },
     async disconnect({ dispatch }) {
       await dispatch("leaveStage", true);
