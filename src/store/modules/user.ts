@@ -1,10 +1,19 @@
 // @ts-nocheck
-import { router } from "../../router";
 import { userGraph } from "services/graphql";
 import { displayName, logout } from "utils/auth";
 import { ROLES } from "utils/constants";
 import { message } from "ant-design-vue";
 import store from "store/index";
+
+// Lazy router import to avoid circular dependency
+let routerInstance: any = null;
+const getRouter = async () => {
+  if (!routerInstance) {
+    const routerModule = await import("../../router");
+    routerInstance = routerModule.router;
+  }
+  return routerInstance;
+};
 
 export default {
   namespaced: true,
@@ -62,6 +71,7 @@ export default {
         ) {
           logout();
 
+          const router = await getRouter();
           if (router.currentRoute.value.meta.requireAuth) {
             router.push("/login");
             message.warning("You have been logged out of this session!");
@@ -110,6 +120,7 @@ export default {
         ) {
           logout();
 
+          const router = await getRouter();
           if (router.currentRoute.value.meta.requireAuth) {
             router.push("/login");
             message.warning("You have been logged out of this session!");
@@ -141,6 +152,7 @@ export default {
         ) {
           logout();
 
+          const router = await getRouter();
           if (router.currentRoute.value.meta.requireAuth) {
             router.push("/login");
             message.warning("You have been logged out of this session!");
