@@ -7,7 +7,6 @@ import PlayerManagement from "views/admin/player-management/index.vue";
 import EmailNotifications from "views/admin/email-notifications/index.vue";
 import Configuration from "views/admin/configuration/index.vue";
 import Home from "views/Home.vue";
-import store from "store";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -134,8 +133,20 @@ export const router = createRouter({
   ],
 });
 
+// Lazy store getter to avoid circular dependency issues
+let storeInstance: any = null;
+const getStore = async () => {
+  if (!storeInstance) {
+    const storeModule = await import("./store");
+    storeInstance = storeModule.default;
+  }
+  return storeInstance;
+};
+
 router.beforeEach(async (to, from, next) => {
   document.body.classList.add("waiting");
+  // Import store dynamically to avoid circular dependency issues
+  const store = await getStore();
   const loggedIn = store.getters["auth/loggedIn"];
 
   if (to.matched.some((record) => record.meta.requireAuth) && !loggedIn) {
