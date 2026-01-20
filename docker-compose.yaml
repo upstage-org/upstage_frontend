@@ -1,6 +1,6 @@
 services:
   upstage:
-    image: node:22-bookworm
+    image: node:24-bookworm
     container_name: upstage_frontend
     volumes:
       - .:/app
@@ -9,8 +9,9 @@ services:
     working_dir: /app
     command: >
       /bin/sh -c "
-      npm install -g npm pnpm &&
-      pnpm install --frozen-lockfile &&
+      export CI=true &&
+      npm install -g npm@latest pnpm@10.28.1 &&
+      pnpm install --no-frozen-lockfile &&
       pnpm build &&
       tail -f /dev/null
       "

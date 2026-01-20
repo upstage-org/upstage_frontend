@@ -29,4 +29,81 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Node modules chunking
+          if (id.includes('node_modules')) {
+            // Vue core (must check first before other vue packages)
+            if (id.includes('/vue/') || id.includes('\\vue\\')) {
+              return 'vue-core';
+            }
+            
+            // Vue ecosystem (router, vuex, etc.)
+            if (id.includes('vue-router') || id.includes('vuex')) {
+              return 'vue-ecosystem';
+            }
+            
+            // Vue composables and runtime
+            if (id.includes('@vue/')) {
+              return 'vue-core';
+            }
+            
+            // Ant Design Vue
+            if (id.includes('ant-design-vue') || id.includes('@ant-design')) {
+              return 'ant-design-vue';
+            }
+            
+            // GraphQL and Apollo
+            if (id.includes('@apollo') || id.includes('/graphql/') || id.includes('\\graphql\\')) {
+              return 'graphql-vendor';
+            }
+            
+            // TipTap editor
+            if (id.includes('@tiptap') || id.includes('/tiptap/') || id.includes('\\tiptap\\')) {
+              return 'tiptap-vendor';
+            }
+            
+            // Large UI libraries
+            if (id.includes('moveable') || id.includes('@daybrush')) {
+              return 'moveable-vendor';
+            }
+            
+            // Utilities
+            if (id.includes('/lodash/') || id.includes('\\lodash\\') || 
+                id.includes('/axios/') || id.includes('\\axios\\') ||
+                id.includes('/dayjs/') || id.includes('\\dayjs\\') ||
+                id.includes('/moment/') || id.includes('\\moment\\')) {
+              return 'utils-vendor';
+            }
+            
+            // Media libraries
+            if (id.includes('html2canvas') || id.includes('flv.js') || id.includes('qr-code')) {
+              return 'media-vendor';
+            }
+            
+            // Stripe
+            if (id.includes('stripe') || id.includes('@stripe')) {
+              return 'stripe-vendor';
+            }
+            
+            // MQTT
+            if (id.includes('mqtt')) {
+              return 'mqtt-vendor';
+            }
+            
+            // VueUse
+            if (id.includes('@vueuse')) {
+              return 'vueuse-vendor';
+            }
+            
+            // All other node_modules go into vendor chunk
+            return 'vendor';
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 3000, // Increased to 3MB since major dependencies are already split into separate vendor chunks
+  },
 });
