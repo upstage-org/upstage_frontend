@@ -69,17 +69,31 @@ export default {
     const replaying = inject("replaying");
 
     const startAnimation = () => {
-      if (dot.value && dot.value instanceof HTMLElement) {
-        try {
-          animate(dot.value, {
-            opacity: [1, 0, 1],
-            duration: 2000,
-            loop: true,
-          });
-        } catch (error) {
-          // Silently handle animation errors if element is not accessible
-          console.debug("Animation skipped:", error);
-        }
+      // Check if element exists, is an HTMLElement, and is actually visible/accessible
+      if (!dot.value) return;
+      
+      const element = dot.value instanceof HTMLElement 
+        ? dot.value 
+        : (dot.value.$el instanceof HTMLElement ? dot.value.$el : null);
+      
+      if (!element) return;
+      
+      // Check if element is actually in the DOM and visible
+      if (!element.isConnected || !document.body.contains(element)) return;
+      
+      // Check if element has dimensions (is visible, not hidden by v-show)
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return;
+      
+      try {
+        animate(element, {
+          opacity: [1, 0, 1],
+          duration: 2000,
+          loop: true,
+        });
+      } catch (error) {
+        // Silently handle animation errors if element is not accessible
+        // Don't log to avoid console noise
       }
     };
 
@@ -91,9 +105,12 @@ export default {
 
     // Watch for status changes to restart animation when element becomes visible
     watch([status, masquerading], () => {
-      nextTick(() => {
-        startAnimation();
-      });
+      // Add a small delay to ensure v-show has updated the DOM
+      setTimeout(() => {
+        nextTick(() => {
+          startAnimation();
+        });
+      }, 50);
     });
 
     return {
