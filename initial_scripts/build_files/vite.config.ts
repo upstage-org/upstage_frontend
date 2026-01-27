@@ -31,6 +31,22 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      onwarn(warning, warn) {
+        // Suppress warnings about /*#__PURE__*/ comments in third-party dependencies
+        // These are harmless and come from packages like @daybrush/utils and react-compat-moveable
+        // The warning message contains "contains an annotation that Rollup cannot interpret"
+        if (
+          warning.code === 'MODULE_LEVEL_DIRECTIVE' ||
+          (warning.message && (
+            warning.message.includes('/*#__PURE__*/') ||
+            warning.message.includes('contains an annotation that Rollup cannot interpret')
+          ))
+        ) {
+          return;
+        }
+        // Use default warning handler for other warnings
+        warn(warning);
+      },
       output: {
         manualChunks(id) {
           // Simplified chunking strategy to avoid initialization order issues
