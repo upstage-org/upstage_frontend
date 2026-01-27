@@ -198,11 +198,15 @@ const handleFrameClick = ({ event, index }: { event: any; index: number }) => {
 const handleClose = () => {
   if (files) {
     if (editingMediaResult.value) {
+      // When editing existing media, close immediately without confirmation
       editingMediaVar(undefined);
       files.value = [];
-      editingMediaResult.value = undefined
-      refetch();
+      // Refetch after clearing to update the query cache
+      nextTick(() => {
+        refetch();
+      });
     } else {
+      // When creating new media, show confirmation dialog
       Modal.confirm({
         title: "Are you sure you want to quit?",
         icon: createVNode(ExclamationCircleOutlined),
@@ -213,7 +217,6 @@ const handleClose = () => {
         ),
         onOk() {
           files.value = [];
-          editingMediaResult.value = undefined
         },
         okButtonProps: {
           danger: true,
@@ -447,10 +450,13 @@ const getUserDisplayName = (user: User) => {
 
 <template>
   <a-modal
-    :visible="!!files?.length && !composingMode"
+    :open="!!files?.length && !composingMode"
     :body-style="{ padding: 0 }"
     :width="1100"
+    :closable="true"
+    :mask-closable="false"
     @cancel="handleClose"
+    @close="handleClose"
   >
     <template #title>
       <a-space>
