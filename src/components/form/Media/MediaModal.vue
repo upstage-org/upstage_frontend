@@ -123,7 +123,7 @@ export default {
   props: {
     media: Object,
   },
-  emits: ["complete"],
+  emits: ["complete", "close"],
   setup: (props, { emit }) => {
     const form = reactive(props.media);
     form.multi = false;
@@ -276,7 +276,14 @@ export default {
       { immediate: true },
     );
 
-    const closeModal = inject("closeModal");
+    const injectedCloseModal = inject("closeModal", null);
+    const closeModal = () => {
+      if (injectedCloseModal) {
+        injectedCloseModal();
+      } else {
+        emit("close");
+      }
+    };
 
     const updateMediaSize = ({ width, height }) => {
       if (width > height) {

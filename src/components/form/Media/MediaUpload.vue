@@ -10,7 +10,7 @@
     </div>
   </div>
   <Modal width="100%" height="100%" v-model="active">
-    <MediaModal v-if="media" :media="media" @complete="uploadCompleted" />
+    <MediaModal v-if="media" :media="media" @complete="uploadCompleted" @close="active = false" />
   </Modal>
 </template>
 
