@@ -1,10 +1,10 @@
 <template>
   <template v-if="reactionVisibility">
     <button class="button is-small is-rounded reaction mx-1" v-for="react in reactions" :key="react"
-      @click="sendReaction(react)" style="width: 26px; height: 26px; padding: 0px;">
+      @click="sendReaction(react)" style="width: 26px; height: 26px; padding: 0px; display: flex; align-items: center; justify-content: center;">
       {{ react }}
     </button>
-    <span v-if="customEmoji" style="position: absolute; margin-left: 28px">
+    <span v-if="customEmoji" style="position: absolute; margin-left: 28px; display: flex; align-items: center; height: 100%;">
       <ChatInput :picker-only="true" :style="{ height: '24px', padding: 0 }" className="is-white"
         @update:model-value="sendCustomReaction">
         <template #icon>
@@ -118,5 +118,11 @@ export default {
 
 .button.is-rounded {
   width: 16px;
+}
+
+.reaction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

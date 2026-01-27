@@ -252,6 +252,10 @@ emoji-picker {
   top: 0;
 
   .button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
     .icon:first-child:last-child {
       margin: auto;
     }
