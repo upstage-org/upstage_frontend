@@ -178,6 +178,16 @@ export default {
       if (props.controlable && canPlay.value) {
         showControls(true, e);
         store.commit("stage/SET_ACTIVE_MOVABLE", props.object.id);
+        // When clicking an avatar, also "hold" it so teardrop, lightbulb, and context
+        // menu work. This restores the expected behavior when selecting from the depth
+        // bar (green frame) then clicking the avatar on stage.
+        const holdable =
+          props.object.type === "avatar" &&
+          (!props.object.holder ||
+            props.object.holder.id === store.state.stage.session);
+        if (holdable) {
+          store.dispatch("user/setAvatarId", props.object.id, { root: true });
+        }
       }
     };
 
