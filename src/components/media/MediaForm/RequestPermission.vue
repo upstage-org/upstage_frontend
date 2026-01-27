@@ -39,9 +39,13 @@ const handleOk = async () => {
     <SendOutlined />Request permission
   </a-button>
   <a-modal
-    v-model:visible="visible"
+    v-model:open="visible"
     :confirm-loading="loading"
+    :closable="true"
+    :mask-closable="false"
     @ok="handleOk"
+    @cancel="visible = false"
+    @close="visible = false"
     okText="Send Request"
   >
     You are requesting permission for

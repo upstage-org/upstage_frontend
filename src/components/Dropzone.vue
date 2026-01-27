@@ -128,7 +128,15 @@ const uploadFile = async (file: any) => {
 </script>
 
 <template>
-  <a-modal :footer="null" :visible="visible" @cancel="visible = false" width="100%" wrapClassName="fullscreen-dragzone"
+  <a-modal 
+    :footer="null" 
+    :open="visible" 
+    :closable="true"
+    :mask-closable="true"
+    @cancel="visible = false"
+    @close="visible = false"
+    width="100%" 
+    wrapClassName="fullscreen-dragzone"
     class="h-full top-0 p-0">
     <a-upload-dragger :show-upload-list="false" :custom-request="uploadFile" multiple>
       <p class="ant-upload-drag-icon">

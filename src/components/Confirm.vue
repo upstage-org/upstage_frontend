@@ -24,14 +24,18 @@ export default {
         Modal,
         {
           ...props,
-          visible: visible.value,
-          "onUpdate:visible": (val) => (visible.value = val),
+          open: visible.value,
+          "onUpdate:open": (val) => (visible.value = val),
+          closable: true,
+          maskClosable: false,
           async onOk(e) {
             loading.value = true;
             await props.onConfirm(payload.value, e);
             loading.value = false;
             visible.value = false;
           },
+          onCancel: () => (visible.value = false),
+          onClose: () => (visible.value = false),
           trigger: [""],
           okButtonProps: {
             loading: loading.value,

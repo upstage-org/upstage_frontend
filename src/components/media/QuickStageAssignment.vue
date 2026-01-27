@@ -103,8 +103,17 @@ const handleOk = async () => {
   <a-button class="ml-2" type="primary" @click="visible = true">
     <plus-circle-outlined />Assign to stage
   </a-button>
-  <a-modal v-model:visible="visible" class="custom-class" style="color: red"
-    title="Assign this media to one of your stages" :width="600" :footer="null">
+  <a-modal 
+    v-model:open="visible" 
+    class="custom-class" 
+    style="color: red"
+    title="Assign this media to one of your stages" 
+    :width="600" 
+    :footer="null"
+    :closable="true"
+    :mask-closable="false"
+    @cancel="visible = false"
+    @close="visible = false">
     <div class="flex" style="align-items: center; justify-content: flex-start;">
       <div style="max-width: 350px;">
         <MediaPreview v-if="media.assetType" :media="media as Media" />
