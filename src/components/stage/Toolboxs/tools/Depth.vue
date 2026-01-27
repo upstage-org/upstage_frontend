@@ -27,7 +27,12 @@ export default {
   setup() {
     const store = useStore();
     const objects = computed(() => store.getters["stage/objects"]);
-    const currentAvatar = computed(() => store.state.user.avatarId);
+    // Use session’s avatarId (synced) so depth tool red/grey matches stage teardrops
+    const currentAvatar = computed(() => {
+      const session = store.state.stage.session;
+      const mySession = store.state.stage.sessions?.find((s) => s.id === session);
+      return mySession?.avatarId ?? store.state.user.avatarId;
+    });
 
     return { objects, currentAvatar };
   },
