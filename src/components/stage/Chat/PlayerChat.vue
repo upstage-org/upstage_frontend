@@ -6,24 +6,30 @@
     fontSize,
   }">
       <div class="actions">
-        <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
-          <span class="icon">
-            <Icon v-if="collapsed" src="maximise.svg" size="20" />
-            <Icon v-else src="minimise.svg" size="24" class="mt-4" />
-          </span>
-        </button>
-        <button class="chat-setting button is-rounded is-outlined"
-          :class="{ 'has-background-primary-light': isMovingable }" @click="toggleMoveable">
-          <span class="icon">
-            <Icon src="prop.svg" size="20" />
-          </span>
-        </button>
-        <button class="chat-setting button is-rounded is-outlined drag-icon-button"
-          @mousedown.prevent="startDrag">
-          <span class="icon">
-            <Icon src="movement-slider.svg" size="20" />
-          </span>
-        </button>
+        <a-tooltip title="Minimise">
+          <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
+            <span class="icon">
+              <Icon v-if="collapsed" src="maximise.svg" size="20" />
+              <Icon v-else src="minimise.svg" size="24" class="mt-4" />
+            </span>
+          </button>
+        </a-tooltip>
+        <a-tooltip title="Resize">
+          <button class="chat-setting button is-rounded is-outlined"
+            :class="{ 'has-background-primary-light': isMovingable }" @click="toggleMoveable">
+            <span class="icon">
+              <Icon src="prop.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
+        <a-tooltip title="Move">
+          <button class="chat-setting button is-rounded is-outlined drag-icon-button"
+            @mousedown.prevent="startDrag">
+            <span class="icon">
+              <Icon src="movement-slider.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
         <ClearChat option="player-chat" />
       </div>
       <div class="card-content" ref="theContent">

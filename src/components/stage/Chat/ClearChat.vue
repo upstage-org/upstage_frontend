@@ -1,14 +1,16 @@
 <template>
-  <button
-    v-if="clearChatVisibility"
-    class="chat-setting button is-rounded is-outlined"
-    @click="clearChat"
-    :class="{ 'is-loading': clearing }"
-  >
-    <span class="icon">
-      <Icon src="clear.svg" size="20" />
-    </span>
-  </button>
+  <a-tooltip title="Clear">
+    <button
+      v-if="clearChatVisibility"
+      class="chat-setting button is-rounded is-outlined"
+      @click="clearChat"
+      :class="{ 'is-loading': clearing }"
+    >
+      <span class="icon">
+        <Icon src="clear.svg" size="20" />
+      </span>
+    </button>
+  </a-tooltip>
 </template>
 
 <script>
