@@ -101,6 +101,11 @@ export const useSaveMedia = (
       payload.media.urls = payload.files
         .filter((file) => file.status !== "local")
         .map((file) => file.url!);
+      // Backend expects non-nullable Float for w/h; older media can yield null/NaN (e.g. missing or bad dimensions)
+      const w = Number(payload.media.w);
+      const h = Number(payload.media.h);
+      payload.media.w = Number.isFinite(w) ? w : 100;
+      payload.media.h = Number.isFinite(h) ? h : 100;
       const result = await mutate({ input: payload.media });
       const mediaId = result?.data?.saveMedia.asset.id;
       if (mediaId) {

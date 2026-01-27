@@ -102,7 +102,13 @@ watch(editingMediaResult, () => {
     tags.value = editingMedia.tags;
     owner.value = editingMedia.owner.username;
     copyrightLevel.value = editingMedia.copyrightLevel;
-    const attributes = JSON.parse(editingMedia.description) as MediaAttributes;
+    const attributes = JSON.parse(editingMedia.description || "{}") as MediaAttributes;
+    const aw = Number(attributes?.w);
+    const ah = Number(attributes?.h);
+    frameSize.value = {
+      width: Number.isFinite(aw) ? aw : 100,
+      height: Number.isFinite(ah) ? ah : 100,
+    };
     if (files?.value) {
       const frames =
         attributes?.frames && attributes.frames.length
@@ -274,8 +280,8 @@ const { progress, saveMedia, saving } = useSaveMedia(
         stageIds: stageIds.value,
         userIds: userIds.value,
         tags: tags.value,
-        w: frameSize.value.width,
-        h: frameSize.value.height,
+        w: Number.isFinite(Number(frameSize.value?.width)) ? Number(frameSize.value.width) : 100,
+        h: Number.isFinite(Number(frameSize.value?.height)) ? Number(frameSize.value.height) : 100,
         note: note.value,
         urls: [],
         voice,
