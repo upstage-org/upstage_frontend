@@ -6,3 +6,11 @@ declare module "*.vue" {
   const component: DefineComponent<{}, {}, any>;
   export default component;
 }
+
+// Global references to avoid circular dependencies
+declare global {
+  interface Window {
+    __UPSTAGE_STORE__?: any;
+    __UPSTAGE_ROUTER__?: any;
+  }
+}

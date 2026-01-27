@@ -1,6 +1,6 @@
 <template>
   <section class="modal-card-body p-0">
-    <button class="delete close-modal" aria-label="close" @click="closeModal"></button>
+    <button class="delete close-modal" aria-label="close" @click.stop="closeModal"></button>
     <div class="container-fluid">
       <footer class="modal-card-foot">
         <div class="columns is-fullwidth">
@@ -278,10 +278,11 @@ export default {
 
     const injectedCloseModal = inject("closeModal", null);
     const closeModal = () => {
+      // Always emit close event first (parent handles it)
+      emit("close");
+      // Also call injected closeModal if available (for Modal component's default slot)
       if (injectedCloseModal) {
         injectedCloseModal();
-      } else {
-        emit("close");
       }
     };
 

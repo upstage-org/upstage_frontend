@@ -55,6 +55,7 @@ export default {
     const uploadCompleted = () => {
       refresh();
       media.value = null;
+      active.value = false;
     };
 
     return {
