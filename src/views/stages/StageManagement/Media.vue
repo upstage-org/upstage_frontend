@@ -1,7 +1,15 @@
 <template>
   <div class="columns">
     <div class="column">
-      <b><span >Media assigned to this Stage</span></b>
+      <b><span>Media assigned to this Stage</span></b>
+    </div>
+    <div class="column" align="right">
+      <SaveButton
+        class="mb-4"
+        :loading="saving"
+        :disabled="!stage?.id"
+        @click="saveMediaOrder"
+      />
     </div>
   </div>
 
@@ -15,7 +23,10 @@ import SaveButton from "components/form/SaveButton.vue";
 import Dropdown from "components/form/Dropdown.vue";
 import Field from "components/form/Field.vue";
 import Icon from "components/Icon.vue";
-import { inject } from "vue";
+import { inject, computed } from "vue";
+import { message } from "ant-design-vue";
+import { useMutation } from "services/graphql/composable";
+import { stageGraph } from "services/graphql";
 import MultiframePreview from "./MultiframePreview.vue";
 import Reorder from "./Reorder.vue";
 
@@ -32,8 +43,27 @@ export default {
   },
   setup: () => {
     const stage = inject("stage");
-
-    return {  selectedMedia: stage.value.assets || [] };
+    const refresh = inject("refresh");
+    const selectedMedia = computed({
+      get: () => stage.value?.assets ?? [],
+      set: (val) => {
+        if (stage.value) stage.value.assets = val;
+      },
+    });
+    const { loading: saving, save } = useMutation(stageGraph.saveStageMedia);
+    const saveMediaOrder = async () => {
+      if (!stage.value?.id) return;
+      const mediaIds = (selectedMedia.value ?? []).map((m) => m.id);
+      await save(
+        () => {
+          message.success("Media order saved!");
+          refresh(stage.value.id);
+        },
+        stage.value.id,
+        mediaIds
+      );
+    };
+    return { stage, selectedMedia, saving, saveMediaOrder };
   },
 };
 </script>
