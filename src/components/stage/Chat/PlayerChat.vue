@@ -302,7 +302,8 @@ export default {
     display: flex;
     align-items: center;
 
-    button {
+    button,
+    :deep(button) {
       width: 26px;
       height: 26px;
       padding: 0;
@@ -310,6 +311,10 @@ export default {
       display: flex;
       align-items: center;
       justify-content: center;
+      min-width: 26px;
+      min-height: 26px;
+      max-width: 26px;
+      max-height: 26px;
     }
   }
 
