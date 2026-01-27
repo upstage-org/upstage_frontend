@@ -230,7 +230,8 @@ export default {
           refresh(stage.value.id);
         },
         stage.value.id,
-        configData
+        configData,
+        stage.value.visibility
       );
       const mqtt = buildClient();
       const client = mqtt.connect();

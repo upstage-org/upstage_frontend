@@ -397,17 +397,17 @@ export default {
       `,
       { id, stageIds }
     ),
-  saveStageConfig: (id, config) =>
+  saveStageConfig: (id, config, visibility) =>
     studioClient.request(
       gql`
-        mutation UpdateStage($id: ID!, $config: String) {
-          updateStage(input: { id: $id, config: $config }) {
+        mutation UpdateStageConfig($id: ID!, $config: String, $visibility: Boolean) {
+          updateStage(input: { id: $id, config: $config, visibility: $visibility }) {
             ...stageFragment
           }
         }
         ${stageFragment}
       `,
-      { id, config }
+      { id, config, visibility }
     ),
   assignableMedia: () =>
     studioClient.request(gql`

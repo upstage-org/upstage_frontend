@@ -317,6 +317,10 @@ export default {
     };
     const updateStage = async () => {
       try {
+        // Preserve visibility when it might have been omitted (e.g. stale form)
+        if (form.id && typeof form.visibility === "undefined" && typeof stage.value?.visibility !== "undefined") {
+          form.visibility = stage.value.visibility;
+        }
         await mutation();
         message.success("Stage updated successfully!");
         store.commit("cache/UPDATE_STAGE_VISIBILITY", {
