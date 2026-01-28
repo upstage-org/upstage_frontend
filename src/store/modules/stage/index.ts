@@ -548,6 +548,15 @@ export default {
       );
       state.sessions.sort((a, b) => b.at - a.at);
     },
+    UPDATE_SESSION_TIMESTAMP(state, sessionId) {
+      // Update session timestamp when participant is active (e.g., sending chat messages)
+      // This prevents active participants from being filtered out due to stale timestamps
+      const index = state.sessions.findIndex((s) => s.id === sessionId);
+      if (index > -1) {
+        state.sessions[index].at = +new Date();
+        state.sessions.sort((a, b) => b.at - a.at);
+      }
+    },
     SET_CHAT_VISIBILITY(state, visible) {
       state.settings.chatVisibility = visible;
     },
@@ -884,6 +893,12 @@ export default {
       if (message.highlight) {
         commit("HIGHLIGHT_MESSAGE", message.highlight);
         return;
+      }
+
+      // Update session timestamp when a chat message is received
+      // This ensures active participants (who are chatting) don't disappear from the participant list
+      if (message.session) {
+        commit("UPDATE_SESSION_TIMESTAMP", message.session);
       }
 
       const model = {
