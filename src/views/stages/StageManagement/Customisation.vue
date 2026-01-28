@@ -244,9 +244,9 @@ export default {
           { qos: 1, retain: false },
           (error, res) => {
             if (error) {
-              reject(error);
+              console.error("MQTT publish error:", error);
             } else {
-              resolve(res);
+              console.log("MQTT publish success:", res);
               mqtt.disconnect();
             }
           }

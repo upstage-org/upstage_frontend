@@ -192,17 +192,18 @@ export default {
     const stage = inject("stage");
     const clearCache = inject("clearCache");
 
+    const playerAccess = ref(
+      useAttribute(stage, "playerAccess", true).value ?? [],
+    );
+
     const form = reactive({
       fileLocation: "",
       ...stage.value,
       owner: stage.value.owner?.id,
       status: useAttribute(stage, "status").value ?? "rehearsal",
       cover: useAttribute(stage, "cover").value,
+      playerAccess: JSON.stringify(playerAccess.value),
     });
-
-    const playerAccess = ref(
-      useAttribute(stage, "playerAccess", true).value ?? [],
-    );
 
     watch(playerAccess, (val) => {
       form.playerAccess = JSON.stringify(val);
@@ -307,7 +308,10 @@ export default {
     );
     const createStage = async () => {
       try {
-        const stage = await mutation();
+        // Ensure playerAccess is set from the reactive playerAccess ref
+        form.playerAccess = JSON.stringify(playerAccess.value);
+        // Pass the current form state explicitly to ensure all changes are included
+        const stage = await mutation(form);
         message.success("Stage created successfully!");
         store.dispatch("cache/fetchStages");
         router.push(`/stages/stage-management/${stage.id}/`);
@@ -321,7 +325,10 @@ export default {
         if (form.id && typeof form.visibility === "undefined" && typeof stage.value?.visibility !== "undefined") {
           form.visibility = stage.value.visibility;
         }
-        await mutation();
+        // Ensure playerAccess is set from the reactive playerAccess ref
+        form.playerAccess = JSON.stringify(playerAccess.value);
+        // Pass the current form state explicitly to ensure all changes are included
+        await mutation(form);
         message.success("Stage updated successfully!");
         store.commit("cache/UPDATE_STAGE_VISIBILITY", {
           stageId: form.id,
