@@ -1002,12 +1002,16 @@ export default {
       };
       mqtt.sendMessage(TOPICS.BOARD, payload);
     },
-    switchFrame(action, object) {
-      const payload = {
-        type: BOARD_ACTIONS.SWITCH_FRAME,
-        object: serializeObject(object),
-      };
-      mqtt.sendMessage(TOPICS.BOARD, payload);
+    switchFrame({ commit }, object) {
+      if (object.liveAction) {
+        const payload = {
+          type: BOARD_ACTIONS.SWITCH_FRAME,
+          object: serializeObject(object),
+        };
+        mqtt.sendMessage(TOPICS.BOARD, payload);
+      } else {
+        commit("UPDATE_OBJECT", serializeObject(object));
+      }
     },
     sendToBack(action, object) {
       const payload = {
@@ -1031,12 +1035,16 @@ export default {
       };
       mqtt.sendMessage(TOPICS.BOARD, payload);
     },
-    toggleAutoplayFrames(action, object) {
-      const payload = {
-        type: BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES,
-        object: serializeObject(object),
-      };
-      mqtt.sendMessage(TOPICS.BOARD, payload);
+    toggleAutoplayFrames({ commit }, object) {
+      if (object.liveAction) {
+        const payload = {
+          type: BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES,
+          object: serializeObject(object),
+        };
+        mqtt.sendMessage(TOPICS.BOARD, payload);
+      } else {
+        commit("UPDATE_OBJECT", serializeObject(object));
+      }
     },
     handleBoardMessage({ commit }, { message }) {
       switch (message.type) {
