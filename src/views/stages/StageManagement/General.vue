@@ -196,11 +196,20 @@ export default {
       useAttribute(stage, "playerAccess", true).value ?? [],
     );
 
+    // Get initial status from attribute, normalize to lowercase, default to "rehearsal"
+    const initialStatus = useAttribute(stage, "status").value;
+    const normalizedStatus = initialStatus 
+      ? String(initialStatus).toLowerCase() 
+      : "rehearsal";
+    const validStatus = (normalizedStatus === "live" || normalizedStatus === "rehearsal") 
+      ? normalizedStatus 
+      : "rehearsal";
+
     const form = reactive({
       fileLocation: "",
       ...stage.value,
       owner: stage.value.owner?.id,
-      status: useAttribute(stage, "status").value ?? "rehearsal",
+      status: validStatus, // Ensure status is always "live" or "rehearsal"
       cover: useAttribute(stage, "cover").value || null,
       playerAccess: JSON.stringify(playerAccess.value),
       visibility: stage.value?.visibility !== undefined ? stage.value.visibility : true,
@@ -331,13 +340,19 @@ export default {
         // Ensure playerAccess is set from the reactive playerAccess ref
         form.playerAccess = JSON.stringify(playerAccess.value);
         
+        // Ensure status is explicitly set (default to "rehearsal" if not set)
+        // Status must be either "live" or "rehearsal"
+        if (!form.status || (form.status !== "live" && form.status !== "rehearsal")) {
+          form.status = "rehearsal";
+        }
+        
         // Build the payload explicitly to ensure all fields are included
         const payload = {
           id: form.id,
           name: form.name,
           description: form.description || null,
           fileLocation: form.fileLocation,
-          status: form.status || "rehearsal", // Ensure status is always set
+          status: form.status, // Status is always explicitly set above - either "live" or "rehearsal"
           visibility: form.visibility !== undefined ? form.visibility : null,
           cover: form.cover || null,
           playerAccess: form.playerAccess || null,
