@@ -201,8 +201,9 @@ export default {
       ...stage.value,
       owner: stage.value.owner?.id,
       status: useAttribute(stage, "status").value ?? "rehearsal",
-      cover: useAttribute(stage, "cover").value,
+      cover: useAttribute(stage, "cover").value || null,
       playerAccess: JSON.stringify(playerAccess.value),
+      visibility: stage.value?.visibility !== undefined ? stage.value.visibility : true,
     });
 
     watch(playerAccess, (val) => {
@@ -321,14 +322,30 @@ export default {
     };
     const updateStage = async () => {
       try {
+        // Ensure all fields are explicitly set before saving
         // Preserve visibility when it might have been omitted (e.g. stale form)
         if (form.id && typeof form.visibility === "undefined" && typeof stage.value?.visibility !== "undefined") {
           form.visibility = stage.value.visibility;
         }
+        
         // Ensure playerAccess is set from the reactive playerAccess ref
         form.playerAccess = JSON.stringify(playerAccess.value);
-        // Pass the current form state explicitly to ensure all changes are included
-        await mutation(form);
+        
+        // Build the payload explicitly to ensure all fields are included
+        const payload = {
+          id: form.id,
+          name: form.name,
+          description: form.description || null,
+          fileLocation: form.fileLocation,
+          status: form.status || "rehearsal", // Ensure status is always set
+          visibility: form.visibility !== undefined ? form.visibility : null,
+          cover: form.cover || null,
+          playerAccess: form.playerAccess || null,
+          owner: form.owner, // Include owner if set
+        };
+        
+        // Pass the explicit payload to ensure all changes are included
+        await mutation(payload);
         message.success("Stage updated successfully!");
         store.commit("cache/UPDATE_STAGE_VISIBILITY", {
           stageId: form.id,
