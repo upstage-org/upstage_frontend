@@ -538,7 +538,24 @@ export default {
         if (session.leaving) {
           return state.sessions.splice(index, 1);
         } else {
-          Object.assign(state.sessions[index], session);
+          // Preserve existing avatarId if not explicitly provided in update
+          // This handles cases where:
+          // 1. User is inactive but still holds avatar (preserve avatarId)
+          // 2. User explicitly releases avatar (avatarId: null clears it)
+          // 3. User switches avatar (avatarId: newId updates it)
+          const existingAvatarId = state.sessions[index].avatarId;
+          // Only update avatarId if explicitly provided in the session update
+          const shouldUpdateAvatarId = 'avatarId' in session;
+          // Create update object without avatarId if not provided
+          const updateData = { ...session };
+          if (!shouldUpdateAvatarId) {
+            delete updateData.avatarId;
+          }
+          Object.assign(state.sessions[index], updateData);
+          // Restore avatarId if it wasn't in the update
+          if (!shouldUpdateAvatarId) {
+            state.sessions[index].avatarId = existingAvatarId;
+          }
         }
       } else {
         state.sessions.push(session);
