@@ -217,6 +217,9 @@ export default {
       state.model = model;
       if (model) {
         const media = model.assets;
+        // Collect assigned media identifiers for filtering objects
+        const assignedMediaFileLocations = new Set();
+        const assignedMediaSrcs = new Set();
         if (media && media.length) {
           media.forEach((item) => {
             if (item.assetType?.name === "video") {
@@ -232,6 +235,13 @@ export default {
             if (item.multi) {
               item.frames = item.frames.map((src) => absolutePath(src));
             }
+            // Track assigned media identifiers
+            if (item.fileLocation) {
+              assignedMediaFileLocations.add(item.fileLocation);
+            }
+            if (item.src) {
+              assignedMediaSrcs.add(item.src);
+            }
             const key = item.assetType?.name + "s";
             if (!state.tools[key]) {
               state.tools[key] = [];
@@ -241,6 +251,28 @@ export default {
         } else {
           state.preloading = false;
         }
+        // Filter out objects whose source media is no longer assigned
+        // Keep objects that don't have fileLocation or src (like drawings, texts) as they're not media-based
+        state.board.objects = state.board.objects.filter((object) => {
+          // If object doesn't have fileLocation or src, it's not media-based (e.g., drawing, text) - keep it
+          if (!object.fileLocation && !object.src) {
+            return true;
+          }
+          // If no media is assigned, remove all media-based objects
+          if (!media || !media.length) {
+            return false;
+          }
+          // If object has fileLocation, check if the media is still assigned
+          if (object.fileLocation && assignedMediaFileLocations.has(object.fileLocation)) {
+            return true;
+          }
+          // If object has src, check if the media is still assigned (matching by absolute path)
+          if (object.src && assignedMediaSrcs.has(object.src)) {
+            return true;
+          }
+          // Object's media is no longer assigned - remove it
+          return false;
+        });
         const config = useAttribute({ value: model }, "config", true).value;
         if (config) {
           Object.assign(state.config, config);
