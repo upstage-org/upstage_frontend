@@ -174,7 +174,7 @@
 </template>
 
 <script>
-import { reactive, ref } from "vue";
+import { reactive, ref, watch, computed } from "vue";
 import Selectable from "components/Selectable.vue";
 import SaveButton from "components/form/SaveButton.vue";
 import { message } from "ant-design-vue";
@@ -196,7 +196,8 @@ export default {
     const stage = inject("stage");
     const refresh = inject("refresh");
     const store = useStore();
-    const config = useAttribute(stage, "config", true).value ?? {
+    const configAttribute = useAttribute(stage, "config", true);
+    const config = computed(() => configAttribute.value ?? {
       ratio: {
         width: 16,
         height: 9,
@@ -209,12 +210,27 @@ export default {
       },
       defaultcolor: "#30AC45",
       enabledLiveStreaming: true,
-    };
+    });
 
-    const selectedRatio = reactive(config.ratio);
-    const animations = reactive(config.animations);
-    const defaultcolor = ref(config.defaultcolor || "#30AC45");
-    const enabledLiveStreaming = ref(config.enabledLiveStreaming ?? true);
+    const selectedRatio = reactive(config.value.ratio);
+    const animations = reactive(config.value.animations);
+    const defaultcolor = ref(config.value.defaultcolor || "#30AC45");
+    const enabledLiveStreaming = ref(config.value.enabledLiveStreaming ?? true);
+
+    // Watch for config changes (e.g., after refresh) and update enabledLiveStreaming
+    // This ensures the toggle reflects the saved state after refresh
+    watch(config, (newConfig) => {
+      if (newConfig) {
+        // Update enabledLiveStreaming if it's explicitly set in the config
+        if (typeof newConfig.enabledLiveStreaming === 'boolean') {
+          enabledLiveStreaming.value = newConfig.enabledLiveStreaming;
+        }
+        // Update defaultcolor if it exists in the config
+        if (newConfig.defaultcolor) {
+          defaultcolor.value = newConfig.defaultcolor;
+        }
+      }
+    }, { deep: true, immediate: false });
 
     const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
     const saveCustomisation = async () => {
