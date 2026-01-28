@@ -120,6 +120,7 @@ export default {
           $cover: String
           $playerAccess: String
           $owner: ID
+          $config: String
         ) {
           updateStage(
             input: {
@@ -132,6 +133,7 @@ export default {
               cover: $cover
               playerAccess: $playerAccess
               owner: $owner
+              config: $config
             }
           ) {
             ...stageFragment

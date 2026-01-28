@@ -301,59 +301,86 @@ export default {
       }
     }, { deep: true });
 
-    const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
+    const { loading: saving, mutation } = useMutation(stageGraph.updateStage);
     const saveCustomisation = async () => {
-      // Ensure all settings are explicitly included in the config
-      const configData = JSON.stringify({
+      // Build config object with ALL current values - ensure nothing is missing
+      const configObject = {
         ratio: {
-          width: selectedRatio.width,
-          height: selectedRatio.height,
+          width: Number(selectedRatio.width) || 16,
+          height: Number(selectedRatio.height) || 9,
         },
         animations: {
-          bubble: animations.bubble,
-          curtain: animations.curtain,
-          bubbleSpeed: animations.bubbleSpeed,
-          curtainSpeed: animations.curtainSpeed,
+          bubble: animations.bubble || "fade",
+          curtain: animations.curtain || "drop",
+          bubbleSpeed: Number(animations.bubbleSpeed) || 1000,
+          curtainSpeed: Number(animations.curtainSpeed) || 5000,
         },
-        defaultcolor: defaultcolor.value,
-        enabledLiveStreaming: enabledLiveStreaming.value, // Explicitly include boolean value
-      });
+        defaultcolor: defaultcolor.value || "#30AC45",
+        enabledLiveStreaming: Boolean(enabledLiveStreaming.value), // Explicitly convert to boolean - THIS IS THE KEY FIX
+      };
+      
+      // Stringify the config - this ensures enabledLiveStreaming is included in the JSON
+      const configData = JSON.stringify(configObject);
+      
+      // Get current visibility from stage - preserve existing value
+      const visibility = stage.value?.visibility !== undefined 
+        ? Boolean(stage.value.visibility)
+        : null;
+      
+      // Preserve all other stage fields when saving customisation
+      const payload = {
+        id: stage.value.id,
+        name: stage.value.name || null, // Preserve name
+        description: stage.value.description || null, // Preserve description
+        fileLocation: stage.value.fileLocation || null, // Preserve fileLocation
+        status: stage.value.status || null, // Preserve status
+        visibility: visibility, // Current visibility value
+        cover: stage.value.attributes?.find(a => a.name === 'cover')?.description || null, // Preserve cover
+        playerAccess: stage.value.attributes?.find(a => a.name === 'playerAccess')?.description || null, // Preserve playerAccess
+        owner: stage.value.owner?.id || null, // Preserve owner
+        config: configData, // NEW config with enabledLiveStreaming
+      };
       
       try {
-        await save(
-          () => {
-            message.success("Customisation saved!");
-            // Small delay to ensure backend has processed the save before refreshing
-            setTimeout(() => {
-              refresh(stage.value.id);
-            }, 200);
-          },
-          stage.value.id,
-          configData,
-          stage.value.visibility
-        );
+        console.log('Saving customisation:', {
+          stageId: payload.id,
+          config: configObject,
+          configJSON: configData,
+          enabledLiveStreaming: configObject.enabledLiveStreaming,
+          visibility: visibility
+        });
+        
+        await mutation(payload);
+        message.success("Customisation saved!");
+        
+        // Small delay to ensure backend has processed the save before refreshing
+        setTimeout(() => {
+          refresh(stage.value.id);
+        }, 200);
+        
+        // Publish MQTT message after successful save
+        const mqtt = buildClient();
+        const client = mqtt.connect();
+        client.publish(namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
+          JSON.stringify(
+            {
+              type: "setBackdropColor",
+              color: defaultcolor.value,
+            }),
+            { qos: 1, retain: false },
+            (error, res) => {
+              if (error) {
+                console.error("MQTT publish error:", error);
+              } else {
+                console.log("MQTT publish success:", res);
+                mqtt.disconnect();
+              }
+            }
+          );
       } catch (error) {
         console.error('Error saving customisation:', error);
         message.error('Failed to save customisation. Please try again.');
       }
-      const mqtt = buildClient();
-      const client = mqtt.connect();
-      client.publish(namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
-        JSON.stringify(
-          {
-            type: "setBackdropColor",
-            color: defaultcolor.value,
-          }),
-          { qos: 1, retain: false },
-          (error, res) => {
-            if (error) {
-              console.error("MQTT publish error:", error);
-            } else {
-              console.log("MQTT publish success:", res);
-              mqtt.disconnect();
-            }
-          }
-        );
     };
 
     const sendBackdropColor = (color) => {

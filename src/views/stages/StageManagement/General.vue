@@ -331,40 +331,57 @@ export default {
     };
     const updateStage = async () => {
       try {
-        // Ensure all fields are explicitly set before saving
-        // Preserve visibility when it might have been omitted (e.g. stale form)
-        if (form.id && typeof form.visibility === "undefined" && typeof stage.value?.visibility !== "undefined") {
-          form.visibility = stage.value.visibility;
-        }
-        
         // Ensure playerAccess is set from the reactive playerAccess ref
-        form.playerAccess = JSON.stringify(playerAccess.value);
+        const playerAccessJson = JSON.stringify(playerAccess.value || []);
         
         // Ensure status is explicitly set (default to "rehearsal" if not set)
         // Status must be either "live" or "rehearsal"
-        if (!form.status || (form.status !== "live" && form.status !== "rehearsal")) {
-          form.status = "rehearsal";
-        }
+        const statusValue = (form.status === "live" || form.status === "rehearsal") 
+          ? form.status 
+          : "rehearsal";
         
-        // Build the payload explicitly to ensure all fields are included
+        // Get current visibility - preserve boolean value, default to true if undefined
+        const visibilityValue = form.visibility !== undefined 
+          ? Boolean(form.visibility)
+          : (stage.value?.visibility !== undefined ? Boolean(stage.value.visibility) : true);
+        
+        // Preserve existing config - get it from stage attributes if it exists
+        const existingConfigAttr = stage.value?.attributes?.find(a => a.name === 'config');
+        const existingConfig = existingConfigAttr?.description || null;
+        
+        // Build the payload with ALL current values - only set to null if field explicitly allows null
         const payload = {
           id: form.id,
-          name: form.name,
-          description: form.description || null,
-          fileLocation: form.fileLocation,
-          status: form.status, // Status is always explicitly set above - either "live" or "rehearsal"
-          visibility: form.visibility !== undefined ? form.visibility : null,
-          cover: form.cover || null,
-          playerAccess: form.playerAccess || null,
-          owner: form.owner || null,
+          name: form.name || "", // Name is required, use empty string if missing
+          description: form.description !== undefined ? form.description : null, // Description can be null
+          fileLocation: form.fileLocation || "", // fileLocation is required
+          status: statusValue, // Always "live" or "rehearsal"
+          visibility: visibilityValue, // Always a boolean
+          cover: form.cover !== undefined ? form.cover : null, // Cover can be null
+          playerAccess: playerAccessJson, // Always a JSON string (can be "[]")
+          owner: form.owner !== undefined ? form.owner : null, // Owner can be null
+          config: existingConfig, // Preserve existing config from Customisation page
         };
+        
+        console.log('Saving General Information:', {
+          stageId: payload.id,
+          name: payload.name,
+          description: payload.description,
+          fileLocation: payload.fileLocation,
+          status: payload.status,
+          visibility: payload.visibility,
+          cover: payload.cover,
+          playerAccess: payload.playerAccess,
+          owner: payload.owner,
+          config: payload.config ? 'preserved' : 'none',
+        });
         
         // Pass the explicit payload to ensure all changes are included
         await mutation(payload);
         message.success("Stage updated successfully!");
         store.commit("cache/UPDATE_STAGE_VISIBILITY", {
           stageId: form.id,
-          visibility: form.visibility,
+          visibility: visibilityValue,
         });
         console.log(clearCache);
         clearCache();
