@@ -347,27 +347,17 @@ export default {
         }
         
         // Build the payload explicitly to ensure all fields are included
-        // Send actual values, not null (GraphQL will omit null fields)
         const payload = {
           id: form.id,
           name: form.name,
-          description: form.description || "",
+          description: form.description || null,
           fileLocation: form.fileLocation,
           status: form.status, // Status is always explicitly set above - either "live" or "rehearsal"
-          visibility: form.visibility !== undefined ? form.visibility : true,
-          cover: form.cover || "",
-          playerAccess: form.playerAccess || "[]", // Empty array as JSON string
-          owner: form.owner || undefined, // Omit if not set
+          visibility: form.visibility !== undefined ? form.visibility : null,
+          cover: form.cover || null,
+          playerAccess: form.playerAccess || null,
+          owner: form.owner || null,
         };
-        
-        // Remove undefined values so GraphQL doesn't send them
-        Object.keys(payload).forEach(key => {
-          if (payload[key] === undefined) {
-            delete payload[key];
-          }
-        });
-        
-        console.log('Saving stage payload:', payload); // Debug log
         
         // Pass the explicit payload to ensure all changes are included
         await mutation(payload);
