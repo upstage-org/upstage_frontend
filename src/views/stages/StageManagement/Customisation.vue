@@ -197,7 +197,9 @@ export default {
     const refresh = inject("refresh");
     const store = useStore();
     const configAttribute = useAttribute(stage, "config", true);
-    const config = computed(() => configAttribute.value ?? {
+    
+    // Helper function to get default config
+    const getDefaultConfig = () => ({
       ratio: {
         width: 16,
         height: 9,
@@ -212,43 +214,128 @@ export default {
       enabledLiveStreaming: true,
     });
 
-    const selectedRatio = reactive(config.value.ratio);
-    const animations = reactive(config.value.animations);
-    const defaultcolor = ref(config.value.defaultcolor || "#30AC45");
-    const enabledLiveStreaming = ref(config.value.enabledLiveStreaming ?? true);
+    const config = computed(() => {
+      const savedConfig = configAttribute.value;
+      return savedConfig ?? getDefaultConfig();
+    });
 
-    // Watch for config changes (e.g., after refresh) and update enabledLiveStreaming
-    // This ensures the toggle reflects the saved state after refresh
-    watch(config, (newConfig) => {
-      if (newConfig) {
-        // Update enabledLiveStreaming if it's explicitly set in the config
-        if (typeof newConfig.enabledLiveStreaming === 'boolean') {
-          enabledLiveStreaming.value = newConfig.enabledLiveStreaming;
+    // Initialize reactive values from config
+    const initialConfig = config.value;
+    const selectedRatio = reactive({ 
+      width: initialConfig.ratio?.width ?? 16, 
+      height: initialConfig.ratio?.height ?? 9 
+    });
+    const animations = reactive({ 
+      bubble: initialConfig.animations?.bubble ?? "fade",
+      curtain: initialConfig.animations?.curtain ?? "drop",
+      bubbleSpeed: initialConfig.animations?.bubbleSpeed ?? 1000,
+      curtainSpeed: initialConfig.animations?.curtainSpeed ?? 5000,
+    });
+    const defaultcolor = ref(initialConfig.defaultcolor ?? "#30AC45");
+    const enabledLiveStreaming = ref(
+      typeof initialConfig.enabledLiveStreaming === 'boolean' 
+        ? initialConfig.enabledLiveStreaming 
+        : true
+    );
+
+    // Helper function to update all settings from config
+    const updateSettingsFromConfig = (parsedConfig) => {
+      if (!parsedConfig) return;
+      
+      // Update enabledLiveStreaming - explicitly check for boolean to preserve false values
+      if (typeof parsedConfig.enabledLiveStreaming === 'boolean') {
+        enabledLiveStreaming.value = parsedConfig.enabledLiveStreaming;
+      }
+      
+      // Update defaultcolor - check if it exists (including empty string)
+      // Always update if it's defined, even if it's an empty string
+      if (parsedConfig.defaultcolor !== undefined && parsedConfig.defaultcolor !== null) {
+        defaultcolor.value = parsedConfig.defaultcolor;
+      }
+      
+      // Update ratio if it exists - update both properties explicitly
+      if (parsedConfig.ratio) {
+        if (typeof parsedConfig.ratio.width === 'number') {
+          selectedRatio.width = parsedConfig.ratio.width;
         }
-        // Update defaultcolor if it exists in the config
-        if (newConfig.defaultcolor) {
-          defaultcolor.value = newConfig.defaultcolor;
+        if (typeof parsedConfig.ratio.height === 'number') {
+          selectedRatio.height = parsedConfig.ratio.height;
         }
       }
-    }, { deep: true, immediate: false });
+      
+      // Update animations if they exist - update all properties explicitly
+      if (parsedConfig.animations) {
+        if (parsedConfig.animations.bubble !== undefined) {
+          animations.bubble = parsedConfig.animations.bubble;
+        }
+        if (parsedConfig.animations.curtain !== undefined) {
+          animations.curtain = parsedConfig.animations.curtain;
+        }
+        if (typeof parsedConfig.animations.bubbleSpeed === 'number') {
+          animations.bubbleSpeed = parsedConfig.animations.bubbleSpeed;
+        }
+        if (typeof parsedConfig.animations.curtainSpeed === 'number') {
+          animations.curtainSpeed = parsedConfig.animations.curtainSpeed;
+        }
+      }
+    };
+
+    // Watch configAttribute directly to catch when the config is loaded/updated
+    watch(configAttribute, (newConfigValue) => {
+      updateSettingsFromConfig(newConfigValue);
+    }, { immediate: true });
+    
+    // Also watch stage attributes to catch when stage is refreshed
+    watch(() => stage.value?.attributes, (newAttributes) => {
+      if (newAttributes) {
+        const configAttr = newAttributes.find(a => a.name === 'config');
+        if (configAttr?.description) {
+          try {
+            const parsedConfig = JSON.parse(configAttr.description);
+            updateSettingsFromConfig(parsedConfig);
+          } catch (e) {
+            // Ignore parse errors
+            console.error('Error parsing config:', e);
+          }
+        }
+      }
+    }, { deep: true });
 
     const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
     const saveCustomisation = async () => {
+      // Ensure all settings are explicitly included in the config
       const configData = JSON.stringify({
-        ratio: selectedRatio,
-        animations,
-        defaultcolor: defaultcolor.value,
-        enabledLiveStreaming: enabledLiveStreaming.value,
-      });
-      await save(
-        () => {
-          message.success("Customisation saved!");
-          refresh(stage.value.id);
+        ratio: {
+          width: selectedRatio.width,
+          height: selectedRatio.height,
         },
-        stage.value.id,
-        configData,
-        stage.value.visibility
-      );
+        animations: {
+          bubble: animations.bubble,
+          curtain: animations.curtain,
+          bubbleSpeed: animations.bubbleSpeed,
+          curtainSpeed: animations.curtainSpeed,
+        },
+        defaultcolor: defaultcolor.value,
+        enabledLiveStreaming: enabledLiveStreaming.value, // Explicitly include boolean value
+      });
+      
+      try {
+        await save(
+          () => {
+            message.success("Customisation saved!");
+            // Small delay to ensure backend has processed the save before refreshing
+            setTimeout(() => {
+              refresh(stage.value.id);
+            }, 200);
+          },
+          stage.value.id,
+          configData,
+          stage.value.visibility
+        );
+      } catch (error) {
+        console.error('Error saving customisation:', error);
+        message.error('Failed to save customisation. Please try again.');
+      }
       const mqtt = buildClient();
       const client = mqtt.connect();
       client.publish(namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
