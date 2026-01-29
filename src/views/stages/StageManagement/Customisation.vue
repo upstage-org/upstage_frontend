@@ -303,7 +303,9 @@ export default {
 
     const { loading: saving, mutation } = useMutation(stageGraph.updateStage);
     const saveCustomisation = async () => {
-      // Build config object with ALL current values - ensure nothing is missing
+      // ALWAYS send ALL current values to backend - no conditional logic
+      // Build config object with ALL current customisation values
+
       const configObject = {
         ratio: {
           width: Number(selectedRatio.width) || 16,
@@ -316,48 +318,62 @@ export default {
           curtainSpeed: Number(animations.curtainSpeed) || 5000,
         },
         defaultcolor: defaultcolor.value || "#30AC45",
-        enabledLiveStreaming: Boolean(enabledLiveStreaming.value), // Explicitly convert to boolean - THIS IS THE KEY FIX
+        enabledLiveStreaming: Boolean(enabledLiveStreaming.value),
       };
-      
-      // Stringify the config - this ensures enabledLiveStreaming is included in the JSON
+
+      // Stringify the config
       const configData = JSON.stringify(configObject);
-      
-      // Get current visibility from stage - preserve existing value
-      const visibility = stage.value?.visibility !== undefined 
+
+      // Get ALL current stage values - ALWAYS send everything
+      const statusValue = stage.value?.status || "rehearsal";
+      const visibilityValue = stage.value?.visibility !== undefined
         ? Boolean(stage.value.visibility)
-        : null;
-      
-      // Preserve all other stage fields when saving customisation
+        : true;
+      const coverValue = stage.value?.attributes?.find(a => a.name === 'cover')?.description || "";
+      const playerAccessValue = stage.value?.attributes?.find(a => a.name === 'playerAccess')?.description || "[]";
+      const ownerValue = stage.value?.owner?.id || null;
+      const nameValue = stage.value?.name || "";
+      const descriptionValue = stage.value?.description || "";
+      const fileLocationValue = stage.value?.fileLocation || "";
+
+      // Build the payload with ALL current values - ALWAYS send everything
       const payload = {
         id: stage.value.id,
-        name: stage.value.name || null, // Preserve name
-        description: stage.value.description || null, // Preserve description
-        fileLocation: stage.value.fileLocation || null, // Preserve fileLocation
-        status: stage.value.status || null, // Preserve status
-        visibility: visibility, // Current visibility value
-        cover: stage.value.attributes?.find(a => a.name === 'cover')?.description || null, // Preserve cover
-        playerAccess: stage.value.attributes?.find(a => a.name === 'playerAccess')?.description || null, // Preserve playerAccess
-        owner: stage.value.owner?.id || null, // Preserve owner
-        config: configData, // NEW config with enabledLiveStreaming
+        name: nameValue,
+        description: descriptionValue,
+        fileLocation: fileLocationValue,
+        status: statusValue,
+        visibility: visibilityValue,
+        cover: coverValue,
+        playerAccess: playerAccessValue,
+        owner: ownerValue,
+        config: configData,
       };
-      
+
       try {
-        console.log('Saving customisation:', {
+        console.log('Saving Customisation with ALL values:', {
           stageId: payload.id,
+          name: payload.name,
+          description: payload.description,
+          fileLocation: payload.fileLocation,
+          status: payload.status,
+          visibility: payload.visibility,
+          cover: payload.cover,
+          playerAccess: payload.playerAccess,
+          owner: payload.owner,
           config: configObject,
           configJSON: configData,
-          enabledLiveStreaming: configObject.enabledLiveStreaming,
-          visibility: visibility
         });
-        
+
+        // Send the complete payload to backend
         await mutation(payload);
         message.success("Customisation saved!");
-        
+
         // Small delay to ensure backend has processed the save before refreshing
         setTimeout(() => {
           refresh(stage.value.id);
         }, 200);
-        
+
         // Publish MQTT message after successful save
         const mqtt = buildClient();
         const client = mqtt.connect();

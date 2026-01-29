@@ -331,39 +331,50 @@ export default {
     };
     const updateStage = async () => {
       try {
-        // Ensure playerAccess is set from the reactive playerAccess ref
+        // ALWAYS send ALL current values to backend - no conditional logic
+        // Backend will handle defaults if values are missing
+
+        // PlayerAccess - always send current value as JSON string
         const playerAccessJson = JSON.stringify(playerAccess.value || []);
-        
-        // Ensure status is explicitly set (default to "rehearsal" if not set)
-        // Status must be either "live" or "rehearsal"
-        const statusValue = (form.status === "live" || form.status === "rehearsal") 
-          ? form.status 
+
+        // Status - always send current value, must be "live" or "rehearsal"
+        const statusValue = (form.status === "live" || form.status === "rehearsal")
+          ? form.status
           : "rehearsal";
-        
-        // Get current visibility - preserve boolean value, default to true if undefined
-        const visibilityValue = form.visibility !== undefined 
+
+        // Visibility - always send current boolean value
+        const visibilityValue = form.visibility !== undefined
           ? Boolean(form.visibility)
           : (stage.value?.visibility !== undefined ? Boolean(stage.value.visibility) : true);
-        
-        // Preserve existing config - get it from stage attributes if it exists
+
+        // Cover - always send current value (can be empty string or URL)
+        const coverValue = form.cover || "";
+
+        // Owner - always send current value
+        const ownerValue = form.owner || stage.value?.owner?.id || null;
+
+        // Config - preserve existing config from Customisation page
         const existingConfigAttr = stage.value?.attributes?.find(a => a.name === 'config');
-        const existingConfig = existingConfigAttr?.description || null;
-        
-        // Build the payload with ALL current values - only set to null if field explicitly allows null
+        const configValue = existingConfigAttr?.description || null;
+
+        // Description - send current value (can be empty string)
+        const descriptionValue = form.description !== undefined ? form.description : "";
+
+        // Build the payload with ALL current values - ALWAYS send everything
         const payload = {
           id: form.id,
-          name: form.name || "", // Name is required, use empty string if missing
-          description: form.description !== undefined ? form.description : null, // Description can be null
-          fileLocation: form.fileLocation || "", // fileLocation is required
-          status: statusValue, // Always "live" or "rehearsal"
-          visibility: visibilityValue, // Always a boolean
-          cover: form.cover !== undefined ? form.cover : null, // Cover can be null
-          playerAccess: playerAccessJson, // Always a JSON string (can be "[]")
-          owner: form.owner !== undefined ? form.owner : null, // Owner can be null
-          config: existingConfig, // Preserve existing config from Customisation page
+          name: form.name || "",
+          description: descriptionValue,
+          fileLocation: form.fileLocation || "",
+          status: statusValue,
+          visibility: visibilityValue,
+          cover: coverValue,
+          playerAccess: playerAccessJson,
+          owner: ownerValue,
+          config: configValue,
         };
-        
-        console.log('Saving General Information:', {
+
+        console.log('Saving General Information with ALL values:', {
           stageId: payload.id,
           name: payload.name,
           description: payload.description,
@@ -375,15 +386,18 @@ export default {
           owner: payload.owner,
           config: payload.config ? 'preserved' : 'none',
         });
-        
-        // Pass the explicit payload to ensure all changes are included
+
+        // Send the complete payload to backend
         await mutation(payload);
         message.success("Stage updated successfully!");
+
+        // Update Vuex cache
         store.commit("cache/UPDATE_STAGE_VISIBILITY", {
           stageId: form.id,
           visibility: visibilityValue,
         });
-        console.log(clearCache);
+
+        // Clear cache to force refresh
         clearCache();
       } catch (error) {
         handleError(error);
