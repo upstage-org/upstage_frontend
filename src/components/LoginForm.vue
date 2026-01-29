@@ -99,7 +99,7 @@
           </div>
           <div class="field">
             <p class="control has-icons-left has-icons-right">
-              <input class="input" :type="showPassword ? 'text' : 'password'" placeholder="Confirm Password"
+              <input class="input" :type="showPassword ? 'text' : 'password'" placeholder="Confirm password"
                 v-model="passwordConfirm" required />
               <span class="icon is-small is-left">
                 <i class="fas fa-lock"></i>
