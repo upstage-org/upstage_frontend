@@ -31,9 +31,9 @@
         <label class="label">{{ $t("stage_name") }}</label>
       </div>
       <div class="field-body">
-        <Field placeholder="Full Name" v-model="form.name" required requiredMessage="Stage name is required" expanded
+        <Field placeholder="Full name" v-model="form.name" required requiredMessage="Stage name is required." expanded
           class="half-flex" />
-        <Field required placeholder="URL" v-model="form.fileLocation" requiredMessage="URL is required" expanded
+        <Field required placeholder="URL" v-model="form.fileLocation" requiredMessage="URL is required." expanded
           @keyup="urlValid = null" @input="checkURL" :right="validatingURL
             ? 'fas fa-circle-notch fa-spin'
             : urlValid === true
@@ -55,7 +55,7 @@
         <div class="field">
           <div class="control">
             <textarea class="textarea"
-              placeholder="enter a description that will appear on the screen while your Stage is loading."
+              placeholder="Enter a description that will appear on the screen while your stage is loading"
               v-model="form.description"></textarea>
           </div>
         </div>
