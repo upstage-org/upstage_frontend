@@ -29,8 +29,12 @@ const draw = (ctx, { fromX, fromY, x, y, size, color }) => {
 
 const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
 
+const DEFAULT_STROKE_COLOR = "#000000";
+
 const execute = async (ctx, command, animate) => {
-  const { type, size, color, lines } = command;
+  // Use this command's own color so changing the colour picker doesn't affect previous strokes
+  const color = command.color ?? DEFAULT_STROKE_COLOR;
+  const { type, size, lines } = command;
   if (lines && lines.length) {
     if (type === "draw") {
       for (let i = 0; i < lines.length; i++) {
@@ -58,10 +62,10 @@ const execute = async (ctx, command, animate) => {
     }
   } else {
     if (type === "draw") {
-      if (command.fromX && command.fromY) {
-        draw(ctx, command);
+      if (command.fromX != null && command.fromY != null) {
+        draw(ctx, { ...command, color });
       } else {
-        drawDot(ctx, command);
+        drawDot(ctx, { ...command, color });
       }
     } else {
       eraseDot(ctx, command);

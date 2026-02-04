@@ -278,7 +278,7 @@ export default {
           Object.assign(state.config, config);
           state.config.ratio = config.ratio.width / config.ratio.height;
           state.backdropColor = config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
-          state.enabledLiveStreaming = typeof (config?.enabledLiveStreaming) ===  'boolean' ? config?.enabledLiveStreaming : true
+          state.enabledLiveStreaming = typeof (config?.enabledLiveStreaming) === 'boolean' ? config?.enabledLiveStreaming : true
         }
         const cover = useAttribute({ value: model }, "cover", false).value;
         state.model.cover = cover && absolutePath(cover);
@@ -662,11 +662,18 @@ export default {
         state.board.whiteboard = [];
       }
       switch (message.type) {
-        case DRAW_ACTIONS.NEW_LINE:
+        case DRAW_ACTIONS.NEW_LINE: {
+          // Store a copy with per-stroke color so changing the colour picker doesn't affect previous lines
+          const cmd = message.command ?? {};
+          const commandWithColor = {
+            ...cmd,
+            color: cmd.color ?? "#000000",
+          };
           state.board.whiteboard = state.board.whiteboard.concat(
-            message.command,
+            commandWithColor,
           );
           break;
+        }
         case DRAW_ACTIONS.UNDO:
           state.board.whiteboard = state.board.whiteboard.filter(
             (e, i) => i !== message.index,
@@ -741,10 +748,10 @@ export default {
     SET_PURCHASE_POPUP(state, purchase) {
       state.purchasePopup = purchase;
       if (purchase.isActive) {
-          state.receiptPopup.donationDetails = {
-            ...purchase,
-            date: new Date().toLocaleDateString(),
-          };
+        state.receiptPopup.donationDetails = {
+          ...purchase,
+          date: new Date().toLocaleDateString(),
+        };
       }
     },
     ADD_TRACK(state, track) {

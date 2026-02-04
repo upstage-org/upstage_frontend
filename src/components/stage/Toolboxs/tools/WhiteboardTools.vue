@@ -94,14 +94,15 @@ export default {
 
     watch(history, (val) => {
       if (history.length) {
-        let command = val[0];
+        const lastStroke = val[val.length - 1];
         const ratio = 1 / stageSize.value.height;
-        command = {
-          ...command,
-          size: command.size * ratio,
-          x: command.x * ratio,
-          y: command.y * ratio,
-          lines: command.lines.map((line) => ({
+        const command = {
+          ...lastStroke,
+          color: lastStroke.color ?? "#000000",
+          size: lastStroke.size * ratio,
+          x: lastStroke.x * ratio,
+          y: lastStroke.y * ratio,
+          lines: lastStroke.lines.map((line) => ({
             x: line.x * ratio,
             y: line.y * ratio,
             fromX: line.fromX * ratio,
