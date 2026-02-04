@@ -248,7 +248,7 @@ const { result, loading } = useQuery<StudioGraph>(
     }
   `,
   {},
-  { fetchPolicy: "cache-only" } as any
+  { fetchPolicy: "cache-first" } as any
 );
 const mediaTypes = computed(() => {
   if (result.value?.mediaTypes) {
@@ -685,6 +685,29 @@ const getUserDisplayName = (user: User) => {
           <a-tabs>
             <a-tab-pane key="stages" tab="Stages" class="pb-4">
               <StageAssignment v-model="stageIds as any" />
+            </a-tab-pane>
+            <a-tab-pane key="tags" tab="Tags" class="pb-4">
+              <div class="p-4">
+                <a-form-item :label="$t('tags')">
+                  <a-select
+                    v-model:value="tags"
+                    mode="tags"
+                    :placeholder="$t('tags')"
+                    style="width: 100%"
+                    :options="
+                      result?.tags
+                        ? result.tags.map((node) => ({
+                            value: node.name,
+                            label: node.name,
+                          }))
+                        : []
+                    "
+                  />
+                </a-form-item>
+                <p class="text-gray-500 text-sm">
+                  Add tags to make this item easier to find when filtering (e.g. for a person or project).
+                </p>
+              </div>
             </a-tab-pane>
             <a-tab-pane key="permissions" tab="Permissions">
               <MediaPermissions
