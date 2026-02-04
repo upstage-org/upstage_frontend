@@ -1,6 +1,6 @@
 <template>
   <transition @leave="leave">
-    <section v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading)"
+    <section v-if="!ready || !clicked || (!isLive && !canPlay && !masquerading)"
       class="hero is-fullheight is-fullwidth cover-image" :class="{ replaying }" @click="clicked = true" :style="{
         'background-image': model && `url(&quot;${model.cover || '/img/greencurtain.jpg'}&quot;)`,
         'background-color': backdropColor
@@ -14,7 +14,7 @@
             <h2 v-if="model.description" class="subtittle">
               {{ model.description }}
             </h2>
-            <template v-if="status !== 'live' && !canPlay">
+            <template v-if="!isLive && !canPlay">
               <span v-if="status" class="tag is-dark">{{
                 status.toUpperCase()
               }}</span>&nbsp;
@@ -100,9 +100,11 @@ export default {
     );
 
     const status = useAttribute(model, "status");
+    /** Only when stage is Live (not rehearsal) can anyone enter; compare case-insensitively */
+    const isLive = computed(() => (status.value && String(status.value).toLowerCase()) === "live");
     const timer = ref();
     watch(model, (val) => {
-      if (val && status.value === "live") {
+      if (val && isLive.value) {
         timer.value = setTimeout(stopLoading, 60000);
       }
     });
@@ -148,6 +150,7 @@ export default {
       leave,
       backdropColor,
       status,
+      isLive,
       canPlay,
       masquerading
     };
