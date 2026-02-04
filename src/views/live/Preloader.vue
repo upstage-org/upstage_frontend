@@ -99,7 +99,9 @@ export default {
       { immediate: true },
     );
 
-    const status = useAttribute(model, "status");
+    /** Status comes from top-level model.status (stageList API), or from attributes for get_stage_by_id */
+    const statusFromAttr = useAttribute(model, "status");
+    const status = computed(() => model.value?.status ?? statusFromAttr.value);
     /** Only when stage is Live (not rehearsal) can anyone enter; compare case-insensitively */
     const isLive = computed(() => (status.value && String(status.value).toLowerCase()) === "live");
     const timer = ref();
