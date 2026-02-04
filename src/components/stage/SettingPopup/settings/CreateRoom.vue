@@ -8,9 +8,9 @@
         <Field
           v-model="form.name"
           required
-          required-message="Room name is required"
-          pattern="^[^?&:&quot;'%#]+$"
-          title="Meeting name should not contain any of these characters: ?, &, :, ', &quot;, %, #."
+          required-message="Room name is required."
+          pattern="^[^?&:"'%#]+$"
+          title="Meeting name should not contain any of these characters: ?, &, :, ', ", %, #."
         >
         </Field>
       </HorizontalField>
