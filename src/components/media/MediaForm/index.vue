@@ -99,7 +99,7 @@ watch(editingMediaResult, () => {
     const { editingMedia } = editingMediaResult.value;
     name.value = editingMedia.name;
     type.value = editingMedia.assetType.name;
-    tags.value = editingMedia.tags;
+    tags.value = Array.isArray(editingMedia.tags) ? editingMedia.tags : [];
     owner.value = editingMedia.owner.username;
     copyrightLevel.value = editingMedia.copyrightLevel;
     const attributes = JSON.parse(editingMedia.description || "{}") as MediaAttributes;
@@ -126,13 +126,19 @@ watch(editingMediaResult, () => {
     }
     Object.assign(voice, getDefaultAvatarVoice());
     if (attributes?.voice && attributes.voice.voice) {
-      Object.assign(voice, attributes.voice);
+      voice.voice = attributes.voice.voice ?? "";
+      voice.variant = attributes.voice.variant ?? voice.variant;
+      voice.pitch = Number(attributes.voice.pitch) || 50;
+      voice.speed = Number(attributes.voice.speed) || 1;
+      voice.amplitude = Number(attributes.voice.amplitude) || 50;
     }
     link.url = "";
     link.blank = true;
     link.effect = false;
     if (attributes?.link) {
-      Object.assign(link, attributes.link);
+      link.url = attributes.link.url ?? "";
+      link.blank = attributes.link.blank !== false;
+      link.effect = !!attributes.link.effect;
     }
     note.value = attributes?.note ?? "";
     if (editingMedia.stages) {
@@ -279,13 +285,23 @@ const { progress, saveMedia, saving } = useSaveMedia(
         owner: owner.value,
         stageIds: stageIds.value,
         userIds: userIds.value,
-        tags: tags.value,
+        tags: Array.isArray(tags.value) ? tags.value : [],
         w: Number.isFinite(Number(frameSize.value?.width)) ? Number(frameSize.value.width) : 100,
         h: Number.isFinite(Number(frameSize.value?.height)) ? Number(frameSize.value.height) : 100,
-        note: note.value,
+        note: note.value ?? "",
         urls: [],
-        voice,
-        link,
+        voice: {
+          voice: voice.voice ?? "",
+          variant: voice.variant ?? "",
+          pitch: Number(voice.pitch) ?? 50,
+          speed: Number(voice.speed) ?? 1,
+          amplitude: Number(voice.amplitude) ?? 50,
+        },
+        link: {
+          url: link.url ?? "",
+          blank: !!link.blank,
+          effect: !!link.effect,
+        },
       },
     };
   },
