@@ -120,9 +120,13 @@ export const useDrawable = (options = {}) => {
       execute(ctx, command);
     }
     if (res == "up") {
+      const hadStrokeInProgress = data.flag;
       data.flag = false;
+      // Only end a stroke if we actually started one (mousedown was received). Brave's color
+      // widget can fire a spurious mouseup without mousedown; data.lines would still hold the
+      // previous stroke and we'd duplicate it with the new color otherwise.
+      if (!hadStrokeInProgress) return;
       const lines = data.lines || [];
-      // Snapshot stroke with primitive color so changing the colour picker later cannot affect this stroke
       const strokeColor =
         typeof color.value === "string" ? color.value : DEFAULT_STROKE_COLOR;
       const snapshot = {
@@ -135,7 +139,6 @@ export const useDrawable = (options = {}) => {
       };
       const plainSnapshot = JSON.parse(JSON.stringify(snapshot));
       history.push(plainSnapshot);
-      // Only send/store when stroke has content (avoids adding a dot when user just clicks to start drawing)
       if (lines.length > 0) {
         onStrokeEnd?.(plainSnapshot);
       }
@@ -207,6 +210,7 @@ export const useDrawable = (options = {}) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (clearHistory) {
       history.length = 0;
+      data.lines = [];
     }
     return ctx;
   };
