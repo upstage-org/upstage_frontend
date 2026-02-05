@@ -83,7 +83,20 @@ export default {
   replay_trim_start: "Start",
   replay_trim_end: "Ende",
   replay_trim_apply: "Zuschnitt anwenden",
+  replay_controls_minimize: "Minimieren (Esc zum Wiederherstellen)",
+  replay_controls_show: "Steuerung anzeigen",
   tips: "Tipps",
   esc: "Esc",
-  warning: "Warnung"
+  warning: "Warnung",
+  archive_performance: "Archiv-Aufführung",
+  archive_select_performance: "Aufführung auswählen",
+  archive_compress_gap_label: "Lücken länger als",
+  archive_compress_minutes: "Min",
+  archive_compress_seconds: "Sek",
+  archive_overwrite_original: "Original überschreiben",
+  archive_timeline_full: "Unkomprimiertes Archiv",
+  archive_timeline_compressed: "Komprimiertes Archiv",
+  archive_open_replay: "Wiedergabe öffnen",
+  archive_open_replay_compressed: "Komprimiertes Archiv abspielen",
+  archive_save_name: "Komprimiertes Archiv speichern"
 };

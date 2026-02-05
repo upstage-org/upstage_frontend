@@ -75,7 +75,7 @@
             />
           </div>
           <div v-if="compressedResult" class="mb-3">
-            <span class="tag is-info">{{ $t("archive_timeline_compressed") }}</span>
+            <span class="tag is-light">{{ $t("archive_timeline_compressed") }}</span>
             <TimelineStrip
               class="mt-1"
               :events="compressedResult.events"
@@ -88,7 +88,7 @@
               :href="replayUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="button is-small is-light"
+              :class="['button', 'is-small', compressedResult ? 'is-primary' : 'is-light']"
             >
               {{ compressedResult ? $t("archive_open_replay_compressed") : $t("archive_open_replay") }}
             </a>
@@ -102,13 +102,9 @@
               v-model="saveName"
               :placeholder="selectedArchive?.name"
             />
-            <label class="checkbox ml-3">
-              <input type="checkbox" v-model="overwriteOriginal" />
-              <span>{{ $t("archive_overwrite_original") }}</span>
-            </label>
             <button
               class="button is-primary"
-              :disabled="savingArchive"
+              :disabled="savingArchive || !archiveEvents.length"
               @click="saveArchiveName"
             >
               {{ $t("save") }}
@@ -258,7 +254,6 @@ export default {
     const compressedResult = ref(null);
     const saveName = ref("");
     const savingArchive = ref(false);
-    const overwriteOriginal = ref(false);
 
     const selectedArchive = computed(() =>
       stage.value && selectedArchiveId.value
@@ -358,44 +353,47 @@ export default {
       if (!item || savingArchive.value) return;
       const name = (saveName.value || item.name || "").trim();
       if (!name) return;
+      const eventsToSave = compressedResult.value
+        ? compressedResult.value.events
+        : archiveEvents.value;
+      if (!eventsToSave.length) {
+        message.error("No events to save.");
+        return;
+      }
+      const events = eventsToSave.map((e) => ({
+        topic: e.topic,
+        mqttTimestamp: e.mqttTimestamp,
+        payload: e.payload ?? {},
+      }));
       savingArchive.value = true;
       try {
-        if (compressedResult.value) {
-          const events = compressedResult.value.events.map((e) => ({
-            topic: e.topic,
-            mqttTimestamp: e.mqttTimestamp,
-            payload: e.payload ?? {},
-          }));
-          if (overwriteOriginal.value) {
-            await stageGraph.savePerformance({
-              performanceId: item.id,
-              name,
-              description: item.description ?? undefined,
-              events,
-            });
-          } else {
-            const stageId = stage.value?.id != null ? Number(stage.value.id) : null;
-            if (stageId == null) {
-              message.error("Stage not found.");
-              return;
-            }
-            await stageGraph.createPerformanceWithEvents({
-              stageId,
-              name,
-              description: item.description ?? undefined,
-              events,
-            });
-          }
-          message.success("Compressed archive saved.");
-          compressedResult.value = null;
-          selectedArchiveId.value = null;
-          saveName.value = "";
-          overwriteOriginal.value = false;
-          if (refresh) refresh(stage.value.id);
+        const existingName = (item.name || "").trim();
+        const isSameName = name === existingName;
+        if (isSameName) {
+          await stageGraph.savePerformance({
+            performanceId: item.id,
+            name,
+            description: item.description ?? undefined,
+            events,
+          });
         } else {
-          await updateMutation("Performance updated successfully!", item.id, name, item.description);
-          if (refresh) refresh(stage.value.id);
+          const stageId = stage.value?.id != null ? Number(stage.value.id) : null;
+          if (stageId == null) {
+            message.error("Stage not found.");
+            return;
+          }
+          await stageGraph.createPerformanceWithEvents({
+            stageId,
+            name,
+            description: item.description ?? undefined,
+            events,
+          });
         }
+        message.success("Archive saved.");
+        compressedResult.value = null;
+        selectedArchiveId.value = null;
+        saveName.value = "";
+        if (refresh) refresh(stage.value.id);
       } catch (err) {
         message.error(err?.message ?? err ?? "Failed to save.");
       } finally {
@@ -627,7 +625,6 @@ export default {
       compressedResult,
       saveName,
       savingArchive,
-      overwriteOriginal,
       selectedArchive,
       replayUrl,
       onSelectArchive,
