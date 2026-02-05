@@ -38,6 +38,7 @@ import {
 } from "services/speech/voice";
 import { useMutation, useQuery } from "@vue3-apollo/core";
 import { message } from "ant-design-vue";
+import { MEDIA_FORM_OPTIONS_QUERY } from "services/graphql/media";
 
 const model = defineModel()
 const files = inject<Ref<UploadFile[]>>("files");
@@ -241,20 +242,9 @@ const handleClose = () => {
 const clearMode = ref(false);
 
 const { result, loading } = useQuery<StudioGraph>(
-  gql`
-    {
-      mediaTypes {
-        id
-        name
-      }
-      tags {
-        id
-        name
-      }
-    }
-  `,
+  MEDIA_FORM_OPTIONS_QUERY,
   {},
-  { fetchPolicy: "cache-first" } as any
+  { fetchPolicy: "cache-and-network" } as any
 );
 const mediaTypes = computed(() => {
   if (result.value?.mediaTypes) {

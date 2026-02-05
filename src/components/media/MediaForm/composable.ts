@@ -4,6 +4,10 @@ import gql from "graphql-tag";
 import { ref, computed } from "vue";
 import { permissionFragment } from "models/fragment";
 import {
+  MEDIA_FORM_OPTIONS_QUERY,
+  MEDIA_FILTER_QUERY,
+} from "services/graphql/media";
+import {
   AvatarVoice,
   CopyrightLevel,
   Link,
@@ -63,15 +67,21 @@ export const useSaveMedia = (
   const { mutate } = useMutation<
     { saveMedia: { asset: Media } },
     { input: SaveMediaMutationVariables }
-  >(gql`
-    mutation SaveMedia($input: SaveMediaInput!) {
-      saveMedia(input: $input) {
-        asset {
-          id
+  >(
+    gql`
+      mutation SaveMedia($input: SaveMediaInput!) {
+        saveMedia(input: $input) {
+          asset {
+            id
+          }
         }
       }
+    `,
+    {
+      refetchQueries: [MEDIA_FORM_OPTIONS_QUERY, MEDIA_FILTER_QUERY],
+      awaitRefetchQueries: true,
     }
-  `);
+  );
   const progress = ref(100);
 
   const saveMedia = async () => {

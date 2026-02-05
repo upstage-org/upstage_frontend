@@ -12,47 +12,11 @@ import Navbar from "../Navbar.vue";
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { useStore } from "vuex";
+import { MEDIA_FILTER_QUERY } from "services/graphql/media";
 
-const { result: response, loading } = useQuery(gql`
-  {
-    whoami {
-      username
-      displayName
-      roleName
-    }
-    users(active: true) {
-      id
-      username
-      displayName
-    }
-    stages(input:{}) {
-      edges {
-        id
-        name
-        createdOn
-        owner {
-          username
-          displayName
-        }
-      }
-    }
-    getAllStages {
-        id
-        name
-        permission
-    }
-    tags {
-      id
-      name
-      color
-      createdOn
-    }
-    mediaTypes {
-      id
-      name
-    }
-  }
-`);
+const { result: response, loading } = useQuery(MEDIA_FILTER_QUERY, {}, {
+  fetchPolicy: "cache-and-network",
+});
 const store = useStore();
 const isAdmin = computed(() => store.getters["user/isAdmin"]);
 const result = computed(() => response?.value);

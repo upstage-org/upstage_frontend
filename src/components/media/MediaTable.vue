@@ -342,7 +342,7 @@ const filterTag = (tag: string) => {
           </a>
         </template>
         <template v-if="column.key === 'tags'">
-          <a-tag v-for="(tag, i) in text" :key="i" :color="tag" @click="filterTag(tag)" class="cursor-pointer">{{ tag }}
+          <a-tag v-for="(tag, i) in text" :key="i" color="default" @click="filterTag(tag)" class="cursor-pointer tags-cell-tag">{{ tag }}
           </a-tag>
         </template>
         <template v-if="column.key === 'size'">
@@ -407,4 +407,9 @@ const filterTag = (tag: string) => {
     <slot></slot>
   </a-layout>
 </template>
-state/auth
+
+<style scoped>
+.tags-cell-tag {
+  color: #000;
+}
+</style>
