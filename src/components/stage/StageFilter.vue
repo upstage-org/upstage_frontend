@@ -53,7 +53,7 @@ const owners = ref([]);
 const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
-const access = ref(['owner', 'editor', 'player']);
+const access = ref(['owner', 'editor', 'player', 'audience']);
 const dates = ref<[Dayjs, Dayjs] | undefined>();
 
 const ranges = [
@@ -118,7 +118,7 @@ onMounted(() => {
   types.value = [];
   stages.value = [];
   tags.value = [];
-  access.value = ["owner", "editor", "player"];
+  access.value = ["owner", "editor", "player", "audience"];
   dates.value = undefined;
   updateInquiry({
     name: "",
@@ -126,7 +126,7 @@ onMounted(() => {
     stages: [],
     tags: [],
     mediaTypes: [],
-    access: ["owner", "editor", "player"],
+    access: ["owner", "editor", "player", "audience"],
     createdBetween: undefined,
   });
 });
