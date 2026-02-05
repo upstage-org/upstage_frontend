@@ -262,6 +262,17 @@ const mediaTypes = computed(() => {
   return [];
 });
 
+const isMultiframe = computed(() => {
+  const desc = editingMediaResult.value?.editingMedia?.description;
+  if (!desc) return false;
+  try {
+    const attrs = JSON.parse(desc) as MediaAttributes;
+    return !!(attrs?.multi && Array.isArray(attrs?.frames) && attrs.frames.length > 1);
+  } catch {
+    return false;
+  }
+});
+
 const refresh = inject("refresh") as () => any;
 const { progress, saveMedia, saving } = useSaveMedia(
   () => {
@@ -355,13 +366,11 @@ watch(visibleDropzone as Ref, (val) => {
 });
 
 const addExistingFrame = () => {
-  if (composingMode) {
-    composingMode.value = true;
-    inquiryVar({
-      ...inquiryVar(),
-      mediaTypes: [type.value],
-    });
-  }
+  composingMode!.value = true;
+  inquiryVar({
+    ...inquiryVar(),
+    mediaTypes: [type.value],
+  });
 };
 
 const frameSize = ref({ width: 100, height: 100 });
@@ -595,7 +604,6 @@ const getUserDisplayName = (user: User) => {
           </template>
 
           <a-popconfirm
-            title="Are you sure you want to delete this media?"
             ok-text="Yes"
             cancel-text="No"
             @confirm="onDelete()"
@@ -603,6 +611,14 @@ const getUserDisplayName = (user: User) => {
             :ok-button-props="{ danger: true }"
             loading="deleting"
           >
+            <template #title>
+              <div>
+                <p>Are you sure you want to delete this media?</p>
+                <p v-if="isMultiframe" class="text-gray-600 text-sm mt-2">
+                  This is a multi-frame item. If you created it from an existing image, that original image will stay in your library and will not be deleted.
+                </p>
+              </div>
+            </template>
             <a-button
               type="primary"
               style="background-color: #ff4d4f; border-color: #ff4d4f"
