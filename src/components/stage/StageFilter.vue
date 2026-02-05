@@ -204,7 +204,11 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           <template #dropdownRender="{ menuNode: menu }">
             <v-nodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
-            <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="owners = []">
+            <div
+              class="w-full cursor-pointer text-center"
+              @mousedown.prevent
+              @click.stop.prevent="owners = (result as any)?.users?.map((u: any) => u.username) ?? []"
+            >
               <team-outlined />&nbsp;All players
             </div>
           </template>
