@@ -343,6 +343,7 @@ export default {
       }
       state.status = "OFFLINE";
       state.replay.isReplaying = false;
+      state.sessions = [];
       state.background = null;
       state.curtain = null;
       state.backdropColor = "gray";
@@ -612,9 +613,11 @@ export default {
       } else {
         state.sessions.push(session);
       }
-      state.sessions = state.sessions.filter(
-        (s) => moment().diff(moment(new Date(s.at)), "minute") < 60,
-      );
+      if (!state.replay.isReplaying) {
+        state.sessions = state.sessions.filter(
+          (s) => moment().diff(moment(new Date(s.at)), "minute") < 60,
+        );
+      }
       state.sessions.sort((a, b) => b.at - a.at);
     },
     UPDATE_SESSION_TIMESTAMP(state, sessionId) {
@@ -1404,6 +1407,9 @@ export default {
         state.replay.loopCount = 0;
       }
       commit("CLEAN_STAGE");
+      const initialBackdrop =
+        state.model?.config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
+      commit("SET_BACKDROP_COLOR", initialBackdrop);
       state.replay.isReplaying = true;
       const events = effective.events;
       const speed = state.replay.speed;
