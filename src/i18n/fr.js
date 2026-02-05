@@ -98,7 +98,7 @@ export default {
   replay_jump_prev_event: "Événement précédent",
   replay_jump_next_event: "Événement suivant",
   replay_auto_compress: "Compresser automatiquement",
-  replay_auto_compress_desc: "Supprimer les temps morts de plus de N minutes, en laissant 3 secondes entre les scènes actives.",
+  replay_auto_compress_desc: "Supprimer les temps d'inactivité de plus que les minutes et/ou secondes indiquées, en laissant 3 secondes entre les scènes actives.",
   replay_auto_compress_minutes: "Supprimer les lacunes de plus de (minutes) :",
   replay_auto_compress_apply: "Appliquer",
   replay_auto_compress_clear: "Afficher la chronologie complète",

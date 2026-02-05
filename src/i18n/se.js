@@ -97,7 +97,7 @@ export default {
   replay_jump_prev_event: "Föregående händelse",
   replay_jump_next_event: "Nästa händelse",
   replay_auto_compress: "Komprimera automatiskt",
-  replay_auto_compress_desc: "Ta bort dötid längre än N minuter och lämna 3 sekunders mellanrum mellan aktiva scener.",
+  replay_auto_compress_desc: "Ta bort inaktiv tid längre än angivna minuter och/eller sekunder, med 3 sekunders mellanrum mellan aktiva scener.",
   replay_auto_compress_minutes: "Ta bort luckor längre än (minuter):",
   replay_auto_compress_apply: "Tillämpa",
   replay_auto_compress_clear: "Visa full tidslinje",

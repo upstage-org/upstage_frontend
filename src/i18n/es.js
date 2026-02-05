@@ -97,7 +97,7 @@ export default {
   replay_jump_prev_event: "Evento anterior",
   replay_jump_next_event: "Siguiente evento",
   replay_auto_compress: "Comprimir automáticamente",
-  replay_auto_compress_desc: "Eliminar tiempo muerto mayor que N minutos, dejando 3 segundos entre escenas activas.",
+  replay_auto_compress_desc: "Eliminar tiempo inactivo mayor que los minutos y/o segundos indicados, dejando 3 segundos entre escenas activas.",
   replay_auto_compress_minutes: "Eliminar intervalos mayores que (minutos):",
   replay_auto_compress_apply: "Aplicar",
   replay_auto_compress_clear: "Mostrar línea de tiempo completa",

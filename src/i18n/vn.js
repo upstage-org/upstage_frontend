@@ -75,7 +75,7 @@ export default {
   replay_jump_prev_event: "Sự kiện trước",
   replay_jump_next_event: "Sự kiện tiếp theo",
   replay_auto_compress: "Tự động nén",
-  replay_auto_compress_desc: "Loại bỏ khoảng trống dài hơn N phút, để lại 3 giây giữa các cảnh có hoạt động.",
+  replay_auto_compress_desc: "Loại bỏ thời gian chờ dài hơn số phút và/hoặc giây đã cho, để lại 3 giây giữa các cảnh có hoạt động.",
   replay_auto_compress_minutes: "Loại bỏ khoảng trống dài hơn (phút):",
   replay_auto_compress_apply: "Áp dụng",
   replay_auto_compress_clear: "Hiện toàn bộ dòng thời gian",

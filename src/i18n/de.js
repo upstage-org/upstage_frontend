@@ -75,7 +75,7 @@ export default {
   replay_jump_prev_event: "Vorheriges Ereignis",
   replay_jump_next_event: "Nächstes Ereignis",
   replay_auto_compress: "Automatisch komprimieren",
-  replay_auto_compress_desc: "Totzeiten länger als N Minuten entfernen, mit 3 Sekunden Pause zwischen aktiven Szenen.",
+  replay_auto_compress_desc: "Inaktive Zeit länger als die angegebenen Minuten und/oder Sekunden entfernen, mit 3 Sekunden Pause zwischen aktiven Szenen.",
   replay_auto_compress_minutes: "Lücken länger als (Minuten) entfernen:",
   replay_auto_compress_apply: "Anwenden",
   replay_auto_compress_clear: "Vollständige Zeitleiste anzeigen",

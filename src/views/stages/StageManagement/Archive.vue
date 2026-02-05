@@ -41,7 +41,7 @@
           min="0"
           max="999"
           placeholder="0"
-          v-model.number="deadSpaceMinutes"
+          v-model.number="idleTimeMinutes"
         />
         <span class="archive-compress-unit">{{ $t("archive_compress_minutes") }}</span>
         <input
@@ -50,12 +50,12 @@
           min="0"
           max="59"
           placeholder="0"
-          v-model.number="deadSpaceSeconds"
+          v-model.number="idleTimeSeconds"
         />
         <span class="archive-compress-unit">{{ $t("archive_compress_seconds") }}</span>
         <button
           class="button is-info"
-          :disabled="!archiveEvents.length || totalDeadSpaceSeconds < 1"
+          :disabled="!archiveEvents.length || totalIdleTimeSeconds < 1"
           @click="applyCompressPreview"
         >
           {{ $t("replay_auto_compress_apply") }}
@@ -246,10 +246,10 @@ export default {
     const stage = inject("stage");
     const refresh = inject("refresh");
     const selectedArchiveId = ref(null);
-    const deadSpaceMinutes = ref(5);
-    const deadSpaceSeconds = ref(0);
-    const totalDeadSpaceSeconds = computed(
-      () => (deadSpaceMinutes.value || 0) * 60 + (deadSpaceSeconds.value || 0)
+    const idleTimeMinutes = ref(5);
+    const idleTimeSeconds = ref(0);
+    const totalIdleTimeSeconds = computed(
+      () => (idleTimeMinutes.value || 0) * 60 + (idleTimeSeconds.value || 0)
     );
     const archiveEvents = ref([]);
     const archiveBegin = ref(0);
@@ -310,8 +310,8 @@ export default {
     const replayUrl = computed(() => {
       if (!stage.value || !selectedArchiveId.value) return "#";
       const base = `${configs.UPSTAGE_URL || ""}/replay/${stage.value.fileLocation}/${selectedArchiveId.value}`;
-      const params = compressedResult.value && totalDeadSpaceSeconds.value > 0
-        ? `?compress=${totalDeadSpaceSeconds.value}`
+      const params = compressedResult.value && totalIdleTimeSeconds.value > 0
+        ? `?compress=${totalIdleTimeSeconds.value}`
         : "";
       return base + params;
     });
@@ -344,12 +344,12 @@ export default {
       }
     }
     function applyCompressPreview() {
-      if (!archiveEvents.value.length || totalDeadSpaceSeconds.value < 1) return;
+      if (!archiveEvents.value.length || totalIdleTimeSeconds.value < 1) return;
       const result = computeCompressedEvents(
         archiveEvents.value,
         archiveBegin.value,
         archiveEnd.value,
-        totalDeadSpaceSeconds.value
+        totalIdleTimeSeconds.value
       );
       compressedResult.value = result;
     }
@@ -617,9 +617,9 @@ export default {
       deletePerformance,
       deleting,
       selectedArchiveId,
-      deadSpaceMinutes,
-      deadSpaceSeconds,
-      totalDeadSpaceSeconds,
+      idleTimeMinutes,
+      idleTimeSeconds,
+      totalIdleTimeSeconds,
       archiveEvents,
       archiveBegin,
       archiveEnd,

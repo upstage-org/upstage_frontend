@@ -1,4 +1,19 @@
 <template>
+  <div v-show="collapsed" id="replay-controls-minimized" class="replay-controls-restore">
+    <a-tooltip :title="$t('replay_controls_show')">
+      <button
+        type="button"
+        class="button is-light is-small"
+        aria-label="Show replay controls"
+        @click="collapsed = false"
+      >
+        <span class="icon">
+          <i class="fas fa-chevron-up"></i>
+        </span>
+        <span>{{ $t("replay_controls_show") }}</span>
+      </button>
+    </a-tooltip>
+  </div>
   <div v-show="!collapsed" id="replay-controls" class="card is-light">
     <div class="card-body">
       <div class="replay-section-title replay-playback-title">{{ $t("replay_playback") }}</div>
@@ -57,26 +72,18 @@
             <i class="fas fa-fast-forward"></i>
           </button>
         </a-tooltip>
-        <Modal width="500px">
-          <template #trigger>
-            <button
-              class="button minimise is-rounded is-light is-small"
-              @click="collapsed = true"
-            >
-              <span class="icon">
-                <Icon src="minimise.svg" size="24" class="mt-4" />
-              </span>
-            </button>
-          </template>
-          <template #header>{{ $t("tips") }}</template>
-          <template #content>
-            <p>
-              Replay controls are hidden! You can toggle the
-              <code>{{ $t("esc") }}</code> key to quickly hide the replay
-              controls or bring it back 👌
-            </p>
-          </template>
-        </Modal>
+        <a-tooltip :title="$t('replay_controls_minimize')">
+          <button
+            type="button"
+            class="button minimise is-rounded is-light is-small"
+            aria-label="Minimize replay controls"
+            @click="collapsed = true"
+          >
+            <span class="icon">
+              <i class="fas fa-chevron-down"></i>
+            </span>
+          </button>
+        </a-tooltip>
         <teleport v-if="!collapsed" to="body">
           <Modal
             width="500px"
@@ -428,5 +435,12 @@ export default {
 
 .replay-trim-input {
   width: 90px;
+}
+
+.replay-controls-restore {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 50;
 }
 </style>
