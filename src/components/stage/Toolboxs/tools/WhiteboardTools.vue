@@ -67,7 +67,7 @@
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted, watch } from "vue";
+import { computed, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import ColorPicker from "components/form/ColorPicker.vue";
 import Icon from "components/Icon.vue";
@@ -81,8 +81,30 @@ export default {
     const isDrawing = computed(() => {
       return store.state.stage.preferences.isDrawing;
     });
-    const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } =
-      useDrawable();
+    const { el, cursor, toggleErase, color, size, mode, clearCanvas } =
+      useDrawable({
+        onStrokeEnd(snapshot) {
+          // Use only the snapshot (primitive color) so the colour picker never affects this stroke
+          const ratio = 1 / stageSize.value.height;
+          const strokeColor =
+            typeof snapshot.color === "string" ? snapshot.color : "#000000";
+          const command = {
+            type: snapshot.type,
+            size: snapshot.size * ratio,
+            x: snapshot.x * ratio,
+            y: snapshot.y * ratio,
+            color: strokeColor,
+            lines: (snapshot.lines || []).map((line) => ({
+              x: line.x * ratio,
+              y: line.y * ratio,
+              fromX: line.fromX * ratio,
+              fromY: line.fromY * ratio,
+            })),
+          };
+          store.dispatch("stage/sendDrawWhiteboard", command);
+          clearCanvas(true);
+        },
+      });
 
     onMounted(() => {
       store.commit("stage/UPDATE_IS_DRAWING", true);
@@ -90,35 +112,6 @@ export default {
 
     onUnmounted(() => {
       store.commit("stage/UPDATE_IS_DRAWING", false);
-    });
-
-    watch(history, (val) => {
-      if (history.length) {
-        const lastStroke = val[val.length - 1];
-        const ratio = 1 / stageSize.value.height;
-        // Use this command's own color (primitive) so the colour picker only affects new strokes
-        const strokeColor =
-          typeof lastStroke.color === "string"
-            ? lastStroke.color
-            : "#000000";
-        const command = JSON.parse(
-          JSON.stringify({
-            ...lastStroke,
-            color: strokeColor,
-            size: lastStroke.size * ratio,
-            x: lastStroke.x * ratio,
-            y: lastStroke.y * ratio,
-            lines: (lastStroke.lines || []).map((line) => ({
-              x: line.x * ratio,
-              y: line.y * ratio,
-              fromX: line.fromX * ratio,
-              fromY: line.fromY * ratio,
-            })),
-          }),
-        );
-        store.dispatch("stage/sendDrawWhiteboard", command);
-        clearCanvas(true);
-      }
     });
 
     const undo = () => {

@@ -74,7 +74,8 @@ const execute = async (ctx, command, animate, onAfterSegment) => {
   }
 };
 
-export const useDrawable = () => {
+export const useDrawable = (options = {}) => {
+  const { onStrokeEnd } = options;
   const color = ref("#000");
   const size = ref(10);
   const mode = ref("draw");
@@ -122,18 +123,17 @@ export const useDrawable = () => {
       // Snapshot stroke with primitive color so changing the colour picker later cannot affect this stroke
       const strokeColor =
         typeof color.value === "string" ? color.value : DEFAULT_STROKE_COLOR;
-      history.push(
-        JSON.parse(
-          JSON.stringify({
-            type: mode.value,
-            size: size.value,
-            color: strokeColor,
-            lines: data.lines,
-            x: data.currX,
-            y: data.currY,
-          }),
-        ),
-      );
+      const snapshot = {
+        type: mode.value,
+        size: size.value,
+        color: strokeColor,
+        lines: (data.lines || []).map((l) => ({ ...l })),
+        x: data.currX,
+        y: data.currY,
+      };
+      const plainSnapshot = JSON.parse(JSON.stringify(snapshot));
+      history.push(plainSnapshot);
+      onStrokeEnd?.(plainSnapshot);
     }
     if (res == "move") {
       if (data.flag) {
