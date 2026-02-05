@@ -246,42 +246,46 @@ export default {
         : null
     );
     const sessions = computed(() => {
-      const res = [];
-      if (stage.value) {
-        const { performances, chats } = stage.value;
-        (performances || []).forEach((p) => {
-          p.messages = chats
-            .filter((c) => c.performanceId === p.id)
-            .map((c) => c.payload);
-          res.push(p);
-        });
-      }
-      res.sort((a, b) => b.id - a.id);
-      res.forEach((session) => {
-        const messages = session.messages.filter((m) => !m.clear);
-        if (messages.length) {
-          session.begin = null;
-          for (const m of messages) {
+      if (!stage.value) return [];
+      const { performances, chats } = stage.value;
+      const list = (performances || []).map((p) => {
+        const messages = chats
+          .filter((c) => c.performanceId === p.id)
+          .map((c) => c.payload);
+        const filtered = messages.filter((m) => !m.clear);
+        let begin = null;
+        let end = null;
+        let duration = 0;
+        let chatless = true;
+        if (filtered.length) {
+          chatless = false;
+          for (const m of filtered) {
             if (m.at) {
-              if (!session.begin) session.begin = m.at;
-              session.end = m.at;
-              session.duration = m.at - session.begin;
+              if (begin == null) begin = m.at;
+              end = m.at;
+              duration = end - begin;
             }
           }
-        } else {
-          session.chatless = true;
-          session.duration = 0;
         }
-      });
-      res.forEach((session) => {
-        session.privateMessages = session.messages.filter(
+        const privateMessages = messages.filter(
           (m) => m.isPrivate || m.clearPlayerChat
         );
-        session.publicMessages = session.messages.filter(
+        const publicMessages = messages.filter(
           (m) => !m.isPrivate && !m.clearPlayerChat
         );
+        return {
+          ...p,
+          messages,
+          begin,
+          end,
+          duration,
+          chatless,
+          privateMessages,
+          publicMessages,
+        };
       });
-      return res;
+      list.sort((a, b) => b.id - a.id);
+      return list;
     });
     const replayUrl = computed(() => {
       if (!stage.value || !selectedArchiveId.value) return "#";
