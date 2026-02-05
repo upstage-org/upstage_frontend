@@ -96,6 +96,9 @@ export default {
       timers: [],
       interval: null,
       speed: 1,
+      loop: true,
+      loopCount: 0,
+      loopMax: null as number | null,
     },
     audioPlayers: [],
     isSavingScene: false,
@@ -1350,13 +1353,27 @@ export default {
         ? Number(timestamp)
         : state.replay.timestamp.begin;
       state.replay.timestamp.current = current;
+      if (timestamp == null) {
+        state.replay.loopCount = 0;
+      }
       commit("CLEAN_STAGE");
       state.replay.isReplaying = true;
       const events = state.model.events;
       const speed = state.replay.speed;
+      const loop = state.replay.loop;
+      const loopMax = state.replay.loopMax;
       state.replay.interval = setInterval(() => {
         state.replay.timestamp.current += 1;
         if (state.replay.timestamp.current > state.replay.timestamp.end) {
+          const shouldLoop =
+            loop &&
+            (loopMax == null || state.replay.loopCount + 1 < loopMax);
+          if (shouldLoop) {
+            state.replay.loopCount += 1;
+            state.replay.timestamp.current = state.replay.timestamp.begin;
+            dispatch("replayRecording", state.replay.timestamp.begin);
+            return;
+          }
           state.replay.timestamp.current = state.replay.timestamp.begin;
           dispatch("pauseReplay");
         }
@@ -1406,6 +1423,53 @@ export default {
       if (event) {
         dispatch("replayRecording", event.mqttTimestamp);
       }
+    },
+    seekToNextEventReplay({ state, dispatch }) {
+      const current = state.replay.timestamp.current;
+      const nextEvent = state.model.events.find(
+        (e) => e.mqttTimestamp > current,
+      );
+      if (nextEvent) {
+        dispatch("replayRecording", nextEvent.mqttTimestamp);
+      }
+    },
+    seekToPreviousEventReplay({ state, dispatch }) {
+      const current = state.replay.timestamp.current;
+      let event = null;
+      for (let i = state.model.events.length - 1; i >= 0; i--) {
+        event = state.model.events[i];
+        if (event.mqttTimestamp < current) {
+          break;
+        }
+      }
+      if (event) {
+        dispatch("replayRecording", event.mqttTimestamp);
+      }
+    },
+    setReplayTrim({ state, commit }, { begin, end }) {
+      const ts = state.replay.timestamp;
+      const events = state.model?.events ?? [];
+      const first = events[0]?.mqttTimestamp ?? ts.begin;
+      const last = events[events.length - 1]?.mqttTimestamp ?? ts.end;
+      let newBegin = begin != null ? Number(begin) : first;
+      let newEnd = end != null ? Number(end) : last;
+      newBegin = Math.max(first, Math.min(newBegin, last));
+      newEnd = Math.min(last, Math.max(newEnd, first));
+      if (newBegin > newEnd) {
+        [newBegin, newEnd] = [newEnd, newBegin];
+      }
+      const clampedCurrent = Math.min(
+        Math.max(ts.current, newBegin),
+        newEnd,
+      );
+      commit("SET_REPLAY", {
+        timestamp: {
+          ...ts,
+          begin: newBegin,
+          end: newEnd,
+          current: clampedCurrent,
+        },
+      });
     },
     handleCounterMessage({ commit, state }, { message }) {
       commit("UPDATE_SESSIONS_COUNTER", message);
