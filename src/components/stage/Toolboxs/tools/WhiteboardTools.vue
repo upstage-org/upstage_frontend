@@ -89,13 +89,15 @@ export default {
           const ratio = 1 / stageSize.value.height;
           const strokeColor =
             typeof snapshot.color === "string" ? snapshot.color : "#000000";
+          const _sendId = uuidv4();
           const command = {
             type: snapshot.type,
             size: snapshot.size * ratio,
             x: snapshot.x * ratio,
             y: snapshot.y * ratio,
             color: strokeColor,
-            _sendId: uuidv4(),
+            _sendId,
+            _clientTimestamp: Date.now(),
             lines: (snapshot.lines || []).map((line) => ({
               x: line.x * ratio,
               y: line.y * ratio,

@@ -121,6 +121,7 @@ export const useDrawable = (options = {}) => {
     }
     if (res == "up") {
       data.flag = false;
+      const lines = data.lines || [];
       // Snapshot stroke with primitive color so changing the colour picker later cannot affect this stroke
       const strokeColor =
         typeof color.value === "string" ? color.value : DEFAULT_STROKE_COLOR;
@@ -128,13 +129,16 @@ export const useDrawable = (options = {}) => {
         type: mode.value,
         size: size.value,
         color: strokeColor,
-        lines: (data.lines || []).map((l) => ({ ...l })),
+        lines: lines.map((l) => ({ ...l })),
         x: data.currX,
         y: data.currY,
       };
       const plainSnapshot = JSON.parse(JSON.stringify(snapshot));
       history.push(plainSnapshot);
-      onStrokeEnd?.(plainSnapshot);
+      // Only send/store when stroke has content (avoids adding a dot when user just clicks to start drawing)
+      if (lines.length > 0) {
+        onStrokeEnd?.(plainSnapshot);
+      }
     }
     if (res == "move") {
       if (data.flag) {
