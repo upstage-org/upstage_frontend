@@ -212,7 +212,7 @@ export default {
     off: "Pas de boucle",
   },
   last_access: "Dernier accès",
-  last_login: "Dernière connexion",
+  latest_activity: "Dernière activité",
   access: "Accès",
   display_name: "Nom de l’affichage",
   email: "Email",

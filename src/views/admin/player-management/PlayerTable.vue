@@ -79,7 +79,7 @@ export default {
                 uploadLimit
                 intro
                 canSendEmail
-                lastLogin
+                latestActivity
                 roleName
               }
             }
@@ -166,9 +166,9 @@ export default {
         },
       },
       {
-        title: t("last_login"),
-        dataIndex: "lastLogin",
-        key: "last_login",
+        title: t("latest_activity"),
+        dataIndex: "latestActivity",
+        key: "latest_activity",
         sorter: {
           multiple: 4,
         },

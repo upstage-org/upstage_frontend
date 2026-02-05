@@ -194,7 +194,7 @@ export default {
     off: "No loop",
   },
   last_access: "Last active",
-  last_login: "Last login",
+  latest_activity: "Latest activity",
   access: "Access",
   studio: "Studio",
   display_name: "Display name",

@@ -212,7 +212,7 @@ export default {
     off: "No Loop",
   },
   last_access: "Sista åtkomst",
-  last_login: "Sista inloggningen",
+  latest_activity: "Senaste aktivitet",
   access: "Tillgång",
   display_name: "Displaynamn",
   email: "E-post",
