@@ -31,7 +31,7 @@ const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
 
 const DEFAULT_STROKE_COLOR = "#000000";
 
-const execute = async (ctx, command, animate) => {
+const execute = async (ctx, command, animate, onAfterSegment) => {
   // Use this command's own color so changing the colour picker doesn't affect previous strokes
   const color = command.color ?? DEFAULT_STROKE_COLOR;
   const { type, size, lines } = command;
@@ -48,6 +48,7 @@ const execute = async (ctx, command, animate) => {
           color,
         });
         if (animate) {
+          onAfterSegment?.(ctx.canvas);
           await wait(10);
         }
       }
@@ -255,10 +256,11 @@ export const useRelativeCommands = (drawing) =>
     const ratio = Math.min(w / original.w, h / original.h);
     return commands.map((command) => ({
       ...command,
+      color: command.color ?? DEFAULT_STROKE_COLOR,
       size: command.size * ratio,
       x: (command.x - original.x) * ratio,
       y: (command.y - original.y) * ratio,
-      lines: command.lines.map((line) => ({
+      lines: (command.lines || []).map((line) => ({
         x: (line.x - original.x) * ratio,
         y: (line.y - original.y) * ratio,
         fromX: (line.fromX - original.x) * ratio,
@@ -274,10 +276,25 @@ export const useDrawing = (drawing) => {
   const draw = async (newDrawing, oldDrawing) => {
     if (!drawing.value) return;
     const { value: canvas } = el;
-    canvas.width = drawing.value.w;
-    canvas.height = drawing.value.h;
+    const w = drawing.value.w;
+    const h = drawing.value.h;
+    // Only resize when dimensions change to avoid clearing the canvas (which can cause a white flash)
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw to offscreen first so we never show an empty canvas (avoids white flash when redrawing)
+    const offscreen = document.createElement("canvas");
+    offscreen.width = w;
+    offscreen.height = h;
+    const offCtx = offscreen.getContext("2d");
+    offCtx.clearRect(0, 0, w, h);
+    // After each animated segment, blit offscreen to visible so the audience sees the stroke being drawn
+    const blitToVisible = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(offscreen, 0, 0);
+    };
     for (let i = 0; i < commands.value.length; i++) {
       const command = commands.value[i];
       let shouldAnimate = true;
@@ -286,8 +303,17 @@ export const useDrawing = (drawing) => {
           shouldAnimate = false;
         }
       }
-      execute(ctx, command, shouldAnimate);
+      if (shouldAnimate) {
+        blitToVisible();
+      }
+      await execute(
+        offCtx,
+        command,
+        shouldAnimate,
+        shouldAnimate ? blitToVisible : undefined,
+      );
     }
+    blitToVisible();
     return ctx;
   };
 
