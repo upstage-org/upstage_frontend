@@ -69,9 +69,11 @@
 <script>
 import { computed, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
+import { v4 as uuidv4 } from "uuid";
 import ColorPicker from "components/form/ColorPicker.vue";
 import Icon from "components/Icon.vue";
 import { useDrawable } from "./Draw/composable";
+import { DRAW_ACTIONS } from "utils/constants";
 
 export default {
   components: { ColorPicker, Icon },
@@ -84,7 +86,6 @@ export default {
     const { el, cursor, toggleErase, color, size, mode, clearCanvas } =
       useDrawable({
         onStrokeEnd(snapshot) {
-          // Use only the snapshot (primitive color) so the colour picker never affects this stroke
           const ratio = 1 / stageSize.value.height;
           const strokeColor =
             typeof snapshot.color === "string" ? snapshot.color : "#000000";
@@ -94,6 +95,7 @@ export default {
             x: snapshot.x * ratio,
             y: snapshot.y * ratio,
             color: strokeColor,
+            _sendId: uuidv4(),
             lines: (snapshot.lines || []).map((line) => ({
               x: line.x * ratio,
               y: line.y * ratio,
@@ -101,6 +103,11 @@ export default {
               fromY: line.fromY * ratio,
             })),
           };
+          // Show stroke immediately with this stroke's color (optimistic update)
+          store.commit("stage/UPDATE_WHITEBOARD", {
+            type: DRAW_ACTIONS.NEW_LINE,
+            command,
+          });
           store.dispatch("stage/sendDrawWhiteboard", command);
           clearCanvas(true);
         },

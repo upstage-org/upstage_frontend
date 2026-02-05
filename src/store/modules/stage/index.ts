@@ -663,15 +663,24 @@ export default {
       }
       switch (message.type) {
         case DRAW_ACTIONS.NEW_LINE: {
-          // Store a deep copy with per-stroke color so changing the colour picker doesn't affect previous lines
           const cmd = message.command ?? {};
+          // Dedupe: skip if we already added this stroke (optimistic update)
+          if (cmd._sendId && state.board.whiteboard.some((c) => c._sendId === cmd._sendId)) {
+            break;
+          }
           const strokeColor =
             typeof cmd.color === "string" ? cmd.color : "#000000";
-          const commandWithColor = {
-            ...cmd,
-            color: strokeColor,
-          };
-          const stored = JSON.parse(JSON.stringify(commandWithColor));
+          const stored = JSON.parse(
+            JSON.stringify({
+              type: cmd.type,
+              size: cmd.size,
+              x: cmd.x,
+              y: cmd.y,
+              color: strokeColor,
+              lines: cmd.lines || [],
+              _sendId: cmd._sendId,
+            }),
+          );
           state.board.whiteboard = state.board.whiteboard.concat(stored);
           break;
         }

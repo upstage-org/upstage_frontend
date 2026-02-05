@@ -261,19 +261,24 @@ export const useRelativeCommands = (drawing) =>
     }
     const { commands, original, w, h } = drawing.value;
     const ratio = Math.min(w / original.w, h / original.h);
-    return commands.map((command) => ({
-      ...command,
-      color: command.color ?? DEFAULT_STROKE_COLOR,
-      size: command.size * ratio,
-      x: (command.x - original.x) * ratio,
-      y: (command.y - original.y) * ratio,
-      lines: (command.lines || []).map((line) => ({
-        x: (line.x - original.x) * ratio,
-        y: (line.y - original.y) * ratio,
-        fromX: (line.fromX - original.x) * ratio,
-        fromY: (line.fromY - original.y) * ratio,
-      })),
-    }));
+    return commands.map((command) => {
+      // Use only primitive color from this command so current colour picker never affects previous strokes
+      const color =
+        typeof command.color === "string" ? command.color : DEFAULT_STROKE_COLOR;
+      return {
+        type: command.type,
+        size: command.size * ratio,
+        x: (command.x - original.x) * ratio,
+        y: (command.y - original.y) * ratio,
+        color,
+        lines: (command.lines || []).map((line) => ({
+          x: (line.x - original.x) * ratio,
+          y: (line.y - original.y) * ratio,
+          fromX: (line.fromX - original.x) * ratio,
+          fromY: (line.fromY - original.y) * ratio,
+        })),
+      };
+    });
   });
 
 export const useDrawing = (drawing) => {
