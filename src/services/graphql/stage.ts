@@ -542,7 +542,7 @@ export default {
   deletePerformance: (id) =>
     studioClient.request(
       gql`
-        mutation DeletePerformance($id: Int!) {
+        mutation DeletePerformance($id: ID!) {
           deletePerformance(id: $id) {
             success
           }
