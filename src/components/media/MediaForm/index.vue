@@ -95,8 +95,8 @@ const handleDropdownVisibleChange = (open: boolean) => {
 };
 
 watch(editingMediaResult, () => {
-  if (editingMediaResult.value) {
-    const { editingMedia } = editingMediaResult.value;
+  const editingMedia = editingMediaResult.value?.editingMedia;
+  if (editingMedia) {
     name.value = editingMedia.name;
     type.value = editingMedia.assetType.name;
     tags.value = Array.isArray(editingMedia.tags) ? editingMedia.tags : [];
@@ -305,13 +305,12 @@ const { progress, saveMedia, saving } = useSaveMedia(
       },
     };
   },
-  (id) => {
-    if (files && refresh) {
-      editingMediaVar(undefined);
-      editingMediaResult.value = undefined
+  () => {
+    editingMediaVar(undefined);
+    if (files?.value) {
       files.value = [];
-      refresh();
     }
+    refresh?.();
   }
 );
 const { loading: deleting, mutate: deleteMedia } = useMutation(gql`
