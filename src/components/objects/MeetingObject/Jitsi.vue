@@ -57,7 +57,7 @@
 <script>
 import Object from "../Object.vue";
 import Loading from "components/Loading.vue";
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
 
@@ -91,14 +91,22 @@ export default {
     const loadTrack = () => {
       if (tracks.value.length) {
         try {
-          if (videoTrack.value) {
+          if (videoTrack.value && videoEl.value) {
+            try {
+              videoTrack.value.detach();
+            } catch (_) {}
+            videoEl.value.srcObject = null;
             videoTrack.value.attach(videoEl.value);
           }
-          if (audioTrack.value && !audioTrack.value.isLocal()) {
+          if (audioTrack.value && !audioTrack.value.isLocal() && audioEl.value) {
+            try {
+              audioTrack.value.detach();
+            } catch (_) {}
+            audioEl.value.srcObject = null;
             audioTrack.value.attach(audioEl.value);
           }
         } catch (error) {
-          console.log("Error on attaching track", error);
+          console.warn("Error attaching Jitsi track", error);
         }
       }
     };
@@ -127,7 +135,7 @@ export default {
       reloadStreams,
       (val) => {
         if (val) {
-          loadTrack();
+          nextTick(() => loadTrack());
         }
       },
       { immediate: true },
