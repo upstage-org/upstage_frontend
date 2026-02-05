@@ -34,6 +34,21 @@ import { Promise } from "core-js";
 
 const mqtt = buildClient();
 
+const GAP_BETWEEN_SCENES_SECONDS = 3;
+
+function getEffectiveReplay(state) {
+  if (state.replay.useCompressed && state.replay.compressed) {
+    return {
+      events: state.replay.compressed.events,
+      timestamp: state.replay.compressed.timestamp,
+    };
+  }
+  return {
+    events: state.model?.events ?? [],
+    timestamp: state.replay.timestamp,
+  };
+}
+
 export default {
   namespaced: true,
   state: {
@@ -99,6 +114,11 @@ export default {
       loop: true,
       loopCount: 0,
       loopMax: null as number | null,
+      useCompressed: false,
+      compressed: null as {
+        events: Array<{ mqttTimestamp: number; topic: string; payload: unknown }>;
+        timestamp: { begin: number; end: number; current: number };
+      } | null,
     },
     audioPlayers: [],
     isSavingScene: false,
@@ -217,7 +237,16 @@ export default {
     },
     enabledLiveStreaming(stage) {
       return stage.enabledLiveStreaming
-    }
+    },
+    replayEffectiveEvents(state) {
+      return getEffectiveReplay(state).events;
+    },
+    replayEffectiveTimestamp(state) {
+      return getEffectiveReplay(state).timestamp;
+    },
+    replayUseCompressed(state) {
+      return state.replay.useCompressed;
+    },
   },
   mutations: {
     SET_MODEL(state, model) {
@@ -1264,6 +1293,8 @@ export default {
               current: events[0].mqttTimestamp,
               end: events[events.length - 1].mqttTimestamp,
             },
+            useCompressed: false,
+            compressed: null,
           });
         } else {
           (events || []).forEach((event) => dispatch("replayEvent", event));
@@ -1349,32 +1380,32 @@ export default {
     async replayRecording({ state, dispatch, commit }, timestamp) {
       stopSpeaking();
       await dispatch("pauseReplay");
-      const current = timestamp
-        ? Number(timestamp)
-        : state.replay.timestamp.begin;
-      state.replay.timestamp.current = current;
+      const effective = getEffectiveReplay(state);
+      const ts = effective.timestamp;
+      const current = timestamp != null ? Number(timestamp) : ts.begin;
+      ts.current = current;
       if (timestamp == null) {
         state.replay.loopCount = 0;
       }
       commit("CLEAN_STAGE");
       state.replay.isReplaying = true;
-      const events = state.model.events;
+      const events = effective.events;
       const speed = state.replay.speed;
       const loop = state.replay.loop;
       const loopMax = state.replay.loopMax;
       state.replay.interval = setInterval(() => {
-        state.replay.timestamp.current += 1;
-        if (state.replay.timestamp.current > state.replay.timestamp.end) {
+        ts.current += 1;
+        if (ts.current > ts.end) {
           const shouldLoop =
             loop &&
             (loopMax == null || state.replay.loopCount + 1 < loopMax);
           if (shouldLoop) {
             state.replay.loopCount += 1;
-            state.replay.timestamp.current = state.replay.timestamp.begin;
-            dispatch("replayRecording", state.replay.timestamp.begin);
+            ts.current = ts.begin;
+            dispatch("replayRecording", ts.begin);
             return;
           }
-          state.replay.timestamp.current = state.replay.timestamp.begin;
+          ts.current = ts.begin;
           dispatch("pauseReplay");
         }
       }, 1000 / speed);
@@ -1403,19 +1434,19 @@ export default {
       });
     },
     seekForwardReplay({ state, dispatch }) {
-      const current = state.replay.timestamp.current + 10000;
-      const nextEvent = state.model.events.find(
-        (e) => e.mqttTimestamp > current,
-      );
+      const { events, timestamp } = getEffectiveReplay(state);
+      const current = timestamp.current + 10000;
+      const nextEvent = events.find((e) => e.mqttTimestamp > current);
       if (nextEvent) {
         dispatch("replayRecording", nextEvent.mqttTimestamp);
       }
     },
     seekBackwardReplay({ state, dispatch }) {
-      const current = state.replay.timestamp.current - 10000;
+      const { events, timestamp } = getEffectiveReplay(state);
+      const current = timestamp.current - 10000;
       let event = null;
-      for (let i = state.model.events.length - 1; i >= 0; i--) {
-        event = state.model.events[i];
+      for (let i = events.length - 1; i >= 0; i--) {
+        event = events[i];
         if (event.mqttTimestamp < current) {
           break;
         }
@@ -1425,19 +1456,19 @@ export default {
       }
     },
     seekToNextEventReplay({ state, dispatch }) {
-      const current = state.replay.timestamp.current;
-      const nextEvent = state.model.events.find(
-        (e) => e.mqttTimestamp > current,
-      );
+      const { events, timestamp } = getEffectiveReplay(state);
+      const current = timestamp.current;
+      const nextEvent = events.find((e) => e.mqttTimestamp > current);
       if (nextEvent) {
         dispatch("replayRecording", nextEvent.mqttTimestamp);
       }
     },
     seekToPreviousEventReplay({ state, dispatch }) {
-      const current = state.replay.timestamp.current;
+      const { events, timestamp } = getEffectiveReplay(state);
+      const current = timestamp.current;
       let event = null;
-      for (let i = state.model.events.length - 1; i >= 0; i--) {
-        event = state.model.events[i];
+      for (let i = events.length - 1; i >= 0; i--) {
+        event = events[i];
         if (event.mqttTimestamp < current) {
           break;
         }
@@ -1470,6 +1501,77 @@ export default {
           current: clampedCurrent,
         },
       });
+    },
+    computeCompressedReplay({ state, dispatch }, deadSpaceMinutes) {
+      const rawEvents = state.model?.events ?? [];
+      const ts = state.replay.timestamp;
+      const begin = ts.begin;
+      const end = ts.end;
+      const inRange = rawEvents.filter(
+        (e) => e.mqttTimestamp >= begin && e.mqttTimestamp <= end,
+      );
+      const sorted = [...inRange].sort(
+        (a, b) => a.mqttTimestamp - b.mqttTimestamp,
+      );
+      if (sorted.length === 0) return;
+      const gapThresholdSeconds = Number(deadSpaceMinutes) * 60;
+      const segments: Array<{ startTs: number; endTs: number; events: typeof sorted }> = [];
+      let seg = {
+        startTs: sorted[0].mqttTimestamp,
+        endTs: sorted[0].mqttTimestamp,
+        events: [sorted[0]],
+      };
+      segments.push(seg);
+      for (let i = 1; i < sorted.length; i++) {
+        const ev = sorted[i];
+        const gap = ev.mqttTimestamp - seg.endTs;
+        if (gap > gapThresholdSeconds) {
+          seg = {
+            startTs: ev.mqttTimestamp,
+            endTs: ev.mqttTimestamp,
+            events: [ev],
+          };
+          segments.push(seg);
+        } else {
+          seg.endTs = ev.mqttTimestamp;
+          seg.events.push(ev);
+        }
+      }
+      let compressedStart = 0;
+      const newEvents: Array<{ mqttTimestamp: number; topic: string; payload: unknown; id?: number; performanceId?: number }> = [];
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const duration = segment.endTs - segment.startTs;
+        for (const event of segment.events) {
+          newEvents.push({
+            ...event,
+            mqttTimestamp:
+              compressedStart + (event.mqttTimestamp - segment.startTs),
+          });
+        }
+        compressedStart += duration;
+        if (i < segments.length - 1) {
+          compressedStart += GAP_BETWEEN_SCENES_SECONDS;
+        }
+      }
+      state.replay.compressed = {
+        events: newEvents,
+        timestamp: {
+          begin: 0,
+          end: compressedStart,
+          current: 0,
+        },
+      };
+      state.replay.useCompressed = true;
+      dispatch("pauseReplay");
+      dispatch("replayRecording", 0);
+    },
+    clearCompressedReplay({ state, dispatch }) {
+      state.replay.useCompressed = false;
+      state.replay.compressed = null;
+      dispatch("pauseReplay");
+      const ts = state.replay.timestamp;
+      dispatch("replayRecording", ts.begin);
     },
     handleCounterMessage({ commit, state }, { message }) {
       commit("UPDATE_SESSIONS_COUNTER", message);
