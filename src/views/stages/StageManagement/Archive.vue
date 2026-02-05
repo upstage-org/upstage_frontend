@@ -356,11 +356,17 @@ export default {
       savingArchive.value = true;
       try {
         if (compressedResult.value) {
-          await stageGraph.duplicatePerformance(
-            item.id,
+          const events = compressedResult.value.events.map((e) => ({
+            topic: e.topic,
+            mqttTimestamp: e.mqttTimestamp,
+            payload: e.payload ?? {},
+          }));
+          await stageGraph.savePerformance({
+            stageId: stage.value.id,
             name,
-            item.description ?? null
-          );
+            description: item.description ?? undefined,
+            events,
+          });
           message.success("Compressed archive saved.");
           compressedResult.value = null;
           selectedArchiveId.value = null;

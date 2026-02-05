@@ -584,6 +584,24 @@ export default {
       `,
       { sourceId, name, description }
     ),
+  savePerformance: (input: {
+    performanceId?: number;
+    stageId?: number;
+    name: string;
+    description?: string | null;
+    events: Array<{ topic: string; mqttTimestamp: number; payload?: unknown }>;
+  }) =>
+    studioClient.request(
+      gql`
+        mutation savePerformance($input: SavePerformanceInput!) {
+          savePerformance(input: $input) {
+            id
+            name
+          }
+        }
+      `,
+      { input }
+    ),
   startRecording: (stageId, name, description) =>
     studioClient.request(
       gql`
