@@ -94,6 +94,8 @@ export default {
   start_recording: "Bắt đầu ghi âm",
   change_your_nickname: "Thay đổi biệt hiệu của bạn",
   create_new_meeting_room: "Tạo phòng họp mới",
+  refresh_meeting: "Làm mới cuộc họp",
+  refresh_meeting_tooltip: "Nếu bạn chỉ thấy khung màu xanh, nhấp để tải lại cuộc họp",
   create_room: "Tạo phòng",
   scene_name: "Tên cảnh",
   save_scene: "Lưu cảnh",

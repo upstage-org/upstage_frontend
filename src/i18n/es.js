@@ -118,6 +118,8 @@ export default {
   start_recording: "Iniciar la grabación",
   change_your_nickname: "Cambiar el apodo",
   create_new_meeting_room: "Crear una nueva sala de reuniones",
+  refresh_meeting: "Actualizar reunión",
+  refresh_meeting_tooltip: "Si solo ves el marco verde, haz clic para recargar la reunión",
   create_room: "Crear una sala",
   scene_name: "Nombre de la escena",
   save_scene: "Guardar escena",

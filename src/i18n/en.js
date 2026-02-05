@@ -97,6 +97,8 @@ export default {
   start_recording: "Start recording",
   change_your_nickname: "Change your nickname",
   create_new_meeting_room: "Create new meeting room",
+  refresh_meeting: "Refresh meeting",
+  refresh_meeting_tooltip: "If you only see the green frame, click to reload the meeting",
   create_room: "Create room",
   scene_name: "Scene name",
   save_scene: "Save scene",

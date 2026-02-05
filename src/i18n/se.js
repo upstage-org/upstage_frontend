@@ -120,6 +120,8 @@ export default {
   start_recording: "Startinspelning",
   change_your_nickname: "Ändra ditt smeknamn",
   create_new_meeting_room: "Skapa nytt Mötesrum",
+  refresh_meeting: "Uppdatera möte",
+  refresh_meeting_tooltip: "Om du bara ser den gröna ramen, klicka för att ladda om mötet",
   create_room: "Skapa Rum",
   scene_name: "Scenens namn",
   save_scene: "Spara Scenen",

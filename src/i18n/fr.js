@@ -121,6 +121,8 @@ export default {
   start_recording: "Commencer l’enregistrement",
   change_your_nickname: "Changez votre surnom",
   create_new_meeting_room: "Créer une nouvelle salle de réunion",
+  refresh_meeting: "Rafraîchir la réunion",
+  refresh_meeting_tooltip: "Si vous ne voyez que le cadre vert, cliquez pour recharger la réunion",
   create_room: "Créer un salon",
   scene_name: "Nom de la Scène",
   save_scene: "Sauver la Scène",

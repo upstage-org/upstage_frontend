@@ -113,6 +113,7 @@ export default {
       donationDetails: { amount: 0, date: "" },
     },
     reloadStreams: null,
+    meetingRefreshKey: 0,
     enabledLiveStreaming: true
   },
   getters: {
@@ -204,6 +205,9 @@ export default {
     },
     reloadStreams(state) {
       return state.reloadStreams;
+    },
+    meetingRefreshKey(state) {
+      return state.meetingRefreshKey;
     },
     activeObject(state) {
       return state.board.objects.find((o) => o.id == state.activeMovable);
@@ -760,6 +764,9 @@ export default {
     },
     RELOAD_STREAMS(state) {
       state.reloadStreams = new Date();
+    },
+    REFRESH_MEETING(state) {
+      state.meetingRefreshKey = (state.meetingRefreshKey || 0) + 1;
     },
     OPEN_RECEIPT_POPUP(state, { amount, date }) {
       state.receiptPopup.isActive = true;
@@ -1521,6 +1528,9 @@ export default {
     },
     reloadStreams({ commit }) {
       commit("RELOAD_STREAMS");
+    },
+    refreshMeeting({ commit }) {
+      commit("REFRESH_MEETING");
     },
   },
 };
