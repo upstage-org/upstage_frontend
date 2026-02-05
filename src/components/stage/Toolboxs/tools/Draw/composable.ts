@@ -291,6 +291,10 @@ export const useDrawing = (drawing) => {
     const { value: canvas } = el;
     const w = drawing.value.w;
     const h = drawing.value.h;
+    // Snapshot commands once so the colour picker cannot affect strokes during this draw (e.g. on click)
+    const commandsSnapshot = JSON.parse(
+      JSON.stringify(commands.value || []),
+    );
     // Only resize when dimensions change to avoid clearing the canvas (which can cause a white flash)
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
@@ -308,13 +312,11 @@ export const useDrawing = (drawing) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(offscreen, 0, 0);
     };
-    for (let i = 0; i < commands.value.length; i++) {
-      const command = commands.value[i];
+    for (let i = 0; i < commandsSnapshot.length; i++) {
+      const command = commandsSnapshot[i];
       let shouldAnimate = true;
-      if (newDrawing && oldDrawing && oldDrawing.commands) {
-        if (i < oldDrawing.commands.length) {
-          shouldAnimate = false;
-        }
+      if (oldDrawing?.commands != null && i < oldDrawing.commands.length) {
+        shouldAnimate = false;
       }
       if (shouldAnimate) {
         blitToVisible();
