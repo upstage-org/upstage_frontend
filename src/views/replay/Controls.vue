@@ -1,6 +1,7 @@
 <template>
   <div v-show="!collapsed" id="replay-controls" class="card is-light">
     <div class="card-body">
+      <div class="replay-section-title replay-playback-title">{{ $t("replay_playback") }}</div>
       <div class="is-fullwidth my-2 has-text-centered">
         <a-tooltip title="Rewind 10s">
           <button
@@ -103,49 +104,53 @@
           </Modal>
         </teleport>
       </div>
-      <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-1 my-1">
-        <label class="checkbox is-small">
-          <input type="checkbox" v-model="loop" @change="onLoopChange" />
-          <span class="ml-1">{{ $t("replay_loop") }}</span>
-        </label>
-        <template v-if="loop">
-          <span class="is-size-7">{{ $t("replay_iterations") }}</span>
-          <input
-            type="number"
-            class="input is-small"
-            style="width: 4rem"
-            min="1"
-            :placeholder="$t('replay_loop_infinite')"
-            v-model.number="loopMaxInput"
-          />
-          <span v-if="loopMax != null && loopMax > 0" class="is-size-7">
-            ({{ replayLoopCount }}/{{ loopMax }})
-          </span>
-        </template>
+      <div class="replay-section replay-loop-section">
+        <div class="replay-section-title">{{ $t("replay_loop") }}</div>
+        <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-2">
+          <label class="checkbox replay-checkbox">
+            <input type="checkbox" v-model="loop" @change="onLoopChange" />
+            <span>{{ $t("replay_loop_enable") }}</span>
+          </label>
+          <template v-if="loop">
+            <span class="replay-label">{{ $t("replay_iterations") }}:</span>
+            <select
+              class="select is-small replay-select"
+              v-model="loopOption"
+            >
+              <option value="infinite">{{ $t("replay_loop_infinite") }}</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+            </select>
+            <span v-if="loopMax != null && loopMax > 0" class="replay-loop-count">
+              {{ $t("replay_loop_count", { current: replayLoopCount, max: loopMax }) }}
+            </span>
+          </template>
+        </div>
       </div>
-      <details v-if="hasEvents" class="mt-1">
-        <summary class="is-size-7">{{ $t("replay_trim") }}</summary>
-        <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-1 mt-1">
-          <span class="is-size-7">{{ $t("replay_trim_start") }}</span>
+      <details v-if="hasEvents" class="replay-section replay-trim-section">
+        <summary class="replay-section-title">{{ $t("replay_trim") }}</summary>
+        <div class="replay-trim-fields is-flex is-flex-wrap-wrap is-align-items-center is-gap-2">
+          <label class="replay-label">{{ $t("replay_trim_start") }}</label>
           <input
             type="number"
-            class="input is-small"
-            style="width: 5rem"
+            class="input is-small replay-trim-input"
             :min="fullRange.begin"
             :max="fullRange.end"
             v-model.number="trimStart"
           />
-          <span class="is-size-7">{{ $t("replay_trim_end") }}</span>
+          <label class="replay-label">{{ $t("replay_trim_end") }}</label>
           <input
             type="number"
-            class="input is-small"
-            style="width: 5rem"
+            class="input is-small replay-trim-input"
             :min="fullRange.begin"
             :max="fullRange.end"
             v-model.number="trimEnd"
           />
           <button
-            class="button is-small is-light"
+            class="button is-small is-primary"
             @click="applyTrim"
           >
             {{ $t("replay_trim_apply") }}
@@ -200,13 +205,20 @@ export default {
     });
     const loopMax = computed(() => store.state.stage.replay.loopMax);
     const replayLoopCount = computed(() => store.state.stage.replay.loopCount);
-    const loopMaxInput = ref(loopMax.value ?? "");
-    watch(loopMax, (v) => { loopMaxInput.value = v ?? ""; });
-    watch(loopMaxInput, (v) => {
-      const n = v === "" || v == null ? null : Number(v);
-      store.commit("stage/SET_REPLAY", {
-        loopMax: n != null && n >= 1 ? n : null,
-      });
+    const loopOptions = ["infinite", "2", "3", "4", "5", "10"];
+    const loopOption = computed({
+      get: () =>
+        loopMax.value == null
+          ? "infinite"
+          : loopOptions.includes(String(loopMax.value))
+            ? String(loopMax.value)
+            : "infinite",
+      set: (v) => {
+        const n = v === "infinite" ? null : Number(v);
+        store.commit("stage/SET_REPLAY", {
+          loopMax: n != null && n >= 1 ? n : null,
+        });
+      },
     });
 
     const events = computed(() => store.state.stage.model?.events ?? []);
@@ -308,7 +320,7 @@ export default {
       collapsed,
       loop,
       loopMax,
-      loopMaxInput,
+      loopOption,
       replayLoopCount,
       onLoopChange,
       hasEvents,
@@ -327,6 +339,11 @@ export default {
   left: 16px;
   bottom: 16px;
   min-height: 108px;
+  max-width: 420px;
+  font-size: 14px;
+  .card-body {
+    padding: 12px 14px;
+  }
   .button.is-rounded {
     width: 16px;
   }
@@ -345,5 +362,69 @@ export default {
     position: absolute;
     right: 8px;
   }
+}
+
+.replay-playback-title {
+  margin-bottom: 4px;
+}
+
+.replay-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.replay-section-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #363636;
+  display: block;
+}
+
+.replay-label {
+  font-size: 13px;
+  color: #4a4a4a;
+}
+
+.replay-checkbox {
+  font-size: 13px;
+  margin-bottom: 0;
+  span {
+    margin-left: 6px;
+  }
+}
+
+.replay-select {
+  min-width: 100px;
+  font-size: 13px;
+}
+
+.replay-loop-count {
+  font-size: 13px;
+  color: #4a4a4a;
+}
+
+.replay-trim-section summary {
+  cursor: pointer;
+  list-style: none;
+  &::-webkit-details-marker {
+    display: none;
+  }
+  &::before {
+    content: "▸ ";
+    font-size: 12px;
+  }
+}
+.replay-trim-section[open] summary::before {
+  content: "▾ ";
+}
+
+.replay-trim-fields {
+  margin-top: 8px;
+}
+
+.replay-trim-input {
+  width: 90px;
 }
 </style>
