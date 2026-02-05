@@ -4,7 +4,7 @@
     :style="{
       position: 'absolute',
       opacity: object.opacity * (isDragging ? 0.5 : 1),
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
+      filter: `grayscale(${object.liveAction || object.drawingId ? 0 : 1})`,
       'transform-origin': transformOrigin,
     }"
     @mousedown="clickInside"
@@ -22,7 +22,7 @@
       height: object.h + 'px',
       transform: `rotate(${object.rotate}deg)`,
       opacity: object.opacity,
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
+      filter: `grayscale(${object.liveAction || object.drawingId ? 0 : 1})`,
     }"
   >
     <slot />
