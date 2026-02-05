@@ -340,7 +340,14 @@ export default {
       if (!name) return;
       savingArchive.value = true;
       try {
-        await updateMutation("Performance updated successfully!", item.id, name, item.description);
+        if (compressedResult.value) {
+          await duplicateMutation("Compressed archive saved.", item.id, name, item.description ?? undefined);
+          compressedResult.value = null;
+          selectedArchiveId.value = null;
+          saveName.value = "";
+        } else {
+          await updateMutation("Performance updated successfully!", item.id, name, item.description);
+        }
         if (refresh) refresh(stage.value.id);
       } finally {
         savingArchive.value = false;
@@ -516,6 +523,9 @@ export default {
 
     const { loading: updating, save: updateMutation } = useMutation(
       stageGraph.updatePerformance,
+    );
+    const { save: duplicateMutation } = useMutation(
+      stageGraph.duplicatePerformance,
     );
     const updatePerformance = async (item, complete) => {
       await updateMutation(

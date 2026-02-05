@@ -567,6 +567,23 @@ export default {
       `,
       { id, name, description }
     ),
+  duplicatePerformance: (sourceId, name, description) =>
+    studioClient.request(
+      gql`
+        mutation duplicatePerformance(
+          $sourceId: ID!
+          $name: String!
+          $description: String
+        ) {
+          duplicatePerformance(
+            input: { sourceId: $sourceId, name: $name, description: $description }
+          ) {
+            id
+          }
+        }
+      `,
+      { sourceId, name, description }
+    ),
   startRecording: (stageId, name, description) =>
     studioClient.request(
       gql`
