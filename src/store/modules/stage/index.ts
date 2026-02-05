@@ -36,6 +36,22 @@ const mqtt = buildClient();
 
 import { computeCompressedEvents as computeCompressedEventsUtil } from "utils/replayCompress";
 
+let replayDrawQueue: { message: unknown; commit: (m: string, p: unknown) => void }[] = [];
+let replayDrawRafId: number | null = null;
+
+function flushReplayDrawQueue() {
+  if (replayDrawQueue.length === 0) {
+    replayDrawRafId = null;
+    return;
+  }
+  const commit = replayDrawQueue[0].commit;
+  replayDrawQueue.forEach(({ message }) => {
+    commit("UPDATE_WHITEBOARD", message);
+  });
+  replayDrawQueue = [];
+  replayDrawRafId = null;
+}
+
 function getEffectiveReplay(state) {
   if (state.replay.useCompressed && state.replay.compressed) {
     return {
@@ -1410,7 +1426,9 @@ export default {
         }
       }, 1000 / speed);
       events.forEach((event) => {
-        if (event.mqttTimestamp - current >= 0) {
+        if (event.mqttTimestamp <= current) {
+          dispatch("replicateEvent", event);
+        } else {
           const timer = setTimeout(
             () => {
               dispatch("replayEvent", event);
@@ -1418,8 +1436,6 @@ export default {
             ((event.mqttTimestamp - current) * 1000) / speed,
           );
           state.replay.timers.push(timer);
-        } else {
-          dispatch("replicateEvent", event);
         }
       });
     },
@@ -1428,6 +1444,11 @@ export default {
       state.replay.interval = null;
       state.replay.timers.forEach((timer) => clearTimeout(timer));
       state.replay.timers = [];
+      if (replayDrawRafId !== null) {
+        cancelAnimationFrame(replayDrawRafId);
+        replayDrawRafId = null;
+      }
+      replayDrawQueue = [];
       state.tools.audios.forEach((audio) => {
         audio.isPlaying = false;
         audio.changed = true;
@@ -1618,8 +1639,18 @@ export default {
         commit("SET_ACTIVE_MOVABLE", id);
       }
     },
-    handleDrawMessage({ commit }, { message }) {
-      commit("UPDATE_WHITEBOARD", message);
+    handleDrawMessage({ commit, state }, { message }) {
+      if (
+        state.replay.isReplaying &&
+        state.replay.speed >= 4
+      ) {
+        replayDrawQueue.push({ message, commit });
+        if (replayDrawRafId === null) {
+          replayDrawRafId = requestAnimationFrame(flushReplayDrawQueue);
+        }
+      } else {
+        commit("UPDATE_WHITEBOARD", message);
+      }
     },
     sendDrawWhiteboard(action, command) {
       mqtt.sendMessage(TOPICS.DRAW, { type: DRAW_ACTIONS.NEW_LINE, command });
