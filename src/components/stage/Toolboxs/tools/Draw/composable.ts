@@ -119,14 +119,21 @@ export const useDrawable = () => {
     }
     if (res == "up") {
       data.flag = false;
-      history.push({
-        type: mode.value,
-        size: size.value,
-        color: color.value,
-        lines: data.lines,
-        x: data.currX,
-        y: data.currY,
-      });
+      // Snapshot stroke with primitive color so changing the colour picker later cannot affect this stroke
+      const strokeColor =
+        typeof color.value === "string" ? color.value : DEFAULT_STROKE_COLOR;
+      history.push(
+        JSON.parse(
+          JSON.stringify({
+            type: mode.value,
+            size: size.value,
+            color: strokeColor,
+            lines: data.lines,
+            x: data.currX,
+            y: data.currY,
+          }),
+        ),
+      );
     }
     if (res == "move") {
       if (data.flag) {

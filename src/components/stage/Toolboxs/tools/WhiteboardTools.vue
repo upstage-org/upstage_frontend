@@ -96,19 +96,26 @@ export default {
       if (history.length) {
         const lastStroke = val[val.length - 1];
         const ratio = 1 / stageSize.value.height;
-        const command = {
-          ...lastStroke,
-          color: lastStroke.color ?? "#000000",
-          size: lastStroke.size * ratio,
-          x: lastStroke.x * ratio,
-          y: lastStroke.y * ratio,
-          lines: lastStroke.lines.map((line) => ({
-            x: line.x * ratio,
-            y: line.y * ratio,
-            fromX: line.fromX * ratio,
-            fromY: line.fromY * ratio,
-          })),
-        };
+        // Use this command's own color (primitive) so the colour picker only affects new strokes
+        const strokeColor =
+          typeof lastStroke.color === "string"
+            ? lastStroke.color
+            : "#000000";
+        const command = JSON.parse(
+          JSON.stringify({
+            ...lastStroke,
+            color: strokeColor,
+            size: lastStroke.size * ratio,
+            x: lastStroke.x * ratio,
+            y: lastStroke.y * ratio,
+            lines: (lastStroke.lines || []).map((line) => ({
+              x: line.x * ratio,
+              y: line.y * ratio,
+              fromX: line.fromX * ratio,
+              fromY: line.fromY * ratio,
+            })),
+          }),
+        );
         store.dispatch("stage/sendDrawWhiteboard", command);
         clearCanvas(true);
       }

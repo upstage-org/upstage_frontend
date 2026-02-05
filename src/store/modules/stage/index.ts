@@ -665,9 +665,11 @@ export default {
         case DRAW_ACTIONS.NEW_LINE: {
           // Store a deep copy with per-stroke color so changing the colour picker doesn't affect previous lines
           const cmd = message.command ?? {};
+          const strokeColor =
+            typeof cmd.color === "string" ? cmd.color : "#000000";
           const commandWithColor = {
             ...cmd,
-            color: cmd.color ?? "#000000",
+            color: strokeColor,
           };
           const stored = JSON.parse(JSON.stringify(commandWithColor));
           state.board.whiteboard = state.board.whiteboard.concat(stored);
