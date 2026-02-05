@@ -47,11 +47,11 @@ export default {
 
     watch(
       [ready, () => route.query.compress],
-      ([isReady, compressMinutes]) => {
-        if (isReady && compressMinutes != null && compressMinutes !== "") {
-          const n = Number(compressMinutes);
-          if (n >= 1) {
-            store.dispatch("stage/computeCompressedReplay", n);
+      ([isReady, compressParam]) => {
+        if (isReady && compressParam != null && compressParam !== "") {
+          const totalSeconds = Number(compressParam);
+          if (totalSeconds > 0) {
+            store.dispatch("stage/computeCompressedReplay", totalSeconds);
           }
         }
       },

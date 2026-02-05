@@ -19,7 +19,7 @@
       <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-3 mb-3">
         <label class="label mb-0">{{ $t("archive_select_performance") }}</label>
         <select
-          class="select"
+          class="select mr-3"
           v-model="selectedArchiveId"
           @change="onSelectArchive"
         >
@@ -33,18 +33,28 @@
           </option>
         </select>
         <template v-if="selectedArchiveId">
-          <label class="label mb-0">{{ $t("replay_auto_compress_minutes") }}</label>
+          <label class="label mb-0">{{ $t("archive_compress_gap_label") }}</label>
           <input
             type="number"
-            class="input"
-            style="width: 5rem"
-            min="1"
+            class="input archive-compress-input"
+            min="0"
             max="999"
+            placeholder="0"
             v-model.number="deadSpaceMinutes"
           />
+          <span class="archive-compress-unit">{{ $t("archive_compress_minutes") }}</span>
+          <input
+            type="number"
+            class="input archive-compress-input"
+            min="0"
+            max="59"
+            placeholder="0"
+            v-model.number="deadSpaceSeconds"
+          />
+          <span class="archive-compress-unit">{{ $t("archive_compress_seconds") }}</span>
           <button
             class="button is-info"
-            :disabled="!archiveEvents.length || !deadSpaceMinutes || deadSpaceMinutes < 1"
+            :disabled="!archiveEvents.length || totalDeadSpaceSeconds < 1"
             @click="applyCompressPreview"
           >
             {{ $t("replay_auto_compress_apply") }}
@@ -232,6 +242,10 @@ export default {
     const refresh = inject("refresh");
     const selectedArchiveId = ref(null);
     const deadSpaceMinutes = ref(5);
+    const deadSpaceSeconds = ref(0);
+    const totalDeadSpaceSeconds = computed(
+      () => (deadSpaceMinutes.value || 0) * 60 + (deadSpaceSeconds.value || 0)
+    );
     const archiveEvents = ref([]);
     const archiveBegin = ref(0);
     const archiveEnd = ref(0);
@@ -290,8 +304,8 @@ export default {
     const replayUrl = computed(() => {
       if (!stage.value || !selectedArchiveId.value) return "#";
       const base = `${configs.UPSTAGE_URL || ""}/replay/${stage.value.fileLocation}/${selectedArchiveId.value}`;
-      const params = compressedResult.value && deadSpaceMinutes.value
-        ? `?compress=${deadSpaceMinutes.value}`
+      const params = compressedResult.value && totalDeadSpaceSeconds.value > 0
+        ? `?compress=${totalDeadSpaceSeconds.value}`
         : "";
       return base + params;
     });
@@ -324,12 +338,12 @@ export default {
       }
     }
     function applyCompressPreview() {
-      if (!archiveEvents.value.length || !deadSpaceMinutes.value) return;
+      if (!archiveEvents.value.length || totalDeadSpaceSeconds.value < 1) return;
       const result = computeCompressedEvents(
         archiveEvents.value,
         archiveBegin.value,
         archiveEnd.value,
-        deadSpaceMinutes.value
+        totalDeadSpaceSeconds.value
       );
       compressedResult.value = result;
     }
@@ -358,6 +372,9 @@ export default {
 
     const date = (value) => {
       return value ? moment(value).format("YYYY-MM-DD") : "Now";
+    };
+    const dateTimeUtc = (value) => {
+      return value ? moment.utc(value).format("YYYY-MM-DD HH:mm") + " UTC" : "";
     };
 
     const headers = [
@@ -391,8 +408,8 @@ export default {
       },
       {
         title: "Archived On",
-        key: "createdOn",
-        type: "date",
+        render: (item) => dateTimeUtc(item.createdOn),
+        align: "center",
       },
       {
         title: "",
@@ -560,6 +577,8 @@ export default {
       deleting,
       selectedArchiveId,
       deadSpaceMinutes,
+      deadSpaceSeconds,
+      totalDeadSpaceSeconds,
       archiveEvents,
       archiveBegin,
       archiveEnd,
@@ -580,5 +599,13 @@ export default {
 <style scoped>
 .button.is-light>img {
   max-width: unset;
+}
+.archive-compress-input {
+  width: 4rem;
+}
+.archive-compress-unit {
+  font-size: 0.9rem;
+  color: #4a4a4a;
+  margin-right: 0.25rem;
 }
 </style>

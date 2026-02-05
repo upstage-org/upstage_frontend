@@ -1502,14 +1502,14 @@ export default {
         },
       });
     },
-    computeCompressedReplay({ state, dispatch }, deadSpaceMinutes) {
+    computeCompressedReplay({ state, dispatch }, deadSpaceSeconds) {
       const rawEvents = state.model?.events ?? [];
       const ts = state.replay.timestamp;
       const result = computeCompressedEventsUtil(
         rawEvents,
         ts.begin,
         ts.end,
-        deadSpaceMinutes,
+        deadSpaceSeconds,
       );
       if (!result) return;
       state.replay.compressed = {
