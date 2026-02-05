@@ -97,8 +97,23 @@ const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) =
 };
 
 onMounted(() => {
+  // Reset filter state to a consistent default when entering the Media page,
+  // so we don't show "no results" due to stale inquiry from Stages or another route.
+  name.value = "";
+  owners.value = sharedAuth && sharedAuth.username ? [sharedAuth.username] : [];
+  types.value = [];
+  stages.value = [];
+  tags.value = [];
+  dates.value = undefined;
+  dormant.value = false;
   updateInquiry({
-    createdBetween: undefined
+    name: "",
+    owners: owners.value,
+    stages: [],
+    tags: [],
+    mediaTypes: [],
+    dormant: false,
+    createdBetween: undefined,
   });
 });
 

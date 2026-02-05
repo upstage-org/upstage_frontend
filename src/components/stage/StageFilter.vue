@@ -111,8 +111,23 @@ watchEffect(() => {
 });
 
 onMounted(() => {
+  // Reset filter state to a consistent default when entering the Stages page,
+  // so we don't show "no results" due to stale inquiry from Media or another route.
+  name.value = "";
+  owners.value = [];
+  types.value = [];
+  stages.value = [];
+  tags.value = [];
+  access.value = ["owner", "editor", "player"];
+  dates.value = undefined;
   updateInquiry({
-    createdBetween: undefined
+    name: "",
+    owners: [],
+    stages: [],
+    tags: [],
+    mediaTypes: [],
+    access: ["owner", "editor", "player"],
+    createdBetween: undefined,
   });
 });
 
