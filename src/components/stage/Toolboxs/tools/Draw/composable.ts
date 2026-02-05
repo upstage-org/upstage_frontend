@@ -32,8 +32,9 @@ const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
 const DEFAULT_STROKE_COLOR = "#000000";
 
 const execute = async (ctx, command, animate, onAfterSegment) => {
-  // Use this command's own color so changing the colour picker doesn't affect previous strokes
-  const color = command.color ?? DEFAULT_STROKE_COLOR;
+  const raw = command.color ?? DEFAULT_STROKE_COLOR;
+  const color =
+    typeof raw === "string" ? raw : DEFAULT_STROKE_COLOR;
   const { type, size, lines } = command;
   if (lines && lines.length) {
     if (type === "draw") {
