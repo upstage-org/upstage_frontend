@@ -21,7 +21,7 @@ import Preloader from "views/live/Preloader.vue";
 import ConnectionStatus from "views/live/ConnectionStatus.vue";
 import Controls from "./Controls.vue";
 import { useStore } from "vuex";
-import { computed, provide } from "vue";
+import { computed, provide, watch } from "vue";
 import { useRoute } from "vue-router";
 export default {
   components: {
@@ -35,15 +35,28 @@ export default {
   },
   setup: () => {
     const store = useStore();
+    const route = useRoute();
     const ready = computed(
       () => store.state.stage.model && !store.state.stage.preloading,
     );
 
-    const route = useRoute();
     store.dispatch("stage/loadStage", {
       url: route.params.url,
       recordId: route.params.id,
     });
+
+    watch(
+      [ready, () => route.query.compress],
+      ([isReady, compressMinutes]) => {
+        if (isReady && compressMinutes != null && compressMinutes !== "") {
+          const n = Number(compressMinutes);
+          if (n >= 1) {
+            store.dispatch("stage/computeCompressedReplay", n);
+          }
+        }
+      },
+      { immediate: true }
+    );
 
     provide("replaying", true);
 

@@ -130,34 +130,6 @@
           </template>
         </div>
       </div>
-      <div v-if="hasEvents" class="replay-section replay-compress-section">
-        <div class="replay-section-title">{{ $t("replay_auto_compress") }}</div>
-        <p class="replay-compress-desc is-size-7 mb-2">{{ $t("replay_auto_compress_desc") }}</p>
-        <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-2">
-          <label class="replay-label">{{ $t("replay_auto_compress_minutes") }}</label>
-          <input
-            type="number"
-            class="input is-small replay-compress-input"
-            min="1"
-            max="999"
-            v-model.number="deadSpaceMinutes"
-          />
-          <button
-            class="button is-small is-info"
-            :disabled="!deadSpaceMinutes || deadSpaceMinutes < 1"
-            @click="applyCompress"
-          >
-            {{ $t("replay_auto_compress_apply") }}
-          </button>
-          <button
-            v-if="useCompressed"
-            class="button is-small is-light"
-            @click="clearCompress"
-          >
-            {{ $t("replay_auto_compress_clear") }}
-          </button>
-        </div>
-      </div>
       <details v-if="hasEvents" class="replay-section replay-trim-section">
         <summary class="replay-section-title">{{ $t("replay_trim") }}</summary>
         <div class="replay-trim-fields is-flex is-flex-wrap-wrap is-align-items-center is-gap-2">
@@ -224,7 +196,6 @@ export default {
   setup() {
     const store = useStore();
     const timestamp = computed(() => store.getters["stage/replayEffectiveTimestamp"]);
-    const useCompressed = computed(() => store.getters["stage/replayUseCompressed"]);
     const isPlaying = computed(() => store.state.stage.replay.interval);
     const speed = computed(() => store.state.stage.replay.speed);
     const speeds = [0.5, 1, 2, 4, 8, 16, 32];
@@ -273,18 +244,6 @@ export default {
 
     const trimStart = ref(null);
     const trimEnd = ref(null);
-    const deadSpaceMinutes = ref(5);
-
-    const applyCompress = () => {
-      const n = deadSpaceMinutes.value;
-      if (n != null && n >= 1) {
-        store.dispatch("stage/computeCompressedReplay", n);
-      }
-    };
-
-    const clearCompress = () => {
-      store.dispatch("stage/clearCompressedReplay");
-    };
 
     const onLoopChange = () => {
       store.commit("stage/SET_REPLAY", { loop: loop.value });
@@ -371,10 +330,6 @@ export default {
       trimStart,
       trimEnd,
       applyTrim,
-      useCompressed,
-      deadSpaceMinutes,
-      applyCompress,
-      clearCompress,
     };
   },
 };

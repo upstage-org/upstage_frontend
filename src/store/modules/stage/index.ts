@@ -34,7 +34,7 @@ import { Promise } from "core-js";
 
 const mqtt = buildClient();
 
-const GAP_BETWEEN_SCENES_SECONDS = 3;
+import { computeCompressedEvents as computeCompressedEventsUtil } from "utils/replayCompress";
 
 function getEffectiveReplay(state) {
   if (state.replay.useCompressed && state.replay.compressed) {
@@ -1505,60 +1505,17 @@ export default {
     computeCompressedReplay({ state, dispatch }, deadSpaceMinutes) {
       const rawEvents = state.model?.events ?? [];
       const ts = state.replay.timestamp;
-      const begin = ts.begin;
-      const end = ts.end;
-      const inRange = rawEvents.filter(
-        (e) => e.mqttTimestamp >= begin && e.mqttTimestamp <= end,
+      const result = computeCompressedEventsUtil(
+        rawEvents,
+        ts.begin,
+        ts.end,
+        deadSpaceMinutes,
       );
-      const sorted = [...inRange].sort(
-        (a, b) => a.mqttTimestamp - b.mqttTimestamp,
-      );
-      if (sorted.length === 0) return;
-      const gapThresholdSeconds = Number(deadSpaceMinutes) * 60;
-      const segments: Array<{ startTs: number; endTs: number; events: typeof sorted }> = [];
-      let seg = {
-        startTs: sorted[0].mqttTimestamp,
-        endTs: sorted[0].mqttTimestamp,
-        events: [sorted[0]],
-      };
-      segments.push(seg);
-      for (let i = 1; i < sorted.length; i++) {
-        const ev = sorted[i];
-        const gap = ev.mqttTimestamp - seg.endTs;
-        if (gap > gapThresholdSeconds) {
-          seg = {
-            startTs: ev.mqttTimestamp,
-            endTs: ev.mqttTimestamp,
-            events: [ev],
-          };
-          segments.push(seg);
-        } else {
-          seg.endTs = ev.mqttTimestamp;
-          seg.events.push(ev);
-        }
-      }
-      let compressedStart = 0;
-      const newEvents: Array<{ mqttTimestamp: number; topic: string; payload: unknown; id?: number; performanceId?: number }> = [];
-      for (let i = 0; i < segments.length; i++) {
-        const segment = segments[i];
-        const duration = segment.endTs - segment.startTs;
-        for (const event of segment.events) {
-          newEvents.push({
-            ...event,
-            mqttTimestamp:
-              compressedStart + (event.mqttTimestamp - segment.startTs),
-          });
-        }
-        compressedStart += duration;
-        if (i < segments.length - 1) {
-          compressedStart += GAP_BETWEEN_SCENES_SECONDS;
-        }
-      }
+      if (!result) return;
       state.replay.compressed = {
-        events: newEvents,
+        events: result.events,
         timestamp: {
-          begin: 0,
-          end: compressedStart,
+          ...result.timestamp,
           current: 0,
         },
       };
