@@ -207,8 +207,8 @@ export default {
       animations: {
         bubble: "fade",
         curtain: "drop",
-        bubbleSpeed: 1000,
-        curtainSpeed: 5000,
+        bubbleSpeed: 2000,
+        curtainSpeed: 10000,
       },
       defaultcolor: "#30AC45",
       enabledLiveStreaming: true,
@@ -228,8 +228,8 @@ export default {
     const animations = reactive({ 
       bubble: initialConfig.animations?.bubble ?? "fade",
       curtain: initialConfig.animations?.curtain ?? "drop",
-      bubbleSpeed: initialConfig.animations?.bubbleSpeed ?? 1000,
-      curtainSpeed: initialConfig.animations?.curtainSpeed ?? 5000,
+      bubbleSpeed: initialConfig.animations?.bubbleSpeed ?? 2000,
+      curtainSpeed: initialConfig.animations?.curtainSpeed ?? 10000,
     });
     const defaultcolor = ref(initialConfig.defaultcolor ?? "#30AC45");
     const enabledLiveStreaming = ref(
@@ -314,8 +314,8 @@ export default {
         animations: {
           bubble: animations.bubble || "fade",
           curtain: animations.curtain || "drop",
-          bubbleSpeed: Number(animations.bubbleSpeed) || 1000,
-          curtainSpeed: Number(animations.curtainSpeed) || 5000,
+          bubbleSpeed: Number(animations.bubbleSpeed) || 2000,
+          curtainSpeed: Number(animations.curtainSpeed) || 10000,
         },
         defaultcolor: defaultcolor.value || "#30AC45",
         enabledLiveStreaming: Boolean(enabledLiveStreaming.value),

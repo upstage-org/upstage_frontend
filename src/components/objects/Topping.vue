@@ -89,8 +89,7 @@ export default {
         pos = outOfViewportPosition(el);
         count++;
       }
-      const duration = config.value?.animations?.bubbleSpeed ?? 1000;
-      console.log(config.value?.animations?.bubbleSpeed);
+      const duration = config.value?.animations?.bubbleSpeed ?? 2000;
       switch (config.value?.animations?.bubble) {
         case "fade":
           animate(el, {
@@ -117,7 +116,7 @@ export default {
     };
 
     const leave = (el, complete) => {
-      const duration = config.value?.animations?.bubbleSpeed ?? 1000;
+      const duration = config.value?.animations?.bubbleSpeed ?? 2000;
       switch (config.value?.animations?.bubble) {
         case "fade":
           animate(el, {
