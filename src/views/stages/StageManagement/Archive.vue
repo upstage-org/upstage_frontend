@@ -16,10 +16,10 @@
     </header>
     <div class="card-content">
       <p class="mb-3">{{ $t("replay_auto_compress_desc") }}</p>
-      <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-3 mb-3">
+      <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-3 mb-2">
         <label class="label mb-0">{{ $t("archive_select_performance") }}</label>
         <select
-          class="select mr-3"
+          class="select"
           v-model="selectedArchiveId"
           @change="onSelectArchive"
         >
@@ -32,34 +32,34 @@
             {{ s.name || `#${s.id}` }} ({{ date(s.begin) }} – {{ date(s.end) }})
           </option>
         </select>
-        <template v-if="selectedArchiveId">
-          <label class="label mb-0">{{ $t("archive_compress_gap_label") }}</label>
-          <input
-            type="number"
-            class="input archive-compress-input"
-            min="0"
-            max="999"
-            placeholder="0"
-            v-model.number="deadSpaceMinutes"
-          />
-          <span class="archive-compress-unit">{{ $t("archive_compress_minutes") }}</span>
-          <input
-            type="number"
-            class="input archive-compress-input"
-            min="0"
-            max="59"
-            placeholder="0"
-            v-model.number="deadSpaceSeconds"
-          />
-          <span class="archive-compress-unit">{{ $t("archive_compress_seconds") }}</span>
-          <button
-            class="button is-info"
-            :disabled="!archiveEvents.length || totalDeadSpaceSeconds < 1"
-            @click="applyCompressPreview"
-          >
-            {{ $t("replay_auto_compress_apply") }}
-          </button>
-        </template>
+      </div>
+      <div v-if="selectedArchiveId" class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-3 mb-3">
+        <label class="label mb-0">{{ $t("archive_compress_gap_label") }}</label>
+        <input
+          type="number"
+          class="input archive-compress-input"
+          min="0"
+          max="999"
+          placeholder="0"
+          v-model.number="deadSpaceMinutes"
+        />
+        <span class="archive-compress-unit">{{ $t("archive_compress_minutes") }}</span>
+        <input
+          type="number"
+          class="input archive-compress-input"
+          min="0"
+          max="59"
+          placeholder="0"
+          v-model.number="deadSpaceSeconds"
+        />
+        <span class="archive-compress-unit">{{ $t("archive_compress_seconds") }}</span>
+        <button
+          class="button is-info"
+          :disabled="!archiveEvents.length || totalDeadSpaceSeconds < 1"
+          @click="applyCompressPreview"
+        >
+          {{ $t("replay_auto_compress_apply") }}
+        </button>
       </div>
       <template v-if="selectedArchive && (archiveEvents.length || loadingEvents)">
         <div v-if="loadingEvents" class="mb-3">{{ $t("loading") }}…</div>
@@ -93,7 +93,7 @@
               {{ compressedResult ? $t("archive_open_replay_compressed") : $t("archive_open_replay") }}
             </a>
           </div>
-          <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-2">
+          <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-2 mb-2">
             <label class="label mb-0">{{ $t("archive_save_name") }}</label>
             <input
               type="text"
@@ -102,6 +102,10 @@
               v-model="saveName"
               :placeholder="selectedArchive?.name"
             />
+            <label class="checkbox ml-3">
+              <input type="checkbox" v-model="overwriteOriginal" />
+              <span>{{ $t("archive_overwrite_original") }}</span>
+            </label>
             <button
               class="button is-primary"
               :disabled="savingArchive"
@@ -254,6 +258,7 @@ export default {
     const compressedResult = ref(null);
     const saveName = ref("");
     const savingArchive = ref(false);
+    const overwriteOriginal = ref(false);
 
     const selectedArchive = computed(() =>
       stage.value && selectedArchiveId.value
@@ -361,16 +366,31 @@ export default {
             mqttTimestamp: e.mqttTimestamp,
             payload: e.payload ?? {},
           }));
-          await stageGraph.savePerformance({
-            stageId: stage.value.id,
-            name,
-            description: item.description ?? undefined,
-            events,
-          });
+          if (overwriteOriginal.value) {
+            await stageGraph.savePerformance({
+              performanceId: item.id,
+              name,
+              description: item.description ?? undefined,
+              events,
+            });
+          } else {
+            const stageId = stage.value?.id != null ? Number(stage.value.id) : null;
+            if (stageId == null) {
+              message.error("Stage not found.");
+              return;
+            }
+            await stageGraph.createPerformanceWithEvents({
+              stageId,
+              name,
+              description: item.description ?? undefined,
+              events,
+            });
+          }
           message.success("Compressed archive saved.");
           compressedResult.value = null;
           selectedArchiveId.value = null;
           saveName.value = "";
+          overwriteOriginal.value = false;
           if (refresh) refresh(stage.value.id);
         } else {
           await updateMutation("Performance updated successfully!", item.id, name, item.description);
@@ -607,6 +627,7 @@ export default {
       compressedResult,
       saveName,
       savingArchive,
+      overwriteOriginal,
       selectedArchive,
       replayUrl,
       onSelectArchive,

@@ -165,6 +165,7 @@ export default {
   archive_compress_gap_label: "Remove gaps longer than",
   archive_compress_minutes: "min",
   archive_compress_seconds: "sec",
+  archive_overwrite_original: "Overwrite original performance",
   auto_recorded: "Auto recorded",
   live_streaming: "Enable streaming",
   all_of_its_replay_and_chat: "All of its replay and chat",

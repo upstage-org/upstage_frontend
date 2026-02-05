@@ -602,6 +602,23 @@ export default {
       `,
       { input }
     ),
+  createPerformanceWithEvents: (input: {
+    stageId: number;
+    name: string;
+    description?: string | null;
+    events: Array<{ topic: string; mqttTimestamp: number; payload?: unknown }>;
+  }) =>
+    studioClient.request(
+      gql`
+        mutation createPerformanceWithEvents($input: CreatePerformanceWithEventsInput!) {
+          createPerformanceWithEvents(input: $input) {
+            id
+            name
+          }
+        }
+      `,
+      { input }
+    ),
   startRecording: (stageId, name, description) =>
     studioClient.request(
       gql`
