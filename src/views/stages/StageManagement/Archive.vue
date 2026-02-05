@@ -566,14 +566,23 @@ export default {
       complete();
     };
 
-    const { loading: deleting, save: deleteMutation } = useMutation(
-      stageGraph.deletePerformance,
-    );
+    const deleting = ref(false);
     const deletePerformance = async (item, complete) => {
-      await deleteMutation("Performance deleted successfully!", item.id);
-      complete();
-      if (refresh) {
-        refresh(stage.value.id);
+      const id = item.id != null ? Number(item.id) : null;
+      if (id == null) {
+        message.error("Invalid performance.");
+        return;
+      }
+      deleting.value = true;
+      try {
+        await stageGraph.deletePerformance(id);
+        message.success("Performance deleted successfully!");
+        complete();
+        if (refresh) refresh(stage.value.id);
+      } catch (err) {
+        message.error(err?.message ?? err ?? "Failed to delete performance.");
+      } finally {
+        deleting.value = false;
       }
     };
 
