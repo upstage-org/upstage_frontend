@@ -663,15 +663,14 @@ export default {
       }
       switch (message.type) {
         case DRAW_ACTIONS.NEW_LINE: {
-          // Store a copy with per-stroke color so changing the colour picker doesn't affect previous lines
+          // Store a deep copy with per-stroke color so changing the colour picker doesn't affect previous lines
           const cmd = message.command ?? {};
           const commandWithColor = {
             ...cmd,
             color: cmd.color ?? "#000000",
           };
-          state.board.whiteboard = state.board.whiteboard.concat(
-            commandWithColor,
-          );
+          const stored = JSON.parse(JSON.stringify(commandWithColor));
+          state.board.whiteboard = state.board.whiteboard.concat(stored);
           break;
         }
         case DRAW_ACTIONS.UNDO:
