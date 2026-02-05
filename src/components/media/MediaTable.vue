@@ -269,10 +269,7 @@ onDone((data: any) => {
 });
 
 provide("refresh", () => {
-  fetchMore({
-    variables: tableParams,
-    updateQuery,
-  });
+  refetch();
 });
 
 const editMedia = (media: Media) => {
