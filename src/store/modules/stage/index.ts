@@ -664,37 +664,14 @@ export default {
       switch (message.type) {
         case DRAW_ACTIONS.NEW_LINE: {
           const cmd = message.command ?? {};
-          const board = state.board.whiteboard;
-          // Dedupe by id: skip if we already added this stroke (optimistic update)
-          if (cmd._sendId && board.some((c) => c._sendId === cmd._sendId)) {
+          if (cmd._sendId && state.board.whiteboard.some((c) => c._sendId === cmd._sendId)) {
             break;
           }
-          // Dedupe echo: backend may strip _sendId and inject current color; skip if last stroke has same geometry and was just added
-          const last = board[board.length - 1];
-          const sameGeometry =
-            last &&
-            (cmd.lines?.length ?? 0) === (last.lines?.length ?? 0) &&
-            cmd.type === last.type;
-          const recentlyAdded =
-            last?._clientTimestamp &&
-            Date.now() - last._clientTimestamp < 3000;
-          if (!cmd._sendId && sameGeometry && recentlyAdded) {
-            break;
-          }
-          const strokeColor =
-            typeof cmd.color === "string" ? cmd.color : "#000000";
-          const stored = JSON.parse(
-            JSON.stringify({
-              type: cmd.type,
-              size: cmd.size,
-              x: cmd.x,
-              y: cmd.y,
-              color: strokeColor,
-              lines: cmd.lines || [],
-              _sendId: cmd._sendId,
-              _clientTimestamp: cmd._clientTimestamp,
-            }),
-          );
+          const commandWithColor = {
+            ...cmd,
+            color: typeof cmd.color === "string" ? cmd.color : "#000000",
+          };
+          const stored = JSON.parse(JSON.stringify(commandWithColor));
           state.board.whiteboard = state.board.whiteboard.concat(stored);
           break;
         }

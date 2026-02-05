@@ -32,9 +32,7 @@ const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
 const DEFAULT_STROKE_COLOR = "#000000";
 
 const execute = async (ctx, command, animate, onAfterSegment) => {
-  const raw = command.color ?? DEFAULT_STROKE_COLOR;
-  const color =
-    typeof raw === "string" ? raw : DEFAULT_STROKE_COLOR;
+  const color = command.color ?? DEFAULT_STROKE_COLOR;
   const { type, size, lines } = command;
   if (lines && lines.length) {
     if (type === "draw") {
@@ -122,25 +120,21 @@ export const useDrawable = (options = {}) => {
     if (res == "up") {
       const hadStrokeInProgress = data.flag;
       data.flag = false;
-      // Only end a stroke if we actually started one (mousedown was received). Brave's color
-      // widget can fire a spurious mouseup without mousedown; data.lines would still hold the
-      // previous stroke and we'd duplicate it with the new color otherwise.
+      // Only end a stroke if we actually started one (mousedown was received).
+      // Some browsers (e.g. Brave) can fire a spurious mouseup from the color widget without mousedown.
       if (!hadStrokeInProgress) return;
       const lines = data.lines || [];
-      const strokeColor =
-        typeof color.value === "string" ? color.value : DEFAULT_STROKE_COLOR;
       const snapshot = {
         type: mode.value,
         size: size.value,
-        color: strokeColor,
+        color: color.value,
         lines: lines.map((l) => ({ ...l })),
         x: data.currX,
         y: data.currY,
       };
-      const plainSnapshot = JSON.parse(JSON.stringify(snapshot));
-      history.push(plainSnapshot);
+      history.push(snapshot);
       if (lines.length > 0) {
-        onStrokeEnd?.(plainSnapshot);
+        onStrokeEnd?.(snapshot);
       }
     }
     if (res == "move") {
@@ -270,24 +264,19 @@ export const useRelativeCommands = (drawing) =>
     }
     const { commands, original, w, h } = drawing.value;
     const ratio = Math.min(w / original.w, h / original.h);
-    return commands.map((command) => {
-      // Use only primitive color from this command so current colour picker never affects previous strokes
-      const color =
-        typeof command.color === "string" ? command.color : DEFAULT_STROKE_COLOR;
-      return {
-        type: command.type,
-        size: command.size * ratio,
-        x: (command.x - original.x) * ratio,
-        y: (command.y - original.y) * ratio,
-        color,
-        lines: (command.lines || []).map((line) => ({
-          x: (line.x - original.x) * ratio,
-          y: (line.y - original.y) * ratio,
-          fromX: (line.fromX - original.x) * ratio,
-          fromY: (line.fromY - original.y) * ratio,
-        })),
-      };
-    });
+    return commands.map((command) => ({
+      ...command,
+      color: command.color ?? DEFAULT_STROKE_COLOR,
+      size: command.size * ratio,
+      x: (command.x - original.x) * ratio,
+      y: (command.y - original.y) * ratio,
+      lines: (command.lines || []).map((line) => ({
+        x: (line.x - original.x) * ratio,
+        y: (line.y - original.y) * ratio,
+        fromX: (line.fromX - original.x) * ratio,
+        fromY: (line.fromY - original.y) * ratio,
+      })),
+    }));
   });
 
 export const useDrawing = (drawing) => {
@@ -299,11 +288,6 @@ export const useDrawing = (drawing) => {
     const { value: canvas } = el;
     const w = drawing.value.w;
     const h = drawing.value.h;
-    // Snapshot commands once so the colour picker cannot affect strokes during this draw (e.g. on click)
-    const commandsSnapshot = JSON.parse(
-      JSON.stringify(commands.value || []),
-    );
-    // Only resize when dimensions change to avoid clearing the canvas (which can cause a white flash)
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
@@ -320,11 +304,13 @@ export const useDrawing = (drawing) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(offscreen, 0, 0);
     };
-    for (let i = 0; i < commandsSnapshot.length; i++) {
-      const command = commandsSnapshot[i];
+    for (let i = 0; i < commands.value.length; i++) {
+      const command = commands.value[i];
       let shouldAnimate = true;
-      if (oldDrawing?.commands != null && i < oldDrawing.commands.length) {
-        shouldAnimate = false;
+      if (newDrawing && oldDrawing && oldDrawing.commands) {
+        if (i < oldDrawing.commands.length) {
+          shouldAnimate = false;
+        }
       }
       if (shouldAnimate) {
         blitToVisible();

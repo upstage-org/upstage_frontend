@@ -87,17 +87,13 @@ export default {
       useDrawable({
         onStrokeEnd(snapshot) {
           const ratio = 1 / stageSize.value.height;
-          const strokeColor =
-            typeof snapshot.color === "string" ? snapshot.color : "#000000";
-          const _sendId = uuidv4();
           const command = {
             type: snapshot.type,
             size: snapshot.size * ratio,
             x: snapshot.x * ratio,
             y: snapshot.y * ratio,
-            color: strokeColor,
-            _sendId,
-            _clientTimestamp: Date.now(),
+            color: snapshot.color ?? "#000000",
+            _sendId: uuidv4(),
             lines: (snapshot.lines || []).map((line) => ({
               x: line.x * ratio,
               y: line.y * ratio,
@@ -105,7 +101,6 @@ export default {
               fromY: line.fromY * ratio,
             })),
           };
-          // Show stroke immediately with this stroke's color (optimistic update)
           store.commit("stage/UPDATE_WHITEBOARD", {
             type: DRAW_ACTIONS.NEW_LINE,
             command,
