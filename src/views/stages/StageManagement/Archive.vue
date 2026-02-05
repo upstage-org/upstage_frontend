@@ -221,6 +221,7 @@ import { computeCompressedEvents } from "utils/replayCompress";
 import { computed, inject, ref, watch } from "vue";
 import moment from "moment";
 import humanizeDuration from "humanize-duration";
+import { message } from "ant-design-vue";
 import { useMutation } from "services/graphql/composable";
 import { stageGraph } from "services/graphql";
 import configs from "config";
@@ -355,14 +356,22 @@ export default {
       savingArchive.value = true;
       try {
         if (compressedResult.value) {
-          await duplicateMutation("Compressed archive saved.", item.id, name, item.description ?? undefined);
+          await stageGraph.duplicatePerformance(
+            item.id,
+            name,
+            item.description ?? null
+          );
+          message.success("Compressed archive saved.");
           compressedResult.value = null;
           selectedArchiveId.value = null;
           saveName.value = "";
+          if (refresh) refresh(stage.value.id);
         } else {
           await updateMutation("Performance updated successfully!", item.id, name, item.description);
+          if (refresh) refresh(stage.value.id);
         }
-        if (refresh) refresh(stage.value.id);
+      } catch (err) {
+        message.error(err?.message ?? err ?? "Failed to save.");
       } finally {
         savingArchive.value = false;
       }
@@ -540,9 +549,6 @@ export default {
 
     const { loading: updating, save: updateMutation } = useMutation(
       stageGraph.updatePerformance,
-    );
-    const { save: duplicateMutation } = useMutation(
-      stageGraph.duplicatePerformance,
     );
     const updatePerformance = async (item, complete) => {
       await updateMutation(
