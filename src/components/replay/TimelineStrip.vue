@@ -4,7 +4,7 @@
       v-for="(event, idx) in events"
       :key="event.id ?? idx"
       class="timeline-strip-marker"
-      :style="{ left: position(event) + '%' }"
+      :style="{ left: position(event, idx) + '%' }"
     />
   </div>
 </template>
@@ -22,10 +22,13 @@ export default {
   },
   setup(props) {
     const duration = computed(() => (props.end || 0) - (props.begin || 0));
-    const position = (event) => {
+    const position = (event, index) => {
       const d = duration.value;
-      if (!d) return 0;
       const ts = Number(event.mqttTimestamp ?? 0);
+      if (!d || d <= 0) {
+        const n = props.events?.length || 1;
+        return n <= 1 ? 0 : (index * 100) / (n - 1);
+      }
       return ((ts - props.begin) * 100) / d;
     };
     return { position };

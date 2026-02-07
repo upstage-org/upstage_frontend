@@ -45,14 +45,15 @@ export function computeCompressedEvents(
   const newEvents: ReplayEvent[] = [];
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
-    const duration = segment.endTs - segment.startTs;
+    let segmentDuration = segment.endTs - segment.startTs;
+    if (segmentDuration <= 0) segmentDuration = 1;
     for (const event of segment.events) {
       newEvents.push({
         ...event,
         mqttTimestamp: compressedStart + (event.mqttTimestamp - segment.startTs),
       });
     }
-    compressedStart += duration;
+    compressedStart += segmentDuration;
   }
   return {
     events: newEvents,
