@@ -169,7 +169,10 @@
       </button>
     </template>
     <template #replay="{ item }">
-      <router-link :to="`/replay/${stage.fileLocation}/${item.id}`"
+      <router-link
+        :to="`/replay/${stage.fileLocation}/${item.id}`"
+        target="_blank"
+        rel="noopener noreferrer"
         :class="`button ${item.recording ? 'is-primary' : 'is-dark'}`">
         <i class="fas fa-video"></i>
       </router-link>
