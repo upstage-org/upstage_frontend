@@ -53,9 +53,28 @@
           v-model.number="idleTimeSeconds"
         />
         <span class="archive-compress-unit">{{ $t("archive_compress_seconds") }}</span>
+        <label class="label mb-0 ml-2">{{ $t("archive_compress_gap_between_label") }}</label>
+        <input
+          type="number"
+          class="input archive-compress-input"
+          min="0"
+          max="999"
+          placeholder="0"
+          v-model.number="gapMinutes"
+        />
+        <span class="archive-compress-unit">{{ $t("archive_compress_minutes") }}</span>
+        <input
+          type="number"
+          class="input archive-compress-input"
+          min="0"
+          max="59"
+          placeholder="0"
+          v-model.number="gapSeconds"
+        />
+        <span class="archive-compress-unit">{{ $t("archive_compress_seconds") }}</span>
         <button
           class="button is-info"
-          :disabled="!archiveEvents.length || totalIdleTimeSeconds < 1"
+          :disabled="!archiveEvents.length"
           @click="applyCompressPreview"
         >
           {{ $t("replay_auto_compress_apply") }}
@@ -244,8 +263,13 @@ export default {
     const selectedArchiveId = ref(null);
     const idleTimeMinutes = ref(5);
     const idleTimeSeconds = ref(0);
+    const gapMinutes = ref(0);
+    const gapSeconds = ref(0);
     const totalIdleTimeSeconds = computed(
       () => (idleTimeMinutes.value || 0) * 60 + (idleTimeSeconds.value || 0)
+    );
+    const totalGapSeconds = computed(
+      () => (gapMinutes.value || 0) * 60 + (gapSeconds.value || 0)
     );
     const archiveEvents = ref([]);
     const archiveBegin = ref(0);
@@ -309,10 +333,14 @@ export default {
     const replayUrl = computed(() => {
       if (!stage.value || !selectedArchiveId.value) return "#";
       const base = `${configs.UPSTAGE_URL || ""}/replay/${stage.value.fileLocation}/${selectedArchiveId.value}`;
-      const params = compressedResult.value && totalIdleTimeSeconds.value > 0
-        ? `?compress=${totalIdleTimeSeconds.value}`
-        : "";
-      return base + params;
+      if (!compressedResult.value) return base;
+      const compress = totalIdleTimeSeconds.value;
+      const gap = totalGapSeconds.value;
+      const params = new URLSearchParams();
+      if (compress >= 0) params.set("compress", String(compress));
+      if (gap > 0) params.set("gap", String(gap));
+      const qs = params.toString();
+      return qs ? base + "?" + qs : base;
     });
 
     async function onSelectArchive() {
@@ -343,12 +371,13 @@ export default {
       }
     }
     function applyCompressPreview() {
-      if (!archiveEvents.value.length || totalIdleTimeSeconds.value < 1) return;
+      if (!archiveEvents.value.length) return;
       const result = computeCompressedEvents(
         archiveEvents.value,
         archiveBegin.value,
         archiveEnd.value,
-        totalIdleTimeSeconds.value
+        totalIdleTimeSeconds.value,
+        totalGapSeconds.value
       );
       compressedResult.value = result;
     }

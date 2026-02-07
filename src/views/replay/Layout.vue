@@ -46,13 +46,15 @@ export default {
     });
 
     watch(
-      [ready, () => route.query.compress],
-      ([isReady, compressParam]) => {
+      [ready, () => route.query.compress, () => route.query.gap],
+      ([isReady, compressParam, gapParam]) => {
         if (isReady && compressParam != null && compressParam !== "") {
-          const totalSeconds = Number(compressParam);
-          if (totalSeconds > 0) {
-            store.dispatch("stage/computeCompressedReplay", totalSeconds);
-          }
+          const idleTimeSeconds = Number(compressParam);
+          const gapSeconds = gapParam != null && gapParam !== "" ? Number(gapParam) : 0;
+          store.dispatch("stage/computeCompressedReplay", {
+            idleTimeSeconds: Number.isNaN(idleTimeSeconds) ? 0 : idleTimeSeconds,
+            gapSeconds: Number.isNaN(gapSeconds) ? 0 : Math.max(0, gapSeconds),
+          });
         }
       },
       { immediate: true }

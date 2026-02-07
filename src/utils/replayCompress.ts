@@ -1,5 +1,3 @@
-const GAP_BETWEEN_SCENES_SECONDS = 3;
-
 export interface ReplayEvent {
   mqttTimestamp: number;
   topic: string;
@@ -12,7 +10,8 @@ export function computeCompressedEvents(
   rawEvents: ReplayEvent[],
   begin: number,
   end: number,
-  idleTimeSeconds: number
+  idleTimeSeconds: number,
+  gapBetweenScenesSeconds: number = 0
 ): { events: ReplayEvent[]; timestamp: { begin: number; end: number } } | null {
   const inRange = rawEvents.filter(
     (e) => e.mqttTimestamp >= begin && e.mqttTimestamp <= end
@@ -21,6 +20,7 @@ export function computeCompressedEvents(
   if (sorted.length === 0) return null;
 
   const gapThresholdSeconds = Number(idleTimeSeconds);
+  const gapSeconds = Math.max(0, Number(gapBetweenScenesSeconds) || 0);
   const segments: Array<{ startTs: number; endTs: number; events: ReplayEvent[] }> = [];
   let seg = {
     startTs: sorted[0].mqttTimestamp,
@@ -56,7 +56,7 @@ export function computeCompressedEvents(
     }
     compressedStart += duration;
     if (i < segments.length - 1) {
-      compressedStart += GAP_BETWEEN_SCENES_SECONDS;
+      compressedStart += gapSeconds;
     }
   }
   return {
