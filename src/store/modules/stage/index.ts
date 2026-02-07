@@ -362,7 +362,7 @@ export default {
       state.chat.privateMessages = [];
       state.chat.color = randomColor();
     },
-    /** Restore tools (avatars, props, etc.) from model.assets after CLEAN_STAGE so replay loop/seek has assets. */
+    /** Restore tools (avatars, props, audios, etc.) from model.assets after CLEAN_STAGE so replay loop/seek has assets. */
     RESTORE_REPLAY_TOOLS(state, model) {
       if (!model?.assets?.length) return;
       state.tools.avatars = [];
@@ -370,6 +370,7 @@ export default {
       state.tools.backdrops = [];
       state.tools.streams = [];
       state.tools.curtains = [];
+      state.tools.audios = [];
       model.assets.forEach((item) => {
         const key = item.assetType?.name + "s";
         if (!state.tools[key]) state.tools[key] = [];
@@ -1417,7 +1418,7 @@ export default {
       });
     },
     replicateEvent({ dispatch }, { topic, payload }) {
-      const message = payload;
+      const message = { ...payload };
       message.mute = true;
       dispatch("handleMessage", {
         topic: unnamespaceTopic(topic),
