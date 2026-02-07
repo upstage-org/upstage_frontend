@@ -270,7 +270,7 @@ export default {
         const filtered = messages.filter((m) => !m.clear);
         let begin = null;
         let end = null;
-        let duration = 0;
+        let durationFromChat = 0;
         let chatless = true;
         if (filtered.length) {
           chatless = false;
@@ -278,7 +278,7 @@ export default {
             if (m.at) {
               if (begin == null) begin = m.at;
               end = m.at;
-              duration = end - begin;
+              durationFromChat = end - begin;
             }
           }
         }
@@ -288,6 +288,10 @@ export default {
         const publicMessages = messages.filter(
           (m) => !m.isPrivate && !m.clearPlayerChat
         );
+        const duration =
+          p.duration != null && p.duration !== undefined
+            ? Number(p.duration)
+            : durationFromChat;
         return {
           ...p,
           messages,

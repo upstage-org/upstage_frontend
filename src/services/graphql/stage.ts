@@ -210,6 +210,7 @@ export default {
               name
               description
               recording
+              duration
             }
             scenes {
               id
