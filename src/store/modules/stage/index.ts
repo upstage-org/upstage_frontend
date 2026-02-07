@@ -1532,20 +1532,15 @@ export default {
     computeCompressedReplay({ state, dispatch }, payload) {
       const rawEvents = state.model?.events ?? [];
       const ts = state.replay.timestamp;
-      const idle =
+      const idleTimeSeconds =
         typeof payload === "object" && payload != null && "idleTimeSeconds" in payload
           ? Number(payload.idleTimeSeconds)
           : Number(payload);
-      const gap =
-        typeof payload === "object" && payload != null && "gapSeconds" in payload
-          ? Math.max(0, Number(payload.gapSeconds) || 0)
-          : 0;
       const result = computeCompressedEventsUtil(
         rawEvents,
         ts.begin,
         ts.end,
-        idle,
-        gap,
+        idleTimeSeconds,
       );
       if (!result) return;
       state.replay.compressed = {

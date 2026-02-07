@@ -46,15 +46,11 @@ export default {
     });
 
     watch(
-      [ready, () => route.query.compress, () => route.query.gap],
-      ([isReady, compressParam, gapParam]) => {
+      [ready, () => route.query.compress],
+      ([isReady, compressParam]) => {
         if (isReady && compressParam != null && compressParam !== "") {
-          const idleTimeSeconds = Number(compressParam);
-          const gapSeconds = gapParam != null && gapParam !== "" ? Number(gapParam) : 0;
-          store.dispatch("stage/computeCompressedReplay", {
-            idleTimeSeconds: Number.isNaN(idleTimeSeconds) ? 0 : idleTimeSeconds,
-            gapSeconds: Number.isNaN(gapSeconds) ? 0 : Math.max(0, gapSeconds),
-          });
+          const totalSeconds = Number(compressParam);
+          store.dispatch("stage/computeCompressedReplay", Number.isNaN(totalSeconds) ? 0 : totalSeconds);
         }
       },
       { immediate: true }

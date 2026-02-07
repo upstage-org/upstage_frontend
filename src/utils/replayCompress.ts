@@ -10,8 +10,7 @@ export function computeCompressedEvents(
   rawEvents: ReplayEvent[],
   begin: number,
   end: number,
-  idleTimeSeconds: number,
-  gapBetweenScenesSeconds: number = 0
+  idleTimeSeconds: number
 ): { events: ReplayEvent[]; timestamp: { begin: number; end: number } } | null {
   const inRange = rawEvents.filter(
     (e) => e.mqttTimestamp >= begin && e.mqttTimestamp <= end
@@ -20,7 +19,6 @@ export function computeCompressedEvents(
   if (sorted.length === 0) return null;
 
   const gapThresholdSeconds = Number(idleTimeSeconds);
-  const gapSeconds = Math.max(0, Number(gapBetweenScenesSeconds) || 0);
   const segments: Array<{ startTs: number; endTs: number; events: ReplayEvent[] }> = [];
   let seg = {
     startTs: sorted[0].mqttTimestamp,
@@ -55,9 +53,6 @@ export function computeCompressedEvents(
       });
     }
     compressedStart += duration;
-    if (i < segments.length - 1) {
-      compressedStart += gapSeconds;
-    }
   }
   return {
     events: newEvents,
