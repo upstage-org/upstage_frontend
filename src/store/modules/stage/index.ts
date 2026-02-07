@@ -362,6 +362,34 @@ export default {
       state.chat.privateMessages = [];
       state.chat.color = randomColor();
     },
+    /** Restore tools (avatars, props, etc.) from model.assets after CLEAN_STAGE so replay loop/seek has assets. */
+    RESTORE_REPLAY_TOOLS(state, model) {
+      if (!model?.assets?.length) return;
+      state.tools.avatars = [];
+      state.tools.props = [];
+      state.tools.backdrops = [];
+      state.tools.streams = [];
+      state.tools.curtains = [];
+      model.assets.forEach((item) => {
+        const key = item.assetType?.name + "s";
+        if (!state.tools[key]) state.tools[key] = [];
+        state.tools[key].push(item);
+      });
+    },
+    /** Restore config and settings from model after CLEAN_STAGE so replay loop/seek matches normal playback. */
+    RESTORE_REPLAY_CONFIG(state, model) {
+      if (!model) return;
+      if (model.config && typeof model.config === "object") {
+        state.config = { ...getDefaultStageConfig(), ...model.config };
+        if (model.config.ratio != null) {
+          const r = model.config.ratio;
+          state.config.ratio = typeof r === "number" ? r : (r?.width ?? 16) / (r?.height ?? 9);
+        }
+      }
+      if (model.settings && typeof model.settings === "object") {
+        state.settings = { ...getDefaultStageSettings(), ...model.settings };
+      }
+    },
     SET_BACKGROUND(state, background) {
       if (background) {
         if (
@@ -1407,6 +1435,10 @@ export default {
         state.replay.loopCount = 0;
       }
       commit("CLEAN_STAGE");
+      if (state.model) {
+        commit("RESTORE_REPLAY_TOOLS", state.model);
+        commit("RESTORE_REPLAY_CONFIG", state.model);
+      }
       const initialBackdrop =
         state.model?.config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
       commit("SET_BACKDROP_COLOR", initialBackdrop);
