@@ -5,10 +5,10 @@ services:
     volumes:
       - .:/app
       - /frontend_app/dist:/app/dist
-      - /frontend_app/.env:/app/.env
     working_dir: /app
     command: >
       /bin/sh -c "
+      cp /app/dist/.env /app/.env &&
       export CI=true &&
       corepack enable &&
       corepack prepare pnpm@10.28.1 --activate &&
