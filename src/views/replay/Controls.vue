@@ -1,17 +1,47 @@
 <template>
+  <div v-show="collapsed" id="replay-controls-minimized" class="replay-controls-restore">
+    <a-tooltip :title="$t('replay_controls_show')">
+      <button
+        type="button"
+        class="button is-light is-small"
+        aria-label="Show replay controls"
+        @click="collapsed = false"
+      >
+        <span class="icon">
+          <i class="fas fa-chevron-up"></i>
+        </span>
+        <span>{{ $t("replay_controls_show") }}</span>
+      </button>
+    </a-tooltip>
+  </div>
   <div v-show="!collapsed" id="replay-controls" class="card is-light">
     <div class="card-body">
+      <div class="replay-section-title replay-playback-title">{{ $t("replay_playback") }}</div>
       <div class="is-fullwidth my-2 has-text-centered">
-        <button
-          class="button is-primary is-outlined is-rounded reaction is-small m-1"
-          @click="seekBackward"
-        >
-          <i class="fas fa-fast-backward"></i>
-        </button>
+        <a-tooltip title="Rewind 10s">
+          <button
+            class="button is-primary is-outlined is-rounded reaction is-small m-1"
+            @click="seekBackward"
+            aria-label="Rewind 10 seconds"
+          >
+            <i class="fas fa-fast-backward"></i>
+          </button>
+        </a-tooltip>
+        <a-tooltip :title="$t('replay_jump_prev_event')">
+          <button
+            class="button is-primary is-outlined is-rounded reaction is-small m-1"
+            @click="seekToPreviousEvent"
+            :disabled="!hasPreviousEvent"
+            aria-label="Previous event"
+          >
+            <i class="fas fa-step-backward"></i>
+          </button>
+        </a-tooltip>
         <button
           v-if="isPlaying"
           class="button is-primary is-outlined is-rounded reaction mx-1"
           @click="pause"
+          aria-label="Pause"
         >
           <i class="fas fa-pause"></i>
         </button>
@@ -19,35 +49,41 @@
           v-else
           class="button is-primary is-rounded reaction mx-1"
           @click="play"
+          aria-label="Play"
         >
           <i class="fas fa-play"></i>
         </button>
-        <button
-          class="button is-primary is-outlined is-rounded reaction is-small m-1"
-          @click="seekForward"
-        >
-          <i class="fas fa-fast-forward"></i>
-        </button>
-        <Modal width="500px">
-          <template #trigger>
-            <button
-              class="button minimise is-rounded is-light is-small"
-              @click="collapsed = true"
-            >
-              <span class="icon">
-                <Icon src="minimise.svg" size="24" class="mt-4" />
-              </span>
-            </button>
-          </template>
-          <template #header>{{ $t("tips") }}</template>
-          <template #content>
-            <p>
-              Replay controls are hidden! You can toggle the
-              <code>{{ $t("esc") }}</code> key to quickly hide the replay
-              controls or bring it back 👌
-            </p>
-          </template>
-        </Modal>
+        <a-tooltip :title="$t('replay_jump_next_event')">
+          <button
+            class="button is-primary is-outlined is-rounded reaction is-small m-1"
+            @click="seekToNextEvent"
+            :disabled="!hasNextEvent"
+            aria-label="Next event"
+          >
+            <i class="fas fa-step-forward"></i>
+          </button>
+        </a-tooltip>
+        <a-tooltip title="Forward 10s">
+          <button
+            class="button is-primary is-outlined is-rounded reaction is-small m-1"
+            @click="seekForward"
+            aria-label="Forward 10 seconds"
+          >
+            <i class="fas fa-fast-forward"></i>
+          </button>
+        </a-tooltip>
+        <a-tooltip :title="$t('replay_controls_minimize')">
+          <button
+            type="button"
+            class="button minimise is-rounded is-light is-small"
+            aria-label="Minimize replay controls"
+            @click="collapsed = true"
+          >
+            <span class="icon">
+              <i class="fas fa-chevron-down"></i>
+            </span>
+          </button>
+        </a-tooltip>
         <teleport v-if="!collapsed" to="body">
           <Modal
             width="500px"
@@ -75,6 +111,59 @@
           </Modal>
         </teleport>
       </div>
+      <div class="replay-section replay-loop-section">
+        <div class="replay-section-title">{{ $t("replay_loop") }}</div>
+        <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-2">
+          <label class="checkbox replay-checkbox">
+            <input type="checkbox" v-model="loop" @change="onLoopChange" />
+            <span>{{ $t("replay_loop_enable") }}</span>
+          </label>
+          <template v-if="loop">
+            <span class="replay-label">{{ $t("replay_iterations") }}:</span>
+            <select
+              class="select is-small replay-select"
+              v-model="loopOption"
+            >
+              <option value="infinite">{{ $t("replay_loop_infinite") }}</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+            </select>
+            <span v-if="loopMax != null && loopMax > 0" class="replay-loop-count">
+              {{ $t("replay_loop_count", { current: replayLoopCount, max: loopMax }) }}
+            </span>
+          </template>
+        </div>
+      </div>
+      <details v-if="hasEvents" class="replay-section replay-trim-section">
+        <summary class="replay-section-title">{{ $t("replay_trim") }}</summary>
+        <div class="replay-trim-fields is-flex is-flex-wrap-wrap is-align-items-center is-gap-2">
+          <label class="replay-label">{{ $t("replay_trim_start") }}</label>
+          <input
+            type="number"
+            class="input is-small replay-trim-input"
+            :min="fullRange.begin"
+            :max="fullRange.end"
+            v-model.number="trimStart"
+          />
+          <label class="replay-label">{{ $t("replay_trim_end") }}</label>
+          <input
+            type="number"
+            class="input is-small replay-trim-input"
+            :min="fullRange.begin"
+            :max="fullRange.end"
+            v-model.number="trimEnd"
+          />
+          <button
+            class="button is-small is-primary"
+            @click="applyTrim"
+          >
+            {{ $t("replay_trim_apply") }}
+          </button>
+        </div>
+      </details>
     </div>
     <footer class="card-footer">
       <div class="card-footer-item" style="width: 60px">
@@ -103,7 +192,7 @@
 import Dropdown from "components/form/Dropdown.vue";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import EventIndicator from "./EventIndicator.vue";
 import { useShortcut } from "components/stage/composable";
@@ -113,10 +202,59 @@ export default {
   components: { Dropdown, EventIndicator, Icon, Modal },
   setup() {
     const store = useStore();
-    const timestamp = computed(() => store.state.stage.replay.timestamp);
+    const timestamp = computed(() => store.getters["stage/replayEffectiveTimestamp"]);
     const isPlaying = computed(() => store.state.stage.replay.interval);
     const speed = computed(() => store.state.stage.replay.speed);
     const speeds = [0.5, 1, 2, 4, 8, 16, 32];
+    const loop = computed({
+      get: () => store.state.stage.replay.loop,
+      set: (v) => store.commit("stage/SET_REPLAY", { loop: v }),
+    });
+    const loopMax = computed(() => store.state.stage.replay.loopMax);
+    const replayLoopCount = computed(() => store.state.stage.replay.loopCount);
+    const loopOptions = ["infinite", "2", "3", "4", "5", "10"];
+    const loopOption = computed({
+      get: () =>
+        loopMax.value == null
+          ? "infinite"
+          : loopOptions.includes(String(loopMax.value))
+            ? String(loopMax.value)
+            : "infinite",
+      set: (v) => {
+        const n = v === "infinite" ? null : Number(v);
+        store.commit("stage/SET_REPLAY", {
+          loopMax: n != null && n >= 1 ? n : null,
+        });
+      },
+    });
+
+    const events = computed(() => store.getters["stage/replayEffectiveEvents"] ?? []);
+    const originalEvents = computed(() => store.state.stage.model?.events ?? []);
+    const originalTimestamp = computed(() => store.state.stage.replay.timestamp);
+    const hasEvents = computed(() => originalEvents.value.length > 0);
+    const fullRange = computed(() => {
+      const ev = originalEvents.value;
+      const ts = originalTimestamp.value;
+      return {
+        begin: ev[0]?.mqttTimestamp ?? ts.begin,
+        end: ev[ev.length - 1]?.mqttTimestamp ?? ts.end,
+      };
+    });
+    const hasPreviousEvent = computed(() => {
+      const current = timestamp.value.current;
+      return events.value.some((e) => e.mqttTimestamp < current);
+    });
+    const hasNextEvent = computed(() => {
+      const current = timestamp.value.current;
+      return events.value.some((e) => e.mqttTimestamp > current);
+    });
+
+    const trimStart = ref(null);
+    const trimEnd = ref(null);
+
+    const onLoopChange = () => {
+      store.commit("stage/SET_REPLAY", { loop: loop.value });
+    };
 
     const seek = (e) => {
       store.dispatch("stage/replayRecording", e.target.value);
@@ -130,12 +268,12 @@ export default {
       store.dispatch("stage/pauseReplay");
     };
 
-    const changeSpeed = (speed, open) => {
-      store.commit("stage/SET_REPLAY", { speed });
+    const changeSpeed = (speedVal, open) => {
+      store.commit("stage/SET_REPLAY", { speed: speedVal });
       if (isPlaying.value) {
         play();
       }
-      if (speed >= 16) {
+      if (speedVal >= 16) {
         open();
       }
     };
@@ -146,6 +284,22 @@ export default {
 
     const seekBackward = () => {
       store.dispatch("stage/seekBackwardReplay");
+    };
+
+    const seekToNextEvent = () => {
+      store.dispatch("stage/seekToNextEventReplay");
+    };
+
+    const seekToPreviousEvent = () => {
+      store.dispatch("stage/seekToPreviousEventReplay");
+    };
+
+    const applyTrim = () => {
+      const start = trimStart.value;
+      const end = trimEnd.value;
+      if (start != null && end != null && start < end) {
+        store.dispatch("stage/setReplayTrim", { begin: start, end });
+      }
     };
 
     const collapsed = ref(false);
@@ -168,7 +322,21 @@ export default {
       changeSpeed,
       seekForward,
       seekBackward,
+      seekToNextEvent,
+      seekToPreviousEvent,
+      hasPreviousEvent,
+      hasNextEvent,
       collapsed,
+      loop,
+      loopMax,
+      loopOption,
+      replayLoopCount,
+      onLoopChange,
+      hasEvents,
+      fullRange,
+      trimStart,
+      trimEnd,
+      applyTrim,
     };
   },
 };
@@ -179,7 +347,12 @@ export default {
   position: fixed;
   left: 16px;
   bottom: 16px;
-  height: 108px;
+  min-height: 108px;
+  max-width: 420px;
+  font-size: 14px;
+  .card-body {
+    padding: 12px 14px;
+  }
   .button.is-rounded {
     width: 16px;
   }
@@ -198,5 +371,76 @@ export default {
     position: absolute;
     right: 8px;
   }
+}
+
+.replay-playback-title {
+  margin-bottom: 4px;
+}
+
+.replay-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.replay-section-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #363636;
+  display: block;
+}
+
+.replay-label {
+  font-size: 13px;
+  color: #4a4a4a;
+}
+
+.replay-checkbox {
+  font-size: 13px;
+  margin-bottom: 0;
+  span {
+    margin-left: 6px;
+  }
+}
+
+.replay-select {
+  min-width: 100px;
+  font-size: 13px;
+}
+
+.replay-loop-count {
+  font-size: 13px;
+  color: #4a4a4a;
+}
+
+.replay-trim-section summary {
+  cursor: pointer;
+  list-style: none;
+  &::-webkit-details-marker {
+    display: none;
+  }
+  &::before {
+    content: "▸ ";
+    font-size: 12px;
+  }
+}
+.replay-trim-section[open] summary::before {
+  content: "▾ ";
+}
+
+.replay-trim-fields {
+  margin-top: 8px;
+}
+
+.replay-trim-input {
+  width: 90px;
+}
+
+.replay-controls-restore {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 50;
 }
 </style>

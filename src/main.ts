@@ -6,10 +6,23 @@ import { router } from "router";
 import store from "./store";
 import "@fortawesome/fontawesome-free/css/all.css";
 import ClickOutside from "./directives/ClickOutside";
+import { apolloPlugin } from "@vue3-apollo/core";
+import { apolloClient } from "./apollo";
+
+// Set global references to avoid circular dependency issues
+// These are accessed by router.ts and store/modules/user.ts
+(window as any).__UPSTAGE_STORE__ = store;
+(window as any).__UPSTAGE_ROUTER__ = router;
+
 const app = createApp(App)
   .use(store)
   .use(router)
   .use(i18n)
+  .use(apolloPlugin as any, {
+    clients: {
+      default: apolloClient,
+    },
+  })
   .directive("click-outside", ClickOutside);
 
 if ("serviceWorker" in navigator) {

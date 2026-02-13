@@ -6,24 +6,30 @@
     fontSize,
   }">
       <div class="actions">
-        <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
-          <span class="icon">
-            <Icon v-if="collapsed" src="maximise.svg" size="20" />
-            <Icon v-else src="minimise.svg" size="24" class="mt-4" />
-          </span>
-        </button>
-        <button class="chat-setting button is-rounded is-outlined"
-          :class="{ 'has-background-primary-light': isMovingable }" @click="toggleMoveable">
-          <span class="icon">
-            <Icon src="prop.svg" size="20" />
-          </span>
-        </button>
-        <button class="chat-setting button is-rounded is-outlined drag-icon-button"
-          @mousedown.prevent="startDrag">
-          <span class="icon">
-            <Icon src="movement-slider.svg" size="20" />
-          </span>
-        </button>
+        <a-tooltip title="Minimise">
+          <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
+            <span class="icon">
+              <Icon v-if="collapsed" src="maximise.svg" size="20" />
+              <Icon v-else src="minimise.svg" size="24" />
+            </span>
+          </button>
+        </a-tooltip>
+        <a-tooltip title="Resize">
+          <button class="chat-setting button is-rounded is-outlined"
+            :class="{ 'has-background-primary-light': isMovingable }" @click="toggleMoveable">
+            <span class="icon">
+              <Icon src="prop.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
+        <a-tooltip title="Move">
+          <button class="chat-setting button is-rounded is-outlined drag-icon-button"
+            @mousedown.prevent="startDrag">
+            <span class="icon">
+              <Icon src="movement-slider.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
         <ClearChat option="player-chat" />
       </div>
       <div class="card-content" ref="theContent">
@@ -34,12 +40,12 @@
           <div class="is-fullwidth my-1 reaction-bar">
             <div class="font-size-controls">
               <a-tooltip title="Increase font size">
-                <button class="button is-small is-rounded mx-1" @click="increateFontSize()">
+                <button class="button is-small is-rounded mx-1" @click="increateFontSize()" style="display: flex; align-items: center; justify-content: center;">
                   ➕
                 </button>
               </a-tooltip>
               <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded" @click="decreaseFontSize()">
+                <button class="button is-small is-rounded" @click="decreaseFontSize()" style="display: flex; align-items: center; justify-content: center;">
                   ➖
                 </button>
               </a-tooltip>
@@ -293,12 +299,22 @@ export default {
     right: 24px;
     top: 10px;
     z-index: 1;
+    display: flex;
+    align-items: center;
 
-    button {
+    button,
+    :deep(button) {
       width: 26px;
       height: 26px;
       padding: 0;
       margin-left: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 26px;
+      min-height: 26px;
+      max-width: 26px;
+      max-height: 26px;
     }
   }
 
@@ -309,11 +325,16 @@ export default {
   .reaction-bar {
     height: 30px;
     position: relative;
+    display: flex;
+    align-items: center;
 
     .font-size-controls {
       position: absolute;
       top: 0;
       right: 0;
+      display: flex;
+      align-items: center;
+      height: 100%;
 
       .button.is-rounded {
         width: 16px;

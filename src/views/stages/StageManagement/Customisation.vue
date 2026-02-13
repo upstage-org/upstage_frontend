@@ -174,7 +174,7 @@
 </template>
 
 <script>
-import { reactive, ref } from "vue";
+import { reactive, ref, watch, computed } from "vue";
 import Selectable from "components/Selectable.vue";
 import SaveButton from "components/form/SaveButton.vue";
 import { message } from "ant-design-vue";
@@ -196,7 +196,10 @@ export default {
     const stage = inject("stage");
     const refresh = inject("refresh");
     const store = useStore();
-    const config = useAttribute(stage, "config", true).value ?? {
+    const configAttribute = useAttribute(stage, "config", true);
+    
+    // Helper function to get default config
+    const getDefaultConfig = () => ({
       ratio: {
         width: 16,
         height: 9,
@@ -204,52 +207,196 @@ export default {
       animations: {
         bubble: "fade",
         curtain: "drop",
-        bubbleSpeed: 1000,
-        curtainSpeed: 5000,
+        bubbleSpeed: 2000,
+        curtainSpeed: 10000,
       },
       defaultcolor: "#30AC45",
       enabledLiveStreaming: true,
+    });
+
+    const config = computed(() => {
+      const savedConfig = configAttribute.value;
+      return savedConfig ?? getDefaultConfig();
+    });
+
+    // Initialize reactive values from config
+    const initialConfig = config.value;
+    const selectedRatio = reactive({ 
+      width: initialConfig.ratio?.width ?? 16, 
+      height: initialConfig.ratio?.height ?? 9 
+    });
+    const animations = reactive({ 
+      bubble: initialConfig.animations?.bubble ?? "fade",
+      curtain: initialConfig.animations?.curtain ?? "drop",
+      bubbleSpeed: initialConfig.animations?.bubbleSpeed ?? 2000,
+      curtainSpeed: initialConfig.animations?.curtainSpeed ?? 10000,
+    });
+    const defaultcolor = ref(initialConfig.defaultcolor ?? "#30AC45");
+    const enabledLiveStreaming = ref(
+      typeof initialConfig.enabledLiveStreaming === 'boolean' 
+        ? initialConfig.enabledLiveStreaming 
+        : true
+    );
+
+    // Helper function to update all settings from config
+    const updateSettingsFromConfig = (parsedConfig) => {
+      if (!parsedConfig) return;
+      
+      // Update enabledLiveStreaming - explicitly check for boolean to preserve false values
+      if (typeof parsedConfig.enabledLiveStreaming === 'boolean') {
+        enabledLiveStreaming.value = parsedConfig.enabledLiveStreaming;
+      }
+      
+      // Update defaultcolor - check if it exists (including empty string)
+      // Always update if it's defined, even if it's an empty string
+      if (parsedConfig.defaultcolor !== undefined && parsedConfig.defaultcolor !== null) {
+        defaultcolor.value = parsedConfig.defaultcolor;
+      }
+      
+      // Update ratio if it exists - update both properties explicitly
+      if (parsedConfig.ratio) {
+        if (typeof parsedConfig.ratio.width === 'number') {
+          selectedRatio.width = parsedConfig.ratio.width;
+        }
+        if (typeof parsedConfig.ratio.height === 'number') {
+          selectedRatio.height = parsedConfig.ratio.height;
+        }
+      }
+      
+      // Update animations if they exist - update all properties explicitly
+      if (parsedConfig.animations) {
+        if (parsedConfig.animations.bubble !== undefined) {
+          animations.bubble = parsedConfig.animations.bubble;
+        }
+        if (parsedConfig.animations.curtain !== undefined) {
+          animations.curtain = parsedConfig.animations.curtain;
+        }
+        if (typeof parsedConfig.animations.bubbleSpeed === 'number') {
+          animations.bubbleSpeed = parsedConfig.animations.bubbleSpeed;
+        }
+        if (typeof parsedConfig.animations.curtainSpeed === 'number') {
+          animations.curtainSpeed = parsedConfig.animations.curtainSpeed;
+        }
+      }
     };
 
-    const selectedRatio = reactive(config.ratio);
-    const animations = reactive(config.animations);
-    const defaultcolor = ref(config.defaultcolor || "#30AC45");
-    const enabledLiveStreaming = ref(config.enabledLiveStreaming ?? true);
-
-    const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
-    const saveCustomisation = async () => {
-      const configData = JSON.stringify({
-        ratio: selectedRatio,
-        animations,
-        defaultcolor: defaultcolor.value,
-        enabledLiveStreaming: enabledLiveStreaming.value,
-      });
-      await save(
-        () => {
-          message.success("Customisation saved!");
-          refresh(stage.value.id);
-        },
-        stage.value.id,
-        configData
-      );
-      const mqtt = buildClient();
-      const client = mqtt.connect();
-      client.publish(namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
-        JSON.stringify(
-          {
-            type: "setBackdropColor",
-            color: defaultcolor.value,
-          }),
-          { qos: 1, retain: false },
-          (error, res) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(res);
-              mqtt.disconnect();
-            }
+    // Watch configAttribute directly to catch when the config is loaded/updated
+    watch(configAttribute, (newConfigValue) => {
+      updateSettingsFromConfig(newConfigValue);
+    }, { immediate: true });
+    
+    // Also watch stage attributes to catch when stage is refreshed
+    watch(() => stage.value?.attributes, (newAttributes) => {
+      if (newAttributes) {
+        const configAttr = newAttributes.find(a => a.name === 'config');
+        if (configAttr?.description) {
+          try {
+            const parsedConfig = JSON.parse(configAttr.description);
+            updateSettingsFromConfig(parsedConfig);
+          } catch (e) {
+            // Ignore parse errors
+            console.error('Error parsing config:', e);
           }
-        );
+        }
+      }
+    }, { deep: true });
+
+    const { loading: saving, mutation } = useMutation(stageGraph.updateStage);
+    const saveCustomisation = async () => {
+      // ALWAYS send ALL current values to backend - no conditional logic
+      // Build config object with ALL current customisation values
+
+      const configObject = {
+        ratio: {
+          width: Number(selectedRatio.width) || 16,
+          height: Number(selectedRatio.height) || 9,
+        },
+        animations: {
+          bubble: animations.bubble || "fade",
+          curtain: animations.curtain || "drop",
+          bubbleSpeed: Number(animations.bubbleSpeed) || 2000,
+          curtainSpeed: Number(animations.curtainSpeed) || 10000,
+        },
+        defaultcolor: defaultcolor.value || "#30AC45",
+        enabledLiveStreaming: Boolean(enabledLiveStreaming.value),
+      };
+
+      // Stringify the config
+      const configData = JSON.stringify(configObject);
+
+      // Get ALL current stage values - ALWAYS send everything
+      const statusValue = stage.value?.status || "rehearsal";
+      const visibilityValue = stage.value?.visibility !== undefined
+        ? Boolean(stage.value.visibility)
+        : true;
+      const coverValue = stage.value?.attributes?.find(a => a.name === 'cover')?.description || "";
+      const playerAccessValue = stage.value?.attributes?.find(a => a.name === 'playerAccess')?.description || "[]";
+      const ownerValue = stage.value?.owner?.id || null;
+      const nameValue = stage.value?.name || "";
+      const descriptionValue = stage.value?.description || "";
+      const fileLocationValue = stage.value?.fileLocation || "";
+
+      // Build the payload with ALL current values - ALWAYS send everything
+      const payload = {
+        id: stage.value.id,
+        name: nameValue,
+        description: descriptionValue,
+        fileLocation: fileLocationValue,
+        status: statusValue,
+        visibility: visibilityValue,
+        cover: coverValue,
+        playerAccess: playerAccessValue,
+        owner: ownerValue,
+        config: configData,
+      };
+
+      try {
+        console.log('Saving Customisation with ALL values:', {
+          stageId: payload.id,
+          name: payload.name,
+          description: payload.description,
+          fileLocation: payload.fileLocation,
+          status: payload.status,
+          visibility: payload.visibility,
+          cover: payload.cover,
+          playerAccess: payload.playerAccess,
+          owner: payload.owner,
+          config: configObject,
+          configJSON: configData,
+        });
+
+        // Send the complete payload to backend
+        await mutation(payload);
+        message.success("Customisation saved!");
+
+        // Small delay to ensure backend has processed the save before refreshing
+        setTimeout(() => {
+          refresh(stage.value.id);
+        }, 200);
+
+        // Publish MQTT message after successful save
+        const mqtt = buildClient();
+        const client = mqtt.connect();
+        client.publish(namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
+          JSON.stringify(
+            {
+              type: "setBackdropColor",
+              color: defaultcolor.value,
+            }),
+            { qos: 1, retain: false },
+            (error, res) => {
+              if (error) {
+                console.error("MQTT publish error:", error);
+              } else {
+                console.log("MQTT publish success:", res);
+                mqtt.disconnect();
+              }
+            }
+          );
+      } catch (error) {
+        console.error('Error saving customisation:', error);
+        message.error('Failed to save customisation. Please try again.');
+      }
     };
 
     const sendBackdropColor = (color) => {

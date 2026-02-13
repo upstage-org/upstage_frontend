@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useMutation, useQuery } from "@vue/apollo-composable";
+import { useMutation, useQuery } from "@vue3-apollo/core";
 import { message } from "ant-design-vue";
 import gql from "graphql-tag";
 import { computed, inject, PropType, ref } from "vue";
@@ -45,7 +45,7 @@ const { result, loading } = useQuery(
       }
     }
   `,
-  null,
+  {},
   {
 
   },
@@ -54,7 +54,7 @@ const { result, loading } = useQuery(
 const dataSource = computed(() => {
   if (result.value) {
     const options =
-      result.value.stages.edges
+      (result.value as any).stages.edges
         .filter((el: any) => {
           return isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner")
         });
@@ -81,7 +81,7 @@ const { mutate } = useMutation<
 const refresh = inject("refresh", () => { });
 
 const handleOk = async () => {
-  const remainIds = result.value.stages.edges
+  const remainIds = (result.value as any).stages.edges
     .filter((el: any) => {
       return !(isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
     }).map((el: AssignedStage) => el.id);
@@ -103,8 +103,17 @@ const handleOk = async () => {
   <a-button class="ml-2" type="primary" @click="visible = true">
     <plus-circle-outlined />Assign to stage
   </a-button>
-  <a-modal v-model:visible="visible" class="custom-class" style="color: red"
-    title="Assign this media to one of your stages" :width="600" :footer="null">
+  <a-modal 
+    v-model:open="visible" 
+    class="custom-class" 
+    style="color: red"
+    title="Assign this media to one of your stages" 
+    :width="600" 
+    :footer="null"
+    :closable="true"
+    :mask-closable="false"
+    @cancel="visible = false"
+    @close="visible = false">
     <div class="flex" style="align-items: center; justify-content: flex-start;">
       <div style="max-width: 350px;">
         <MediaPreview v-if="media.assetType" :media="media as Media" />

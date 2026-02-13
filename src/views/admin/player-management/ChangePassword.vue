@@ -71,7 +71,7 @@ export default {
                   });
                   visible.value = false;
                 } catch (error) {
-                  message.error("Password is required");
+                  message.error("Password is required.");
                 }
               },
               okButtonProps: {

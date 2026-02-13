@@ -36,8 +36,9 @@ import {
   getDefaultAvatarVoice,
   getDefaultVariant,
 } from "services/speech/voice";
-import { useMutation, useQuery } from "@vue/apollo-composable";
+import { useMutation, useQuery } from "@vue3-apollo/core";
 import { message } from "ant-design-vue";
+import { MEDIA_FORM_OPTIONS_QUERY } from "services/graphql/media";
 
 const model = defineModel()
 const files = inject<Ref<UploadFile[]>>("files");
@@ -95,14 +96,20 @@ const handleDropdownVisibleChange = (open: boolean) => {
 };
 
 watch(editingMediaResult, () => {
-  if (editingMediaResult.value) {
-    const { editingMedia } = editingMediaResult.value;
+  const editingMedia = editingMediaResult.value?.editingMedia;
+  if (editingMedia) {
     name.value = editingMedia.name;
     type.value = editingMedia.assetType.name;
-    tags.value = editingMedia.tags;
+    tags.value = Array.isArray(editingMedia.tags) ? editingMedia.tags : [];
     owner.value = editingMedia.owner.username;
     copyrightLevel.value = editingMedia.copyrightLevel;
-    const attributes = JSON.parse(editingMedia.description) as MediaAttributes;
+    const attributes = JSON.parse(editingMedia.description || "{}") as MediaAttributes;
+    const aw = Number(attributes?.w);
+    const ah = Number(attributes?.h);
+    frameSize.value = {
+      width: Number.isFinite(aw) ? aw : 100,
+      height: Number.isFinite(ah) ? ah : 100,
+    };
     if (files?.value) {
       const frames =
         attributes?.frames && attributes.frames.length
@@ -120,13 +127,19 @@ watch(editingMediaResult, () => {
     }
     Object.assign(voice, getDefaultAvatarVoice());
     if (attributes?.voice && attributes.voice.voice) {
-      Object.assign(voice, attributes.voice);
+      voice.voice = attributes.voice.voice ?? "";
+      voice.variant = attributes.voice.variant ?? voice.variant;
+      voice.pitch = Number(attributes.voice.pitch) || 50;
+      voice.speed = Number(attributes.voice.speed) || 1;
+      voice.amplitude = Number(attributes.voice.amplitude) || 50;
     }
     link.url = "";
     link.blank = true;
     link.effect = false;
     if (attributes?.link) {
-      Object.assign(link, attributes.link);
+      link.url = attributes.link.url ?? "";
+      link.blank = attributes.link.blank !== false;
+      link.effect = !!attributes.link.effect;
     }
     note.value = attributes?.note ?? "";
     if (editingMedia.stages) {
@@ -198,11 +211,15 @@ const handleFrameClick = ({ event, index }: { event: any; index: number }) => {
 const handleClose = () => {
   if (files) {
     if (editingMediaResult.value) {
+      // When editing existing media, close immediately without confirmation
       editingMediaVar(undefined);
       files.value = [];
-      editingMediaResult.value = undefined
-      refetch();
+      // Refetch after clearing to update the query cache
+      nextTick(() => {
+        refetch();
+      });
     } else {
+      // When creating new media, show confirmation dialog
       Modal.confirm({
         title: "Are you sure you want to quit?",
         icon: createVNode(ExclamationCircleOutlined),
@@ -213,7 +230,6 @@ const handleClose = () => {
         ),
         onOk() {
           files.value = [];
-          editingMediaResult.value = undefined
         },
         okButtonProps: {
           danger: true,
@@ -226,20 +242,9 @@ const handleClose = () => {
 const clearMode = ref(false);
 
 const { result, loading } = useQuery<StudioGraph>(
-  gql`
-    {
-      mediaTypes {
-        id
-        name
-      }
-      tags {
-        id
-        name
-      }
-    }
-  `,
-  null,
-  { fetchPolicy: "cache-only" }
+  MEDIA_FORM_OPTIONS_QUERY,
+  {},
+  { fetchPolicy: "cache-and-network" } as any
 );
 const mediaTypes = computed(() => {
   if (result.value?.mediaTypes) {
@@ -257,6 +262,17 @@ const mediaTypes = computed(() => {
   return [];
 });
 
+const isMultiframe = computed(() => {
+  const desc = editingMediaResult.value?.editingMedia?.description;
+  if (!desc) return false;
+  try {
+    const attrs = JSON.parse(desc) as MediaAttributes;
+    return !!(attrs?.multi && Array.isArray(attrs?.frames) && attrs.frames.length > 1);
+  } catch {
+    return false;
+  }
+});
+
 const refresh = inject("refresh") as () => any;
 const { progress, saveMedia, saving } = useSaveMedia(
   () => {
@@ -268,25 +284,34 @@ const { progress, saveMedia, saving } = useSaveMedia(
         mediaType: type.value,
         copyrightLevel: copyrightLevel.value,
         owner: owner.value,
-        stageIds: stageIds.value,
-        userIds: userIds.value,
-        tags: tags.value,
-        w: frameSize.value.width,
-        h: frameSize.value.height,
-        note: note.value,
+        stageIds: stageIds.value.map((id) => Number(id)),
+        userIds: userIds.value.map((id) => Number(id)),
+        tags: Array.isArray(tags.value) ? tags.value : [],
+        w: Number.isFinite(Number(frameSize.value?.width)) ? Number(frameSize.value.width) : 100,
+        h: Number.isFinite(Number(frameSize.value?.height)) ? Number(frameSize.value.height) : 100,
+        note: note.value ?? "",
         urls: [],
-        voice,
-        link,
+        voice: {
+          voice: voice.voice ?? "",
+          variant: voice.variant ?? "",
+          pitch: Number(voice.pitch) ?? 50,
+          speed: Number(voice.speed) ?? 1,
+          amplitude: Number(voice.amplitude) ?? 50,
+        },
+        link: {
+          url: link.url ?? "",
+          blank: !!link.blank,
+          effect: !!link.effect,
+        },
       },
     };
   },
-  (id) => {
-    if (files && refresh) {
-      editingMediaVar(undefined);
-      editingMediaResult.value = undefined
+  () => {
+    editingMediaVar(undefined);
+    if (files?.value) {
       files.value = [];
-      refresh();
     }
+    refresh?.();
   }
 );
 const { loading: deleting, mutate: deleteMedia } = useMutation(gql`
@@ -341,13 +366,11 @@ watch(visibleDropzone as Ref, (val) => {
 });
 
 const addExistingFrame = () => {
-  if (composingMode) {
-    composingMode.value = true;
-    inquiryVar({
-      ...inquiryVar(),
-      mediaTypes: [type.value],
-    });
-  }
+  composingMode!.value = true;
+  inquiryVar({
+    ...inquiryVar(),
+    mediaTypes: [type.value],
+  });
 };
 
 const frameSize = ref({ width: 100, height: 100 });
@@ -394,8 +417,8 @@ const onDelete = async () => {
   const res = await deleteMedia({
     id: editingMediaResult.value?.editingMedia?.id,
   });
-  if (res?.data.deleteMedia) {
-    message.success(res?.data.deleteMedia.message);
+  if ((res as any)?.data?.deleteMedia) {
+    message.success((res as any)?.data?.deleteMedia?.message);
     refresh();
     handleClose();
   } else {
@@ -425,8 +448,8 @@ const onUpdateStatus = async () => {
       ? "Active"
       : "Dormant",
   });
-  if (res?.data.updateMediaStatus) {
-    message.success(res?.data.updateMediaStatus.message);
+  if ((res as any)?.data?.updateMediaStatus) {
+    message.success((res as any)?.data?.updateMediaStatus?.message);
     editingMediaVar({
       ...editingMediaVar()!,
       dormant: !editingMediaResult.value?.editingMedia.dormant,
@@ -447,10 +470,13 @@ const getUserDisplayName = (user: User) => {
 
 <template>
   <a-modal
-    :visible="!!files?.length && !composingMode"
+    :open="!!files?.length && !composingMode"
     :body-style="{ padding: 0 }"
     :width="1100"
+    :closable="true"
+    :mask-closable="false"
     @cancel="handleClose"
+    @close="handleClose"
   >
     <template #title>
       <a-space>
@@ -578,7 +604,6 @@ const getUserDisplayName = (user: User) => {
           </template>
 
           <a-popconfirm
-            title="Are you sure you want to delete this media?"
             ok-text="Yes"
             cancel-text="No"
             @confirm="onDelete()"
@@ -586,6 +611,14 @@ const getUserDisplayName = (user: User) => {
             :ok-button-props="{ danger: true }"
             loading="deleting"
           >
+            <template #title>
+              <div>
+                <p>Are you sure you want to delete this media?</p>
+                <p v-if="isMultiframe" class="text-gray-600 text-sm mt-2">
+                  This is a multi-frame item. If you created it from an existing image, that original image will stay in your library and will not be deleted.
+                </p>
+              </div>
+            </template>
             <a-button
               type="primary"
               style="background-color: #ff4d4f; border-color: #ff4d4f"
@@ -673,6 +706,29 @@ const getUserDisplayName = (user: User) => {
           <a-tabs>
             <a-tab-pane key="stages" tab="Stages" class="pb-4">
               <StageAssignment v-model="stageIds as any" />
+            </a-tab-pane>
+            <a-tab-pane key="tags" tab="Tags" class="pb-4">
+              <div class="p-4">
+                <a-form-item :label="$t('tags')">
+                  <a-select
+                    v-model:value="tags"
+                    mode="tags"
+                    :placeholder="$t('tags')"
+                    style="width: 100%"
+                    :options="
+                      result?.tags
+                        ? result.tags.map((node) => ({
+                            value: node.name,
+                            label: node.name,
+                          }))
+                        : []
+                    "
+                  />
+                </a-form-item>
+                <p class="text-gray-500 text-sm">
+                  Add tags to make this item easier to find when filtering (e.g. for a person or project).
+                </p>
+              </div>
             </a-tab-pane>
             <a-tab-pane key="permissions" tab="Permissions">
               <MediaPermissions

@@ -1,6 +1,6 @@
 <template>
   <section class="modal-card-body p-0">
-    <button class="delete close-modal" aria-label="close" @click="closeModal"></button>
+    <button class="delete close-modal" aria-label="close" @click.stop="closeModal"></button>
     <div class="container-fluid">
       <footer class="modal-card-foot">
         <div class="columns is-fullwidth">
@@ -123,7 +123,7 @@ export default {
   props: {
     media: Object,
   },
-  emits: ["complete"],
+  emits: ["complete", "close"],
   setup: (props, { emit }) => {
     const form = reactive(props.media);
     form.multi = false;
@@ -276,7 +276,15 @@ export default {
       { immediate: true },
     );
 
-    const closeModal = inject("closeModal");
+    const injectedCloseModal = inject("closeModal", null);
+    const closeModal = () => {
+      // Always emit close event first (parent handles it)
+      emit("close");
+      // Also call injected closeModal if available (for Modal component's default slot)
+      if (injectedCloseModal) {
+        injectedCloseModal();
+      }
+    };
 
     const updateMediaSize = ({ width, height }) => {
       if (width > height) {

@@ -1,6 +1,6 @@
 <template>
   <transition @leave="leave">
-    <section v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading)"
+    <section v-if="!ready || !clicked || (!isLive && !canPlay && !masquerading)"
       class="hero is-fullheight is-fullwidth cover-image" :class="{ replaying }" @click="clicked = true" :style="{
         'background-image': model && `url(&quot;${model.cover || '/img/greencurtain.jpg'}&quot;)`,
         'background-color': backdropColor
@@ -14,7 +14,7 @@
             <h2 v-if="model.description" class="subtittle">
               {{ model.description }}
             </h2>
-            <template v-if="status !== 'live' && !canPlay">
+            <template v-if="!isLive && !canPlay">
               <span v-if="status" class="tag is-dark">{{
                 status.toUpperCase()
               }}</span>&nbsp;
@@ -99,10 +99,14 @@ export default {
       { immediate: true },
     );
 
-    const status = useAttribute(model, "status");
+    /** Status comes from top-level model.status (stageList API), or from attributes for get_stage_by_id */
+    const statusFromAttr = useAttribute(model, "status");
+    const status = computed(() => model.value?.status ?? statusFromAttr.value);
+    /** Only when stage is Live (not rehearsal) can anyone enter; compare case-insensitively */
+    const isLive = computed(() => (status.value && String(status.value).toLowerCase()) === "live");
     const timer = ref();
     watch(model, (val) => {
-      if (val && status.value === "live") {
+      if (val && isLive.value) {
         timer.value = setTimeout(stopLoading, 60000);
       }
     });
@@ -116,11 +120,21 @@ export default {
     const ready = computed(() => store.getters["stage/ready"]);
     const clicked = ref(false); // Trick the user to click in order to play meSpeak voice
     const leave = (el, complete) => {
-      animate(el, {
-        translateY: "-100%",
-        ease: "outBack",
-        onComplete: complete,
-      });
+      if (!el || !(el instanceof HTMLElement)) {
+        if (complete) complete();
+        return;
+      }
+      try {
+        animate(el, {
+          translateY: "-100%",
+          ease: "outBack",
+          onComplete: complete,
+        });
+      } catch (error) {
+        // Silently handle animation errors if element is not accessible
+        console.debug("Animation skipped:", error);
+        if (complete) complete();
+      }
     };
     const backdropColor = computed(() => store.state.stage.backdropColor);
 
@@ -138,6 +152,7 @@ export default {
       leave,
       backdropColor,
       status,
+      isLive,
       canPlay,
       masquerading
     };

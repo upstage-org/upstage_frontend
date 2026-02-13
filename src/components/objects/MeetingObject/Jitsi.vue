@@ -8,7 +8,10 @@
         <video autoplay ref="videoEl" :style="{
           'border-radius': object.shape === 'circle' ? '100%' : '12px',
         }" @timeupdate="timeupdate"
-        @loadeddata="loadeddata">
+        @loadeddata="loadeddata"
+        disablePictureInPicture
+        controlslist="nodownload nofullscreen noremoteplayback"
+        @contextmenu.prevent>
           Please click on Refresh Stream button.
         </video>
         <audio autoplay ref="audioEl" :muted="localMuted" v-bind:id="'video' + object.id"></audio>
@@ -54,7 +57,7 @@
 <script>
 import Object from "../Object.vue";
 import Loading from "components/Loading.vue";
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
 
@@ -88,14 +91,22 @@ export default {
     const loadTrack = () => {
       if (tracks.value.length) {
         try {
-          if (videoTrack.value) {
+          if (videoTrack.value && videoEl.value) {
+            try {
+              videoTrack.value.detach();
+            } catch (_) {}
+            videoEl.value.srcObject = null;
             videoTrack.value.attach(videoEl.value);
           }
-          if (audioTrack.value && !audioTrack.value.isLocal()) {
+          if (audioTrack.value && !audioTrack.value.isLocal() && audioEl.value) {
+            try {
+              audioTrack.value.detach();
+            } catch (_) {}
+            audioEl.value.srcObject = null;
             audioTrack.value.attach(audioEl.value);
           }
         } catch (error) {
-          console.log("Error on attaching track", error);
+          console.warn("Error attaching Jitsi track", error);
         }
       }
     };
@@ -124,13 +135,33 @@ export default {
       reloadStreams,
       (val) => {
         if (val) {
-          loadTrack();
+          nextTick(() => loadTrack());
         }
       },
       { immediate: true },
     );
 
-    onMounted(() => loadTrack);
+    watch(
+      videoEl,
+      (newEl) => {
+        if (newEl) {
+          // Ensure Picture-in-Picture is disabled whenever video element changes
+          newEl.disablePictureInPicture = true;
+          newEl.addEventListener('enterpictureinpicture', (e) => {
+            e.preventDefault();
+          });
+        }
+      },
+      { immediate: true },
+    );
+
+    onMounted(() => {
+      loadTrack();
+      // Disable Picture-in-Picture on mount
+      if (videoEl.value) {
+        videoEl.value.disablePictureInPicture = true;
+      }
+    });
 
     const clip = (shape) => {
       store.dispatch("stage/shapeObject", {
@@ -170,6 +201,14 @@ export default {
 
     const loadeddata = () => {
       loading.value=false;
+      // Disable Picture-in-Picture when video loads to prevent pop-out functionality
+      if (videoEl.value) {
+        videoEl.value.disablePictureInPicture = true;
+        // Prevent Picture-in-Picture event
+        videoEl.value.addEventListener('enterpictureinpicture', (e) => {
+          e.preventDefault();
+        });
+      }
     }
 
     return {
@@ -195,6 +234,17 @@ export default {
 <style lang="scss" scoped>
 video {
   width: 100%;
+  // Hide Picture-in-Picture button in browser controls
+  &::-webkit-media-controls-picture-in-picture-button {
+    display: none !important;
+  }
+  // Prevent user selection and context menu interactions
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 </style>
 

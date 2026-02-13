@@ -14,16 +14,17 @@ import { useStore } from "vuex";
 export default {
   setup() {
     const store = useStore();
-    const events = computed(() => store.state.stage.model.events);
-    const begin = computed(() =>
-      Number(store.state.stage.replay.timestamp.begin),
-    );
-    const end = computed(() => Number(store.state.stage.replay.timestamp.end));
+    const events = computed(() => store.getters["stage/replayEffectiveEvents"] ?? []);
+    const timestamp = computed(() => store.getters["stage/replayEffectiveTimestamp"]);
+    const begin = computed(() => Number(timestamp.value?.begin ?? 0));
+    const end = computed(() => Number(timestamp.value?.end ?? 0));
     const duration = computed(() => end.value - begin.value);
 
     const position = (event) => {
+      const d = duration.value;
+      if (!d) return 0;
       return (
-        ((Number(event.mqttTimestamp) - begin.value) * 100) / duration.value
+        ((Number(event.mqttTimestamp) - begin.value) * 100) / d
       );
     };
 

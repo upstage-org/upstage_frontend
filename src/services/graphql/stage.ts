@@ -120,6 +120,7 @@ export default {
           $cover: String
           $playerAccess: String
           $owner: ID
+          $config: String
         ) {
           updateStage(
             input: {
@@ -132,6 +133,7 @@ export default {
               cover: $cover
               playerAccess: $playerAccess
               owner: $owner
+              config: $config
             }
           ) {
             ...stageFragment
@@ -208,6 +210,7 @@ export default {
               name
               description
               recording
+              duration
             }
             scenes {
               id
@@ -397,17 +400,17 @@ export default {
       `,
       { id, stageIds }
     ),
-  saveStageConfig: (id, config) =>
+  saveStageConfig: (id, config, visibility) =>
     studioClient.request(
       gql`
-        mutation UpdateStage($id: ID!, $config: String) {
-          updateStage(input: { id: $id, config: $config }) {
+        mutation UpdateStageConfig($id: ID!, $config: String, $visibility: Boolean) {
+          updateStage(input: { id: $id, config: $config, visibility: $visibility }) {
             ...stageFragment
           }
         }
         ${stageFragment}
       `,
-      { id, config }
+      { id, config, visibility }
     ),
   assignableMedia: () =>
     studioClient.request(gql`
@@ -540,7 +543,7 @@ export default {
   deletePerformance: (id) =>
     studioClient.request(
       gql`
-        mutation DeletePerformance($id: Int!) {
+        mutation DeletePerformance($id: ID!) {
           deletePerformance(id: $id) {
             success
           }
@@ -564,6 +567,58 @@ export default {
         }
       `,
       { id, name, description }
+    ),
+  duplicatePerformance: (sourceId, name, description) =>
+    studioClient.request(
+      gql`
+        mutation duplicatePerformance(
+          $sourceId: ID!
+          $name: String!
+          $description: String
+        ) {
+          duplicatePerformance(
+            input: { sourceId: $sourceId, name: $name, description: $description }
+          ) {
+            id
+          }
+        }
+      `,
+      { sourceId, name, description }
+    ),
+  savePerformance: (input: {
+    performanceId?: number;
+    stageId?: number;
+    name: string;
+    description?: string | null;
+    events: Array<{ topic: string; mqttTimestamp: number; payload?: unknown }>;
+  }) =>
+    studioClient.request(
+      gql`
+        mutation savePerformance($input: SavePerformanceInput!) {
+          savePerformance(input: $input) {
+            id
+            name
+          }
+        }
+      `,
+      { input }
+    ),
+  createPerformanceWithEvents: (input: {
+    stageId: number;
+    name: string;
+    description?: string | null;
+    events: Array<{ topic: string; mqttTimestamp: number; payload?: unknown }>;
+  }) =>
+    studioClient.request(
+      gql`
+        mutation createPerformanceWithEvents($input: CreatePerformanceWithEventsInput!) {
+          createPerformanceWithEvents(input: $input) {
+            id
+            name
+          }
+        }
+      `,
+      { input }
     ),
   startRecording: (stageId, name, description) =>
     studioClient.request(

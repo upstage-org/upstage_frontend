@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import { useDebounceFn } from "@vueuse/core";
 import gql from "graphql-tag";
 import { StudioGraph, UploadFile } from "models/studio";
@@ -12,47 +12,11 @@ import Navbar from "../Navbar.vue";
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { useStore } from "vuex";
+import { MEDIA_FILTER_QUERY } from "services/graphql/media";
 
-const { result: response, loading } = useQuery(gql`
-  {
-    whoami {
-      username
-      displayName
-      roleName
-    }
-    users(active: true) {
-      id
-      username
-      displayName
-    }
-    stages(input:{}) {
-      edges {
-        id
-        name
-        createdOn
-        owner {
-          username
-          displayName
-        }
-      }
-    }
-    getAllStages {
-        id
-        name
-        permission
-    }
-    tags {
-      id
-      name
-      color
-      createdOn
-    }
-    mediaTypes {
-      id
-      name
-    }
-  }
-`);
+const { result: response, loading } = useQuery(MEDIA_FILTER_QUERY, {}, {
+  fetchPolicy: "cache-and-network",
+});
 const store = useStore();
 const isAdmin = computed(() => store.getters["user/isAdmin"]);
 const result = computed(() => response?.value);
@@ -133,8 +97,23 @@ const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) =
 };
 
 onMounted(() => {
+  // Reset filter state to a consistent default when entering the Media page,
+  // so we don't show "no results" due to stale inquiry from Stages or another route.
+  name.value = "";
+  owners.value = sharedAuth && sharedAuth.username ? [sharedAuth.username] : [];
+  types.value = [];
+  stages.value = [];
+  tags.value = [];
+  dates.value = undefined;
+  dormant.value = false;
   updateInquiry({
-    createdBetween: undefined
+    name: "",
+    owners: owners.value,
+    stages: [],
+    tags: [],
+    mediaTypes: [],
+    dormant: false,
+    createdBetween: undefined,
   });
 });
 
@@ -194,8 +173,8 @@ const onVisibleDropzone = () => {
         </a-button>
         <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="name" />
         <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags" style="min-width: 124px"
-          placeholder="Owners" :loading="loading" v-model:value="owners" :options="result
-            ? result.users.map((e: any) => ({
+          placeholder="Owners" :loading="loading" v-model:value="owners"           :options="(result as any)
+            ? (result as any).users.map((e: any) => ({
               value: e.username,
               label: e.displayName || e.username,
             }))
@@ -204,14 +183,18 @@ const onVisibleDropzone = () => {
           <template #dropdownRender="{ menuNode: menu }">
             <v-nodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
-            <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="owners = []">
+            <div
+              class="w-full cursor-pointer text-center"
+              @mousedown.prevent
+              @click.stop.prevent="owners = (result as any)?.users?.map((u: any) => u.username) ?? []"
+            >
               <team-outlined />&nbsp;All players
             </div>
           </template>
         </a-select>
         <a-select allowClear showArrow filterOption mode="tags" style="min-width: 128px" placeholder="Media types"
-          :loading="loading" v-model:value="types" :options="result
-            ? result.mediaTypes
+          :loading="loading" v-model:value="types"           :options="(result as any)
+            ? (result as any).mediaTypes
               .filter(
                 (e: any) =>
                   !['shape', 'media'].includes(e.name.toLowerCase()),
@@ -224,8 +207,8 @@ const onVisibleDropzone = () => {
             ">
         </a-select>
         <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags" style="min-width: 160px"
-          placeholder="Stages assigned" :loading="loading" v-model:value="stages" :options="result
-            ? result.getAllStages.map((e: any) => ({
+          placeholder="Stages assigned" :loading="loading" v-model:value="stages"           :options="(result as any)
+            ? (result as any).getAllStages.map((e: any) => ({
               value: e.id,
               label: e.name,
             }))
@@ -233,8 +216,8 @@ const onVisibleDropzone = () => {
             ">
         </a-select>
         <a-select allowClear showArrow mode="tags" style="min-width: 160px" placeholder="Tags" :loading="loading"
-          v-model:value="tags" :options="result
-            ? result.tags.map((e: any) => ({
+          v-model:value="tags"           :options="(result as any)
+            ? (result as any).tags.map((e: any) => ({
               value: e.name,
               label: e.name,
             }))

@@ -36,8 +36,10 @@ export default {
   components: { Icon, Linkify },
   setup: (props) => {
     const store = useStore();
+    // Use holder/session (synced state) so teardrop color stays correct for all
+    // clients. user.avatarId can desync e.g. around depth tool or counter order.
     const isHolding = computed(
-      () => props.object.id === store.state.user.avatarId
+      () => props.object.holder?.id === store.state.stage.session
     );
     const canPlay = computed(() => store.getters["stage/canPlay"]);
 
@@ -87,8 +89,7 @@ export default {
         pos = outOfViewportPosition(el);
         count++;
       }
-      const duration = config.value?.animations?.bubbleSpeed ?? 1000;
-      console.log(config.value?.animations?.bubbleSpeed);
+      const duration = config.value?.animations?.bubbleSpeed ?? 2000;
       switch (config.value?.animations?.bubble) {
         case "fade":
           animate(el, {
@@ -115,7 +116,7 @@ export default {
     };
 
     const leave = (el, complete) => {
-      const duration = config.value?.animations?.bubbleSpeed ?? 1000;
+      const duration = config.value?.animations?.bubbleSpeed ?? 2000;
       switch (config.value?.animations?.bubble) {
         case "fade":
           animate(el, {

@@ -1,10 +1,23 @@
 // @ts-nocheck
-import { router } from "../../router";
 import { userGraph } from "services/graphql";
 import { displayName, logout } from "utils/auth";
 import { ROLES } from "utils/constants";
 import { message } from "ant-design-vue";
 import store from "store/index";
+
+// Lazy router getter to avoid circular dependency
+// Router reference will be set by main.ts after initialization
+let routerInstance: any = null;
+const getRouter = () => {
+  if (!routerInstance) {
+    // Access from global reference set in main.ts
+    routerInstance = (window as any).__UPSTAGE_ROUTER__;
+  }
+  if (!routerInstance) {
+    throw new Error("Router not initialized. Make sure router is set in main.ts");
+  }
+  return routerInstance;
+};
 
 export default {
   namespaced: true,
@@ -62,6 +75,7 @@ export default {
         ) {
           logout();
 
+          const router = getRouter();
           if (router.currentRoute.value.meta.requireAuth) {
             router.push("/login");
             message.warning("You have been logged out of this session!");
@@ -110,6 +124,7 @@ export default {
         ) {
           logout();
 
+          const router = getRouter();
           if (router.currentRoute.value.meta.requireAuth) {
             router.push("/login");
             message.warning("You have been logged out of this session!");
@@ -141,6 +156,7 @@ export default {
         ) {
           logout();
 
+          const router = getRouter();
           if (router.currentRoute.value.meta.requireAuth) {
             router.push("/login");
             message.warning("You have been logged out of this session!");

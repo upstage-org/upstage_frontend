@@ -31,9 +31,9 @@
         <label class="label">{{ $t("stage_name") }}</label>
       </div>
       <div class="field-body">
-        <Field placeholder="Full Name" v-model="form.name" required requiredMessage="Stage name is required" expanded
+        <Field placeholder="Full name" v-model="form.name" required requiredMessage="Stage name is required." expanded
           class="half-flex" />
-        <Field required placeholder="URL" v-model="form.fileLocation" requiredMessage="URL is required" expanded
+        <Field required placeholder="URL" v-model="form.fileLocation" requiredMessage="URL is required." expanded
           @keyup="urlValid = null" @input="checkURL" :right="validatingURL
             ? 'fas fa-circle-notch fa-spin'
             : urlValid === true
@@ -55,7 +55,7 @@
         <div class="field">
           <div class="control">
             <textarea class="textarea"
-              placeholder="enter a description that will appear on the screen while your Stage is loading."
+              placeholder="Enter a description that will appear on the screen while your stage is loading"
               v-model="form.description"></textarea>
           </div>
         </div>
@@ -192,17 +192,28 @@ export default {
     const stage = inject("stage");
     const clearCache = inject("clearCache");
 
+    const playerAccess = ref(
+      useAttribute(stage, "playerAccess", true).value ?? [],
+    );
+
+    // Get initial status from attribute, normalize to lowercase, default to "rehearsal"
+    const initialStatus = useAttribute(stage, "status").value;
+    const normalizedStatus = initialStatus 
+      ? String(initialStatus).toLowerCase() 
+      : "rehearsal";
+    const validStatus = (normalizedStatus === "live" || normalizedStatus === "rehearsal") 
+      ? normalizedStatus 
+      : "rehearsal";
+
     const form = reactive({
       fileLocation: "",
       ...stage.value,
       owner: stage.value.owner?.id,
-      status: useAttribute(stage, "status").value ?? "rehearsal",
-      cover: useAttribute(stage, "cover").value,
+      status: validStatus, // Ensure status is always "live" or "rehearsal"
+      cover: useAttribute(stage, "cover").value || null,
+      playerAccess: JSON.stringify(playerAccess.value),
+      visibility: stage.value?.visibility !== undefined ? stage.value.visibility : true,
     });
-
-    const playerAccess = ref(
-      useAttribute(stage, "playerAccess", true).value ?? [],
-    );
 
     watch(playerAccess, (val) => {
       form.playerAccess = JSON.stringify(val);
@@ -307,7 +318,10 @@ export default {
     );
     const createStage = async () => {
       try {
-        const stage = await mutation();
+        // Ensure playerAccess is set from the reactive playerAccess ref
+        form.playerAccess = JSON.stringify(playerAccess.value);
+        // Pass the current form state explicitly to ensure all changes are included
+        const stage = await mutation(form);
         message.success("Stage created successfully!");
         store.dispatch("cache/fetchStages");
         router.push(`/stages/stage-management/${stage.id}/`);
@@ -317,13 +331,73 @@ export default {
     };
     const updateStage = async () => {
       try {
-        await mutation();
+        // ALWAYS send ALL current values to backend - no conditional logic
+        // Backend will handle defaults if values are missing
+
+        // PlayerAccess - always send current value as JSON string
+        const playerAccessJson = JSON.stringify(playerAccess.value || []);
+
+        // Status - always send current value, must be "live" or "rehearsal"
+        const statusValue = (form.status === "live" || form.status === "rehearsal")
+          ? form.status
+          : "rehearsal";
+
+        // Visibility - always send current boolean value
+        const visibilityValue = form.visibility !== undefined
+          ? Boolean(form.visibility)
+          : (stage.value?.visibility !== undefined ? Boolean(stage.value.visibility) : true);
+
+        // Cover - always send current value (can be empty string or URL)
+        const coverValue = form.cover || "";
+
+        // Owner - always send current value
+        const ownerValue = form.owner || stage.value?.owner?.id || null;
+
+        // Config - preserve existing config from Customisation page
+        const existingConfigAttr = stage.value?.attributes?.find(a => a.name === 'config');
+        const configValue = existingConfigAttr?.description || null;
+
+        // Description - send current value (can be empty string)
+        const descriptionValue = form.description !== undefined ? form.description : "";
+
+        // Build the payload with ALL current values - ALWAYS send everything
+        const payload = {
+          id: form.id,
+          name: form.name || "",
+          description: descriptionValue,
+          fileLocation: form.fileLocation || "",
+          status: statusValue,
+          visibility: visibilityValue,
+          cover: coverValue,
+          playerAccess: playerAccessJson,
+          owner: ownerValue,
+          config: configValue,
+        };
+
+        console.log('Saving General Information with ALL values:', {
+          stageId: payload.id,
+          name: payload.name,
+          description: payload.description,
+          fileLocation: payload.fileLocation,
+          status: payload.status,
+          visibility: payload.visibility,
+          cover: payload.cover,
+          playerAccess: payload.playerAccess,
+          owner: payload.owner,
+          config: payload.config ? 'preserved' : 'none',
+        });
+
+        // Send the complete payload to backend
+        await mutation(payload);
         message.success("Stage updated successfully!");
+
+        // Update Vuex cache
         store.commit("cache/UPDATE_STAGE_VISIBILITY", {
           stageId: form.id,
-          visibility: form.visibility,
+          visibility: visibilityValue,
         });
-        console.log(clearCache);
+
+        // Clear cache to force refresh
         clearCache();
       } catch (error) {
         handleError(error);

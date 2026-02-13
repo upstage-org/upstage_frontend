@@ -35,7 +35,7 @@ export default {
   setup: (props, { emit }) => {
     const store = useStore();
     const isHolding = computed(
-      () => props.object.id === store.state.user.avatarId,
+      () => props.object.holder?.id === store.state.stage.session,
     );
 
     const keepActive = () => {

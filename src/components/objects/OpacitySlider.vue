@@ -78,7 +78,7 @@ export default {
     };
 
     const isHolding = computed(
-      () => props.object.id === store.state.user.avatarId,
+      () => props.object.holder?.id === store.state.stage.session,
     );
     const holdable = computed(() => ["avatar"].includes(props.object.type));
     const activeMovable = computed(() => store.getters["stage/activeMovable"]);

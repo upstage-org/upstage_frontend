@@ -5,8 +5,13 @@
   <div class="card-content voice-parameters">
     <form @submit.prevent="createRoom">
       <HorizontalField title="Name">
-        <Field v-model="form.name" required required-message="Stream name is required" pattern="^[^?&:&quot;'%#]+$"
-          title="Meeting name should not contain any of these characters: ?, &, :, ', &quot;, %, #.">
+        <Field
+          v-model="form.name"
+          required
+          required-message="Stream name is required."
+          pattern="^[^?&:&quot;'%#]+$"
+          title="Meeting name should not contain any of these characters: ?, &, :, ', &quot;, %, #."
+        >
         </Field>
       </HorizontalField>
       <SaveButton :disabled="!form.name.trim()">{{

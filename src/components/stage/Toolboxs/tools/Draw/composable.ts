@@ -29,8 +29,11 @@ const draw = (ctx, { fromX, fromY, x, y, size, color }) => {
 
 const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
 
-const execute = async (ctx, command, animate) => {
-  const { type, size, color, lines } = command;
+const DEFAULT_STROKE_COLOR = "#000000";
+
+const execute = async (ctx, command, animate, onAfterSegment) => {
+  const color = command.color ?? DEFAULT_STROKE_COLOR;
+  const { type, size, lines } = command;
   if (lines && lines.length) {
     if (type === "draw") {
       for (let i = 0; i < lines.length; i++) {
@@ -44,6 +47,7 @@ const execute = async (ctx, command, animate) => {
           color,
         });
         if (animate) {
+          onAfterSegment?.(ctx.canvas);
           await wait(10);
         }
       }
@@ -58,10 +62,10 @@ const execute = async (ctx, command, animate) => {
     }
   } else {
     if (type === "draw") {
-      if (command.fromX && command.fromY) {
-        draw(ctx, command);
+      if (command.fromX != null && command.fromY != null) {
+        draw(ctx, { ...command, color });
       } else {
-        drawDot(ctx, command);
+        drawDot(ctx, { ...command, color });
       }
     } else {
       eraseDot(ctx, command);
@@ -69,7 +73,8 @@ const execute = async (ctx, command, animate) => {
   }
 };
 
-export const useDrawable = () => {
+export const useDrawable = (options = {}) => {
+  const { onStrokeEnd } = options;
   const color = ref("#000");
   const size = ref(10);
   const mode = ref("draw");
@@ -113,15 +118,24 @@ export const useDrawable = () => {
       execute(ctx, command);
     }
     if (res == "up") {
+      const hadStrokeInProgress = data.flag;
       data.flag = false;
-      history.push({
+      // Only end a stroke if we actually started one (mousedown was received).
+      // Some browsers (e.g. Brave) can fire a spurious mouseup from the color widget without mousedown.
+      if (!hadStrokeInProgress) return;
+      const lines = data.lines || [];
+      const snapshot = {
         type: mode.value,
         size: size.value,
         color: color.value,
-        lines: data.lines,
+        lines: lines.map((l) => ({ ...l })),
         x: data.currX,
         y: data.currY,
-      });
+      };
+      history.push(snapshot);
+      if (lines.length > 0) {
+        onStrokeEnd?.(snapshot);
+      }
     }
     if (res == "move") {
       if (data.flag) {
@@ -190,6 +204,7 @@ export const useDrawable = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (clearHistory) {
       history.length = 0;
+      data.lines = [];
     }
     return ctx;
   };
@@ -251,10 +266,11 @@ export const useRelativeCommands = (drawing) =>
     const ratio = Math.min(w / original.w, h / original.h);
     return commands.map((command) => ({
       ...command,
+      color: command.color ?? DEFAULT_STROKE_COLOR,
       size: command.size * ratio,
       x: (command.x - original.x) * ratio,
       y: (command.y - original.y) * ratio,
-      lines: command.lines.map((line) => ({
+      lines: (command.lines || []).map((line) => ({
         x: (line.x - original.x) * ratio,
         y: (line.y - original.y) * ratio,
         fromX: (line.fromX - original.x) * ratio,
@@ -270,10 +286,24 @@ export const useDrawing = (drawing) => {
   const draw = async (newDrawing, oldDrawing) => {
     if (!drawing.value) return;
     const { value: canvas } = el;
-    canvas.width = drawing.value.w;
-    canvas.height = drawing.value.h;
+    const w = drawing.value.w;
+    const h = drawing.value.h;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw to offscreen first so we never show an empty canvas (avoids white flash when redrawing)
+    const offscreen = document.createElement("canvas");
+    offscreen.width = w;
+    offscreen.height = h;
+    const offCtx = offscreen.getContext("2d");
+    offCtx.clearRect(0, 0, w, h);
+    // After each animated segment, blit offscreen to visible so the audience sees the stroke being drawn
+    const blitToVisible = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(offscreen, 0, 0);
+    };
     for (let i = 0; i < commands.value.length; i++) {
       const command = commands.value[i];
       let shouldAnimate = true;
@@ -282,8 +312,17 @@ export const useDrawing = (drawing) => {
           shouldAnimate = false;
         }
       }
-      execute(ctx, command, shouldAnimate);
+      if (shouldAnimate) {
+        blitToVisible();
+      }
+      await execute(
+        offCtx,
+        command,
+        shouldAnimate,
+        shouldAnimate ? blitToVisible : undefined,
+      );
     }
+    blitToVisible();
     return ctx;
   };
 

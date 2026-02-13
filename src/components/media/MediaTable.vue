@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { useMutation, useQuery } from "@vue/apollo-composable";
+import { useMutation, useQuery } from "@vue3-apollo/core";
 import { message } from "ant-design-vue";
 import gql from "graphql-tag";
 import {
@@ -53,7 +53,7 @@ const { result: inquiryResult } = useQuery(gql`
 `);
 const params = computed(() => ({
   ...tableParams,
-  ...inquiryResult.value.inquiry,
+  ...(inquiryResult.value as any)?.inquiry || {},
 }));
 const { result, loading, fetchMore, refetch } = useQuery(
   gql`
@@ -114,11 +114,11 @@ const { result, loading, fetchMore, refetch } = useQuery(
     ${permissionFragment}
   `,
   params,
-  { notifyOnNetworkStatusChange: true },
+  { notifyOnNetworkStatusChange: true } as any,
 );
 
-const updateQuery = (previousResult: StudioGraph, { fetchMoreResult }: any) => {
-  return fetchMoreResult ?? previousResult;
+const updateQuery = (previousQueryResult: any, options: { fetchMoreResult: any; variables: any }) => {
+  return options.fetchMoreResult ?? previousQueryResult;
 };
 
 onMounted(() => {
@@ -240,7 +240,7 @@ const handleTableChange = (
   });
 };
 const dataSource = computed(() =>
-  result.value ? result.value.media.edges : [],
+  (result.value as any)?.media?.edges || [],
 );
 
 const {
@@ -255,12 +255,12 @@ const {
     }
   }
 `);
-onDone((result) => {
+onDone((data: any) => {
   console.log();
-  if (result.data.deleteMedia.success) {
+  if (data?.deleteMedia?.success) {
     message.success("Media deleted successfully");
   } else {
-    message.error(result.data.deleteMedia.message);
+    message.error(data?.deleteMedia?.message);
   }
   fetchMore({
     variables: tableParams,
@@ -269,10 +269,7 @@ onDone((result) => {
 });
 
 provide("refresh", () => {
-  fetchMore({
-    variables: tableParams,
-    updateQuery,
-  });
+  refetch();
 });
 
 const editMedia = (media: Media) => {
@@ -319,7 +316,7 @@ const filterTag = (tag: string) => {
       rowKey="id" :loading="loading" @change="handleTableChange" :pagination="{
         showQuickJumper: true,
         showSizeChanger: true,
-        total: result ? result.media.totalCount : 0,
+        total: (result as any)?.media?.totalCount || 0,
       } as Pagination
         ">
       <template #bodyCell="{ column, record, text }">
@@ -345,7 +342,7 @@ const filterTag = (tag: string) => {
           </a>
         </template>
         <template v-if="column.key === 'tags'">
-          <a-tag v-for="(tag, i) in text" :key="i" :color="tag" @click="filterTag(tag)" class="cursor-pointer">{{ tag }}
+          <a-tag v-for="(tag, i) in text" :key="i" color="default" @click="filterTag(tag)" class="cursor-pointer tags-cell-tag">{{ tag }}
           </a-tag>
         </template>
         <template v-if="column.key === 'size'">
@@ -410,4 +407,9 @@ const filterTag = (tag: string) => {
     <slot></slot>
   </a-layout>
 </template>
-state/auth
+
+<style scoped>
+.tags-cell-tag {
+  color: #000;
+}
+</style>
