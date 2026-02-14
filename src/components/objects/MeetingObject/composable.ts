@@ -9,8 +9,9 @@ export const useLowLevelAPI = () => {
 };
 
 export const useJitsiDomain = () => {
-  const domain = configs.JITSI_ENDPOINT.replace(/(^https?:\/\/|\/)/g, "");
-  return domain;
+  const endpoint = configs.JITSI_ENDPOINT;
+  if (endpoint == null || typeof endpoint !== "string") return "";
+  return endpoint.replace(/(^https?:\/\/|\/)/g, "");
 };
 
 export const useJitsi = () => {

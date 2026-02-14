@@ -51,9 +51,13 @@ export function namespaceTopic(topicName, stageUrl) {
 }
 
 export function unnamespaceTopic(topicName) {
+  if (topicName == null || typeof topicName !== "string") return "";
   const url = store.getters["stage/url"];
   const namespace = configs.MQTT_NAMESPACE;
-  return topicName.substring(namespace.length + url.length + 2);
+  if (url == null || namespace == null) return topicName;
+  const prefixLen = String(namespace).length + String(url).length + 2;
+  if (topicName.length <= prefixLen) return topicName;
+  return topicName.substring(prefixLen);
 }
 
 export function getDefaultStageConfig() {

@@ -24,6 +24,11 @@ const staticAssetsEndpoint =
     ? ensureTrailingSlash(VITE_STATIC_ASSETS_ENDPOINT)
     : ensureTrailingSlash(`${window.location.origin}/resources/`);
 
+const jitsiEndpoint =
+  (typeof VITE_JITSI_ENDPOINT === "string" && VITE_JITSI_ENDPOINT)
+    ? VITE_JITSI_ENDPOINT.replace(/\/$/, "")
+    : window.location.origin;
+
 const configs = {
   MODE: import.meta.env.VITE_ENV_TYPE as "Development" | "Production",
   UPSTAGE_URL: window.location.origin,
@@ -69,7 +74,7 @@ const configs = {
   STATIC_ASSETS_ENDPOINT: staticAssetsEndpoint,
   CLOUDFLARE_CAPTCHA_SITEKEY: VITE_CLOUDFLARE_CAPTCHA_SITEKEY,
   AXIOS_TIMEOUT: 10000,
-  JITSI_ENDPOINT: VITE_JITSI_ENDPOINT,
+  JITSI_ENDPOINT: jitsiEndpoint,
   MQTT_NAMESPACE: VITE_MQTT_NAMESPACE,
   MQTT_CONNECTION: {
     url: VITE_MQTT_ENDPOINT,
