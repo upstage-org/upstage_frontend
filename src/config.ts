@@ -13,6 +13,17 @@ const {
   VITE_ALIAS_RELEASE_VERSION
 } = import.meta.env;
 
+// Fallback when env was not set at build time (e.g. wrong .env path or CI build)
+const ensureTrailingSlash = (url: string) => (url.endsWith("/") ? url : `${url}/`);
+const graphqlEndpoint =
+  (typeof VITE_GRAPHQL_ENDPOINT === "string" && VITE_GRAPHQL_ENDPOINT)
+    ? ensureTrailingSlash(VITE_GRAPHQL_ENDPOINT)
+    : ensureTrailingSlash(`${window.location.origin}/api/`);
+const staticAssetsEndpoint =
+  (typeof VITE_STATIC_ASSETS_ENDPOINT === "string" && VITE_STATIC_ASSETS_ENDPOINT)
+    ? ensureTrailingSlash(VITE_STATIC_ASSETS_ENDPOINT)
+    : ensureTrailingSlash(`${window.location.origin}/resources/`);
+
 const configs = {
   MODE: import.meta.env.VITE_ENV_TYPE as "Development" | "Production",
   UPSTAGE_URL: window.location.origin,
@@ -54,8 +65,8 @@ const configs = {
     },
   ],
 
-  GRAPHQL_ENDPOINT: VITE_GRAPHQL_ENDPOINT,
-  STATIC_ASSETS_ENDPOINT: VITE_STATIC_ASSETS_ENDPOINT,
+  GRAPHQL_ENDPOINT: graphqlEndpoint,
+  STATIC_ASSETS_ENDPOINT: staticAssetsEndpoint,
   CLOUDFLARE_CAPTCHA_SITEKEY: VITE_CLOUDFLARE_CAPTCHA_SITEKEY,
   AXIOS_TIMEOUT: 10000,
   JITSI_ENDPOINT: VITE_JITSI_ENDPOINT,
