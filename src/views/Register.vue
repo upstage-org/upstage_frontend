@@ -11,24 +11,24 @@
           <div class="card-content">
             <div class="content">
               <Field v-model="form.username" left="fas fa-user" placeholder="Username" required
-                requiredMessage="Username is required" :touched="touched" />
+                requiredMessage="Username is required." :touched="touched" />
               <Password v-model="form.password" left="fas fa-lock" placeholder="Password" required
-                requiredMessage="Password is required" :touched="touched" />
-              <Password v-model="form.confirmPassword" left="fas fa-lock" placeholder="Confirm Password"
+                requiredMessage="Password is required." :touched="touched" />
+              <Password v-model="form.confirmPassword" left="fas fa-lock" placeholder="Confirm password"
                 :error="confirmPasswordError" />
               <div class="columns">
                 <div class="column pr-0 pb-0">
-                  <Field v-model="form.firstName" left="fas fa-user" placeholder="First Name" />
+                  <Field v-model="form.firstName" left="fas fa-user" placeholder="First name" />
                 </div>
                 <div class="column pb-0">
-                  <Field v-model="form.lastName" placeholder="Last Name" />
+                  <Field v-model="form.lastName" placeholder="Last name" />
                 </div>
               </div>
               <Field v-model="form.email" left="fas fa-envelope" placeholder="Email" type="email" required
-                requiredMessage="Email is required" :touched="touched" />
+                requiredMessage="Email is required." :touched="touched" />
               <Field v-model="form.intro"
                 placeholder="Please say briefly who you are and why you would like an UpStage account." type="textarea"
-                required requiredMessage="Introduction is required" :touched="touched" />
+                required requiredMessage="Introduction is required." :touched="touched" />
               <label class="checkbox">
                 <input type="checkbox" v-model="agreed" />
                 {{ $t("tos.register") }}
@@ -84,7 +84,7 @@ export default {
       if (!form.username || !form.password || !form.email || (form.password || "").length < 8) return;
       if (confirmPasswordError.value) return;
       if(form.username.length < 2) {
-        message.error("Make your user name at least 2 characters long");
+        message.error("Make your username at least 2 characters long.");
         return;
       }
       if (configs.MODE === 'Production' && !form.token) {
@@ -94,24 +94,24 @@ export default {
         form["token"] = null
       }
       if (!agreed.value) {
-        message.error("Please agree to the Terms & Conditions");
+        message.error("Please agree to the Terms & Conditions.");
         return;
       }
       try {
         const response = await mutation();
         message.success(
-          "Thank you for registering. Your account needs to be approved by an Admin - please check your email.",
+          "Thank you for registering. Your account needs to be approved by an admin. Please check your email.",
         );
         router.push("/login");
       } catch (error) {
         captcha.value?.reset();
         if (error.includes("upstage_user_username_key")) {
-          message.error("Username " + form.username + " already exists!");
+          message.error("Username " + form.username + " already exists.");
         } else if (error.includes("upstage_user_email_key")) {
           if (form.email) {
-            message.error("Email " + form.email + " already exists!");
+            message.error("Email " + form.email + " already exists.");
           } else {
-            message.error("Email is required!");
+            message.error("Email is required.");
           }
         } else {
           message.error(error);

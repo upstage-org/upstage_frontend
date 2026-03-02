@@ -1,6 +1,6 @@
 <template>
   <a-tooltip :title="dynamicTooltip">
-    <div style="position: relative" class="has-tooltip-left">
+    <div style="position: relative" class="has-tooltip-left" :class="{ 'picker-only-root': pickerOnly }">
       <ElasticInput v-if="!pickerOnly" v-bind="$attrs" :model-value="modelValue"
         @update:model-value="$emit('update:modelValue', $event)" @ref="(el) => (input = el)" @submit="$emit('submit')"
         :style="{
@@ -252,9 +252,17 @@ emoji-picker {
   top: 0;
 
   .button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
     .icon:first-child:last-child {
       margin: auto;
     }
   }
+}
+
+.picker-only-root .emoji-picker-wrapper {
+  position: static;
 }
 </style>

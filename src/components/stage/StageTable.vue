@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { useMutation, useQuery } from "@vue/apollo-composable";
+import { useMutation, useQuery } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 import { computed, reactive, watch, provide, onMounted, ComputedRef } from "vue";
 import type { Media, Stage, StudioGraph } from "models/studio";
@@ -9,7 +9,7 @@ import { SorterResult } from "ant-design-vue/lib/table/interface";
 import { useI18n } from "vue-i18n";
 import { capitalize } from "utils/common";
 import { message } from "ant-design-vue";
-import { FetchResult } from "@apollo/client/core";
+import { FetchResult } from "@apollo/client";
 import store from "store";
 import PlayerAudienceCounter from "components/stage/PlayerAudienceCounter.vue";
 
@@ -31,7 +31,7 @@ const { result: inquiryResult } = useQuery(gql`
 `);
 const params = computed(() => ({
   ...tableParams,
-  ...inquiryResult.value.inquiry,
+  ...(inquiryResult.value as any)?.inquiry || {},
 }));
 
 const { result, loading, fetchMore, refetch } = useQuery(
@@ -80,7 +80,7 @@ const { result, loading, fetchMore, refetch } = useQuery(
     }
   `,
   params,
-  { notifyOnNetworkStatusChange: true },
+  { notifyOnNetworkStatusChange: true } as any,
 );
 
 onMounted(() => {
@@ -202,7 +202,7 @@ const handleTableChange = (
   });
 };
 const dataSource = computed(() => {
-  return result.value ? result.value.stages.edges : []
+  return (result.value as any) ? (result.value as any).stages.edges : []
 });
 
 provide("refresh", () => {
@@ -245,8 +245,8 @@ const handleChangeVisibility = async (record: Stage) => {
   });
 };
 
-const handleUpdate = (result: FetchResult) => {
-  if (result.data) {
+const handleUpdate = (data: any) => {
+  if (data?.updateStatus || data?.updateVisibility) {
     message.success("Stage updated successfully!");
   } else {
     message.error("You don't have permission to perform this action!");
@@ -264,7 +264,7 @@ onVisibilityUpdated(handleUpdate);
       rowKey="id" :loading="loading" @change="handleTableChange" :pagination="{
         showQuickJumper: true,
         showSizeChanger: true,
-        total: result ? result.stages.totalCount : 0,
+        total: (result as any) ? (result as any).stages.totalCount : 0,
       } as Pagination
         ">
       <template #bodyCell="{ column, record, text }">

@@ -73,11 +73,9 @@ input[type=range].slider:not([orient=vertical]).has-output-tooltip+output {
 }
 
 input[type=range].slider[orient=vertical] {
-    -webkit-appearance: slider-vertical;
-    -moz-appearance: slider-vertical;
-    appearance: slider-vertical;
+    writing-mode: vertical-lr;
+    direction: rtl;
     -ms-writing-mode: bt-lr;
-    writing-mode: bt-lr
 }
 
 input[type=range].slider[orient=vertical]::-webkit-slider-runnable-track {

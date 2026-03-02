@@ -97,7 +97,8 @@
   <MediaForm />
 </template>
 
-<script>
+<script lang="ts">
+// @ts-nocheck
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween'
 import { assign, get, debounce } from 'lodash';
@@ -114,7 +115,7 @@ import MediaUpload from "./Media/MediaUpload.vue";
 import MediaForm from 'components/media/MediaForm/index.vue';
 import VNodes from './VNodes';
 import StageMediaTable from './StageMediaTable.vue';
-import { useQuery as useApolloQuery } from "@vue/apollo-composable";
+import { useQuery as useApolloQuery } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 import { permissionFragment } from "models/fragment";
 
@@ -238,7 +239,7 @@ export default {
         ${permissionFragment}
       `,
       queryParams,
-      { notifyOnNetworkStatusChange: true }
+      { notifyOnNetworkStatusChange: true } as any
     );
 
     watch(queryParams, () => {

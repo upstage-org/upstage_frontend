@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch, watchEffect, onMounted, computed } from "vue";
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import { useDebounceFn } from "@vueuse/core";
 import gql from "graphql-tag";
 import { StudioGraph } from "models/studio";
@@ -53,7 +53,7 @@ const owners = ref([]);
 const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
-const access = ref(['owner', 'editor', 'player']);
+const access = ref(['owner', 'editor', 'player', 'audience']);
 const dates = ref<[Dayjs, Dayjs] | undefined>();
 
 const ranges = [
@@ -111,8 +111,23 @@ watchEffect(() => {
 });
 
 onMounted(() => {
+  // Reset filter state to a consistent default when entering the Stages page,
+  // so we don't show "no results" due to stale inquiry from Media or another route.
+  name.value = "";
+  owners.value = [];
+  types.value = [];
+  stages.value = [];
+  tags.value = [];
+  access.value = ["owner", "editor", "player", "audience"];
+  dates.value = undefined;
   updateInquiry({
-    createdBetween: undefined
+    name: "",
+    owners: [],
+    stages: [],
+    tags: [],
+    mediaTypes: [],
+    access: ["owner", "editor", "player", "audience"],
+    createdBetween: undefined,
   });
 });
 
@@ -189,7 +204,11 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           <template #dropdownRender="{ menuNode: menu }">
             <v-nodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
-            <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="owners = []">
+            <div
+              class="w-full cursor-pointer text-center"
+              @mousedown.prevent
+              @click.stop.prevent="owners = (result as any)?.users?.map((u: any) => u.username) ?? []"
+            >
               <team-outlined />&nbsp;All players
             </div>
           </template>

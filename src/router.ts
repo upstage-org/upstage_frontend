@@ -7,7 +7,6 @@ import PlayerManagement from "views/admin/player-management/index.vue";
 import EmailNotifications from "views/admin/email-notifications/index.vue";
 import Configuration from "views/admin/configuration/index.vue";
 import Home from "views/Home.vue";
-import store from "store";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -134,8 +133,24 @@ export const router = createRouter({
   ],
 });
 
+// Lazy store getter to avoid circular dependency issues
+// Store reference will be set by main.ts after initialization
+let storeInstance: any = null;
+const getStore = () => {
+  if (!storeInstance) {
+    // Access from global reference set in main.ts
+    storeInstance = (window as any).__UPSTAGE_STORE__;
+  }
+  if (!storeInstance) {
+    throw new Error("Store not initialized. Make sure store is set in main.ts");
+  }
+  return storeInstance;
+};
+
 router.beforeEach(async (to, from, next) => {
   document.body.classList.add("waiting");
+  // Get store from global reference to avoid circular dependency issues
+  const store = getStore();
   const loggedIn = store.getters["auth/loggedIn"];
 
   if (to.matched.some((record) => record.meta.requireAuth) && !loggedIn) {

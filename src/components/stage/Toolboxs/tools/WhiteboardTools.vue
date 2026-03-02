@@ -67,11 +67,13 @@
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted, watch } from "vue";
+import { computed, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
+import { v4 as uuidv4 } from "uuid";
 import ColorPicker from "components/form/ColorPicker.vue";
 import Icon from "components/Icon.vue";
 import { useDrawable } from "./Draw/composable";
+import { DRAW_ACTIONS } from "utils/constants";
 
 export default {
   components: { ColorPicker, Icon },
@@ -81,8 +83,32 @@ export default {
     const isDrawing = computed(() => {
       return store.state.stage.preferences.isDrawing;
     });
-    const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } =
-      useDrawable();
+    const { el, cursor, toggleErase, color, size, mode, clearCanvas } =
+      useDrawable({
+        onStrokeEnd(snapshot) {
+          const ratio = 1 / stageSize.value.height;
+          const command = {
+            type: snapshot.type,
+            size: snapshot.size * ratio,
+            x: snapshot.x * ratio,
+            y: snapshot.y * ratio,
+            color: snapshot.color ?? "#000000",
+            _sendId: uuidv4(),
+            lines: (snapshot.lines || []).map((line) => ({
+              x: line.x * ratio,
+              y: line.y * ratio,
+              fromX: line.fromX * ratio,
+              fromY: line.fromY * ratio,
+            })),
+          };
+          store.commit("stage/UPDATE_WHITEBOARD", {
+            type: DRAW_ACTIONS.NEW_LINE,
+            command,
+          });
+          store.dispatch("stage/sendDrawWhiteboard", command);
+          clearCanvas(true);
+        },
+      });
 
     onMounted(() => {
       store.commit("stage/UPDATE_IS_DRAWING", true);
@@ -90,27 +116,6 @@ export default {
 
     onUnmounted(() => {
       store.commit("stage/UPDATE_IS_DRAWING", false);
-    });
-
-    watch(history, (val) => {
-      if (history.length) {
-        let command = val[0];
-        const ratio = 1 / stageSize.value.height;
-        command = {
-          ...command,
-          size: command.size * ratio,
-          x: command.x * ratio,
-          y: command.y * ratio,
-          lines: command.lines.map((line) => ({
-            x: line.x * ratio,
-            y: line.y * ratio,
-            fromX: line.fromX * ratio,
-            fromY: line.fromY * ratio,
-          })),
-        };
-        store.dispatch("stage/sendDrawWhiteboard", command);
-        clearCanvas(true);
-      }
     });
 
     const undo = () => {

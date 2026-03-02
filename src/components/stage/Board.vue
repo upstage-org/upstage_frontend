@@ -12,7 +12,7 @@
     }">
       <Backdrop />
       <transition-group name="stage-avatars" :css="false" @enter="avatarEnter" @leave="avatarLeave">
-        <component v-for="object in objects" :id="object.id" :key="object.id"
+        <component v-for="object in objects" :id="object.id" :key="objectKey(object)"
           :is="object.drawingId ? 'drawing' : object.type == 'video' ? 'avatar' : object.type ?? 'avatar'"
           :object="object" />
       </transition-group>
@@ -56,6 +56,9 @@ export default {
     const stageSize = computed(() => store.getters["stage/stageSize"]);
     const config = computed(() => store.getters["stage/config"]);
     const objects = computed(() => store.getters["stage/objects"]);
+    const meetingRefreshKey = computed(() => store.getters["stage/meetingRefreshKey"]);
+    const objectKey = (object) =>
+      object.type === "meeting" ? `${object.id}-${meetingRefreshKey.value}` : object.id;
     const drop = (e) => {
       const { object, isReal, nodrop } = JSON.parse(
         e.dataTransfer.getData("text"),
@@ -104,6 +107,7 @@ export default {
 
     return {
       objects,
+      objectKey,
       drop,
       avatarEnter,
       avatarLeave,

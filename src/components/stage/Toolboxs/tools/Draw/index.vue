@@ -159,7 +159,11 @@ export default {
       const area = getDrawedArea();
       if (area) {
         const drawingId = uuidv4();
-        const commands = [...history];
+        // Normalize so each stroke has its own color (avoids colors changing when loading/saving)
+        const commands = history.map((cmd) => ({
+          ...cmd,
+          color: cmd.color ?? "#000000",
+        }));
         store.dispatch("stage/addDrawing", {
           ...area,
           commands,

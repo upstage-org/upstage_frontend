@@ -96,7 +96,7 @@ This guide provides step-by-step instructions for backing up and restoring the d
 2. **Backup the Database**  
    Export the database to a SQL file using `pg_dump`. Ensure the environment variables `$USERNAME`, `$DB_NAME`, and `$HOST` are set.  
    ```bash
-   pg_dump -U $USERNAME -d $DB_NAME -h $HOST > upstage.sql
+   pg_dump -U $USERNAME -Fc -Z9 -d $DB_NAME -h $HOST > backup.dump
    ```
 
 3. **Zip Assets**  
@@ -111,7 +111,7 @@ This guide provides step-by-step instructions for backing up and restoring the d
 1. **Transfer Database Backup**  
    Copy the database SQL file from the source server to your local machine.  
    ```bash
-   scp root@upstage.live:/root/upstage.sql .
+   scp root@upstage.live:/root/backup.dump .
    ```
 
 2. **Transfer Assets Archive**  

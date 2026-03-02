@@ -34,6 +34,37 @@ import { Promise } from "core-js";
 
 const mqtt = buildClient();
 
+import { computeCompressedEvents as computeCompressedEventsUtil } from "utils/replayCompress";
+
+let replayDrawQueue: { message: unknown; commit: (m: string, p: unknown) => void }[] = [];
+let replayDrawRafId: number | null = null;
+
+function flushReplayDrawQueue() {
+  if (replayDrawQueue.length === 0) {
+    replayDrawRafId = null;
+    return;
+  }
+  const commit = replayDrawQueue[0].commit;
+  replayDrawQueue.forEach(({ message }) => {
+    commit("UPDATE_WHITEBOARD", message);
+  });
+  replayDrawQueue = [];
+  replayDrawRafId = null;
+}
+
+function getEffectiveReplay(state) {
+  if (state.replay.useCompressed && state.replay.compressed) {
+    return {
+      events: state.replay.compressed.events,
+      timestamp: state.replay.compressed.timestamp,
+    };
+  }
+  return {
+    events: state.model?.events ?? [],
+    timestamp: state.replay.timestamp,
+  };
+}
+
 export default {
   namespaced: true,
   state: {
@@ -96,6 +127,14 @@ export default {
       timers: [],
       interval: null,
       speed: 1,
+      loop: true,
+      loopCount: 0,
+      loopMax: null as number | null,
+      useCompressed: false,
+      compressed: null as {
+        events: Array<{ mqttTimestamp: number; topic: string; payload: unknown }>;
+        timestamp: { begin: number; end: number; current: number };
+      } | null,
     },
     audioPlayers: [],
     isSavingScene: false,
@@ -113,6 +152,7 @@ export default {
       donationDetails: { amount: 0, date: "" },
     },
     reloadStreams: null,
+    meetingRefreshKey: 0,
     enabledLiveStreaming: true
   },
   getters: {
@@ -205,18 +245,33 @@ export default {
     reloadStreams(state) {
       return state.reloadStreams;
     },
+    meetingRefreshKey(state) {
+      return state.meetingRefreshKey;
+    },
     activeObject(state) {
       return state.board.objects.find((o) => o.id == state.activeMovable);
     },
     enabledLiveStreaming(stage) {
       return stage.enabledLiveStreaming
-    }
+    },
+    replayEffectiveEvents(state) {
+      return getEffectiveReplay(state).events;
+    },
+    replayEffectiveTimestamp(state) {
+      return getEffectiveReplay(state).timestamp;
+    },
+    replayUseCompressed(state) {
+      return state.replay.useCompressed;
+    },
   },
   mutations: {
     SET_MODEL(state, model) {
       state.model = model;
       if (model) {
         const media = model.assets;
+        // Collect assigned media identifiers for filtering objects
+        const assignedMediaFileLocations = new Set();
+        const assignedMediaSrcs = new Set();
         if (media && media.length) {
           media.forEach((item) => {
             if (item.assetType?.name === "video") {
@@ -232,6 +287,13 @@ export default {
             if (item.multi) {
               item.frames = item.frames.map((src) => absolutePath(src));
             }
+            // Track assigned media identifiers
+            if (item.fileLocation) {
+              assignedMediaFileLocations.add(item.fileLocation);
+            }
+            if (item.src) {
+              assignedMediaSrcs.add(item.src);
+            }
             const key = item.assetType?.name + "s";
             if (!state.tools[key]) {
               state.tools[key] = [];
@@ -241,12 +303,34 @@ export default {
         } else {
           state.preloading = false;
         }
+        // Filter out objects whose source media is no longer assigned
+        // Keep objects that don't have fileLocation or src (like drawings, texts) as they're not media-based
+        state.board.objects = state.board.objects.filter((object) => {
+          // If object doesn't have fileLocation or src, it's not media-based (e.g., drawing, text) - keep it
+          if (!object.fileLocation && !object.src) {
+            return true;
+          }
+          // If no media is assigned, remove all media-based objects
+          if (!media || !media.length) {
+            return false;
+          }
+          // If object has fileLocation, check if the media is still assigned
+          if (object.fileLocation && assignedMediaFileLocations.has(object.fileLocation)) {
+            return true;
+          }
+          // If object has src, check if the media is still assigned (matching by absolute path)
+          if (object.src && assignedMediaSrcs.has(object.src)) {
+            return true;
+          }
+          // Object's media is no longer assigned - remove it
+          return false;
+        });
         const config = useAttribute({ value: model }, "config", true).value;
         if (config) {
           Object.assign(state.config, config);
           state.config.ratio = config.ratio.width / config.ratio.height;
           state.backdropColor = config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
-          state.enabledLiveStreaming = typeof (config?.enabledLiveStreaming) ===  'boolean' ? config?.enabledLiveStreaming : true
+          state.enabledLiveStreaming = typeof (config?.enabledLiveStreaming) === 'boolean' ? config?.enabledLiveStreaming : true
         }
         const cover = useAttribute({ value: model }, "cover", false).value;
         state.model.cover = cover && absolutePath(cover);
@@ -259,6 +343,7 @@ export default {
       }
       state.status = "OFFLINE";
       state.replay.isReplaying = false;
+      state.sessions = [];
       state.background = null;
       state.curtain = null;
       state.backdropColor = "gray";
@@ -276,6 +361,35 @@ export default {
       state.chat.messages = [];
       state.chat.privateMessages = [];
       state.chat.color = randomColor();
+    },
+    /** Restore tools (avatars, props, audios, etc.) from model.assets after CLEAN_STAGE so replay loop/seek has assets. */
+    RESTORE_REPLAY_TOOLS(state, model) {
+      if (!model?.assets?.length) return;
+      state.tools.avatars = [];
+      state.tools.props = [];
+      state.tools.backdrops = [];
+      state.tools.streams = [];
+      state.tools.curtains = [];
+      state.tools.audios = [];
+      model.assets.forEach((item) => {
+        const key = item.assetType?.name + "s";
+        if (!state.tools[key]) state.tools[key] = [];
+        state.tools[key].push(item);
+      });
+    },
+    /** Restore config and settings from model after CLEAN_STAGE so replay loop/seek matches normal playback. */
+    RESTORE_REPLAY_CONFIG(state, model) {
+      if (!model) return;
+      if (model.config && typeof model.config === "object") {
+        state.config = { ...getDefaultStageConfig(), ...model.config };
+        if (model.config.ratio != null) {
+          const r = model.config.ratio;
+          state.config.ratio = typeof r === "number" ? r : (r?.width ?? 16) / (r?.height ?? 9);
+        }
+      }
+      if (model.settings && typeof model.settings === "object") {
+        state.settings = { ...getDefaultStageSettings(), ...model.settings };
+      }
     },
     SET_BACKGROUND(state, background) {
       if (background) {
@@ -506,15 +620,43 @@ export default {
         if (session.leaving) {
           return state.sessions.splice(index, 1);
         } else {
-          Object.assign(state.sessions[index], session);
+          // Preserve existing avatarId if not explicitly provided in update
+          // This handles cases where:
+          // 1. User is inactive but still holds avatar (preserve avatarId)
+          // 2. User explicitly releases avatar (avatarId: null clears it)
+          // 3. User switches avatar (avatarId: newId updates it)
+          const existingAvatarId = state.sessions[index].avatarId;
+          // Only update avatarId if explicitly provided in the session update
+          const shouldUpdateAvatarId = 'avatarId' in session;
+          // Create update object without avatarId if not provided
+          const updateData = { ...session };
+          if (!shouldUpdateAvatarId) {
+            delete updateData.avatarId;
+          }
+          Object.assign(state.sessions[index], updateData);
+          // Restore avatarId if it wasn't in the update
+          if (!shouldUpdateAvatarId) {
+            state.sessions[index].avatarId = existingAvatarId;
+          }
         }
       } else {
         state.sessions.push(session);
       }
-      state.sessions = state.sessions.filter(
-        (s) => moment().diff(moment(new Date(s.at)), "minute") < 60,
-      );
+      if (!state.replay.isReplaying) {
+        state.sessions = state.sessions.filter(
+          (s) => moment().diff(moment(new Date(s.at)), "minute") < 60,
+        );
+      }
       state.sessions.sort((a, b) => b.at - a.at);
+    },
+    UPDATE_SESSION_TIMESTAMP(state, sessionId) {
+      // Update session timestamp when participant is active (e.g., sending chat messages)
+      // This prevents active participants from being filtered out due to stale timestamps
+      const index = state.sessions.findIndex((s) => s.id === sessionId);
+      if (index > -1) {
+        state.sessions[index].at = +new Date();
+        state.sessions.sort((a, b) => b.at - a.at);
+      }
     },
     SET_CHAT_VISIBILITY(state, visible) {
       state.settings.chatVisibility = visible;
@@ -604,11 +746,19 @@ export default {
         state.board.whiteboard = [];
       }
       switch (message.type) {
-        case DRAW_ACTIONS.NEW_LINE:
-          state.board.whiteboard = state.board.whiteboard.concat(
-            message.command,
-          );
+        case DRAW_ACTIONS.NEW_LINE: {
+          const cmd = message.command ?? {};
+          if (cmd._sendId && state.board.whiteboard.some((c) => c._sendId === cmd._sendId)) {
+            break;
+          }
+          const commandWithColor = {
+            ...cmd,
+            color: typeof cmd.color === "string" ? cmd.color : "#000000",
+          };
+          const stored = JSON.parse(JSON.stringify(commandWithColor));
+          state.board.whiteboard = state.board.whiteboard.concat(stored);
           break;
+        }
         case DRAW_ACTIONS.UNDO:
           state.board.whiteboard = state.board.whiteboard.filter(
             (e, i) => i !== message.index,
@@ -683,10 +833,10 @@ export default {
     SET_PURCHASE_POPUP(state, purchase) {
       state.purchasePopup = purchase;
       if (purchase.isActive) {
-          state.receiptPopup.donationDetails = {
-            ...purchase,
-            date: new Date().toLocaleDateString(),
-          };
+        state.receiptPopup.donationDetails = {
+          ...purchase,
+          date: new Date().toLocaleDateString(),
+        };
       }
     },
     ADD_TRACK(state, track) {
@@ -694,6 +844,9 @@ export default {
     },
     RELOAD_STREAMS(state) {
       state.reloadStreams = new Date();
+    },
+    REFRESH_MEETING(state) {
+      state.meetingRefreshKey = (state.meetingRefreshKey || 0) + 1;
     },
     OPEN_RECEIPT_POPUP(state, { amount, date }) {
       state.receiptPopup.isActive = true;
@@ -710,7 +863,10 @@ export default {
       client.on("connect", () => {
         commit("SET_STATUS", "LIVE");
         dispatch("reloadMissingEvents");
-        dispatch("subscribe");
+        // Subscribe - errors are handled gracefully in the subscribe function
+        dispatch("subscribe").catch(() => {
+          // Errors are already handled in mqtt.subscribe - this is just to prevent unhandled promise rejection
+        });
         dispatch("joinStage");
       });
       client.on("error", () => {
@@ -742,10 +898,22 @@ export default {
       mqtt
         .subscribe(topics)
         .then((res) => {
-          commit("SET_SUBSCRIBE_STATUS", true);
-          console.log("Subscribed to topics: ", res);
+          // Only set status if we actually got a response (not empty array from error handling)
+          if (res && res.length > 0) {
+            commit("SET_SUBSCRIBE_STATUS", true);
+            console.log("Subscribed to topics: ", res);
+          }
+          // If res is empty array, it means subscribe was deferred due to disconnecting state
+          // MQTT library will automatically retry on reconnect, so we don't need to do anything
         })
-        .catch((error) => console.log(error));
+        .catch((error) => {
+          // Only log non-disconnecting errors
+          const errorMsg = error?.message || error?.toString() || "";
+          if (!errorMsg.includes("disconnecting") && !errorMsg.includes("client disconnecting")) {
+            console.warn("MQTT subscribe error:", error);
+          }
+          // For disconnecting errors, MQTT library will auto-retry on reconnect
+        });
     },
     async disconnect({ dispatch }) {
       await dispatch("leaveStage", true);
@@ -837,6 +1005,12 @@ export default {
       if (message.highlight) {
         commit("HIGHLIGHT_MESSAGE", message.highlight);
         return;
+      }
+
+      // Update session timestamp when a chat message is received
+      // This ensures active participants (who are chatting) don't disappear from the participant list
+      if (message.session) {
+        commit("UPDATE_SESSION_TIMESTAMP", message.session);
       }
 
       const model = {
@@ -940,12 +1114,16 @@ export default {
       };
       mqtt.sendMessage(TOPICS.BOARD, payload);
     },
-    switchFrame(action, object) {
-      const payload = {
-        type: BOARD_ACTIONS.SWITCH_FRAME,
-        object: serializeObject(object),
-      };
-      mqtt.sendMessage(TOPICS.BOARD, payload);
+    switchFrame({ commit }, object) {
+      if (object.liveAction) {
+        const payload = {
+          type: BOARD_ACTIONS.SWITCH_FRAME,
+          object: serializeObject(object),
+        };
+        mqtt.sendMessage(TOPICS.BOARD, payload);
+      } else {
+        commit("UPDATE_OBJECT", serializeObject(object));
+      }
     },
     sendToBack(action, object) {
       const payload = {
@@ -969,12 +1147,16 @@ export default {
       };
       mqtt.sendMessage(TOPICS.BOARD, payload);
     },
-    toggleAutoplayFrames(action, object) {
-      const payload = {
-        type: BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES,
-        object: serializeObject(object),
-      };
-      mqtt.sendMessage(TOPICS.BOARD, payload);
+    toggleAutoplayFrames({ commit }, object) {
+      if (object.liveAction) {
+        const payload = {
+          type: BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES,
+          object: serializeObject(object),
+        };
+        mqtt.sendMessage(TOPICS.BOARD, payload);
+      } else {
+        commit("UPDATE_OBJECT", serializeObject(object));
+      }
     },
     handleBoardMessage({ commit }, { message }) {
       switch (message.type) {
@@ -1159,6 +1341,8 @@ export default {
               current: events[0].mqttTimestamp,
               end: events[events.length - 1].mqttTimestamp,
             },
+            useCompressed: false,
+            compressed: null,
           });
         } else {
           (events || []).forEach((event) => dispatch("replayEvent", event));
@@ -1234,7 +1418,7 @@ export default {
       });
     },
     replicateEvent({ dispatch }, { topic, payload }) {
-      const message = payload;
+      const message = { ...payload };
       message.mute = true;
       dispatch("handleMessage", {
         topic: unnamespaceTopic(topic),
@@ -1244,23 +1428,46 @@ export default {
     async replayRecording({ state, dispatch, commit }, timestamp) {
       stopSpeaking();
       await dispatch("pauseReplay");
-      const current = timestamp
-        ? Number(timestamp)
-        : state.replay.timestamp.begin;
-      state.replay.timestamp.current = current;
+      const effective = getEffectiveReplay(state);
+      const ts = effective.timestamp;
+      const current = timestamp != null ? Number(timestamp) : ts.begin;
+      ts.current = current;
+      if (timestamp == null) {
+        state.replay.loopCount = 0;
+      }
       commit("CLEAN_STAGE");
+      if (state.model) {
+        commit("RESTORE_REPLAY_TOOLS", state.model);
+        commit("RESTORE_REPLAY_CONFIG", state.model);
+      }
+      const initialBackdrop =
+        state.model?.config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
+      commit("SET_BACKDROP_COLOR", initialBackdrop);
       state.replay.isReplaying = true;
-      const events = state.model.events;
+      const events = effective.events;
       const speed = state.replay.speed;
+      const loop = state.replay.loop;
+      const loopMax = state.replay.loopMax;
       state.replay.interval = setInterval(() => {
-        state.replay.timestamp.current += 1;
-        if (state.replay.timestamp.current > state.replay.timestamp.end) {
-          state.replay.timestamp.current = state.replay.timestamp.begin;
+        ts.current += 1;
+        if (ts.current > ts.end) {
+          const shouldLoop =
+            loop &&
+            (loopMax == null || state.replay.loopCount + 1 < loopMax);
+          if (shouldLoop) {
+            state.replay.loopCount += 1;
+            ts.current = ts.begin;
+            dispatch("replayRecording", ts.begin);
+            return;
+          }
+          ts.current = ts.begin;
           dispatch("pauseReplay");
         }
       }, 1000 / speed);
       events.forEach((event) => {
-        if (event.mqttTimestamp - current >= 0) {
+        if (event.mqttTimestamp <= current) {
+          dispatch("replicateEvent", event);
+        } else {
           const timer = setTimeout(
             () => {
               dispatch("replayEvent", event);
@@ -1268,8 +1475,6 @@ export default {
             ((event.mqttTimestamp - current) * 1000) / speed,
           );
           state.replay.timers.push(timer);
-        } else {
-          dispatch("replicateEvent", event);
         }
       });
     },
@@ -1278,25 +1483,30 @@ export default {
       state.replay.interval = null;
       state.replay.timers.forEach((timer) => clearTimeout(timer));
       state.replay.timers = [];
+      if (replayDrawRafId !== null) {
+        cancelAnimationFrame(replayDrawRafId);
+        replayDrawRafId = null;
+      }
+      replayDrawQueue = [];
       state.tools.audios.forEach((audio) => {
         audio.isPlaying = false;
         audio.changed = true;
       });
     },
     seekForwardReplay({ state, dispatch }) {
-      const current = state.replay.timestamp.current + 10000;
-      const nextEvent = state.model.events.find(
-        (e) => e.mqttTimestamp > current,
-      );
+      const { events, timestamp } = getEffectiveReplay(state);
+      const current = timestamp.current + 10000;
+      const nextEvent = events.find((e) => e.mqttTimestamp > current);
       if (nextEvent) {
         dispatch("replayRecording", nextEvent.mqttTimestamp);
       }
     },
     seekBackwardReplay({ state, dispatch }) {
-      const current = state.replay.timestamp.current - 10000;
+      const { events, timestamp } = getEffectiveReplay(state);
+      const current = timestamp.current - 10000;
       let event = null;
-      for (let i = state.model.events.length - 1; i >= 0; i--) {
-        event = state.model.events[i];
+      for (let i = events.length - 1; i >= 0; i--) {
+        event = events[i];
         if (event.mqttTimestamp < current) {
           break;
         }
@@ -1304,6 +1514,85 @@ export default {
       if (event) {
         dispatch("replayRecording", event.mqttTimestamp);
       }
+    },
+    seekToNextEventReplay({ state, dispatch }) {
+      const { events, timestamp } = getEffectiveReplay(state);
+      const current = timestamp.current;
+      const nextEvent = events.find((e) => e.mqttTimestamp > current);
+      if (nextEvent) {
+        dispatch("replayRecording", nextEvent.mqttTimestamp);
+      }
+    },
+    seekToPreviousEventReplay({ state, dispatch }) {
+      const { events, timestamp } = getEffectiveReplay(state);
+      const current = timestamp.current;
+      let event = null;
+      for (let i = events.length - 1; i >= 0; i--) {
+        event = events[i];
+        if (event.mqttTimestamp < current) {
+          break;
+        }
+      }
+      if (event) {
+        dispatch("replayRecording", event.mqttTimestamp);
+      }
+    },
+    setReplayTrim({ state, commit }, { begin, end }) {
+      const ts = state.replay.timestamp;
+      const events = state.model?.events ?? [];
+      const first = events[0]?.mqttTimestamp ?? ts.begin;
+      const last = events[events.length - 1]?.mqttTimestamp ?? ts.end;
+      let newBegin = begin != null ? Number(begin) : first;
+      let newEnd = end != null ? Number(end) : last;
+      newBegin = Math.max(first, Math.min(newBegin, last));
+      newEnd = Math.min(last, Math.max(newEnd, first));
+      if (newBegin > newEnd) {
+        [newBegin, newEnd] = [newEnd, newBegin];
+      }
+      const clampedCurrent = Math.min(
+        Math.max(ts.current, newBegin),
+        newEnd,
+      );
+      commit("SET_REPLAY", {
+        timestamp: {
+          ...ts,
+          begin: newBegin,
+          end: newEnd,
+          current: clampedCurrent,
+        },
+      });
+    },
+    computeCompressedReplay({ state, dispatch }, payload) {
+      const rawEvents = state.model?.events ?? [];
+      const ts = state.replay.timestamp;
+      const idleTimeSeconds =
+        typeof payload === "object" && payload != null && "idleTimeSeconds" in payload
+          ? Number(payload.idleTimeSeconds)
+          : Number(payload);
+      const result = computeCompressedEventsUtil(
+        rawEvents,
+        ts.begin,
+        ts.end,
+        idleTimeSeconds,
+      );
+      if (!result) return;
+      state.replay.compressed = {
+        events: result.events,
+        timestamp: {
+          ...result.timestamp,
+          current: 0,
+        },
+      };
+      state.replay.useCompressed = true;
+      dispatch("pauseReplay");
+      dispatch("replayRecording", 0);
+    },
+    clearCompressedReplay({ state, dispatch }) {
+      state.replay.useCompressed = false;
+      state.replay.compressed = null;
+      dispatch("pauseReplay");
+      const ts = state.replay.timestamp;
+      dispatch("replayRecording", ts.begin);
     },
     handleCounterMessage({ commit, state }, { message }) {
       commit("UPDATE_SESSIONS_COUNTER", message);
@@ -1393,8 +1682,18 @@ export default {
         commit("SET_ACTIVE_MOVABLE", id);
       }
     },
-    handleDrawMessage({ commit }, { message }) {
-      commit("UPDATE_WHITEBOARD", message);
+    handleDrawMessage({ commit, state }, { message }) {
+      if (
+        state.replay.isReplaying &&
+        state.replay.speed >= 4
+      ) {
+        replayDrawQueue.push({ message, commit });
+        if (replayDrawRafId === null) {
+          replayDrawRafId = requestAnimationFrame(flushReplayDrawQueue);
+        }
+      } else {
+        commit("UPDATE_WHITEBOARD", message);
+      }
     },
     sendDrawWhiteboard(action, command) {
       mqtt.sendMessage(TOPICS.DRAW, { type: DRAW_ACTIONS.NEW_LINE, command });
@@ -1426,6 +1725,9 @@ export default {
     },
     reloadStreams({ commit }) {
       commit("RELOAD_STREAMS");
+    },
+    refreshMeeting({ commit }) {
+      commit("REFRESH_MEETING");
     },
   },
 };

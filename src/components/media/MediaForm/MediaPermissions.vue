@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import { message, Modal } from "ant-design-vue";
 import { SelectValue } from "ant-design-vue/lib/select";
 import { TransferItem } from "ant-design-vue/lib/transfer";
@@ -56,8 +56,8 @@ const { result, loading } = useQuery<StudioGraph>(
       }
     }
   `,
-  null,
-  { fetchPolicy: "cache-only" },
+  {},
+  { fetchPolicy: "cache-only" } as any,
 );
 
 const filterOption = (keyword: string, option: any) => {

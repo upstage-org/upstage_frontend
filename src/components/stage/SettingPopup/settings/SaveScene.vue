@@ -55,7 +55,7 @@ export default {
           store.commit("stage/SET_SAVING_SCENE", false);
         }
       } else {
-        message.error("Scene name is required!");
+        message.error("Scene name is required.");
       }
     };
 

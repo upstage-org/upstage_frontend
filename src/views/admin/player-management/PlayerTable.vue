@@ -16,7 +16,7 @@ import Confirm from "components/Confirm.vue";
 import { useUpdateUser } from "hooks/mutations";
 import { useAsyncState } from "@vueuse/core";
 import { computed, ComputedRef } from "vue";
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 import configs from "config";
 import { useRouter } from "vue-router";
@@ -46,7 +46,7 @@ export default {
     `);
     const params = computed(() => ({
       ...tableParams,
-      ...inquiryResult.value.inquiry,
+      ...(inquiryResult.value as any)?.inquiry || {},
     }));
 
     const { result, loading, fetchMore, refetch } = useQuery(
@@ -79,14 +79,14 @@ export default {
                 uploadLimit
                 intro
                 canSendEmail
-                lastLogin
+                latestActivity
                 roleName
               }
             }
           }
         `,
       params,
-      { notifyOnNetworkStatusChange: true },
+      { notifyOnNetworkStatusChange: true } as any,
     );
 
     watch(params, () => {
@@ -166,9 +166,9 @@ export default {
         },
       },
       {
-        title: t("last_login"),
-        dataIndex: "lastLogin",
-        key: "last_login",
+        title: t("latest_activity"),
+        dataIndex: "latestActivity",
+        key: "latest_activity",
         sorter: {
           multiple: 4,
         },
@@ -310,14 +310,14 @@ export default {
             class: "w-full overflow-auto",
             rowKey: "id",
             columns: columns.value,
-            dataSource: result.value?.adminPlayers?.edges || [],
+            dataSource: (result.value as any)?.adminPlayers?.edges || [],
             loading: loading.value,
             onChange: handleTableChange,
             pagination: {
               showQuickJumper: true,
               showSizeChanger: true,
-              total: result.value?.adminPlayers
-                ? result.value.adminPlayers.totalCount
+              total: (result.value as any)?.adminPlayers
+                ? (result.value as any).adminPlayers.totalCount
                 : 0,
             } as Pagination,
           }),

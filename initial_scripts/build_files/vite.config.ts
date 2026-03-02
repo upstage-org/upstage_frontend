@@ -29,4 +29,69 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // Suppress warnings about /*#__PURE__*/ comments in third-party dependencies
+        // These are harmless and come from packages like @daybrush/utils and react-compat-moveable
+        // The warning message contains "contains an annotation that Rollup cannot interpret"
+        if (
+          warning.code === 'MODULE_LEVEL_DIRECTIVE' ||
+          (warning.message && (
+            warning.message.includes('/*#__PURE__*/') ||
+            warning.message.includes('contains an annotation that Rollup cannot interpret')
+          ))
+        ) {
+          return;
+        }
+        // Use default warning handler for other warnings
+        warn(warning);
+      },
+      output: {
+        manualChunks(id) {
+          // Simplified chunking strategy to avoid initialization order issues
+          // Group by dependency relationships, not by library type
+          if (id.includes('node_modules')) {
+            // Group 1: Vue and ALL Vue-dependent libraries (critical - must be together)
+            // This includes Vue core, Vue ecosystem, Vue plugins, and Vue UI libraries
+            if (id.includes('vue') || 
+                id.includes('@vue') || 
+                id.includes('vue-router') || 
+                id.includes('vuex') ||
+                id.includes('vue-i18n') ||
+                id.includes('ant-design-vue') ||
+                id.includes('@ant-design') ||
+                id.includes('@vueuse') ||
+                id.includes('@vue/apollo') ||
+                id.includes('vue-slicksort') ||
+                id.includes('vue-stripe') ||
+                id.includes('vue-turnstile') ||
+                id.includes('vue-masonry') ||
+                id.includes('unplugin-vue') ||
+                id.includes('vue-demi') ||
+                id.includes('@tiptap/vue')) {
+              return 'vue-core';
+            }
+            
+            // Group 2: GraphQL and Apollo (keep together as they have internal dependencies)
+            if (id.includes('@apollo') || 
+                id.includes('graphql') || 
+                id.includes('apollo-client')) {
+              return 'graphql-vendor';
+            }
+            
+            // Group 3: TipTap editor (non-Vue parts only)
+            if (id.includes('@tiptap') && !id.includes('@tiptap/vue')) {
+              return 'tiptap-vendor';
+            }
+            
+            // Group 4: Everything else goes to vendor
+            // This ensures no circular dependencies between vendor and vue-core
+            return 'vendor';
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 3000, // Increased to 3MB since major dependencies are already split into separate vendor chunks
+  },
 });

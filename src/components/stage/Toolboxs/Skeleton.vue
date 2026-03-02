@@ -77,6 +77,16 @@ export default {
           nodrop: props.nodrop,
         }),
       );
+      // Use an explicit drag image so the ghost shows only this thumbnail, not
+      // a mistaken capture of stage content or the whole viewport.
+      const dt = e.dataTransfer;
+      if (dt.setDragImage) {
+        const el = e.currentTarget;
+        const rect = el.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+        dt.setDragImage(el, offsetX, offsetY);
+      }
       document.getElementById("meeting-room")?.classList.add("disable-pointer");
       emit("dragstart", e);
     };

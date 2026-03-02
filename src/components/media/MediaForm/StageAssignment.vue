@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 import { ref, computed, watchEffect, PropType } from "vue";
 import { StudioGraph } from "models/studio";
@@ -26,12 +26,12 @@ const { result, loading } = useQuery(
       }
   }
   `,
-  null,
-  { fetchPolicy: "cache-and-network" },
+  {},
+  { fetchPolicy: "cache-and-network" } as any,
 );
 const stages = computed(() => {
-  if (result.value?.getAllStages) {
-    return result.value.getAllStages.filter((el: any) => isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
+  if ((result.value as any)?.getAllStages) {
+    return (result.value as any).getAllStages.filter((el: any) => isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
       .map(({ id, name }: any) => ({ key: id, name }));
   }
   return [];

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { useMutation } from "@vue/apollo-composable";
+import { useMutation } from "@vue3-apollo/core";
 import configs from "config";
 import gql from "graphql-tag";
 import { Auth } from "models/config";

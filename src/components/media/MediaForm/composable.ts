@@ -1,8 +1,12 @@
-import { useMutation } from "@vue/apollo-composable";
+import { useMutation } from "@vue3-apollo/core";
 import { message } from "ant-design-vue";
 import gql from "graphql-tag";
 import { ref, computed } from "vue";
 import { permissionFragment } from "models/fragment";
+import {
+  MEDIA_FORM_OPTIONS_QUERY,
+  MEDIA_FILTER_QUERY,
+} from "services/graphql/media";
 import {
   AvatarVoice,
   CopyrightLevel,
@@ -24,8 +28,8 @@ interface SaveMediaMutationVariables {
   mediaType: string;
   copyrightLevel: CopyrightLevel;
   owner: string;
-  stageIds: string[];
-  userIds: string[];
+  stageIds: number[];
+  userIds: number[];
   tags: string[];
   w: number;
   h: number;
@@ -63,15 +67,21 @@ export const useSaveMedia = (
   const { mutate } = useMutation<
     { saveMedia: { asset: Media } },
     { input: SaveMediaMutationVariables }
-  >(gql`
-    mutation SaveMedia($input: SaveMediaInput!) {
-      saveMedia(input: $input) {
-        asset {
-          id
+  >(
+    gql`
+      mutation SaveMedia($input: SaveMediaInput!) {
+        saveMedia(input: $input) {
+          asset {
+            id
+          }
         }
       }
+    `,
+    {
+      refetchQueries: [MEDIA_FORM_OPTIONS_QUERY, MEDIA_FILTER_QUERY],
+      awaitRefetchQueries: true,
     }
-  `);
+  );
   const progress = ref(100);
 
   const saveMedia = async () => {
@@ -101,6 +111,25 @@ export const useSaveMedia = (
       payload.media.urls = payload.files
         .filter((file) => file.status !== "local")
         .map((file) => file.url!);
+
+      // DEBUG: Check files and urls
+      console.log('[SaveMedia] Files:', payload.files.map(f => ({ name: f.file?.name, status: f.status, url: f.url })));
+      console.log('[SaveMedia] URLs:', payload.media.urls);
+
+      // Validation: Check if urls is empty
+      if (payload.media.urls.length === 0 && payload.files.length > 0) {
+        const allLocal = payload.files.every(f => f.status === "local");
+        if (allLocal) {
+          message.error("No files were uploaded successfully. Please try uploading again.");
+          return;
+        }
+      }
+
+      // Backend expects non-nullable Float for w/h; older media can yield null/NaN (e.g. missing or bad dimensions)
+      const w = Number(payload.media.w);
+      const h = Number(payload.media.h);
+      payload.media.w = Number.isFinite(w) ? w : 100;
+      payload.media.h = Number.isFinite(h) ? h : 100;
       const result = await mutate({ input: payload.media });
       const mediaId = result?.data?.saveMedia.asset.id;
       if (mediaId) {

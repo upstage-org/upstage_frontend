@@ -1,7 +1,12 @@
 <template>
-    <div v-if="objects.find(el => el.type == 'jitsi')" id="reload-stream">
-        <a-tooltip title="Refresh streams">
-            <button class="button is-small refresh-icon clickable" @mousedown="onReload">
+    <div v-if="hasMeetingOrJitsi" id="reload-stream">
+        <a-tooltip v-if="hasMeeting" :title="$t('refresh_meeting_tooltip')">
+            <button class="button is-small refresh-icon clickable" @mousedown="onRefreshMeeting" :aria-label="$t('refresh_meeting')">
+                <i class="fas fa-video" title="Refresh meeting"></i>
+            </button>
+        </a-tooltip>
+        <a-tooltip v-if="hasJitsi" title="Refresh streams">
+            <button class="button is-small refresh-icon clickable" @mousedown="onReload" aria-label="Refresh streams">
                 <i class="fas fa-sync"></i>
             </button>
         </a-tooltip>
@@ -17,10 +22,18 @@ export default {
     setup: () => {
         const store = useStore();
         const objects = computed(() => store.getters["stage/objects"]);
+        const hasMeeting = computed(() => objects.value.some((el) => el.type === "meeting"));
+        const hasJitsi = computed(() => objects.value.some((el) => el.type === "jitsi"));
+        const hasMeetingOrJitsi = computed(() => hasMeeting.value || hasJitsi.value);
         const onReload = () => store.dispatch("stage/reloadStreams");
+        const onRefreshMeeting = () => store.dispatch("stage/refreshMeeting");
         return {
             objects,
-            onReload
+            hasMeeting,
+            hasJitsi,
+            hasMeetingOrJitsi,
+            onReload,
+            onRefreshMeeting,
         };
     },
 };

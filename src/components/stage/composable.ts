@@ -74,14 +74,22 @@ export const useClearStage = (stageUrl, color) => {
   const clearStage = async () => {
     await new Promise((resolve) => {
       mqttClient.connect().on("connect", () => {
+        const topic = namespaceTopic(TOPICS.BACKGROUND, stageUrl);
         mqttClient
           .sendMessage(
-            namespaceTopic(TOPICS.BACKGROUND, stageUrl),
+            topic,
             {
               type: BACKGROUND_ACTIONS.SET_BACKDROP_COLOR,
               color: color || COLORS.DEFAULT_BACKDROP,
             },
             true
+          )
+          .then(() =>
+            mqttClient.sendMessage(
+              topic,
+              { type: BACKGROUND_ACTIONS.BLANK_SCENE },
+              true
+            )
           )
           .then(resolve);
       });

@@ -27,7 +27,7 @@ import { absolutePath } from "utils/common";
 import Entry from "components/stage/Entry.vue";
 import MasonryWall from "@yeger/vue-masonry-wall";
 import { stageGraph } from "services/graphql";
-import { useQuery } from "@vue/apollo-composable";
+import { useQuery } from "@vue3-apollo/core";
 import gql from "graphql-tag";
 
 export default {

@@ -50,7 +50,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits, computed, watch } from "vue";
+import { defineProps, defineEmits, computed } from "vue";
 import Icon from "components/Icon.vue";
 import Asset from "components/Asset.vue";
 
@@ -61,6 +61,7 @@ const props = defineProps({
   },
 });
 
+const emit = defineEmits(["update:modelValue"]);
 
 const types = computed(() => [
   ...new Set(props.modelValue.map((media) => media.assetType)),
@@ -85,28 +86,25 @@ const dragend = (e) => {
 };
 
 const dragover = (e) => {
-  e.target.classList.add("dropzone");
+  e.currentTarget.classList.add("dropzone");
 };
 
 const dragleave = (e) => {
-  e.target.classList.remove("dropzone");
+  e.currentTarget.classList.remove("dropzone");
 };
 
 const drop = (e) => {
-  e.target.classList.remove("dropzone");
+  const dropTarget = e.currentTarget;
+  dropTarget.classList.remove("dropzone");
   const fromId = e.dataTransfer.getData("text/plain");
-  const toId = e.target.id;
+  const toId = dropTarget.id;
   const fromIndex = props.modelValue.findIndex((t) => t.id === fromId);
   const toIndex = props.modelValue.findIndex((t) => t.id === toId);
   if (fromIndex > -1 && toIndex > -1) {
-    const media = props.modelValue.splice(fromIndex, 1)[0];
-    emit(
-      "update:modelValue",
-      props.modelValue
-        .slice(0, toIndex)
-        .concat(media)
-        .concat(props.modelValue.slice(toIndex)),
-    );
+    const copy = [...props.modelValue];
+    const [media] = copy.splice(fromIndex, 1);
+    copy.splice(toIndex, 0, media);
+    emit("update:modelValue", copy);
   }
 };
 </script>

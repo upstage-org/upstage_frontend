@@ -10,6 +10,111 @@
     <SweepStage :archive="true">{{ $t("archive_performance") }}</SweepStage>
   </div>
 
+  <div class="card mb-4 archive-compress-card">
+    <header class="card-header">
+      <p class="card-header-title">{{ $t("replay_auto_compress") }}</p>
+    </header>
+    <div class="card-content">
+      <p class="mb-3">{{ $t("replay_auto_compress_desc") }}</p>
+      <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-3 mb-2">
+        <label class="label mb-0">{{ $t("archive_select_performance") }}</label>
+        <select
+          class="select"
+          v-model="selectedArchiveId"
+          @change="onSelectArchive"
+        >
+          <option :value="null">{{ $t("archive_select_placeholder") }}</option>
+          <option
+            v-for="s in sessions"
+            :key="s.id"
+            :value="s.id"
+          >
+            {{ s.name || `#${s.id}` }} ({{ date(s.begin) }} – {{ date(s.end) }})
+          </option>
+        </select>
+      </div>
+      <div v-if="selectedArchiveId" class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-3 mb-3">
+        <label class="label mb-0">{{ $t("archive_compress_gap_label") }}</label>
+        <input
+          type="number"
+          class="input archive-compress-input"
+          min="0"
+          max="999"
+          placeholder="0"
+          v-model.number="idleTimeMinutes"
+        />
+        <span class="archive-compress-unit">{{ $t("archive_compress_minutes") }}</span>
+        <input
+          type="number"
+          class="input archive-compress-input"
+          min="0"
+          max="59"
+          placeholder="0"
+          v-model.number="idleTimeSeconds"
+        />
+        <span class="archive-compress-unit">{{ $t("archive_compress_seconds") }}</span>
+        <button
+          class="button is-info"
+          :disabled="!archiveEvents.length"
+          @click="applyCompressPreview"
+        >
+          {{ $t("replay_auto_compress_apply") }}
+        </button>
+      </div>
+      <template v-if="selectedArchive && (archiveEvents.length || loadingEvents)">
+        <div v-if="loadingEvents" class="mb-3">{{ $t("loading") }}…</div>
+        <template v-else>
+          <div class="mb-2">
+            <span class="tag is-light">{{ $t("archive_timeline_full") }}</span>
+            <TimelineStrip
+              v-if="archiveEvents.length"
+              class="mt-1"
+              :events="archiveEvents"
+              :begin="archiveBegin"
+              :end="archiveEnd"
+            />
+          </div>
+          <div v-if="compressedResult" class="mb-3">
+            <span class="tag is-light">{{ $t("archive_timeline_compressed") }}</span>
+            <TimelineStrip
+              class="mt-1"
+              :events="compressedResult.events"
+              :begin="compressedResult.timestamp.begin"
+              :end="compressedResult.timestamp.end"
+            />
+          </div>
+          <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-2 mb-3">
+            <a
+              :href="replayUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              :class="['button', 'is-small', compressedResult ? 'is-primary' : 'is-light']"
+            >
+              {{ compressedResult ? $t("archive_open_replay_compressed") : $t("archive_open_replay") }}
+            </a>
+          </div>
+          <div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-2 mb-2">
+            <label class="label mb-0">{{ $t("archive_save_name") }}</label>
+            <input
+              type="text"
+              class="input"
+              style="min-width: 200px"
+              v-model="saveName"
+              :placeholder="selectedArchive?.name"
+            />
+            <button
+              class="button is-primary"
+              :disabled="savingArchive || !archiveEvents.length"
+              @click="saveArchiveName"
+            >
+              {{ $t("save") }}
+            </button>
+          </div>
+        </template>
+      </template>
+    </div>
+  </div>
+
   <DataTable :data="sessions" :headers="headers">
     <template #name="{ item }">
       <div v-if="item.name">
@@ -64,7 +169,10 @@
       </button>
     </template>
     <template #replay="{ item }">
-      <router-link :to="`/replay/${stage.fileLocation}/${item.id}`"
+      <router-link
+        :to="`/replay/${stage.fileLocation}/${item.id}`"
+        target="_blank"
+        rel="noopener noreferrer"
         :class="`button ${item.recording ? 'is-primary' : 'is-dark'}`">
         <i class="fas fa-video"></i>
       </router-link>
@@ -111,11 +219,15 @@ import CustomConfirm from "components/CustomConfirm.vue";
 import Field from "components/form/Field.vue";
 import ClearChat from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
-import { computed, inject } from "vue";
+import TimelineStrip from "components/replay/TimelineStrip.vue";
+import { computeCompressedEvents } from "utils/replayCompress";
+import { computed, inject, ref, watch } from "vue";
 import moment from "moment";
 import humanizeDuration from "humanize-duration";
+import { message } from "ant-design-vue";
 import { useMutation } from "services/graphql/composable";
 import { stageGraph } from "services/graphql";
+import configs from "config";
 
 export default {
   components: {
@@ -127,13 +239,181 @@ export default {
     Icon,
     CustomConfirm,
     Field,
+    TimelineStrip,
   },
   setup: () => {
     const stage = inject("stage");
     const refresh = inject("refresh");
+    const selectedArchiveId = ref(null);
+    const idleTimeMinutes = ref(5);
+    const idleTimeSeconds = ref(0);
+    const totalIdleTimeSeconds = computed(
+      () => (idleTimeMinutes.value || 0) * 60 + (idleTimeSeconds.value || 0)
+    );
+    const archiveEvents = ref([]);
+    const archiveBegin = ref(0);
+    const archiveEnd = ref(0);
+    const loadingEvents = ref(false);
+    const compressedResult = ref(null);
+    const saveName = ref("");
+    const savingArchive = ref(false);
+
+    const selectedArchive = computed(() =>
+      stage.value && selectedArchiveId.value
+        ? sessions.value.find((s) => s.id === selectedArchiveId.value)
+        : null
+    );
+    const sessions = computed(() => {
+      if (!stage.value) return [];
+      const { performances, chats } = stage.value;
+      const list = (performances || []).map((p) => {
+        const messages = chats
+          .filter((c) => c.performanceId === p.id)
+          .map((c) => c.payload);
+        const filtered = messages.filter((m) => !m.clear);
+        let begin = null;
+        let end = null;
+        let durationFromChat = 0;
+        let chatless = true;
+        if (filtered.length) {
+          chatless = false;
+          for (const m of filtered) {
+            if (m.at) {
+              if (begin == null) begin = m.at;
+              end = m.at;
+              durationFromChat = end - begin;
+            }
+          }
+        }
+        const privateMessages = messages.filter(
+          (m) => m.isPrivate || m.clearPlayerChat
+        );
+        const publicMessages = messages.filter(
+          (m) => !m.isPrivate && !m.clearPlayerChat
+        );
+        const duration =
+          p.duration != null && p.duration !== undefined
+            ? Number(p.duration)
+            : durationFromChat;
+        return {
+          ...p,
+          messages,
+          begin,
+          end,
+          duration,
+          chatless,
+          privateMessages,
+          publicMessages,
+        };
+      });
+      list.sort((a, b) => b.id - a.id);
+      return list;
+    });
+    const replayUrl = computed(() => {
+      if (!stage.value || !selectedArchiveId.value) return "#";
+      const base = `${configs.UPSTAGE_URL || ""}/replay/${stage.value.fileLocation}/${selectedArchiveId.value}`;
+      if (!compressedResult.value) return base;
+      const compress = totalIdleTimeSeconds.value;
+      return compress >= 0 ? base + "?compress=" + compress : base;
+    });
+
+    async function onSelectArchive() {
+      compressedResult.value = null;
+      if (!selectedArchiveId.value || !stage.value) {
+        archiveEvents.value = [];
+        return;
+      }
+      loadingEvents.value = true;
+      try {
+        const { stage: loaded } = await stageGraph.loadStage(
+          stage.value.fileLocation,
+          selectedArchiveId.value
+        );
+        const events = loaded?.events ?? [];
+        archiveEvents.value = events;
+        if (events.length) {
+          archiveBegin.value = events[0].mqttTimestamp;
+          archiveEnd.value = events[events.length - 1].mqttTimestamp;
+        } else {
+          archiveBegin.value = 0;
+          archiveEnd.value = 0;
+        }
+        const sel = sessions.value.find((s) => s.id === selectedArchiveId.value);
+        saveName.value = sel?.name ?? "";
+      } finally {
+        loadingEvents.value = false;
+      }
+    }
+    function applyCompressPreview() {
+      if (!archiveEvents.value.length) return;
+      const result = computeCompressedEvents(
+        archiveEvents.value,
+        archiveBegin.value,
+        archiveEnd.value,
+        totalIdleTimeSeconds.value
+      );
+      compressedResult.value = result;
+    }
+    async function saveArchiveName() {
+      const item = selectedArchive.value;
+      if (!item || savingArchive.value) return;
+      const name = (saveName.value || item.name || "").trim();
+      if (!name) return;
+      const eventsToSave = compressedResult.value
+        ? compressedResult.value.events
+        : archiveEvents.value;
+      if (!eventsToSave.length) {
+        message.error("No events to save.");
+        return;
+      }
+      const events = eventsToSave.map((e) => ({
+        topic: e.topic,
+        mqttTimestamp: e.mqttTimestamp,
+        payload: e.payload ?? {},
+      }));
+      savingArchive.value = true;
+      try {
+        const existingName = (item.name || "").trim();
+        const isSameName = name === existingName;
+        if (isSameName) {
+          await stageGraph.savePerformance({
+            performanceId: item.id,
+            name,
+            description: item.description ?? undefined,
+            events,
+          });
+        } else {
+          const stageId = stage.value?.id != null ? Number(stage.value.id) : null;
+          if (stageId == null) {
+            message.error("Stage not found.");
+            return;
+          }
+          await stageGraph.createPerformanceWithEvents({
+            stageId,
+            name,
+            description: item.description ?? undefined,
+            events,
+          });
+        }
+        message.success("Archive saved.");
+        compressedResult.value = null;
+        selectedArchiveId.value = null;
+        saveName.value = "";
+        if (refresh) refresh(stage.value.id);
+      } catch (err) {
+        message.error(err?.message ?? err ?? "Failed to save.");
+      } finally {
+        savingArchive.value = false;
+      }
+    }
+
+    watch(selectedArchiveId, () => onSelectArchive());
 
     const date = (value) => {
       return value ? moment(value).format("YYYY-MM-DD") : "Now";
+    };
+    const dateTimeUtc = (value) => {
+      return value ? moment.utc(value).format("YYYY-MM-DD HH:mm") + " UTC" : "";
     };
 
     const headers = [
@@ -167,56 +447,14 @@ export default {
       },
       {
         title: "Archived On",
-        key: "createdOn",
-        type: "date",
+        render: (item) => dateTimeUtc(item.createdOn),
+        align: "center",
       },
       {
         title: "",
         slot: "actions",
       },
     ];
-    const sessions = computed(() => {
-      const res = [];
-      if (stage.value) {
-        const { performances, chats } = stage.value;
-        (performances || []).forEach((p) => {
-          p.messages = chats
-            .filter((c) => c.performanceId === p.id)
-            .map((c) => c.payload);
-          res.push(p);
-        });
-      }
-      res.sort((a, b) => b.id - a.id);
-      res.forEach((session) => {
-        const messages = session.messages.filter((m) => !m.clear);
-        if (messages.length) {
-          session.begin = null
-          for (const m of messages) {
-            if (m.at) {
-              if (!session.begin) {
-                session.begin = m.at
-              }
-              session.end = m.at
-              session.duration = m.at - session.begin;
-            }
-
-
-          }
-        } else {
-          session.chatless = true;
-          session.duration = 0;
-        }
-      });
-      res.forEach((session) => {
-        session.privateMessages = session.messages.filter(
-          (m) => m.isPrivate || m.clearPlayerChat,
-        );
-        session.publicMessages = session.messages.filter(
-          (m) => !m.isPrivate && !m.clearPlayerChat,
-        );
-      });
-      return res;
-    });
 
     let textFile;
 
@@ -352,14 +590,23 @@ export default {
       complete();
     };
 
-    const { loading: deleting, save: deleteMutation } = useMutation(
-      stageGraph.deletePerformance,
-    );
+    const deleting = ref(false);
     const deletePerformance = async (item, complete) => {
-      await deleteMutation("Performance deleted successfully!", item.id);
-      complete();
-      if (refresh) {
-        refresh(stage.value.id);
+      const id = item.id != null ? Number(item.id) : null;
+      if (id == null) {
+        message.error("Invalid performance.");
+        return;
+      }
+      deleting.value = true;
+      try {
+        await stageGraph.deletePerformance(id);
+        message.success("Performance deleted successfully!");
+        complete();
+        if (refresh) refresh(stage.value.id);
+      } catch (err) {
+        message.error(err?.message ?? err ?? "Failed to delete performance.");
+      } finally {
+        deleting.value = false;
       }
     };
 
@@ -373,6 +620,22 @@ export default {
       updating,
       deletePerformance,
       deleting,
+      selectedArchiveId,
+      idleTimeMinutes,
+      idleTimeSeconds,
+      totalIdleTimeSeconds,
+      archiveEvents,
+      archiveBegin,
+      archiveEnd,
+      loadingEvents,
+      compressedResult,
+      saveName,
+      savingArchive,
+      selectedArchive,
+      replayUrl,
+      onSelectArchive,
+      applyCompressPreview,
+      saveArchiveName,
     };
   },
 };
@@ -381,5 +644,13 @@ export default {
 <style scoped>
 .button.is-light>img {
   max-width: unset;
+}
+.archive-compress-input {
+  width: 4rem;
+}
+.archive-compress-unit {
+  font-size: 0.9rem;
+  color: #4a4a4a;
+  margin-right: 0.25rem;
 }
 </style>

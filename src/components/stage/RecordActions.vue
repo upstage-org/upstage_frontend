@@ -1,6 +1,10 @@
 <template>
   <div v-if="saved">
-    <router-link :to="`/replay/${stage.fileLocation}/${saved.id}`" class="button is-small is-light is-success">
+    <router-link
+      :to="`/replay/${stage.fileLocation}/${saved.id}`"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="button is-small is-light is-success">
       <span class="icon is-small">
         <i class="fas fa-play"></i>
       </span>

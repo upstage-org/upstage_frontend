@@ -4,7 +4,7 @@
     :style="{
       position: 'absolute',
       opacity: object.opacity * (isDragging ? 0.5 : 1),
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
+      filter: `grayscale(${object.liveAction || object.drawingId ? 0 : 1})`,
       'transform-origin': transformOrigin,
     }"
     @mousedown="clickInside"
@@ -22,7 +22,7 @@
       height: object.h + 'px',
       transform: `rotate(${object.rotate}deg)`,
       opacity: object.opacity,
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
+      filter: `grayscale(${object.liveAction || object.drawingId ? 0 : 1})`,
     }"
   >
     <slot />
@@ -178,6 +178,16 @@ export default {
       if (props.controlable && canPlay.value) {
         showControls(true, e);
         store.commit("stage/SET_ACTIVE_MOVABLE", props.object.id);
+        // When clicking an avatar, also "hold" it so teardrop, lightbulb, and context
+        // menu work. This restores the expected behavior when selecting from the depth
+        // bar (green frame) then clicking the avatar on stage.
+        const holdable =
+          props.object.type === "avatar" &&
+          (!props.object.holder ||
+            props.object.holder.id === store.state.stage.session);
+        if (holdable) {
+          store.dispatch("user/setAvatarId", props.object.id, { root: true });
+        }
       }
     };
 
@@ -201,6 +211,11 @@ export default {
     watch(
       () => props.object,
       () => {
+        // Check if element exists before animating
+        if (!el.value || !(el.value instanceof HTMLElement)) {
+          return;
+        }
+        
         const {
           x: left,
           y: top,
@@ -215,25 +230,30 @@ export default {
         if (animation) {
           animation.pause(true);
         }
-        animation = animate(el.value, {
-          left,
-          top,
-          width,
-          height,
-          rotate,
-          opacity,
-          scaleX,
-          scaleY,
-          ...(moveSpeed > 1000 ? { easing: "linear" } : {}),
-          duration: moveSpeed ?? config.animateDuration,
-          onUpdate: () => {
-            try {
-              moveable.updateRect();
-            } catch (error) {
-              // pass
-            }
-          },
-        });
+        try {
+          animation = animate(el.value, {
+            left,
+            top,
+            width,
+            height,
+            rotate,
+            opacity,
+            scaleX,
+            scaleY,
+            ...(moveSpeed > 1000 ? { easing: "linear" } : {}),
+            duration: moveSpeed ?? config.animateDuration,
+            onUpdate: () => {
+              try {
+                moveable.updateRect();
+              } catch (error) {
+                // pass
+              }
+            },
+          });
+        } catch (error) {
+          // Silently handle animation errors if element is not accessible
+          console.debug("Animation skipped:", error);
+        }
       },
       { deep: true },
     );

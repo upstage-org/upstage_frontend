@@ -186,7 +186,6 @@ export default {
     };
     return {
       el,
-      print,
       active,
       beforeDragPosition,
       deleteObject,

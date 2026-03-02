@@ -27,7 +27,7 @@
           <button class="chat-setting button is-rounded is-outlined" @click="collapsed = !collapsed" :key="collapsed">
             <span class="icon">
               <Icon v-if="collapsed" src="maximise.svg" size="20" />
-              <Icon v-else src="minimise.svg" size="24" class="mt-4" />
+              <Icon v-else src="minimise.svg" size="24" />
             </span>
           </button>
         </a-tooltip>
@@ -49,12 +49,12 @@
             <Reaction :custom-emoji="true" />
             <div class="font-size-controls">
               <a-tooltip title="Increase font size">
-                <button class="button is-small is-rounded mx-1" @click="increateFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
+                <button class="button is-small is-rounded mx-1" @click="increateFontSize()" style="width: 24px; height:24px; padding:0px; display: flex; align-items: center; justify-content: center;">
                   ➕
                 </button>
               </a-tooltip>
               <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded mx-1" @click="decreaseFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
+                <button class="button is-small is-rounded mx-1" @click="decreaseFontSize()" style="width: 24px; height:24px; padding:0px; display: flex; align-items: center; justify-content: center;">
                   ➖
                 </button>
               </a-tooltip>
@@ -318,12 +318,22 @@ export default {
     right: 24px;
     top: 10px;
     z-index: 1;
+    display: flex;
+    align-items: center;
 
-    button {
+    button,
+    :deep(button) {
       width: 26px;
       height: 26px;
       padding: 0;
       margin-left: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 26px;
+      min-height: 26px;
+      max-width: 26px;
+      max-height: 26px;
     }
   }
 
@@ -341,11 +351,16 @@ export default {
 .reaction-bar {
   height: 30px;
   position: relative;
+  display: flex;
+  align-items: center;
 
   .font-size-controls {
     position: absolute;
     top: 0;
     right: 0;
+    display: flex;
+    align-items: center;
+    height: 100%;
 
     .button.is-rounded {
       width: 16px;
