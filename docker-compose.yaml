@@ -8,7 +8,8 @@ services:
     working_dir: /app
     command: >
       /bin/sh -c "
-      cp /app/dist/.env /app/.env &&
+      rm -rf /app/.env &&
+      cat /app/dist/.env > /app/.env && # cat, not cp, to avoid dir creation in docker.
       export CI=true &&
       corepack enable &&
       corepack prepare pnpm@10.28.1 --activate &&
