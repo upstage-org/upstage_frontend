@@ -26,6 +26,7 @@ import {
   getDefaultStageSettings,
 } from "./reusable";
 import { getViewport } from "./reactiveViewport";
+import config from "config";
 import { stageGraph } from "services/graphql";
 import { useAttribute } from "services/graphql/composable";
 import { avatarSpeak, stopSpeaking } from "services/speech";
@@ -869,8 +870,12 @@ export default {
         });
         dispatch("joinStage");
       });
-      client.on("error", () => {
+      client.on("error", (err) => {
+        console.error("[MQTT] Stage client error:", err?.message ?? err);
         commit("SET_STATUS", "OFFLINE");
+      });
+      client.on("reconnect", () => {
+        commit("SET_STATUS", "CONNECTING");
       });
       client.on("close", () => {
         commit("SET_STATUS", "OFFLINE");
@@ -1601,6 +1606,16 @@ export default {
       }
     },
     async joinStage({ rootGetters, state, rootState, commit, dispatch }) {
+      if (!mqtt.client) {
+        dispatch("connect");
+      }
+      const timeoutMs = config.MQTT_CONNECTION?.connectTimeout ?? 10000;
+      try {
+        await mqtt.whenConnected(timeoutMs);
+      } catch (err) {
+        console.error("[MQTT] joinStage: not connected in time:", err?.message ?? err);
+        return;
+      }
       if (!state.session) {
         state.session = rootState.user.user?.id ?? uuidv4();
       }

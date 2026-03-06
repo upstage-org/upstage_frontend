@@ -66,7 +66,7 @@ const configs = {
     password: VITE_MQTT_PASSWORD,
     clean: true, // Reserved session
     connectTimeout: 4000, // Time out
-    reconnectPeriod: 4000, // Reconnection interval
+    reconnectPeriod: 4000, // Reconnection interval (ms); mqtt.js auto-retries on connection loss using this
     retain: true,
   },
   STRIPE_KEY: VITE_STRIPE_KEY,
