@@ -14,7 +14,7 @@ cp -r ./public $build_dir
 cp -r ./public/favicon.ico $build_dir
 cp -r ./docker-compose.yaml $build_dir
 
-cp  /frontend_app/.env /frontend_app/dist # Cannot mount .env from root dir. Docker copies it out.
+cp  /frontend_app/.env /frontend_app/dist/.env # Cannot mount .env from root dir. Docker copies it out.
 
 cd $build_dir
 
