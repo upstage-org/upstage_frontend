@@ -1,5 +1,6 @@
+name: upstage-frontend
 services:
-  upstage:
+  upstage_frontend:
     image: node:22-bookworm
     container_name: upstage_frontend
     volumes:
@@ -8,6 +9,8 @@ services:
     working_dir: /app
     command: >
       /bin/sh -c "
+      rm -rf /app/.env &&
+      cat /app/dist/.env > /app/.env &&
       npm install -g npm pnpm &&
       pnpm install --frozen-lockfile &&
       pnpm build &&

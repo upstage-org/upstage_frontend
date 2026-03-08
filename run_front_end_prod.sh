@@ -12,7 +12,7 @@ cp -r ./initial_scripts/build_files/* $build_dir
 cp -r ./src $build_dir
 cp -r ./public $build_dir
 cp -r ./public/favicon.ico $build_dir
-cp -r ./docker-compose.yaml $build_dir
+cp -r ./docker-compose-prod.yaml $build_dir
 
 cp  /frontend_app/.env /frontend_app/dist/.env # Cannot mount .env from root dir. Docker copies it out.
 
@@ -22,7 +22,8 @@ echo "This build may take up to three minutes. It may be necessary to run 'docke
 
 echo "Building..."
 
-docker compose down
-docker compose up -d
+docker compose -f ./docker-compose-prod.yaml -p upstage-frontend down
+docker compose -f ./docker-compose-prod.yaml -p upstage-frontend up -d
+docker compose -f ./docker-compose-prod.yaml -p upstage-frontend ps
 
 echo "Done"
