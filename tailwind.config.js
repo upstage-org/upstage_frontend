@@ -1,6 +1,7 @@
-module.exports = {
+/** @type {import('tailwindcss').Config} */
+export default {
   content: ["./index.html", "./src/**/*.{vue,js,ts,jsx,tsx}"],
-  darkMode: 'media', // or 'media' or 'class'
+  darkMode: "media",
   theme: {
     extend: {
       typography: {
@@ -18,9 +19,6 @@ module.exports = {
         },
       },
     },
-  },
-  variants: {
-    extend: {},
   },
   plugins: [require("@tailwindcss/typography")],
 };

@@ -1,6 +1,5 @@
 // @ts-nocheck
-import { gql } from "graphql-request";
-import { stageGraph, studioClient } from ".";
+import { gql } from "@apollo/client/core";
 import { studioClient } from "../graphql";
 
 export const stageFragment = gql`
@@ -81,7 +80,7 @@ export const sceneFragment = gql`
   }
 `;
 
-export default {
+const stageOps = {
   createStage: async (variables) => {
     let result = await studioClient.request(
       gql`
@@ -103,7 +102,7 @@ export default {
     );
     if (result) {
       variables.id = result.createStage.id;
-      result = await stageGraph.updateStage(variables);
+      result = await stageOps.updateStage(variables);
       return result.updateStage;
     }
   },
@@ -266,7 +265,7 @@ export default {
       .request(
         gql`
           query ListStage($fileLocation: String) {
-            stageList(input: s{fileLocation: $fileLocation}) {
+            stageList(input: { fileLocation: $fileLocation }) {
               permission
             }
           }
@@ -600,7 +599,7 @@ export default {
       { id }
     ),
   getStreamSign: (key) =>
-    client
+    studioClient
       .request(
         gql`
           query StreamSign($key: String) {
@@ -658,3 +657,5 @@ export default {
       }
     `),
 };
+
+export default stageOps;

@@ -1,14 +1,27 @@
-// @ts-nocheck
-export default {
-  beforeMount: (el, binding) => {
-    el.clickOutsideEvent = (event) => {
-      if (!(el == event.target || el.contains(event.target))) {
+import type { Directive, DirectiveBinding } from "vue";
+
+type ClickOutsideHandler = (event: MouseEvent) => void;
+
+interface ClickOutsideElement extends HTMLElement {
+  __clickOutsideHandler__?: ClickOutsideHandler;
+}
+
+const ClickOutside: Directive<ClickOutsideElement, ClickOutsideHandler> = {
+  beforeMount(el, binding: DirectiveBinding<ClickOutsideHandler>) {
+    el.__clickOutsideHandler__ = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (target && !(el === target || el.contains(target))) {
         binding.value(event);
       }
     };
-    document.addEventListener("click", el.clickOutsideEvent);
+    document.addEventListener("click", el.__clickOutsideHandler__);
   },
-  unmounted: (el) => {
-    document.removeEventListener("click", el.clickOutsideEvent);
+  unmounted(el) {
+    if (el.__clickOutsideHandler__) {
+      document.removeEventListener("click", el.__clickOutsideHandler__);
+      delete el.__clickOutsideHandler__;
+    }
   },
 };
+
+export default ClickOutside;

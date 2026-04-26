@@ -1,11 +1,14 @@
 <template>
   <div id="connection-status">
     <ReloadStream />
-    <span class="tag is-light is-small" :class="{
-      'is-danger': status === 'LIVE',
-      'is-warning': status === 'CONNECTING',
-      'is-rehearsal': status === 'REHEARSAL'
-    }">
+    <span
+      class="tag is-light is-small"
+      :class="{
+        'is-danger': status === 'LIVE',
+        'is-warning': status === 'CONNECTING',
+        'is-rehearsal': status === 'REHEARSAL',
+      }"
+    >
       <template v-if="replaying">
         <span class="icon">
           <i ref="dot" class="fas fa-circle"></i>
@@ -44,48 +47,37 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
+import { computed, inject, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { animate } from "animejs";
-import { ref, computed, onMounted, inject } from "vue";
 import Popover from "components/Popover.vue";
 import Session from "./Session.vue";
 import ReloadStream from "./ReloadStream.vue";
 
-export default {
-  components: { Popover, Session, ReloadStream },
-  setup: () => {
-    const store = useStore();
-    const dot = ref();
-    const status = computed(() => {
-      if (store.state.stage?.model?.status == 'rehearsal') {
-        return 'REHEARSAL'
-      }
-      return store.state.stage.status
-    });
-    const players = computed(() => store.getters["stage/players"]);
-    const audiences = computed(() => store.getters["stage/audiences"]);
-    const masquerading = computed(() => store.state.stage.masquerading);
-    const replaying = inject("replaying");
+const store = useStore();
+const dot = ref<HTMLElement>();
 
-    onMounted(() => {
-      animate(dot.value, {
-        opacity: [1, 0, 1],
-        duration: 2000,
-        loop: true,
-      });
-    });
+const status = computed<string>(() => {
+  if (store.state.stage?.model?.status == "rehearsal") {
+    return "REHEARSAL";
+  }
+  return store.state.stage.status;
+});
+const players = computed(() => store.getters["stage/players"]);
+const audiences = computed(() => store.getters["stage/audiences"]);
+const masquerading = computed<boolean>(() => store.state.stage.masquerading);
+const replaying = inject<boolean>("replaying");
 
-    return {
-      status,
-      dot,
-      players,
-      audiences,
-      replaying,
-      masquerading
-    };
-  },
-};
+onMounted(() => {
+  if (dot.value) {
+    animate(dot.value, {
+      opacity: [1, 0, 1],
+      duration: 2000,
+      loop: true,
+    });
+  }
+});
 </script>
 
 <style scoped lang="scss">

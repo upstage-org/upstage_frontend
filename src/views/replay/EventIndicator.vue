@@ -8,31 +8,23 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
-export default {
-  setup() {
-    const store = useStore();
-    const events = computed(() => store.state.stage.model.events);
-    const begin = computed(() =>
-      Number(store.state.stage.replay.timestamp.begin),
-    );
-    const end = computed(() => Number(store.state.stage.replay.timestamp.end));
-    const duration = computed(() => end.value - begin.value);
 
-    const position = (event) => {
-      return (
-        ((Number(event.mqttTimestamp) - begin.value) * 100) / duration.value
-      );
-    };
+interface ReplayEvent {
+  id: string | number;
+  mqttTimestamp: string | number;
+}
 
-    return {
-      events,
-      position,
-    };
-  },
-};
+const store = useStore();
+const events = computed<ReplayEvent[]>(() => store.state.stage.model.events);
+const begin = computed<number>(() => Number(store.state.stage.replay.timestamp.begin));
+const end = computed<number>(() => Number(store.state.stage.replay.timestamp.end));
+const duration = computed<number>(() => end.value - begin.value);
+
+const position = (event: ReplayEvent): number =>
+  ((Number(event.mqttTimestamp) - begin.value) * 100) / duration.value;
 </script>
 
 <style scoped lang="scss">

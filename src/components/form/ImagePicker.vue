@@ -115,7 +115,7 @@ import MediaForm from 'components/media/MediaForm/index.vue';
 import VNodes from './VNodes';
 import StageMediaTable from './StageMediaTable.vue';
 import { useQuery as useApolloQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { permissionFragment } from "models/fragment";
 
 dayjs.extend(isBetween);

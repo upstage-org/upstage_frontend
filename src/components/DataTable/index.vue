@@ -43,7 +43,7 @@
                   {{ header.render(item) }}
                 </template>
                 <template v-else-if="header.type === 'date'">
-                  <span :title="moment(item[header.key])">
+                  <span :title="dayjs(item[header.key]).toString()">
                     {{ handleFormatDate(item[header.key]) }}
                   </span>
                 </template>
@@ -62,7 +62,7 @@
 import { useQuery } from "services/graphql/composable";
 import Loading from "components/Loading.vue";
 import { computed } from "vue";
-import moment from "moment";
+import dayjs from "@utils/dayjs";
 import Pagination from "./Pagination.vue";
 
 export default {
@@ -115,9 +115,9 @@ export default {
     }
   },
   methods: {
-    moment,
+    dayjs,
     fromNow(date) {
-      return  moment(date).fromNow();
+      return dayjs(date).fromNow();
     },
     sort(header) {
       if (header.sortable) {
@@ -133,8 +133,8 @@ export default {
         return null;
       }
 
-      if (moment(this.now).diff(date, "weeks") > 1) {
-        return moment(date).format("DD/MM/yyyy");
+      if (dayjs(this.now).diff(date, "weeks") > 1) {
+        return dayjs(date).format("DD/MM/yyyy");
       }
 
       return this.fromNow(date);
@@ -153,7 +153,7 @@ export default {
             return sortable(a, b);
           }
           if (type === "date") {
-            moment(a[key]).diff(b[key]);
+            dayjs(a[key]).diff(b[key]);
           }
           if (render) {
             return render(a).localeCompare(render(b));

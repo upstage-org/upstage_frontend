@@ -4,9 +4,14 @@ import i18n from "./i18n";
 import "./styles/studio.less";
 import { router } from "router";
 import store from "./store";
+import { pinia } from "./store/pinia";
 import "@fortawesome/fontawesome-free/css/all.css";
 import ClickOutside from "./directives/ClickOutside";
+import { installApolloClient } from "./apollo";
+
+installApolloClient();
 const app = createApp(App)
+  .use(pinia)
   .use(store)
   .use(router)
   .use(i18n)

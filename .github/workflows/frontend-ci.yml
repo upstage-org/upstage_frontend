@@ -1,0 +1,66 @@
+name: frontend-ci
+
+on:
+  push:
+    paths:
+      - "prod_copy/upstage_frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  pull_request:
+    paths:
+      - "prod_copy/upstage_frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+defaults:
+  run:
+    working-directory: prod_copy/upstage_frontend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: prod_copy/upstage_frontend/pnpm-lock.yaml
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: typecheck
+        run: pnpm typecheck
+
+      - name: lint
+        run: pnpm lint
+
+      - name: format check
+        run: pnpm format:check
+
+      - name: unit tests
+        run: pnpm test
+
+      - name: build
+        run: pnpm build
+
+      - name: install playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: e2e smoke
+        run: pnpm e2e:smoke
+        env:
+          CI: "1"
+
+      - name: upload playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: prod_copy/upstage_frontend/playwright-report
+          retention-days: 7

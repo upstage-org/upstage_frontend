@@ -2,14 +2,12 @@
 import { ref, watch, watchEffect, onMounted, computed } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { StudioGraph } from "models/studio";
 import { inquiryVar } from "apollo";
-import moment, { Moment } from "moment";
 import configs from "config";
 import Navbar from "../Navbar.vue";
-import dayjs from 'dayjs';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from "@utils/dayjs";
 
 const to = (path: string) => `${configs.UPSTAGE_URL}/${path}`;
 const { result, loading } = useQuery<StudioGraph>(gql`

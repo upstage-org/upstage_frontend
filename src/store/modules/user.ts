@@ -1,10 +1,30 @@
 // @ts-nocheck
-import { router } from "../../router";
 import { userGraph } from "services/graphql";
 import { displayName, logout } from "utils/auth";
 import { ROLES } from "utils/constants";
 import { message } from "ant-design-vue";
 import store from "store/index";
+
+const AUTH_ERRORS = [
+  "Missing Authorization Header",
+  "Signature verification failed",
+  "Signature has expired",
+  "Authenticated Failed",
+];
+
+/**
+ * Dispatched on auth failure inside a user-store action. We deliberately do
+ * NOT import the router here (that creates a `store -> router -> store` cycle
+ * via the route guards). The `logout()` helper handles the redirect itself by
+ * setting `window.location.href`, which is sufficient for the few cases that
+ * reach this branch.
+ */
+const handleAuthFailure = (errorMsg: string | undefined): void => {
+  if (errorMsg && AUTH_ERRORS.some((m) => errorMsg.includes(m))) {
+    logout();
+    message.warning("You have been logged out of this session!");
+  }
+};
 
 export default {
   namespaced: true,
@@ -51,22 +71,7 @@ export default {
         commit("SET_NICK_NAME", displayName(currentUser));
         return currentUser;
       } catch (error) {
-        const errorMsg = error.response?.errors[0]?.message;
-        if (
-          [
-            "Missing Authorization Header",
-            "Signature verification failed",
-            "Signature has expired",
-            "Authenticated Failed",
-          ].some((message) => errorMsg?.includes(message))
-        ) {
-          logout();
-
-          if (router.currentRoute.value.meta.requireAuth) {
-            router.push("/login");
-            message.warning("You have been logged out of this session!");
-          }
-        }
+        handleAuthFailure(error.response?.errors[0]?.message);
       } finally {
         commit("SET_LOADING_USER", false);
       }
@@ -100,21 +105,7 @@ export default {
           String(currentUser?.role)
         );
       } catch (error) {
-        if (
-          [
-            "Missing Authorization Header",
-            "Signature verification failed",
-            "Signature has expired",
-            "Authenticated Failed",
-          ].some((message) => error.message?.includes(message))
-        ) {
-          logout();
-
-          if (router.currentRoute.value.meta.requireAuth) {
-            router.push("/login");
-            message.warning("You have been logged out of this session!");
-          }
-        }
+        handleAuthFailure(error.message);
       } finally {
         commit("SET_LOADING_USER", false);
       }
@@ -131,21 +122,7 @@ export default {
         }
         return false;
       } catch (error) {
-        if (
-          [
-            "Missing Authorization Header",
-            "Signature verification failed",
-            "Signature has expired",
-            "Authenticated Failed",
-          ].some((message) => error.message?.includes(message))
-        ) {
-          logout();
-
-          if (router.currentRoute.value.meta.requireAuth) {
-            router.push("/login");
-            message.warning("You have been logged out of this session!");
-          }
-        }
+        handleAuthFailure(error.message);
       } finally {
         commit("SET_LOADING_USER", false);
       }

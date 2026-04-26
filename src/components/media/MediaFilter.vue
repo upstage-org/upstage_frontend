@@ -2,15 +2,13 @@
 import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { StudioGraph, UploadFile } from "models/studio";
 import { editingMediaVar, inquiryVar } from "apollo";
-import moment, { Moment } from "moment";
 import configs from "config";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
-import dayjs from 'dayjs';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from "@utils/dayjs";
 import { useStore } from "vuex";
 
 const { result: response, loading } = useQuery(gql`

@@ -112,7 +112,7 @@ import Field from "components/form/Field.vue";
 import ClearChat from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
 import { computed, inject } from "vue";
-import moment from "moment";
+import dayjs from "@utils/dayjs";
 import humanizeDuration from "humanize-duration";
 import { useMutation } from "services/graphql/composable";
 import { stageGraph } from "services/graphql";
@@ -133,7 +133,7 @@ export default {
     const refresh = inject("refresh");
 
     const date = (value) => {
-      return value ? moment(value).format("YYYY-MM-DD") : "Now";
+      return value ? dayjs(value).format("YYYY-MM-DD") : "Now";
     };
 
     const headers = [

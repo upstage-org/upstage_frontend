@@ -30,9 +30,7 @@
       class="button is-light is-outlined mt-4"
       @click="showLoginForm = false"
     >
-      <span class="icon">
-        <i class="fas fa-chevron-left"></i>
-      </span>
+      <span class="icon"><i class="fas fa-chevron-left"></i></span>
       <span>{{ $t("enter_as_audience") }}</span>
     </button>
     <button
@@ -41,79 +39,63 @@
       @click="showLoginForm = true"
     >
       <span>{{ $t("player_login") }}</span>
-      <span class="icon">
-        <i class="fas fa-chevron-right"></i>
-      </span>
+      <span class="icon"><i class="fas fa-chevron-right"></i></span>
     </button>
   </div>
 </template>
 
-<script>
-import LoginForm from "components/LoginForm.vue";
-import InputButtonPostfix from "components/form/InputButtonPostfix.vue";
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { animate } from "animejs";
 import { message } from "ant-design-vue";
+import LoginForm from "components/LoginForm.vue";
+import InputButtonPostfix from "components/form/InputButtonPostfix.vue";
 
-export default {
-  components: { LoginForm, InputButtonPostfix },
-  setup: () => {
-    const store = useStore();
-    const loggedIn = computed(() => store.getters["auth/loggedIn"]);
-    const showing = ref(!loggedIn.value);
-    const showLoginForm = ref(false);
-    const nickname = ref();
-    const modal = ref();
+const store = useStore();
+const loggedIn = computed<boolean>(() => store.getters["auth/loggedIn"]);
+const showing = ref<boolean>(!loggedIn.value);
+const showLoginForm = ref<boolean>(false);
+const nickname = ref<string>();
+const modal = ref<HTMLElement>();
 
-    onMounted(() => {
-      animate(modal.value, {
-        rotate: ["-3deg", "3deg", "0deg"],
-        duration: 100,
-        direction: "alternate",
-        loop: 5,
-        ease: "outBack",
-      });
+onMounted(() => {
+  if (modal.value) {
+    animate(modal.value, {
+      rotate: ["-3deg", "3deg", "0deg"],
+      duration: 100,
+      direction: "alternate",
+      loop: 5,
+      ease: "outBack",
     });
+  }
+});
 
-    watch(loggedIn, () => {
-      if (loggedIn.value) {
-        store.dispatch("user/fetchCurrent").then(() => store.dispatch("stage/joinStage"));
+const close = () => (showing.value = false);
+
+watch(loggedIn, () => {
+  if (loggedIn.value) {
+    store.dispatch("user/fetchCurrent").then(() => store.dispatch("stage/joinStage"));
+    close();
+  }
+});
+
+const enterAsAudience = () => {
+  if (!showLoginForm.value) {
+    store
+      .dispatch("user/saveNickname", { nickname: nickname.value })
+      .then((resolved: string = "Guest") => {
+        message.success("Welcome to the stage! Your nickname is " + resolved + "!");
         close();
-      }
-    });
+      });
+  }
+};
 
-    const close = () => (showing.value = false);
-
-    const enterAsAudience = () => {
-      if (!showLoginForm.value) {
-        store
-          .dispatch("user/saveNickname", { nickname: nickname.value })
-          .then((nickname = "Guest") => {
-            message.success(
-              "Welcome to the stage! Your nickname is " + nickname + "!",
-            );
-            close();
-          });
-      }
-    };
-
-    const onLoginSuccess = () => {
-      store.dispatch("stage/reloadPermission");
-    };
-
-    return {
-      showing,
-      close,
-      modal,
-      showLoginForm,
-      nickname,
-      enterAsAudience,
-      onLoginSuccess,
-    };
-  },
+const onLoginSuccess = () => {
+  store.dispatch("stage/reloadPermission");
 };
 </script>
+
 <style scoped lang="scss">
 .modal-close {
   position: relative;

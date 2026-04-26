@@ -1,7 +1,6 @@
 // @ts-nocheck
-import { gql } from "graphql-request";
-import { createClient } from "./graphql";
-import { studioClient } from '../graphql';
+import { gql } from "@apollo/client/core";
+import { studioClient } from "../graphql";
 
 export default {
   oneTimePurchase: (input) =>

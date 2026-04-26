@@ -85,7 +85,7 @@
 </template>
 
 <script>
-import moment from "moment";
+import dayjs from "@utils/dayjs";
 import Linkify from "components/Linkify.vue";
 import Divider from "components/Divider.vue";
 import ContextMenu from "components/ContextMenu.vue";
@@ -107,7 +107,7 @@ export default {
     const session = computed(() => store.state.stage.session);
 
     const time = (value) => {
-      return moment(value).fromNow();
+      return dayjs(value).fromNow();
     };
 
     const removeChat = (item, closeMenu) => {

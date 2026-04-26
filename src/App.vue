@@ -19,9 +19,11 @@
  
  
  <script setup lang="ts">
- import { ref, onMounted, computed } from "vue";
+ import { ref, onMounted, computed, watch } from "vue";
  import { useStore } from "vuex";
  import { useRoute } from "vue-router";
+ import { useTitle } from "@vueuse/core";
+ import { useStageViewport } from "store/modules/stage/reactiveViewport";
  import "styles/bulma.css";
  import "styles/bulma_slider.css";
  import "styles/custom.less";
@@ -32,6 +34,16 @@
  store.dispatch("user/fetchCurrent");
  store.dispatch("config/fetchConfig");
  const route = useRoute();
+ useStageViewport();
+ 
+ const title = useTitle();
+ watch(
+   () => route.name,
+   (name) => {
+     title.value = name ? `UpStage - ${String(name)}` : "UpStage";
+   },
+   { immediate: true },
+ );
  
  
  // Version state

@@ -1,11 +1,8 @@
 <template>
   <Modal v-if="visible" v-model="open">
     <template #trigger>
-      <span
-        class="tag is-small is-warning clickable"
-        style="vertical-align: top"
-      >
-        <span class="icon" ref="icon">
+      <span class="tag is-small is-warning clickable" style="vertical-align: top">
+        <span ref="icon" class="icon">
           <Icon src="firefox-logo.svg" />
         </span>
       </span>
@@ -15,8 +12,7 @@
     </template>
     <template #content>
       <p>
-        A Firefox setting needs to be changed to allow you to access UpStage on
-        Firefox.
+        A Firefox setting needs to be changed to allow you to access UpStage on Firefox.
       </p>
       <div class="columns">
         <div class="column is-3 mt-6">
@@ -27,15 +23,12 @@
           <img :src="`${publicPath}/instruction/firefox/1.png`" alt="Step 1" />
           <div class="columns">
             <div class="column is-4 mt-6">
-              <code>Note:</code>&nbsp;If you see this screen, click to continue.
-              Don't worry, the setting change needed for UpStage to work will
-              not impact on performance or security of Firefox.
+              <code>Note:</code>&nbsp;If you see this screen, click to continue. Don't worry,
+              the setting change needed for UpStage to work will not impact on performance or
+              security of Firefox.
             </div>
             <div class="column">
-              <img
-                :src="`${publicPath}/instruction/firefox/1.2.png`"
-                alt="Step 1.2"
-              />
+              <img :src="`${publicPath}/instruction/firefox/1.2.png`" alt="Step 1.2" />
             </div>
           </div>
         </div>
@@ -62,46 +55,35 @@
   </Modal>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
 import { useStore } from "vuex";
+import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
 import Copy from "components/Copy.vue";
-import { animate } from "animejs";
 
-export default {
-  components: { Icon, Modal, Copy },
-  setup: () => {
-    const store = useStore();
-    const isFirefox = navigator.userAgent.indexOf("Firefox") != -1;
-    const status = computed(() => store.state.stage.status);
-    const visible = computed(
-      () =>
-        isFirefox &&
-        (status.value === "CONNECTING" || status.value === "OFFLINE"),
-    );
-    const open = ref(true);
+const publicPath = "/";
+const store = useStore();
+const isFirefox = navigator.userAgent.indexOf("Firefox") != -1;
+const status = computed<string>(() => store.state.stage.status);
+const visible = computed<boolean>(
+  () => isFirefox && (status.value === "CONNECTING" || status.value === "OFFLINE"),
+);
+const open = ref(true);
 
-    const reload = () => window.location.reload();
-
-    const icon = ref();
-    const interval = setInterval(() => {
-      if (icon.value) {
-        animate(icon.value, {
-          scale: [1, 1.5, 1],
-          rotate: [45, -45, 45, -45, 0],
-          ease: "inOutQuad",
-        });
-      }
-    }, 3000);
-
-    onUnmounted(() => {
-      clearInterval(interval);
+const icon = ref<HTMLElement>();
+const interval = setInterval(() => {
+  if (icon.value) {
+    animate(icon.value, {
+      scale: [1, 1.5, 1],
+      rotate: [45, -45, 45, -45, 0],
+      ease: "inOutQuad",
     });
-    return { isFirefox, status, reload, visible, icon, open, publicPath: "/" };
-  },
-};
+  }
+}, 3000);
+
+onUnmounted(() => clearInterval(interval));
 </script>
 
 <style></style>

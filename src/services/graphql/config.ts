@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { gql } from "graphql-request";
+import { gql } from "@apollo/client/core";
 import { studioClient } from "../graphql";
 
 export default {

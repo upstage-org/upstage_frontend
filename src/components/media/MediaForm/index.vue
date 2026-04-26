@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Modal } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import {
   ref,
   computed,

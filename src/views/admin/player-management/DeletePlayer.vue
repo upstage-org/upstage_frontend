@@ -4,7 +4,7 @@ import { Button, Popconfirm, message } from "ant-design-vue";
 import { h } from "vue";
 import { DeleteOutlined } from "@ant-design/icons-vue";
 import { PropType } from "vue";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { useMutation } from "@vue/apollo-composable";
 
 export default {

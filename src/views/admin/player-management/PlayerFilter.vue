@@ -2,10 +2,9 @@
 import { ref, watch, computed, onMounted } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { StudioGraph } from "models/studio";
 import { inquiryVar } from "apollo";
-import moment, { Moment } from "moment";
 import { getSharedAuth } from "utils/common";
 import { h } from "vue";
 import { Button, InputSearch, RangePicker, Space } from "ant-design-vue";
@@ -13,8 +12,7 @@ import Header from "components/Header.vue";
 import { PlusOutlined } from "@ant-design/icons-vue";
 import { useI18n } from "vue-i18n";
 import BatchPlayerCreation from "views/admin/batch-player-creation/index.vue";
-import dayjs from 'dayjs';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from "@utils/dayjs";
 
 export default {
   setup() {

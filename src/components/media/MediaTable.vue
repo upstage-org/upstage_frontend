@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import {
   computed,
   reactive,

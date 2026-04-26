@@ -3,7 +3,7 @@ import { useQuery } from "@vue/apollo-composable";
 import { message, Modal } from "ant-design-vue";
 import { SelectValue } from "ant-design-vue/lib/select";
 import { TransferItem } from "ant-design-vue/lib/transfer";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { ref, watchEffect, PropType, inject, ComputedRef, watch } from "vue";
 import { editingMediaVar } from "apollo";
 import configs from "config";

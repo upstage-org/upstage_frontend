@@ -14,29 +14,28 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
-import moment from "moment";
+import dayjs from "@utils/dayjs";
 import { useStore } from "vuex";
-export default {
-  props: ["session"],
-  setup: (props) => {
-    const store = useStore();
-    const joinedAt = computed(() => {
-      return moment(new Date(props.session.at));
-    });
-    const isOnline = computed(() => {
-      return moment().diff(joinedAt.value, "minutes") < 60;
-    });
 
-    const tagPlayer = () => {
-      if (props.session.isPlayer) {
-        store.commit("stage/TAG_PLAYER", props.session);
-        store.dispatch("stage/showPlayerChat", true);
-      }
-    };
-    return { joinedAt, isOnline, tagPlayer };
-  },
+interface SessionInfo {
+  isPlayer?: boolean;
+  nickname?: string;
+  at: string | number | Date;
+}
+
+const props = defineProps<{ session: SessionInfo }>();
+
+const store = useStore();
+const joinedAt = computed(() => dayjs(new Date(props.session.at)));
+const isOnline = computed(() => dayjs().diff(joinedAt.value, "minutes") < 60);
+
+const tagPlayer = () => {
+  if (props.session.isPlayer) {
+    store.commit("stage/TAG_PLAYER", props.session);
+    store.dispatch("stage/showPlayerChat", true);
+  }
 };
 </script>
 

@@ -78,7 +78,7 @@ import { stageGraph } from "services/graphql";
 import Icon from "components/Icon.vue";
 import { computed } from "vue";
 import humanizeDuration from "humanize-duration";
-import moment from "moment";
+import dayjs from "@utils/dayjs";
 import { useStore } from "vuex";
 import { notification } from "utils/notification";
 import { useClearStage } from "./composable";
@@ -107,14 +107,14 @@ export default {
       loading.value = false;
     };
 
-    const now = ref(moment());
-    const interval = setInterval(() => (now.value = moment()), 1000);
+    const now = ref(dayjs());
+    const interval = setInterval(() => (now.value = dayjs()), 1000);
 
     const label = computed(() => {
       const recording = props.stage.activeRecording;
       if (recording) {
         const name = recording.name;
-        const from = moment.utc(recording.createdOn);
+        const from = dayjs.utc(recording.createdOn);
         const duration = humanizeDuration(
           now.value.diff(from, "milliseconds"),
           {

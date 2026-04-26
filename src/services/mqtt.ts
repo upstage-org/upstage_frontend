@@ -41,14 +41,6 @@ export default function buildClient() {
           this._connectPromise = null;
         }
       });
-      this.client.once("close", () => {
-        if (this._connectReject) {
-          this._connectReject(new Error("[MQTT] Connection closed before connect."));
-          this._connectResolve = null;
-          this._connectReject = null;
-          this._connectPromise = null;
-        }
-      });
       return this.client;
     },
     whenConnected(timeoutMs = 10000) {

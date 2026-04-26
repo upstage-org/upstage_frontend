@@ -1,4 +1,4 @@
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 
 export const permissionFragment = gql`
   fragment permissionFragment on Permission {

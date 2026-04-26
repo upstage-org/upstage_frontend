@@ -6,22 +6,15 @@
   </a-tooltip>
 </template>
 
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
 import Icon from "components/Icon.vue";
 
-export default {
-  components: { Icon },
-  setup: () => {
-    const store = useStore();
-    const masquerading = computed(() => store.state.stage.masquerading);
-    const exitAudienceView = () => {
-      store.commit("stage/TOGGLE_MASQUERADING");
-    };
-
-    return { masquerading, exitAudienceView };
-  },
+const store = useStore();
+const masquerading = computed<boolean>(() => store.state.stage.masquerading);
+const exitAudienceView = () => {
+  store.commit("stage/TOGGLE_MASQUERADING");
 };
 </script>
 

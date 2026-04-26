@@ -9,7 +9,7 @@ import {
 } from "@ant-design/icons-vue";
 import { computed } from "vue";
 import { useMutation } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { inquiryVar } from "apollo";
 
 export default {

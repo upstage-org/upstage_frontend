@@ -11,7 +11,8 @@ services:
       /bin/sh -c "
       rm -rf /app/.env &&
       cat /app/dist/.env > /app/.env &&
-      npm install -g npm pnpm &&
+      corepack enable &&
+      corepack prepare pnpm@10.7.1 --activate &&
       pnpm install --frozen-lockfile &&
       pnpm build &&
       tail -f /dev/null

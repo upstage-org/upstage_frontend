@@ -1,6 +1,6 @@
 import { useMutation } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { ref, computed } from "vue";
 import { permissionFragment } from "models/fragment";
 import {

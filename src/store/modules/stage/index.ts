@@ -1,5 +1,5 @@
 // @ts-nocheck
-import moment from "moment";
+import dayjs from "@utils/dayjs";
 import { v4 as uuidv4 } from "uuid";
 import hash from "object-hash";
 import buildClient from "services/mqtt";
@@ -25,13 +25,11 @@ import {
   getDefaultStageConfig,
   getDefaultStageSettings,
 } from "./reusable";
-import { getViewport } from "./reactiveViewport";
-import config from "config";
 import { stageGraph } from "services/graphql";
 import { useAttribute } from "services/graphql/composable";
 import { avatarSpeak, stopSpeaking } from "services/speech";
 import { animate } from "animejs";
-import { Promise } from "core-js";
+// Native Promise is sufficient on modern (Node 22 / evergreen) targets.
 
 const mqtt = buildClient();
 
@@ -85,7 +83,10 @@ export default {
       },
     },
     reactions: [],
-    viewport: getViewport(),
+    // Static placeholder. Real values are committed by useStageViewport() once
+    // App.vue mounts; calling getViewport() here at module-load time pulls
+    // reactiveViewport.ts (which imports the root store) into a TDZ cycle.
+    viewport: { width: 0, height: 0 },
     sessions: [],
     session: null,
     replay: {
@@ -513,7 +514,7 @@ export default {
         state.sessions.push(session);
       }
       state.sessions = state.sessions.filter(
-        (s) => moment().diff(moment(new Date(s.at)), "minute") < 60,
+        (s) => dayjs().diff(dayjs(new Date(s.at)), "minute") < 60,
       );
       state.sessions.sort((a, b) => b.at - a.at);
     },
@@ -1317,16 +1318,6 @@ export default {
       }
     },
     async joinStage({ rootGetters, state, rootState, commit, dispatch }) {
-      if (!mqtt.client) {
-        dispatch("connect");
-      }
-      const timeoutMs = config.MQTT_CONNECTION?.connectTimeout ?? 10000;
-      try {
-        await mqtt.whenConnected(timeoutMs);
-      } catch (err) {
-        console.error("[MQTT] joinStage: not connected in time:", err?.message ?? err);
-        return;
-      }
       if (!state.session) {
         state.session = rootState.user.user?.id ?? uuidv4();
       }

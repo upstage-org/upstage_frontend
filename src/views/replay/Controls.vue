@@ -44,32 +44,27 @@
             <p>
               Replay controls are hidden! You can toggle the
               <code>{{ $t("esc") }}</code> key to quickly hide the replay
-              controls or bring it back 👌
+              controls or bring it back.
             </p>
           </template>
         </Modal>
         <teleport v-if="!collapsed" to="body">
-          <Modal
-            width="500px"
-            @confirm="(close) => saveRole(item, close)"
-            :loading="loading"
-          >
+          <Modal width="500px" :loading="false">
             <template #render="{ open }">
               <Dropdown
                 style="position: absolute; left: 24px; bottom: 64px"
                 is-up
                 :data="speeds"
-                :render-label="(value) => value + 'x'"
+                :render-label="renderSpeedLabel"
                 v-model="speed"
-                @select="changeSpeed($event, open)"
+                @select="(s: number) => changeSpeed(s, open)"
               />
             </template>
             <template #header>{{ $t("warning") }}</template>
             <template #content>
               <p>
-                Audio and avatar speeches won't be able to play in 16x speed or
-                more. You should only use these playback rate for seeking
-                purpose!
+                Audio and avatar speeches won't be able to play in 16x speed or more. You
+                should only use these playback rate for seeking purpose!
               </p>
             </template>
           </Modal>
@@ -99,79 +94,58 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import Dropdown from "components/form/Dropdown.vue";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
-import { computed, ref } from "vue";
-import { useStore } from "vuex";
 import EventIndicator from "./EventIndicator.vue";
 import { useShortcut } from "components/stage/composable";
 import { displayTimestamp } from "utils/common";
 
-export default {
-  components: { Dropdown, EventIndicator, Icon, Modal },
-  setup() {
-    const store = useStore();
-    const timestamp = computed(() => store.state.stage.replay.timestamp);
-    const isPlaying = computed(() => store.state.stage.replay.interval);
-    const speed = computed(() => store.state.stage.replay.speed);
-    const speeds = [0.5, 1, 2, 4, 8, 16, 32];
+interface ReplayTimestamp {
+  begin: number;
+  current: number;
+  end: number;
+}
 
-    const seek = (e) => {
-      store.dispatch("stage/replayRecording", e.target.value);
-    };
+const store = useStore();
+const timestamp = computed<ReplayTimestamp>(() => store.state.stage.replay.timestamp);
+const isPlaying = computed<boolean>(() => store.state.stage.replay.interval);
+const speed = computed<number>(() => store.state.stage.replay.speed);
+const speeds = [0.5, 1, 2, 4, 8, 16, 32];
+const renderSpeedLabel = (value: number) => `${value}x`;
 
-    const play = () => {
-      store.dispatch("stage/replayRecording", timestamp.value.current);
-    };
-
-    const pause = () => {
-      store.dispatch("stage/pauseReplay");
-    };
-
-    const changeSpeed = (speed, open) => {
-      store.commit("stage/SET_REPLAY", { speed });
-      if (isPlaying.value) {
-        play();
-      }
-      if (speed >= 16) {
-        open();
-      }
-    };
-
-    const seekForward = () => {
-      store.dispatch("stage/seekForwardReplay");
-    };
-
-    const seekBackward = () => {
-      store.dispatch("stage/seekBackwardReplay");
-    };
-
-    const collapsed = ref(false);
-
-    useShortcut((e) => {
-      if (e.keyCode == 27) {
-        collapsed.value = !collapsed.value;
-      }
-    });
-
-    return {
-      timestamp,
-      seek,
-      isPlaying,
-      play,
-      pause,
-      displayTimestamp,
-      speed,
-      speeds,
-      changeSpeed,
-      seekForward,
-      seekBackward,
-      collapsed,
-    };
-  },
+const seek = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  store.dispatch("stage/replayRecording", target.value);
 };
+
+const play = () => {
+  store.dispatch("stage/replayRecording", timestamp.value.current);
+};
+
+const pause = () => {
+  store.dispatch("stage/pauseReplay");
+};
+
+const changeSpeed = (newSpeed: number, open: () => void) => {
+  store.commit("stage/SET_REPLAY", { speed: newSpeed });
+  if (isPlaying.value) play();
+  if (newSpeed >= 16) open();
+};
+
+const seekForward = () => store.dispatch("stage/seekForwardReplay");
+const seekBackward = () => store.dispatch("stage/seekBackwardReplay");
+
+const collapsed = ref<boolean>(false);
+
+useShortcut((e: KeyboardEvent) => {
+  if (e.keyCode == 27) {
+    collapsed.value = !collapsed.value;
+  }
+});
 </script>
 
 <style lang="scss">

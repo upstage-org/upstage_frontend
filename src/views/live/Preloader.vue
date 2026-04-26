@@ -1,10 +1,15 @@
 <template>
   <transition @leave="leave">
-    <section v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading)"
-      class="hero is-fullheight is-fullwidth cover-image" :class="{ replaying }" @click="clicked = true" :style="{
+    <section
+      v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading)"
+      class="hero is-fullheight is-fullwidth cover-image"
+      :class="{ replaying }"
+      :style="{
         'background-image': model && `url(&quot;${model.cover || '/img/greencurtain.jpg'}&quot;)`,
-        'background-color': backdropColor
-      }">
+        'background-color': backdropColor,
+      }"
+      @click="clicked = true"
+    >
       <div class="hero-body">
         <div class="container">
           <template v-if="model">
@@ -15,24 +20,27 @@
               {{ model.description }}
             </h2>
             <template v-if="status !== 'live' && !canPlay">
-              <span v-if="status" class="tag is-dark">{{
-                status.toUpperCase()
-              }}</span>&nbsp;
-              <span>This stage is not currently open to the public. Please come
-                back later!</span>
+              <span v-if="status" class="tag is-dark">{{ status.toUpperCase() }}</span>&nbsp;
+              <span>This stage is not currently open to the public. Please come back later!</span>
             </template>
             <h2 v-else-if="ready" class="subtitle">
-              <span class="sparkle" style="line-height: 2">Stage loaded 100%, click anywhere to continue...</span>
+              <span class="sparkle" style="line-height: 2"
+                >Stage loaded 100%, click anywhere to continue...</span
+              >
             </h2>
             <h2 v-else class="subtitle">
               <template v-if="preloadableAssets.length">
                 <button class="button is-primary is-loading" />
                 <span style="line-height: 2">
                   <span>
-                    Preloading media...
-                    {{ progress }}/{{ preloadableAssets.length }}
+                    Preloading media... {{ progress }}/{{ preloadableAssets.length }}
                     <div id="preloading-area">
-                      <img v-for="src in preloadableAssets" :key="src" :src="src" @load="increaseProgress" />
+                      <img
+                        v-for="src in preloadableAssets"
+                        :key="src"
+                        :src="src"
+                        @load="increaseProgress"
+                      />
                     </div>
                   </span>
                 </span>
@@ -47,7 +55,7 @@
           </template>
           <template v-else>
             <h1 class="title">Stage not found!</h1>
-            <span>Are you sure the stage url is correct 🤔?</span>
+            <span>Are you sure the stage url is correct?</span>
           </template>
         </div>
       </div>
@@ -55,94 +63,69 @@
   </transition>
 </template>
 
-<script>
-import { computed, inject, ref, watch, watchEffect, onUnmounted } from "vue";
+<script setup lang="ts">
+import { computed, inject, onUnmounted, ref, watch, watchEffect } from "vue";
 import { useStore } from "vuex";
 import { animate } from "animejs";
 import { useAttribute } from "services/graphql/composable";
 
-export default {
-  setup: () => {
-    const store = useStore();
-    const preloading = computed(() => store.state.stage.preloading);
-    const preloadableAssets = computed(
-      () => store.getters["stage/preloadableAssets"],
-    );
-    const model = computed(() => store.state.stage.model);
-    const progress = ref(0);
-    const stopLoading = () =>
-      store.commit("stage/SET_PRELOADING_STATUS", false);
-    const increaseProgress = () => {
-      progress.value++;
-      if (progress.value === preloadableAssets.value.length || progress.value === preloadableAssets.value.length - 1) {
-        stopLoading();
-      }
-    };
-    watchEffect(() => {
-      if (preloadableAssets.value.length === 0 && model.value) {
-        stopLoading();
-      }
-    });
-
-    watch(
-      preloading,
-      (val) => {
-        const logo = document.querySelector("#live-logo");
-        if (logo) {
-          if (val) {
-            logo.classList.add("preloader");
-          } else {
-            logo.classList.remove("preloader");
-          }
-        }
-      },
-      { immediate: true },
-    );
-
-    const status = useAttribute(model, "status");
-    const timer = ref();
-    watch(model, (val) => {
-      if (val && status.value === "live") {
-        timer.value = setTimeout(stopLoading, 60000);
-      }
-    });
-    onUnmounted(() => {
-      if (timer.value) {
-        clearInterval(timer.value);
-      }
-    });
-
-    const replaying = inject("replaying");
-    const ready = computed(() => store.getters["stage/ready"]);
-    const clicked = ref(false); // Trick the user to click in order to play meSpeak voice
-    const leave = (el, complete) => {
-      animate(el, {
-        translateY: "-100%",
-        ease: "outBack",
-        onComplete: complete,
-      });
-    };
-    const backdropColor = computed(() => store.state.stage.backdropColor);
-
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const masquerading = computed(() => store.state.stage.masquerading);
-    return {
-      model,
-      preloadableAssets,
-      progress,
-      increaseProgress,
-      preloading,
-      replaying,
-      ready,
-      clicked,
-      leave,
-      backdropColor,
-      status,
-      canPlay,
-      masquerading
-    };
-  },
+const store = useStore();
+const preloading = computed<boolean>(() => store.state.stage.preloading);
+const preloadableAssets = computed<string[]>(() => store.getters["stage/preloadableAssets"]);
+const model = computed(() => store.state.stage.model);
+const progress = ref<number>(0);
+const stopLoading = () => store.commit("stage/SET_PRELOADING_STATUS", false);
+const increaseProgress = () => {
+  progress.value++;
+  if (
+    progress.value === preloadableAssets.value.length ||
+    progress.value === preloadableAssets.value.length - 1
+  ) {
+    stopLoading();
+  }
 };
+watchEffect(() => {
+  if (preloadableAssets.value.length === 0 && model.value) {
+    stopLoading();
+  }
+});
+
+watch(
+  preloading,
+  (val) => {
+    const logo = document.querySelector("#live-logo");
+    if (logo) {
+      if (val) logo.classList.add("preloader");
+      else logo.classList.remove("preloader");
+    }
+  },
+  { immediate: true },
+);
+
+const status = useAttribute(model, "status");
+const timer = ref<ReturnType<typeof setTimeout>>();
+watch(model, (val) => {
+  if (val && status.value === "live") {
+    timer.value = setTimeout(stopLoading, 60000);
+  }
+});
+onUnmounted(() => {
+  if (timer.value) clearTimeout(timer.value);
+});
+
+const replaying = inject<boolean>("replaying");
+const ready = computed<boolean>(() => store.getters["stage/ready"]);
+const clicked = ref<boolean>(false);
+const leave = (el: Element, complete: () => void) => {
+  animate(el as HTMLElement, {
+    translateY: "-100%",
+    ease: "outBack",
+    onComplete: complete,
+  });
+};
+const backdropColor = computed<string>(() => store.state.stage.backdropColor);
+const canPlay = computed<boolean>(() => store.getters["stage/canPlay"]);
+const masquerading = computed<boolean>(() => store.state.stage.masquerading);
 </script>
 
 <style scoped lang="scss">
@@ -181,11 +164,9 @@ section {
   0% {
     opacity: 1;
   }
-
   50% {
     opacity: 0;
   }
-
   100% {
     opacity: 1;
   }

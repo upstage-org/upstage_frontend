@@ -12,7 +12,10 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
+import { computed, provide } from "vue";
+import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import Logo from "components/Logo.vue";
 import Chat from "components/stage/Chat/index.vue";
 import Board from "components/stage/Board.vue";
@@ -20,38 +23,19 @@ import AudioPlayer from "components/stage/AudioPlayer.vue";
 import Preloader from "views/live/Preloader.vue";
 import ConnectionStatus from "views/live/ConnectionStatus.vue";
 import Controls from "./Controls.vue";
-import { useStore } from "vuex";
-import { computed, provide } from "vue";
-import { useRoute } from "vue-router";
-export default {
-  components: {
-    Logo,
-    Preloader,
-    Chat,
-    Board,
-    AudioPlayer,
-    ConnectionStatus,
-    Controls,
-  },
-  setup: () => {
-    const store = useStore();
-    const ready = computed(
-      () => store.state.stage.model && !store.state.stage.preloading,
-    );
 
-    const route = useRoute();
-    store.dispatch("stage/loadStage", {
-      url: route.params.url,
-      recordId: route.params.id,
-    });
+const store = useStore();
+const ready = computed<boolean>(
+  () => store.state.stage.model && !store.state.stage.preloading,
+);
 
-    provide("replaying", true);
+const route = useRoute();
+store.dispatch("stage/loadStage", {
+  url: route.params.url,
+  recordId: route.params.id,
+});
 
-    return {
-      ready,
-    };
-  },
-};
+provide("replaying", true);
 </script>
 
 <style lang="scss">
@@ -60,8 +44,8 @@ export default {
 }
 #live-stage {
   *:not(input, textarea) {
-    -webkit-user-select: none; /* Safari */
-    user-select: none; /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 #live-logo {

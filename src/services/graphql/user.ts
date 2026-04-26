@@ -1,8 +1,7 @@
 // @ts-nocheck
-import { gql } from "graphql-request";
-import { createClient } from "./graphql";
-import { studioClient } from './';
-import _ from 'lodash';
+import { gql } from "@apollo/client/core";
+import { studioClient } from "../graphql";
+import _ from "lodash";
 
 export const userFragment = gql`
   fragment userFragment on User {

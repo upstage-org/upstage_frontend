@@ -17,7 +17,7 @@ import { useUpdateUser } from "hooks/mutations";
 import { useAsyncState } from "@vueuse/core";
 import { computed, ComputedRef } from "vue";
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import configs from "config";
 import { useRouter } from "vue-router";
 

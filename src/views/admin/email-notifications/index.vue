@@ -5,7 +5,6 @@ import { Layout, message, Space } from "ant-design-vue";
 import { TransferItem } from "ant-design-vue/lib/transfer";
 import RichTextEditor from "components/editor/RichTextEditor.vue";
 import configs from "config";
-import { enableExperimentalFragmentVariables } from "graphql-tag";
 import { useLoading } from "hooks/mutations";
 import { displayName, titleCase } from "utils/common";
 import { reactive } from "vue";
@@ -17,7 +16,7 @@ import Header from "components/Header.vue";
 import { userGraph, configGraph } from "services/graphql";
 import { ROLES } from "utils/constants";
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import store from "store";
 
 const { t } = useI18n();
@@ -36,6 +35,20 @@ const customRecipients = ref<string[]>([]);
 
 const filterRole = ref<number | undefined>();
 const system = computed(() => store.getters["config/system"]);
+
+const filterOption = (keyword: string, option: { title?: string }) =>
+  option.title?.toLowerCase().includes(keyword.toLowerCase()) ?? false;
+
+const onToggleDirect = (
+  checked: boolean | string | number,
+  e: Event,
+  key: string,
+) => {
+  directToEmails.value = directToEmails.value
+    .filter((email) => email !== key)
+    .concat(checked ? [] : key);
+  e.stopPropagation();
+};
 
 const addCustomRecipient = () => {
   const email = prompt("Enter email: ");
@@ -205,23 +218,14 @@ const { proceed, loading } = useLoading(
               flex: '1',
               height: '300px',
             }" :titles="[' available', ' selected']" v-model:target-keys="receiverEmails" :data-source="dataSource"
-            show-search :filter-option="(keyword, option) =>
-                option.title?.toLowerCase().includes(keyword.toLowerCase()) ??
-                false
-              ">
+            show-search :filter-option="filterOption">
             <template #render="item">
               <a-space class="flex justify-between">
                 <span>
                   {{ item?.title }}
                   <a-tag v-if="!item?.title?.includes('<')">Custom recipient</a-tag>
                 </span>
-                <a-switch size="small" :checked="!directToEmails.includes(item?.key as string)" @change="(checked, e) => {
-                  directToEmails = directToEmails
-                    .filter((email) => email !== item?.key)
-                    .concat(checked ? [] : (item?.key as string));
-                  e.stopPropagation();
-                }
-                ">
+                <a-switch size="small" :checked="!directToEmails.includes(item?.key as string)" @change="(checked: boolean | string | number, e: Event) => onToggleDirect(checked, e, item?.key as string)">
                   <template #checkedChildren>
                     <span class="text-[8px] leading-none">BCC</span>
                   </template>

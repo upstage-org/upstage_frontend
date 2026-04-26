@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { useMutation, useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { computed, reactive, watch, provide, onMounted, ComputedRef } from "vue";
 import type { Media, Stage, StudioGraph } from "models/studio";
 import { absolutePath } from "utils/common";

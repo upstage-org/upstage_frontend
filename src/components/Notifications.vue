@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { absolutePath } from "utils/common";
 import { useConfirmPermission } from "components/media/MediaForm/composable";
 import { inquiryVar } from "apollo";

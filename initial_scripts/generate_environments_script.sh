@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Generates /frontend_app/.env from initial_scripts/env.template.
+# Build configs (package.json, vite.config.ts, etc.) now live at the project
+# root, so this script no longer needs to merge anything into /frontend_app/build.
+
 echo "Please provide the following environment variables:"
 echo "1. The SERVICE domain name for the service machine you set up before: Example: svc.yourdomain.org"
 echo "2. JITSI_ENDPOINT: The endpoint for the Jitsi server, WITHOUT the https://. It's ok if it's not initialized/running yet: Exammple: streaming.yourdomain.org"
@@ -20,10 +24,8 @@ IFS='/' read -ra parts <<< "$dpath"
 DOMAIN=${parts[4]}
 
 output_file="/frontend_app/.env"
-build_dir="/frontend_app/build"
 
 mkdir -p /frontend_app/dist
-mkdir -p /frontend_app/build
 
 declare -A values
 values[MQTT_USERNAME]=$MQTT_USERNAME
@@ -55,8 +57,3 @@ sed -i "s|{{JITSI_ENDPOINT}}|${values[JITSI_ENDPOINT]}|g" "$output_file"
 sed -i "s|{{CLOUDFLARE_CAPTCHA_SITEKEY}}|${values[CLOUDFLARE_CAPTCHA_SITEKEY]}|g" "$output_file"
 
 echo ".env file generated successfully!"
-
-cp -r ./initial_scripts/build_files/* $build_dir
-cp -r ./src $build_dir
-cp -r ./public $build_dir
-cp ./docker-compose.yaml $build_dir

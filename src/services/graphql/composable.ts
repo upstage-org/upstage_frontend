@@ -161,7 +161,7 @@ export const useFirst = (nodes) => {
   );
 };
 
-export function useAttribute(node, attributeName, isJson) {
+export function useAttribute(node, attributeName, isJson?: boolean) {
   return computed(() => {
     let value = node.value?.attributes?.find(
       (a) => a.name === attributeName,

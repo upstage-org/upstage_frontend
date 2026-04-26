@@ -3,7 +3,7 @@ import { ref, provide, watch, Ref, defineModel } from "vue";
 import configs from "config";
 import { message } from "ant-design-vue";
 import { useLazyQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { uploadDefault } from "models/studio";
 import i18n from "../i18n";
 import { humanFileSize } from "utils/common";

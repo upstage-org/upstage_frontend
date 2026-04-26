@@ -59,7 +59,7 @@ import { computed, onMounted, ref, watch } from "vue";
 export default {
   props: {
     data: Array,
-    modelValue: String,
+    modelValue: [String, Number],
     renderLabel: {
       type: Function,
       default: (item) => item,

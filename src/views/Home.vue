@@ -28,7 +28,7 @@ import Entry from "components/stage/Entry.vue";
 import MasonryWall from "@yeger/vue-masonry-wall";
 import { stageGraph } from "services/graphql";
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 
 export default {
   name: "Home",

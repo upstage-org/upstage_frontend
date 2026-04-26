@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { computed, ref } from "vue";
 import { AvatarVoice, StudioGraph, VoiceGraph } from "models/studio";
 import { avatarSpeak } from "services/speech";

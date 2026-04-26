@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { ref, computed, watchEffect, PropType } from "vue";
 import { StudioGraph } from "models/studio";
 import { TransferItem } from "ant-design-vue/lib/transfer";

@@ -5,16 +5,21 @@ import {
   makeVar,
   from,
   fromPromise,
+  gql,
 } from "@apollo/client/core";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
 import { message } from "ant-design-vue";
 import configs from "config";
 import { getSharedAuth, setSharedAuth } from "utils/common";
-import gql from "graphql-tag";
 import { Media } from "models/studio";
 import { provideApolloClient } from "@vue/apollo-composable";
 import { logout } from "utils/auth";
+
+const REFRESHABLE_ERRORS = new Set([
+  "Signature has expired",
+  "Authenticated Failed",
+]);
 // HTTP connection to the API
 const httpLink = createHttpLink({
   // You should use an absolute URL here
@@ -30,7 +35,7 @@ const errorLink = onError(
       for (let err of graphQLErrors) {
         const refreshToken = sharedAuth.refresh_token;
 
-        if (err.message === "Signature has expired") {
+        if (REFRESHABLE_ERRORS.has(err.message)) {
           if (!refreshing) {
             refreshing = true;
             return fromPromise(
@@ -149,4 +154,15 @@ export const apolloClient = new ApolloClient({
   cache,
 });
 
-provideApolloClient(apolloClient);
+/**
+ * Wires the singleton Apollo client into `@vue/apollo-composable` so that
+ * components can call `useQuery`/`useMutation` without manually providing it.
+ *
+ * Call this once during app bootstrap (see `main.ts`) BEFORE the router
+ * touches any composable that depends on the client.
+ */
+export const installApolloClient = (): void => {
+  provideApolloClient(apolloClient);
+};
+
+installApolloClient();

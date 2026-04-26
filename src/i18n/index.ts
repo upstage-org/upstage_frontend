@@ -9,10 +9,16 @@ import vn from "./vn";
 
 const persistedLocale = localStorage.getItem("locale");
 
+type MessageSchema = typeof en;
+type LocaleMessages = Record<string, Partial<MessageSchema>>;
+
+const messages: LocaleMessages = { de, en, es, fr, pt, se, vn };
+
 const i18n = createI18n({
+  legacy: false,
   locale: persistedLocale ?? "en",
   fallbackLocale: "en",
-  messages: { de, en, es, fr, pt, se, vn },
+  messages,
 });
 
 export default i18n;
