@@ -1,14 +1,19 @@
+import type { JQueryStatic } from "jquery";
+
 /**
  * Ambient declarations for legacy global scripts injected from `index.html`.
  *
  * - `JitsiMeetExternalAPI` ships from `https://meet.jit.si/external_api.min.js`
  *   and provides the iframe-based meeting embed.
  * - `JitsiMeetJS` ships from `/js/jitsi/lib-jitsi-meet.min.js` and exposes the
- *   low-level XMPP/RTC primitives used in `services/jitsi`.
+ *   low-level XMPP/RTC primitives used in `services/jitsi` (and expects a global
+ *   jQuery — we assign it from `src/main.ts`).
  * - `meSpeak` ships from `/js/mespeak/mespeak.js` and powers avatar speech.
  */
 declare global {
   interface Window {
+    $: JQueryStatic;
+    jQuery: JQueryStatic;
     JitsiMeetExternalAPI: JitsiMeetExternalAPIConstructor;
     JitsiMeetJS: JitsiMeetJSStatic;
     meSpeak: MeSpeak;

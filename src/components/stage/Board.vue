@@ -1,6 +1,6 @@
 <template>
   <section id="live-stage" class="hero bg-cover is-fullheight" :style="{ 'background-color': backdropColor }">
-    <div id="board" @dragenter.prevent @dragover.prevent @drop.prevent="drop" :style="{
+    <div id="board" data-testid="board" @dragenter.prevent @dragover.prevent @drop.prevent="drop" :style="{
       width: stageSize.width + 'px',
       height: stageSize.height + 'px',
       transform:

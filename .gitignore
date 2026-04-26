@@ -42,6 +42,8 @@ coverage/
 reports/
 test-results/
 playwright-report/
+tests/e2e/runtime.json
+tests/e2e/.cache/
 
 # Editor & IDE
 .idea/

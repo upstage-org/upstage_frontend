@@ -1,6 +1,6 @@
 <template>
   <a-tooltip :title="dynamicTooltip">
-    <div style="position: relative" class="has-tooltip-left">
+    <div style="position: relative" class="has-tooltip-left" data-testid="chat-input" :data-chat-mode="behavior">
       <ElasticInput v-if="!pickerOnly" v-bind="$attrs" :model-value="modelValue"
         @update:model-value="$emit('update:modelValue', $event)" @ref="(el) => (input = el)" @submit="$emit('submit')"
         :style="{
@@ -223,6 +223,7 @@ export default {
       dynamicTooltip,
       chatDarkMode,
       emojiPickerStyle,
+      behavior,
     };
   },
 };

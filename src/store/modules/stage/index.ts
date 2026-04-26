@@ -136,13 +136,14 @@ export default {
     preloadableAssets(state) {
       const assets = []
         .concat(state.tools.avatars.filter(a => !a.multi).map((a) => a.src))
-        .concat(state.tools.avatars.filter(a => a.multi).map((a) => a.frames ?? []).flat())
-        .concat(state.tools.props.filter(a => !a.multi).map((p) => p.src))
-        .concat(state.tools.props.filter(a => a.multi).map((a) => a.frames ?? []).flat())
-        .concat(state.tools.backdrops.filter(a => !a.multi).map((b) => b.src))
-        .concat(state.tools.backdrops.filter(a => a.multi).map((a) => a.frames ?? []).flat())
+        .concat(state.tools.avatars.filter((a) => a.multi).map((a) => a.frames ?? []).flat())
+        .concat(state.tools.props.filter((a) => !a.multi).map((p) => p.src))
+        .concat(state.tools.props.filter((a) => a.multi).map((a) => a.frames ?? []).flat())
+        .concat(state.tools.backdrops.filter((a) => !a.multi).map((b) => b.src))
+        .concat(state.tools.backdrops.filter((a) => a.multi).map((a) => a.frames ?? []).flat())
         .concat(state.tools.curtains.map((b) => b.src));
-      return assets;
+      // Drop falsy so we never block on a slot that will never @load
+      return assets.filter((src) => Boolean(src));
     },
     audios(state) {
       return state.tools.audios;
@@ -1154,23 +1155,28 @@ export default {
     async loadStage({ commit, dispatch }, { url, recordId }) {
       commit("CLEAN_STAGE", true);
       commit("SET_PRELOADING_STATUS", true);
-      const { stage } = await stageGraph.loadStage(url, recordId);
-      if (stage) {
-        commit("SET_MODEL", stage);
-        const { events } = stage;
-        if (recordId && events) {
-          commit("SET_REPLAY", {
-            timestamp: {
-              begin: events[0].mqttTimestamp,
-              current: events[0].mqttTimestamp,
-              end: events[events.length - 1].mqttTimestamp,
-            },
-          });
+      try {
+        const { stage } = await stageGraph.loadStage(url, recordId);
+        if (stage) {
+          commit("SET_MODEL", stage);
+          const { events } = stage;
+          if (recordId && events) {
+            commit("SET_REPLAY", {
+              timestamp: {
+                begin: events[0].mqttTimestamp,
+                current: events[0].mqttTimestamp,
+                end: events[events.length - 1].mqttTimestamp,
+              },
+            });
+          } else {
+            (events || []).forEach((event) => dispatch("replayEvent", event));
+          }
+          await stageGraph.updateLastAccess(stage.id);
         } else {
-          (events || []).forEach((event) => dispatch("replayEvent", event));
+          commit("SET_PRELOADING_STATUS", false);
         }
-        await stageGraph.updateLastAccess(stage.id);
-      } else {
+      } catch (e) {
+        console.error("[stage/loadStage] failed", e);
         commit("SET_PRELOADING_STATUS", false);
       }
     },

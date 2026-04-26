@@ -19,6 +19,25 @@
             <h2 v-if="model.description" class="subtittle">
               {{ model.description }}
             </h2>
+            <!--
+              Hidden preload must mount whenever we have assets, independent of the
+              status/ready branch below. Otherwise `status !== 'live' && !canPlay` renders
+              the "closed" copy but skips the v-else block — no imgs mount, @load never
+              fires, and preloading/ready never clear (infinite "loading").
+            -->
+            <div
+              v-if="preloadableAssets.length"
+              id="preloading-area"
+              aria-hidden="true"
+            >
+              <img
+                v-for="(src, idx) in preloadableAssets"
+                :key="`${idx}-${src}`"
+                :src="src"
+                @load="increaseProgress"
+                @error="increaseProgress"
+              />
+            </div>
             <template v-if="status !== 'live' && !canPlay">
               <span v-if="status" class="tag is-dark">{{ status.toUpperCase() }}</span>&nbsp;
               <span>This stage is not currently open to the public. Please come back later!</span>
@@ -32,17 +51,7 @@
               <template v-if="preloadableAssets.length">
                 <button class="button is-primary is-loading" />
                 <span style="line-height: 2">
-                  <span>
-                    Preloading media... {{ progress }}/{{ preloadableAssets.length }}
-                    <div id="preloading-area">
-                      <img
-                        v-for="src in preloadableAssets"
-                        :key="src"
-                        :src="src"
-                        @load="increaseProgress"
-                      />
-                    </div>
-                  </span>
+                  <span> Preloading media... {{ progress }}/{{ preloadableAssets.length }} </span>
                 </span>
               </template>
             </h2>
@@ -74,6 +83,12 @@ const preloading = computed<boolean>(() => store.state.stage.preloading);
 const preloadableAssets = computed<string[]>(() => store.getters["stage/preloadableAssets"]);
 const model = computed(() => store.state.stage.model);
 const progress = ref<number>(0);
+watch(
+  () => model.value?.id,
+  () => {
+    progress.value = 0;
+  },
+);
 const stopLoading = () => store.commit("stage/SET_PRELOADING_STATUS", false);
 const increaseProgress = () => {
   progress.value++;

@@ -12,6 +12,10 @@ import { onError } from "@apollo/client/link/error";
 import { message } from "ant-design-vue";
 import configs from "config";
 import { getSharedAuth, setSharedAuth } from "utils/common";
+import {
+  getAccessTokenForGraphql,
+  getRefreshTokenForGraphql,
+} from "utils/graphqlAuth";
 import { Media } from "models/studio";
 import { provideApolloClient } from "@vue/apollo-composable";
 import { logout } from "utils/auth";
@@ -31,73 +35,57 @@ let refreshing = false;
 const errorLink = onError(
   ({ graphQLErrors, networkError, operation, forward }) => {
     if (graphQLErrors) {
-      const sharedAuth = getSharedAuth()!;
-      for (let err of graphQLErrors) {
-        const refreshToken = sharedAuth.refresh_token;
+      const sharedAuth = getSharedAuth();
+      const username = sharedAuth?.username ?? "";
+      for (const err of graphQLErrors) {
+        if (!REFRESHABLE_ERRORS.has(err.message)) {
+          continue;
+        }
+        const refreshToken = getRefreshTokenForGraphql();
+        if (!refreshToken) {
+          return;
+        }
 
-        if (REFRESHABLE_ERRORS.has(err.message)) {
-          if (!refreshing) {
-            refreshing = true;
-            return fromPromise(
-              apolloClient
-                .mutate({
-                  mutation: gql`
-                    mutation {
-                        refreshToken {
-                            access_token
-                            refresh_token
-                        }
+        if (!refreshing) {
+          refreshing = true;
+          return fromPromise(
+            apolloClient
+              .mutate({
+                mutation: gql`
+                  mutation {
+                    refreshToken {
+                      access_token
+                      refresh_token
                     }
-                  `,
-                  context: {
-                    headers: {
-                      "X-Access-Token": refreshToken,
-                    },
-                  },
-                  variables: {
-                    refreshToken,
-                  },
-                })
-                .catch(() => {
-                  logout();
-                  // Handle token refresh errors e.g clear stored tokens, redirect to login
-                  message.error(
-                    `Token expired, could not refresh your access token. Please login again!`,
-                  );
-                  return;
-                }),
-            )
-              .map((value) => value?.data.refreshToken.access_token)
-              .filter((value) => Boolean(value))
-              .flatMap((accessToken) => {
-                refreshing = false;
-                setSharedAuth({
-                  token: accessToken,
-                  refresh_token: refreshToken ?? "",
-                  username: sharedAuth.username ?? "",
-                });
-                // modify the operation context with a new token
-                operation.setContext({
-                  headers: {
-                    ...operation.getContext().headers,
-                    "Authorization": `Bearer ${accessToken}`,
-                  },
-                });
-                return forward(operation);
-              });
-          } else {
-            return fromPromise(
-              new Promise((resolve) => {
-                const loop = () => {
-                  if (!refreshing) {
-                    resolve(getSharedAuth()?.token);
-                  } else {
-                    setTimeout(loop, 500);
                   }
-                };
-                loop();
+                `,
+                context: {
+                  headers: {
+                    "X-Access-Token": refreshToken,
+                  },
+                },
+                variables: {
+                  refreshToken,
+                },
+              })
+              .catch(() => {
+                refreshing = false;
+                logout();
+                message.error(
+                  `Token expired, could not refresh your access token. Please login again!`,
+                );
+                return;
               }),
-            ).flatMap((accessToken) => {
+          )
+            .map((value) => value?.data.refreshToken.access_token)
+            .filter((value) => Boolean(value))
+            .flatMap((accessToken) => {
+              refreshing = false;
+              setSharedAuth({
+                token: accessToken,
+                refresh_token: refreshToken ?? "",
+                username,
+              });
               operation.setContext({
                 headers: {
                   ...operation.getContext().headers,
@@ -106,21 +94,43 @@ const errorLink = onError(
               });
               return forward(operation);
             });
-          }
         }
+        return fromPromise(
+          new Promise<string | undefined>((resolve) => {
+            const loop = () => {
+              if (!refreshing) {
+                resolve(getAccessTokenForGraphql());
+              } else {
+                setTimeout(loop, 500);
+              }
+            };
+            loop();
+          }),
+        ).flatMap((accessToken) => {
+          if (!accessToken) {
+            return forward(operation);
+          }
+          operation.setContext({
+            headers: {
+              ...operation.getContext().headers,
+              "Authorization": `Bearer ${accessToken}`,
+            },
+          });
+          return forward(operation);
+        });
       }
     }
-    if (networkError) message.error(`[Network error]: ${networkError}`);
+    if (networkError) {
+      message.error(`[Network error]: ${networkError}`);
+    }
   },
 );
 
 const authLink = setContext((request, { headers }) => {
-  // get the authentication token from local storage if it exists
-  const auth = getSharedAuth();
-  // return the headers to the context so httpLink can read them
+  const token = getAccessTokenForGraphql();
   return {
     headers: {
-      "Authorization": `Bearer ${auth?.token}`,
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
       ...headers,
     },
   };

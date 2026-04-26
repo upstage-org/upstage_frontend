@@ -2,7 +2,7 @@
   <div class="columns">
     <div class="column" align="right">
       <template v-if="stage.id">
-        <button class="button ml-2 is-primary" :class="{ 'is-loading': loading }" @click="updateStage"
+        <button data-testid="stage-save" class="button ml-2 is-primary" :class="{ 'is-loading': loading }" @click="updateStage"
           :disabled="!urlValid">
           {{ $t("save_stage") }}
         </button>
@@ -18,7 +18,7 @@
         </DeleteStage>
       </template>
       <template v-else>
-        <button class="button ml-2 is-primary" :class="{ 'is-loading': loading }" @click="createStage"
+        <button data-testid="stage-create" class="button ml-2 is-primary" :class="{ 'is-loading': loading }" @click="createStage"
           :disabled="!urlValid">
           {{ $t("create_stage") }}
         </button>
@@ -31,9 +31,9 @@
         <label class="label">{{ $t("stage_name") }}</label>
       </div>
       <div class="field-body">
-        <Field placeholder="Full Name" v-model="form.name" required requiredMessage="Stage name is required" expanded
+        <Field data-testid="stage-name-input" placeholder="Full Name" v-model="form.name" required requiredMessage="Stage name is required" expanded
           class="half-flex" />
-        <Field required placeholder="URL" v-model="form.fileLocation" requiredMessage="URL is required" expanded
+        <Field data-testid="stage-url-input" required placeholder="URL" v-model="form.fileLocation" requiredMessage="URL is required" expanded
           @keyup="urlValid = null" @input="checkURL" :right="validatingURL
             ? 'fas fa-circle-notch fa-spin'
             : urlValid === true

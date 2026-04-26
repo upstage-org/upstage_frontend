@@ -110,8 +110,8 @@ const uploadFile = async (file: any) => {
 
 <template>
   <a-modal :footer="null" :visible="visible" @cancel="visible = false" width="100%" wrapClassName="fullscreen-dragzone"
-    class="h-full top-0 p-0">
-    <a-upload-dragger :show-upload-list="false" :custom-request="uploadFile" multiple>
+    class="h-full top-0 p-0" data-testid="dropzone">
+    <a-upload-dragger data-testid="dropzone-input" :show-upload-list="false" :custom-request="uploadFile" multiple>
       <p class="ant-upload-drag-icon">
         <UploadOutlined />
       </p>

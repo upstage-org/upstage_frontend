@@ -1,3 +1,7 @@
+import $ from "jquery";
+// `public/js/jitsi/lib-jitsi-meet.min.js` (see index.html) still references a global jQuery
+window.jQuery = window.$ = $;
+
 import { createApp } from "vue";
 import App from "./App.vue";
 import i18n from "./i18n";

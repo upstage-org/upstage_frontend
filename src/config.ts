@@ -15,10 +15,35 @@ const {
 
 // Fallback when env was not set at build time (e.g. wrong .env path or CI build)
 const ensureTrailingSlash = (url: string) => (url.endsWith("/") ? url : `${url}/`);
-const graphqlEndpoint =
-  (typeof VITE_GRAPHQL_ENDPOINT === "string" && VITE_GRAPHQL_ENDPOINT)
+
+const graphqlFromEnv =
+  typeof VITE_GRAPHQL_ENDPOINT === "string" && VITE_GRAPHQL_ENDPOINT
     ? ensureTrailingSlash(VITE_GRAPHQL_ENDPOINT)
     : ensureTrailingSlash(`${window.location.origin}/api/`);
+
+/**
+ * In dev, `VITE_GRAPHQL_ENDPOINT=http://localhost:3001/api/` breaks the SPA: the
+ * browser would POST cross-origin to :3001 (no Vite `server.proxy`). Studio is on
+ * 3001, but the page is on 3000 — use the same origin + `/api/` so the proxy works.
+ * Node/e2e should keep calling 3001 directly (see `tests/e2e/graphql.ts`).
+ */
+function resolveGraphqlEndpoint(): string {
+  if (!import.meta.env.DEV) {
+    return graphqlFromEnv;
+  }
+  try {
+    const apiUrl = new URL(graphqlFromEnv, window.location.origin);
+    const isLocal = ["localhost", "127.0.0.1"].includes(apiUrl.hostname);
+    if (isLocal && apiUrl.origin !== window.location.origin) {
+      return ensureTrailingSlash(`${window.location.origin}/api/`);
+    }
+  } catch {
+    // keep graphqlFromEnv
+  }
+  return graphqlFromEnv;
+}
+
+const graphqlEndpoint = resolveGraphqlEndpoint();
 const staticAssetsEndpoint =
   (typeof VITE_STATIC_ASSETS_ENDPOINT === "string" && VITE_STATIC_ASSETS_ENDPOINT)
     ? ensureTrailingSlash(VITE_STATIC_ASSETS_ENDPOINT)

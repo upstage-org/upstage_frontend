@@ -9,8 +9,8 @@
   <body>
     <div id="app"></div>
     <!--
-      Legacy globals required by services/speech (mespeak) and Jitsi integrations.
-      jQuery and TinyMCE were dropped after audits showed no consumer in src/.
+      Jitsi (lib-jitsi-meet) still expects `window.jQuery` / `window.$` at runtime; see main.ts.
+      meSpeak: services/speech (mespeak).
     -->
     <script type="text/javascript" src="/js/jitsi/lib-jitsi-meet.min.js"></script>
     <script type="text/javascript" src="/js/mespeak/mespeak.js"></script>

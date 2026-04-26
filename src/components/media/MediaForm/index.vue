@@ -456,11 +456,12 @@ const getUserDisplayName = (user: User) => {
       <a-space>
         <a-input-group compact>
           <a-select
+            data-testid="media-form-type"
             :options="mediaTypes"
             v-model:value="type"
             style="min-width: 110px"
           ></a-select>
-          <a-input v-model:value="name" :placeholder="mediaName"></a-input>
+          <a-input data-testid="media-form-name" v-model:value="name" :placeholder="mediaName"></a-input>
         </a-input-group>
         <template v-if="!['video', 'audio'].includes(type)">
           <a-button type="primary" @click="visibleDropzone = true">
@@ -698,6 +699,7 @@ const getUserDisplayName = (user: User) => {
               <div class="p-4">
                 <a-form-item label="New Owner">
                   <a-select
+                    data-testid="media-form-owner"
                     v-model:value="owner"
                     placeholder="Select new owner"
                     :loading="!users.length"
@@ -750,6 +752,7 @@ const getUserDisplayName = (user: User) => {
         >
         </a-select>
         <a-button
+          data-testid="media-form-save"
           key="submit"
           type="primary"
           :loading="saving"

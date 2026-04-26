@@ -1,5 +1,6 @@
 <template>
-  <div ref="el" tabindex="0" @keyup.delete="deleteObject" @dblclick="hold" @click="openLink" :style="activeMovable
+  <div ref="el" tabindex="0" :data-testid="object?.name ? `object-${object.name}` : undefined"
+    :data-object-id="object?.id" :data-object-type="object?.type" @keyup.delete="deleteObject" @dblclick="hold" @click="openLink" :style="activeMovable
     ? {
       position: 'relative',
       'z-index': 1,
