@@ -40,6 +40,14 @@ export default defineConfig({
     fs: {
       allow: [".."],
     },
+    // Same-origin /api/... in the browser (Apollo + e2e page.evaluate) — avoids
+    // CORS when the studio API is on a different port than Vite.
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+      },
+    },
   },
   css: {
     preprocessorOptions: {

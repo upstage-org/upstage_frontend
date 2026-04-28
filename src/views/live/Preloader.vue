@@ -117,7 +117,13 @@ watch(
   { immediate: true },
 );
 
-const status = useAttribute(model, "status");
+// `ListStage` includes `status` on the stage payload; the attributes array can lag
+// or duplicate it — prefer the root field from `loadStage`, then `attributes`.
+const statusFromAttributes = useAttribute(model, "status");
+const status = computed(() => {
+  const m = model.value as { status?: string } | undefined;
+  return m?.status ?? statusFromAttributes.value ?? "rehearsal";
+});
 const timer = ref<ReturnType<typeof setTimeout>>();
 watch(model, (val) => {
   if (val && status.value === "live") {
