@@ -14,6 +14,8 @@ build/
 *.local
 
 # Environment variables
+env_backup
+
 .env
 .env.local
 .env.*.local
