@@ -7,9 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // .env.test wins over the SPA's runtime .env so e2e knobs don't poison Vite.
 loadEnv({ path: path.join(__dirname, ".env.test") });
 
-const PORT = 3000;
-const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
-// If set, Playwright will NOT start `pnpm dev` — you must serve the SPA yourself.
+/** Browser `baseURL`: Vite (`pnpm dev`). Same-origin `/api/*` is proxied to Studio — see vite.config `server.proxy`. */
+const E2E_FRONTEND_PORT = 3000;
+const BASE_URL =
+  process.env.E2E_BASE_URL ?? `http://localhost:${E2E_FRONTEND_PORT}`;
+// If set, Playwright will NOT start `pnpm dev` — you must serve the SPA yourself on that URL (still typically :3000).
 // Leave `E2E_BASE_URL` unset in `.env.test` for the default (Vite on 3000).
 const HAS_EXTERNAL_SERVER = Boolean(process.env.E2E_BASE_URL);
 // Default to headed locally so the human can watch the play unfold; CI still
@@ -64,7 +66,7 @@ export default defineConfig({
     ? undefined
     : {
         command: "pnpm dev",
-        port: PORT,
+        port: E2E_FRONTEND_PORT,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
       },

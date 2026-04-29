@@ -12,6 +12,19 @@ import { gql, loginAsAdmin } from "./graphql";
 
 const TCP_TIMEOUT_MS = 3_000;
 
+/** Parsed from `E2E_GRAPHQL_ENDPOINT` — Studio listens here from Node (global-setup / graphql.ts). */
+function graphqlEndpointTcp(): { host: string; port: number; label: string } {
+  const raw =
+    process.env.E2E_GRAPHQL_ENDPOINT ?? "http://127.0.0.1:3001/api/studio_graphql";
+  const u = new URL(raw);
+  const port = Number(u.port || (u.protocol === "https:" ? 443 : 80));
+  return {
+    host: u.hostname,
+    port,
+    label: `Studio GraphQL (${raw})`,
+  };
+}
+
 function probeTcp(host: string, port: number, label: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
@@ -44,9 +57,13 @@ export default async function globalSetup() {
   // Fail fast with a clear message instead of waiting for browser timeouts.
   await probeTcp(
     baseUrl.hostname,
-    Number(baseUrl.port || 80),
+    Number(baseUrl.port || (baseUrl.protocol === "https:" ? 443 : 80)),
     "frontend (Vite or reverse proxy for E2E_BASE_URL)",
   );
+
+  const gqlTcp = graphqlEndpointTcp();
+  await probeTcp(gqlTcp.host, gqlTcp.port, gqlTcp.label);
+
   // Live `loadStage` and Preloader are GraphQL-driven; MQTT is for realtime sync.
   // Do not fail the whole run if the broker is down — @full/perform will surface it.
   try {

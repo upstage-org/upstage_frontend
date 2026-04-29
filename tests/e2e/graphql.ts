@@ -2,10 +2,14 @@
  * Tiny zero-dep GraphQL client for the e2e harness. We deliberately do NOT
  * pull in @apollo/client here so the harness can run in Node without the SPA's
  * polyfill chain.
+ *
+ * Uses `E2E_GRAPHQL_ENDPOINT` (see `.env.test`): Studio backend on port **3001**
+ * by default. Playwright opens the SPA on **3000** (`baseURL`); the browser hits
+ * `/api/*` same-origin and Vite proxies to :3001.
  */
 
 const ENDPOINT = process.env.E2E_GRAPHQL_ENDPOINT
-  ?? "http://localhost:3001/api/studio_graphql";
+  ?? "http://127.0.0.1:3001/api/studio_graphql";
 
 export interface GqlResult<T> {
   data?: T;

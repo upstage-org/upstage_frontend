@@ -12,6 +12,8 @@ import type { JQueryStatic } from "jquery";
  */
 declare global {
   interface Window {
+    /** Dev-only hook for Playwright E2E (`pnpm dev`). Do not rely on in production. */
+    __UPSTAGE_STORE__?: import("vuex").Store<unknown>;
     $: JQueryStatic;
     jQuery: JQueryStatic;
     JitsiMeetExternalAPI: JitsiMeetExternalAPIConstructor;

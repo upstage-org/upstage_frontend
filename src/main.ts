@@ -21,6 +21,10 @@ const app = createApp(App)
   .use(i18n)
   .directive("click-outside", ClickOutside);
 
+if (import.meta.env.DEV) {
+  window.__UPSTAGE_STORE__ = store;
+}
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker

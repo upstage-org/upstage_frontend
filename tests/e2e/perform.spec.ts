@@ -109,15 +109,45 @@ async function runBeat({
       const raw = window.localStorage.getItem("vuex");
       const token = raw ? (JSON.parse(raw)?.auth?.token ?? null) : null;
       if (!token) throw new Error("no admin token in localStorage");
+      const gqlHeaders = {
+        "content-type": "application/json",
+        authorization: `JWT ${token}`,
+      };
+
+      const stageResp = await fetch("/api/studio_graphql", {
+        method: "POST",
+        headers: gqlHeaders,
+        body: JSON.stringify({
+          query: `query StageBackdropAsset($id: ID!) {
+            stage(id: $id) {
+              assets { id fileLocation }
+            }
+          }`,
+          variables: { id: String(stageId) },
+        }),
+      });
+      const stageJson = await stageResp.json();
+      if (stageJson.errors) throw new Error(JSON.stringify(stageJson.errors));
+      const assets = stageJson.data?.stage?.assets ?? [];
+      const asset = assets.find((a: { id: string }) => String(a.id) === String(mediaId));
+      if (!asset?.fileLocation) {
+        throw new Error(
+          `backdrop asset ${mediaId} not found on stage or missing fileLocation`,
+        );
+      }
+
       const resp = await fetch("/api/studio_graphql", {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: `JWT ${token}` },
+        headers: gqlHeaders,
         body: JSON.stringify({
-          query: `mutation Save($input: SaveStageAttributeInput!) {
-            saveStageAttribute(input: $input) { name value }
+          query: `mutation SaveBackdropCover($input: StageInput!) {
+            updateStage(input: $input) { id cover }
           }`,
           variables: {
-            input: { stageId: String(stageId), name: "backdrop", value: String(mediaId) },
+            input: {
+              id: String(stageId),
+              cover: asset.fileLocation,
+            },
           },
         }),
       });
@@ -134,15 +164,14 @@ async function runBeat({
   }
 
   if (beat.kind === "enter") {
-    // Avatars are placed on the stage by the persona via drag/drop; we again
-    // shortcut through GraphQL to keep the spec deterministic.
+    // Avatars are placed from the toolbox via drag/drop; we shortcut through Vuex
+    // (same as Board.vue) plus shapeObject(liveAction) so MQTT reaches observers.
     const mediaRef = runtime.mediaByPersona[beat.speaker];
     if (!mediaRef) throw new Error(`${tag}: no avatar media for ${beat.speaker}`);
     await placeAvatar({
       seat,
       mediaId: mediaRef.id,
       mediaName: mediaRef.name,
-      stageId: runtime.stageId,
       to: beat.to ?? { x: 480, y: 280 },
     });
     await expect
@@ -151,7 +180,7 @@ async function runBeat({
           await adminLive
             .objectByName(mediaRef.name)
             .count(),
-        { timeout: 6_000 },
+        { timeout: 12_000 },
       )
       .toBeGreaterThan(0);
     return;
@@ -197,60 +226,80 @@ async function placeAvatar({
   seat,
   mediaId,
   mediaName,
-  stageId,
   to,
 }: {
   seat: CastSeat;
   mediaId: string;
   mediaName: string;
-  stageId: string;
   to: { x: number; y: number };
 }): Promise<void> {
   await seat.page.evaluate(
-    async ({ mediaId, mediaName, stageId, to }) => {
-      const raw = window.localStorage.getItem("vuex");
-      const token = raw ? (JSON.parse(raw)?.auth?.token ?? null) : null;
-      if (!token) throw new Error("no token for placeAvatar");
-      const resp = await fetch("/api/studio_graphql", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `JWT ${token}` },
-        body: JSON.stringify({
-          query: `mutation Place($input: PlaceObjectOnStageInput!) {
-            placeObjectOnStage(input: $input) { id }
-          }`,
-          variables: {
-            input: {
-              stageId: String(stageId),
-              mediaId: String(mediaId),
-              x: to.x,
-              y: to.y,
-              name: mediaName,
-            },
-          },
-        }),
-      });
-      const result = await resp.json();
-      if (result.errors) {
-        // The mutation name varies across backend versions; if this one isn't
-        // accepted we fall through to the Vuex action exposed on window.$store
-        // (some builds expose it for devtools).
-        const store = (window as unknown as { $store?: { dispatch: Function } }).$store;
-        if (store?.dispatch) {
-          await store.dispatch("stage/placeObjectOnStage", {
-            id: mediaId,
-            name: mediaName,
-            x: to.x,
-            y: to.y,
-            type: "avatar",
-            url: undefined,
-            w: 100,
-            h: 100,
-          });
-        } else {
-          throw new Error(`placeObjectOnStage failed: ${JSON.stringify(result.errors)}`);
-        }
+    async ({ mediaId, mediaName, to }) => {
+      type ToolboxAvatar = Record<string, unknown> & { id: unknown };
+      type StageSlice = {
+        status: string;
+        tools: { avatars?: ToolboxAvatar[] };
+        board: { objects: Array<Record<string, unknown> & { id: string }> };
+      };
+      type DevStore = {
+        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
+        state: { stage: StageSlice };
+      };
+
+      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+      if (!store) {
+        throw new Error(
+          "Vuex store not exposed (__UPSTAGE_STORE__). Serve the SPA with `pnpm dev` for perform E2E.",
+        );
       }
+
+      const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+      for (let attempt = 0; attempt < 120; attempt += 1) {
+        if (store.state.stage.status === "LIVE") break;
+        await sleep(250);
+      }
+      if (store.state.stage.status !== "LIVE") {
+        throw new Error(
+          `stage MQTT not LIVE yet (status=${store.state.stage.status}); cannot broadcast avatar placement.`,
+        );
+      }
+
+      let avatar: ToolboxAvatar | undefined;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const avatars = store.state.stage.tools.avatars ?? [];
+        avatar =
+          avatars.find((a) => a.name === mediaName) ??
+          avatars.find((a) => String(a.id) === String(mediaId));
+        if (avatar) break;
+        await sleep(250);
+      }
+      if (!avatar) {
+        const avatars = store.state.stage.tools.avatars ?? [];
+        const ids = avatars.map((a) => String(a.id)).join(", ");
+        throw new Error(
+          `avatar not in toolbox (name=${mediaName}, id=${mediaId}); known ids: [${ids}]`,
+        );
+      }
+
+      const placed = (await store.dispatch("stage/placeObjectOnStage", {
+        ...avatar,
+        name: mediaName,
+        x: to.x,
+        y: to.y,
+      })) as { id: string };
+
+      const fromBoard = store.state.stage.board.objects.find((o) => o.id === placed.id);
+      if (!fromBoard) {
+        throw new Error("placeObjectOnStage did not add object to board.objects");
+      }
+
+      await store.dispatch("stage/shapeObject", {
+        ...fromBoard,
+        liveAction: true,
+        published: false,
+      });
     },
-    { mediaId, mediaName, stageId, to },
+    { mediaId, mediaName, to },
   );
 }
