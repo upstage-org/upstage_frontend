@@ -86,8 +86,8 @@ vite.config.*.timestamp-*
 # npm
 package-lock.json
 
-# pnpm
-pnpm-lock.yaml
+# pnpm : commit this!
+#pnpm-lock.yaml
 
 # yarn (if you ever use it)
 yarn.lock
