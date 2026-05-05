@@ -248,9 +248,12 @@ export default {
         if (config) {
           Object.assign(state.config, config);
           state.config.ratio = config.ratio.width / config.ratio.height;
-          state.backdropColor = config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
           state.enabledLiveStreaming = typeof (config?.enabledLiveStreaming) === 'boolean' ? config?.enabledLiveStreaming : true
         }
+        // Match Stage Management default (#30AC45): new stages often have no saved config yet,
+        // so do not leave backdropColor on CLEAN_STAGE's "gray".
+        state.backdropColor =
+          config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
         const cover = useAttribute({ value: model }, "cover", false).value;
         state.model.cover = cover && absolutePath(cover);
       }
@@ -1076,7 +1079,7 @@ export default {
         type: BACKGROUND_ACTIONS.BLANK_SCENE,
       });
     },
-    handleBackgroundMessage({ commit, dispatch }, { message }) {
+    handleBackgroundMessage({ commit, dispatch, state }, { message }) {
       switch (message.type) {
         case BACKGROUND_ACTIONS.CHANGE_BACKGROUND:
           commit("SET_BACKGROUND", message.background);
@@ -1105,11 +1108,15 @@ export default {
         case BACKGROUND_ACTIONS.SWITCH_SCENE:
           dispatch("replaceScene", message.scene);
           break;
-        case BACKGROUND_ACTIONS.BLANK_SCENE:
+        case BACKGROUND_ACTIONS.BLANK_SCENE: {
+          const blankBackdrop =
+            state.config?.defaultcolor ||
+            state.backdropColor ||
+            COLORS.DEFAULT_BACKDROP;
           commit("REPLACE_SCENE", {
             payload: JSON.stringify({
               background: null,
-              backdropColor: "gray",
+              backdropColor: blankBackdrop,
               board: {
                 objects: [],
                 drawings: [],
@@ -1120,6 +1127,7 @@ export default {
             }),
           });
           break;
+        }
         default:
           break;
       }
