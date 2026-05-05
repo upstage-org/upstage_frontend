@@ -190,7 +190,8 @@ export default {
     const whoami = computed(() => store.getters["user/whoami"]);
     const router = useRouter();
     const stage = inject("stage");
-    const clearCache = inject("clearCache");
+    /** Refetch stage in parent layout so injected `stage` matches DB after save (clearCache alone leaves stale data). */
+    const refresh = inject("refresh");
 
     const form = reactive({
       fileLocation: "",
@@ -323,8 +324,7 @@ export default {
           stageId: form.id,
           visibility: form.visibility,
         });
-        console.log(clearCache);
-        clearCache();
+        await refresh(stage.value.id);
       } catch (error) {
         handleError(error);
       }
