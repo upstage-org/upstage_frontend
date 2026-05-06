@@ -57,7 +57,7 @@ export default async function globalSetup() {
   await probeTcp(
     baseUrl.hostname,
     Number(baseUrl.port || (baseUrl.protocol === "https:" ? 443 : 80)),
-    "frontend (SPA on baseURL — embedded Vite :3000 unless E2E_BASE_URL points elsewhere)",
+    "frontend (SPA origin from baseURL — start Vite/`pnpm dev` yourself first)",
   );
 
   const gqlTcp = graphqlEndpointTcp();

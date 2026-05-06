@@ -10,8 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * Port Playwright waits on when it starts embedded Vite (`pnpm dev`) for e2e when
- * `E2E_BASE_URL` is not set.
+ * SPA TCP port assumed when **`E2E_BASE_URL`** is unset: Playwright connects to an
+ * **already-running** dev server here (typically `pnpm dev`). No embedded server.
  */
 export const E2E_PLAYWRIGHT_VITE_PORT = 3000;
 
@@ -69,16 +69,13 @@ export function loadE2eConfig(): E2eConfig {
   const explicitBaseUrl = process.env.E2E_BASE_URL?.trim();
   const ci = Boolean(process.env.CI);
 
-  let baseUrl: string;
-  let webServerStartsVite: boolean;
+  // Never start `pnpm dev` / Vite from Playwright — infra must already be running.
+  const baseUrl =
+    explicitBaseUrl && explicitBaseUrl.length > 0
+      ? explicitBaseUrl
+      : `http://127.0.0.1:${String(E2E_PLAYWRIGHT_VITE_PORT)}`;
 
-  if (explicitBaseUrl) {
-    baseUrl = explicitBaseUrl;
-    webServerStartsVite = false;
-  } else {
-    baseUrl = `http://127.0.0.1:${String(E2E_PLAYWRIGHT_VITE_PORT)}`;
-    webServerStartsVite = true;
-  }
+  const webServerStartsVite = false;
 
   const headlessExplicit = process.env.PWHEADLESS;
   let headless: boolean;
@@ -126,15 +123,16 @@ export function maskSecret(value: string, visibleEnd = 0): string {
 }
 
 export function formatE2eConfigSummary(cfg: E2eConfig): string {
-  const viteHint = cfg.webServerStartsVite
-    ? `yes (embedded Vite on :${E2E_PLAYWRIGHT_VITE_PORT})`
-    : `no — use E2E_BASE_URL for a server you start yourself (e.g. preview)`;
+  const serverHint =
+    "never — SPA must already be reachable at baseURL (default http://127.0.0.1:" +
+    String(E2E_PLAYWRIGHT_VITE_PORT) +
+    "; set E2E_BASE_URL otherwise)";
   const lines = [
     "E2E configuration (effective after `.env.test` merge)",
     "",
     `  · .env.test path     ${cfg.envTestLoadedFrom ?? "(not found on disk)"}`,
     `  · baseURL            ${cfg.baseUrl}`,
-    `  · embedded Vite      ${viteHint}`,
+    `  · auto-start SPA     ${serverHint}`,
     `  · headless           ${cfg.headless}`,
     `  · GraphQL (Studio)   ${cfg.graphqlEndpoint}`,
     `  · MQTT WS probe TCP  ${cfg.mqttHost}:${cfg.mqttWsPort} (broker plain TCP often 1883 internally)`,

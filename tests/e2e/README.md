@@ -33,7 +33,7 @@ Running **`pnpm exec playwright test`** directly bypasses preflight entirely.
    started from the backend repo’s docker compose scripts; keep the same DB
    between runs if you want `runtime.json` reuse to work.
 
-2. **Frontend:** when **`E2E_BASE_URL` is unset**, Playwright starts **embedded Vite** (`pnpm dev`) on **`http://127.0.0.1:3000`** and proxies `/api` to Studio like any other Vite dev session. Set **`E2E_BASE_URL`** if the SPA is already served elsewhere (preview, custom host/port); embedded Vite is then disabled.
+2. **Frontend** already serving the SPA at **`E2E_BASE_URL`**, or leave it unset to target **`http://127.0.0.1:3000`** (typical `pnpm dev`). Playwright **never** starts the dev server—bring the bundle up yourself first.
 
 3. **Mosquitto** for perform tests. The SPA connects over **WebSockets** (see
    `VITE_MQTT_ENDPOINT`, typically `ws://localhost:9001` on the host). Plain
@@ -113,7 +113,7 @@ Passwords are not stored in `runtime.json`; they stay in code and env.
 
 | Variable | Meaning |
 |----------|---------|
-| `E2E_BASE_URL` | SPA origin. Unset ⇒ Playwright starts Vite on **:3000**. Set to disable embedded Vite and use your own server. |
+| `E2E_BASE_URL` | SPA origin (**must be listening already**). Unset ⇒ default `http://127.0.0.1:3000`; Playwright never spawns Vite. |
 | `E2E_GRAPHQL_ENDPOINT` | Studio GraphQL URL for Node helpers (`graphql.ts`, setup, global-setup). |
 | `E2E_MQTT_HOST`, `E2E_MQTT_PORT` | TCP probe for the WS listener on the host (defaults `localhost` / **`9001`**). Use the same port your `ws://…` MQTT URL exposes; **1883** is internal MQTT, not WS. |
 | `E2E_ADMIN_USERNAME`, `E2E_ADMIN_PASSWORD` | Admin login for harness and SPA. |

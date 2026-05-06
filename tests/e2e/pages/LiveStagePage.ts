@@ -125,13 +125,11 @@ export class LiveStagePage {
   }
 
   /**
-   * Speech bubbles render inside Avatar wrappers; finding them by parent
-   * data-testid lets us scope per persona without colliding with other
-   * avatars on stage.
+   * Speech bubbles live in `Topping.vue`, teleported to `document.body`, so they
+   * are not under `[data-testid="object-*"]`. The topping wrapper uses
+   * `data-testid="speech-topping-${object.name}"`.
    */
   speechBubbleFor(name: string): Locator {
-    return this.page
-      .locator(`[data-testid="object-${name}"] .speech-bubble, [data-testid="object-${name}"] .bubble`)
-      .first();
+    return this.page.getByTestId(`speech-topping-${name}`).locator(".bubble").first();
   }
 }

@@ -75,7 +75,7 @@ export class StageManagementPage {
 
         const resp = await fetch(graphQlEndpoint, {
           method: "POST",
-          headers: { "content-type": "application/json", authorization: `JWT ${token}` },
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
           body: JSON.stringify({
             query: `mutation Assign($id: ID!, $mediaIds: [ID]) {
               assignMedia(input: { id: $id, mediaIds: $mediaIds }) { id }
@@ -124,7 +124,7 @@ export class StageManagementPage {
         ]);
         const resp = await fetch(endpoint, {
           method: "POST",
-          headers: { "content-type": "application/json", authorization: `JWT ${token}` },
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
           body: JSON.stringify({
             query: `mutation UpdateStage($input: StageInput!) {
               updateStage(input: $input) { id }

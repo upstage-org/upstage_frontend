@@ -1,6 +1,9 @@
 <template>
   <teleport to="body">
-    <div class="avatar-topping" :style="{
+    <div
+      class="avatar-topping"
+      :data-testid="object?.name ? `speech-topping-${object.name}` : undefined"
+      :style="{
       left: stageSize.left + object.x + object.w / 2 + 'px',
       top:
         stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',

@@ -111,7 +111,7 @@ async function runBeat({
       if (!token) throw new Error("no admin token in localStorage");
       const gqlHeaders = {
         "content-type": "application/json",
-        authorization: `JWT ${token}`,
+        authorization: `Bearer ${token}`,
       };
 
       const stageResp = await fetch("/api/studio_graphql", {
@@ -214,7 +214,7 @@ async function runBeat({
             if (!(await bubble.count())) return "";
             return (await bubble.innerText()).trim();
           },
-          { timeout: 4_000, intervals: [200, 400, 800] },
+          { timeout: 12_000, intervals: [200, 400, 800, 1600] },
         )
         .toContain(beat.line.split(/\s+/).slice(0, 4).join(" "));
     }

@@ -31,7 +31,7 @@ export async function gql<T = unknown>(
     method: "POST",
     headers: {
       "content-type": "application/json",
-      ...(token ? { authorization: `JWT ${token}` } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
   });
