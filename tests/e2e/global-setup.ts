@@ -1,21 +1,22 @@
-import { config as loadEnv } from "dotenv";
+import "./e2e-env-bootstrap";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-loadEnv({ path: path.join(__dirname, "..", ".env.test") });
-
+import { loadE2eConfig } from "./e2e-config";
+import { forceFreshSetup } from "./fixtures/e2e-env";
+import { readRuntimeOptional } from "./fixtures/runtime";
+import { validateRuntimeStateForReuse } from "./fixtures/validate-runtime";
 import { PERSONAS } from "./personas";
 import { gql, loginAsAdmin } from "./graphql";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const TCP_TIMEOUT_MS = 3_000;
 
-/** Parsed from `E2E_GRAPHQL_ENDPOINT` — Studio listens here from Node (global-setup / graphql.ts). */
 function graphqlEndpointTcp(): { host: string; port: number; label: string } {
-  const raw =
-    process.env.E2E_GRAPHQL_ENDPOINT ?? "http://127.0.0.1:3001/api/studio_graphql";
+  const raw = loadE2eConfig().graphqlEndpoint;
   const u = new URL(raw);
   const port = Number(u.port || (u.protocol === "https:" ? 443 : 80));
   return {
@@ -46,19 +47,17 @@ function shortHash(input: string): string {
   return Math.abs(h).toString(36);
 }
 
-const DEFAULT_E2E_BASE = "http://localhost:3000";
-
 export default async function globalSetup() {
-  // Keep defaults in sync with playwright.config.ts (Vite `pnpm dev` on 3000).
-  const baseUrl = new URL(process.env.E2E_BASE_URL ?? DEFAULT_E2E_BASE);
-  const mqttHost = process.env.E2E_MQTT_HOST ?? "localhost";
-  const mqttPort = Number(process.env.E2E_MQTT_PORT ?? "2087");
+  const e2eCfg = loadE2eConfig();
+  const baseUrl = new URL(e2eCfg.baseUrl);
+  const mqttHost = e2eCfg.mqttHost;
+  const mqttPort = e2eCfg.mqttWsPort;
 
   // Fail fast with a clear message instead of waiting for browser timeouts.
   await probeTcp(
     baseUrl.hostname,
     Number(baseUrl.port || (baseUrl.protocol === "https:" ? 443 : 80)),
-    "frontend (Vite or reverse proxy for E2E_BASE_URL)",
+    "frontend (SPA on baseURL — nginx :80 by default, or Playwright Vite on :3000 when CI / E2E_PLAYWRIGHT_VITE=1)",
   );
 
   const gqlTcp = graphqlEndpointTcp();
@@ -71,7 +70,7 @@ export default async function globalSetup() {
   } catch (e) {
     console.warn(
       `[e2e] MQTT not reachable at ${mqttHost}:${mqttPort} — ${(e as Error).message}. ` +
-        "Continuing. Chat/avatar tests need MQTT; see E2E_MQTT_HOST / E2E_MQTT_PORT.",
+        "Continuing. Chat/avatar tests need MQTT (browser uses ws — external port often 9001; 1883 is internal TCP). See E2E_MQTT_HOST / E2E_MQTT_PORT.",
     );
   }
 
@@ -144,12 +143,35 @@ export default async function globalSetup() {
     );
   }
 
-  // Hand off `runId` and admin token to the specs via env.
-  // Using the wallclock + pid keeps it unique per run; specs also accept
-  // E2E_RUN_ID to allow rerunning perform against an already-set-up stage.
+  // Hand off `runId` to setup.spec via env. Prefer a validated `runtime.json`
+  // so local reruns reuse the same media names / stage slug unless
+  // E2E_FORCE_FRESH_SETUP or the backend no longer matches the file.
   if (!process.env.E2E_RUN_ID) {
-    const runId = `${Date.now()}-${shortHash(String(process.pid))}`;
-    process.env.E2E_RUN_ID = runId;
+    let runId: string | undefined;
+    if (!forceFreshSetup()) {
+      const persisted = readRuntimeOptional();
+      if (persisted) {
+        try {
+          const v = await validateRuntimeStateForReuse(persisted, adminToken);
+          if (v.ok) {
+            runId = persisted.runId;
+            console.log(
+              `[e2e] global-setup: reuse runId (${persisted.runId.slice(0, 12)}…) stage ${persisted.stageSlug}`,
+            );
+          } else {
+            console.log(`[e2e] global-setup: new run — not reusing runtime.json (${v.reason})`);
+          }
+        } catch (e) {
+          console.warn(
+            `[e2e] global-setup: runtime validation threw — ${(e as Error).message}`,
+          );
+        }
+      }
+    } else {
+      console.log("[e2e] global-setup: E2E_FORCE_FRESH_SETUP — skipping runtime.json reuse");
+    }
+    process.env.E2E_RUN_ID =
+      runId ?? `${Date.now()}-${shortHash(String(process.pid))}`;
   }
   process.env.E2E_ADMIN_TOKEN = adminToken;
 

@@ -9,7 +9,14 @@ import { LiveStagePage } from "./pages/LiveStagePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MediaLibraryPage } from "./pages/MediaLibraryPage";
 import { StageManagementPage } from "./pages/StageManagementPage";
-import { writeRuntime, type MediaRef } from "./fixtures/runtime";
+import { forceFreshSetup } from "./fixtures/e2e-env";
+import {
+  clearRuntimeFile,
+  readRuntimeOptional,
+  writeRuntime,
+  type MediaRef,
+} from "./fixtures/runtime";
+import { validateRuntimeStateForReuse } from "./fixtures/validate-runtime";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,7 +93,39 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
   test.setTimeout(15 * 60_000);
 
   test("admin uploads media, creates the stage, and grants player access", async ({ page }) => {
+    if (forceFreshSetup()) {
+      clearRuntimeFile();
+    }
+
     const runId = process.env.E2E_RUN_ID ?? `${Date.now()}`;
+
+    if (!forceFreshSetup()) {
+      const persisted = readRuntimeOptional();
+      if (persisted) {
+        const preToken = await loginAsAdmin();
+        const v = await validateRuntimeStateForReuse(persisted, preToken);
+        if (v.ok) {
+          const login = new LoginPage(page);
+          await login.login(ADMIN.username, ADMIN.password);
+          const adminToken =
+            (await login.getAuthToken()) ?? (await loginAsAdmin());
+          const live = new LiveStagePage(page);
+          await live.goto(persisted.stageSlug);
+          await page.screenshot({
+            path: path.join(__dirname, "..", "..", "test-results", "setup-final.png"),
+            fullPage: true,
+          });
+          writeRuntime({
+            ...persisted,
+            adminToken,
+            lastValidatedAt: new Date().toISOString(),
+          });
+          return;
+        }
+        console.log(`[e2e] setup: full authoring — ${v.reason}`);
+      }
+    }
+
     const { personas, props, backdrops } = planUploads(runId);
 
     const login = new LoginPage(page);
@@ -99,60 +138,90 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
 
     const mediaByPersona: Record<string, MediaRef> = {};
     for (const u of personas) {
-      await library.upload({
-        filePath: u.filePath,
-        name: u.name,
-        mediaType: u.mediaType,
-        ownerUsername: u.ownerUsername,
-      });
-      mediaByPersona[u.persona.username] = await fetchMediaIdByName(
+      let ref = await findMediaRefMaybe(
         adminToken,
         u.name,
         u.ownerUsername,
         u.mediaType,
       );
+      if (!ref) {
+        await library.upload({
+          filePath: u.filePath,
+          name: u.name,
+          mediaType: u.mediaType,
+          ownerUsername: u.ownerUsername,
+        });
+        ref = await fetchMediaIdByName(
+          adminToken,
+          u.name,
+          u.ownerUsername,
+          u.mediaType,
+        );
+      }
+      mediaByPersona[u.persona.username] = ref;
     }
 
     const propRefs: Record<string, MediaRef> = {};
     for (const u of props) {
-      await library.upload({
-        filePath: u.filePath,
-        name: u.name,
-        mediaType: u.mediaType,
-        ownerUsername: u.ownerUsername,
-      });
-      const key = path.basename(u.filePath, ".png");
-      propRefs[key] = await fetchMediaIdByName(
+      let ref = await findMediaRefMaybe(
         adminToken,
         u.name,
         u.ownerUsername,
         u.mediaType,
       );
+      if (!ref) {
+        await library.upload({
+          filePath: u.filePath,
+          name: u.name,
+          mediaType: u.mediaType,
+          ownerUsername: u.ownerUsername,
+        });
+        ref = await fetchMediaIdByName(
+          adminToken,
+          u.name,
+          u.ownerUsername,
+          u.mediaType,
+        );
+      }
+      const key = path.basename(u.filePath, ".png");
+      propRefs[key] = ref;
     }
 
     const backdropRefs: Record<string, MediaRef> = {};
     for (const u of backdrops) {
-      await library.upload({
-        filePath: u.filePath,
-        name: u.name,
-        mediaType: u.mediaType,
-        ownerUsername: u.ownerUsername,
-      });
-      const key = path.basename(u.filePath, ".png");
-      backdropRefs[key] = await fetchMediaIdByName(
+      let ref = await findMediaRefMaybe(
         adminToken,
         u.name,
         u.ownerUsername,
         u.mediaType,
       );
+      if (!ref) {
+        await library.upload({
+          filePath: u.filePath,
+          name: u.name,
+          mediaType: u.mediaType,
+          ownerUsername: u.ownerUsername,
+        });
+        ref = await fetchMediaIdByName(
+          adminToken,
+          u.name,
+          u.ownerUsername,
+          u.mediaType,
+        );
+      }
+      const key = path.basename(u.filePath, ".png");
+      backdropRefs[key] = ref;
     }
 
     const stageMgmt = new StageManagementPage(page);
     const stageSlug = `r-and-j-a1s1-${runId.slice(0, 12)}`.toLowerCase();
-    const stageId = await stageMgmt.create({
-      name: `R&J A1S1 ${runId.slice(0, 8)}`,
-      fileLocation: stageSlug,
-    });
+    const existingStage = await fetchStageFirstByFileLocation(adminToken, stageSlug);
+    const stageId = existingStage
+      ? existingStage.id
+      : await stageMgmt.create({
+          name: `R&J A1S1 ${runId.slice(0, 8)}`,
+          fileLocation: stageSlug,
+        });
 
     const allMediaIds = [
       ...Object.values(mediaByPersona).map((m) => m.id),
@@ -255,6 +324,51 @@ async function waitForStageFileLocationById(
     `[e2e] stage(id=${stageId}) never returned fileLocation within ${timeoutMs}ms. ` +
       `Last GraphQL: ${lastErr ?? "no errors but empty data"}`,
   );
+}
+
+async function findMediaRefMaybe(
+  token: string,
+  name: string,
+  owner: string,
+  mediaType: string,
+): Promise<MediaRef | null> {
+  const input = {
+    page: 1,
+    limit: 50,
+    name,
+    mediaTypes: [mediaType],
+    owners: [owner],
+  };
+  const result = await gql<{
+    media: { edges: Array<{ id: string; name: string }> };
+  }>(
+    `query MediaByName($input: MediaTableInput!) {
+       media(input: $input) { edges { id name } }
+     }`,
+    { input },
+    token,
+  );
+  const list = result.data?.media?.edges ?? [];
+  const node = list.find((m) => m.name === name);
+  return node ? { id: String(node.id), name: node.name } : null;
+}
+
+async function fetchStageFirstByFileLocation(
+  token: string,
+  fileLocation: string,
+): Promise<{ id: string } | null> {
+  const r = await gql<{ stageList: Array<{ id: string | number }> }>(
+    `query E2eStageListByLoc($fileLocation: String!) {
+      stageList(input: { fileLocation: $fileLocation }) {
+        id
+      }
+    }`,
+    { fileLocation },
+    token,
+  );
+  if (r.errors?.length) return null;
+  const first = r.data?.stageList?.[0];
+  return first ? { id: String(first.id) } : null;
 }
 
 async function fetchMediaIdByName(

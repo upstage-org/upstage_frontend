@@ -1,15 +1,20 @@
+import "./e2e-env-bootstrap";
+
 /**
  * Tiny zero-dep GraphQL client for the e2e harness. We deliberately do NOT
  * pull in @apollo/client here so the harness can run in Node without the SPA's
  * polyfill chain.
  *
- * Uses `E2E_GRAPHQL_ENDPOINT` (see `.env.test`): Studio backend on port **3001**
- * by default. Playwright opens the SPA on **3000** (`baseURL`); the browser hits
- * `/api/*` same-origin and Vite proxies to :3001.
+ * Resolved URLs and credentials come from `e2e-config.ts` (`loadE2eConfig`)
+ * after `.env.test` loading via `e2e-env-bootstrap`.
  */
 
-const ENDPOINT = process.env.E2E_GRAPHQL_ENDPOINT
-  ?? "http://127.0.0.1:3001/api/studio_graphql";
+import {
+  getE2eGraphQlEndpoint,
+  loadE2eConfig,
+} from "./e2e-config";
+
+export { getE2eGraphQlEndpoint };
 
 export interface GqlResult<T> {
   data?: T;
@@ -21,7 +26,8 @@ export async function gql<T = unknown>(
   variables: Record<string, unknown> = {},
   token?: string,
 ): Promise<GqlResult<T>> {
-  const res = await fetch(ENDPOINT, {
+  const endpoint = getE2eGraphQlEndpoint();
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -30,14 +36,15 @@ export async function gql<T = unknown>(
     body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) {
-    throw new Error(`GraphQL HTTP ${res.status} from ${ENDPOINT}: ${await res.text()}`);
+    throw new Error(
+      `GraphQL HTTP ${res.status} from ${endpoint}: ${await res.text()}`,
+    );
   }
   return (await res.json()) as GqlResult<T>;
 }
 
 export async function loginAsAdmin(): Promise<string> {
-  const username = process.env.E2E_ADMIN_USERNAME ?? "admin";
-  const password = process.env.E2E_ADMIN_PASSWORD ?? "12345678";
+  const { adminUsername: username, adminPassword: password } = loadE2eConfig();
   const result = await gql<{
     login: { access_token: string; refresh_token: string; username: string };
   }>(

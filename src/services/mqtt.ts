@@ -18,7 +18,7 @@ export default function buildClient() {
       const connectUrl = url;
       if (!connectUrl || typeof connectUrl !== "string") {
         console.error(
-          "[MQTT] No connection URL. Set VITE_MQTT_ENDPOINT to the broker WebSocket URL (e.g. ws://host:8083 or wss://host:8084)."
+          "[MQTT] No connection URL. Set VITE_MQTT_ENDPOINT to the broker WebSocket URL (e.g. ws://localhost:9001)."
         );
       }
       const clientId = uuidv4();

@@ -1,25 +1,18 @@
-import { defineConfig, devices } from "@playwright/test";
-import { config as loadEnv } from "dotenv";
+import "./tests/e2e/e2e-env-bootstrap";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { defineConfig, devices } from "@playwright/test";
+
+import {
+  E2E_PLAYWRIGHT_VITE_PORT,
+  loadE2eConfig,
+} from "./tests/e2e/e2e-config";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// .env.test wins over the SPA's runtime .env so e2e knobs don't poison Vite.
-loadEnv({ path: path.join(__dirname, ".env.test") });
 
-/** Browser `baseURL`: Vite (`pnpm dev`). Same-origin `/api/*` is proxied to Studio — see vite.config `server.proxy`. */
-const E2E_FRONTEND_PORT = 3000;
-const BASE_URL =
-  process.env.E2E_BASE_URL ?? `http://localhost:${E2E_FRONTEND_PORT}`;
-// If set, Playwright will NOT start `pnpm dev` — you must serve the SPA yourself on that URL (still typically :3000).
-// Leave `E2E_BASE_URL` unset in `.env.test` for the default (Vite on 3000).
-const HAS_EXTERNAL_SERVER = Boolean(process.env.E2E_BASE_URL);
-// Default to headed locally so the human can watch the play unfold; CI still
-// runs headless. Override either way with `PWHEADLESS=1` (force headless) or
-// `PWHEADLESS=0` (force headed).
-const HEADLESS = process.env.PWHEADLESS
-  ? process.env.PWHEADLESS !== "0" && process.env.PWHEADLESS.toLowerCase() !== "false"
-  : Boolean(process.env.CI);
+const e2eCfg = loadE2eConfig();
+const BASE_URL = e2eCfg.baseUrl;
+const HEADLESS = e2eCfg.headless;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -27,7 +20,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  globalSetup: "./tests/e2e/global-setup.ts",
+  globalSetup: path.join(__dirname, "tests/e2e/global-setup.ts"),
   reporter: [
     ["html", { open: "never" }],
     ["list"],
@@ -62,12 +55,12 @@ export default defineConfig({
       dependencies: ["setup"],
     },
   ],
-  webServer: HAS_EXTERNAL_SERVER
-    ? undefined
-    : {
+  webServer: e2eCfg.webServerStartsVite
+    ? {
         command: "pnpm dev",
-        port: E2E_FRONTEND_PORT,
+        port: E2E_PLAYWRIGHT_VITE_PORT,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
-      },
+      }
+    : undefined,
 });
