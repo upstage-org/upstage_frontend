@@ -57,7 +57,7 @@ export default async function globalSetup() {
   await probeTcp(
     baseUrl.hostname,
     Number(baseUrl.port || (baseUrl.protocol === "https:" ? 443 : 80)),
-    "frontend (SPA on baseURL — nginx :80 by default, or Playwright Vite on :3000 when CI / E2E_PLAYWRIGHT_VITE=1)",
+    "frontend (SPA on baseURL — embedded Vite :3000 unless E2E_BASE_URL points elsewhere)",
   );
 
   const gqlTcp = graphqlEndpointTcp();

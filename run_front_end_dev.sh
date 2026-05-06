@@ -2,7 +2,9 @@
 
 set -a
 SITE=dev
-FRONTEND_PORT=80
+# Published as host:container (${FRONTEND_PORT}:${FRONTEND_PORT}); also passed to vite `preview.port`.
+# Must be ≥1024 for typical non-root UIDs inside the container.
+FRONTEND_PORT=8080
 HOST_UID=1000
 HOST_GID=1000
 

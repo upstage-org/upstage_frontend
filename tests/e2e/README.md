@@ -33,14 +33,7 @@ Running **`pnpm exec playwright test`** directly bypasses preflight entirely.
    started from the backend repo’s docker compose scripts; keep the same DB
    between runs if you want `runtime.json` reuse to work.
 
-2. **Frontend** SPA origin:
-
-   - **Local dev default:** `baseURL` is **`http://localhost`** (port **80**, as with nginx serving the bundle). Playwright **does not** start Vite unless you opt in — you run nginx (or equivalent) yourself.
-   - **`E2E_PLAYWRIGHT_VITE=1`** (without `E2E_BASE_URL`): Playwright starts **`pnpm dev`** and uses **`http://127.0.0.1:3000`** (`E2E_PLAYWRIGHT_VITE_PORT` in `e2e-config.ts`).
-   - **`CI=1`**: same embedded Vite behaviour as today (port **3000**), so GitHub Actions does not need nginx.
-   - **`E2E_BASE_URL`**: set explicitly to any origin (disables embedded Vite).
-
-   Nginx must proxy **`/api`** to Studio (same as Vite’s dev proxy in `vite.config.ts`).
+2. **Frontend:** when **`E2E_BASE_URL` is unset**, Playwright starts **embedded Vite** (`pnpm dev`) on **`http://127.0.0.1:3000`** and proxies `/api` to Studio like any other Vite dev session. Set **`E2E_BASE_URL`** if the SPA is already served elsewhere (preview, custom host/port); embedded Vite is then disabled.
 
 3. **Mosquitto** for perform tests. The SPA connects over **WebSockets** (see
    `VITE_MQTT_ENDPOINT`, typically `ws://localhost:9001` on the host). Plain
@@ -120,8 +113,7 @@ Passwords are not stored in `runtime.json`; they stay in code and env.
 
 | Variable | Meaning |
 |----------|---------|
-| `E2E_BASE_URL` | Overrides SPA origin; when set, Playwright never starts embedded Vite. |
-| `E2E_PLAYWRIGHT_VITE` | Local: set truthy (`1`) with `E2E_BASE_URL` unset to start Vite on **:3000** instead of assuming nginx on **:80**. |
+| `E2E_BASE_URL` | SPA origin. Unset ⇒ Playwright starts Vite on **:3000**. Set to disable embedded Vite and use your own server. |
 | `E2E_GRAPHQL_ENDPOINT` | Studio GraphQL URL for Node helpers (`graphql.ts`, setup, global-setup). |
 | `E2E_MQTT_HOST`, `E2E_MQTT_PORT` | TCP probe for the WS listener on the host (defaults `localhost` / **`9001`**). Use the same port your `ws://…` MQTT URL exposes; **1883** is internal MQTT, not WS. |
 | `E2E_ADMIN_USERNAME`, `E2E_ADMIN_PASSWORD` | Admin login for harness and SPA. |

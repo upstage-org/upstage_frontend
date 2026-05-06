@@ -1,19 +1,19 @@
 #!/bin/bash
 
 set -a
-
-# Container runs as the host user (see docker-compose-prod.yaml). Exporting
-# these here makes the compose ${HOST_UID}/${HOST_GID} interpolation
-# deterministic without anyone having to hand-edit .env.compose.
-export HOST_UID="$(id -u)"
-export HOST_GID="$(id -g)"
+SITE=prod
+# Published as host:container (${FRONTEND_PORT}:${FRONTEND_PORT}); also passed to vite `preview.port`.
+# Must be ≥1024 for typical non-root UIDs inside the container.
+FRONTEND_PORT=8081
+HOST_UID=1000
+HOST_GID=1000
 
 # Build configs (package.json, vite.config.ts, tsconfig.json, index.html, etc.)
 # now live at the project root, so the build runs in-place. Only the env file
-# is still pulled out of /frontend_app (set up by the OS-level installer).
+# is still pulled out of /frontend_app_${SITE} (set up by the OS-level installer).
 
-dist_dir=/frontend_app/dist
-env_src=/frontend_app/.env
+dist_dir=/frontend_app_${SITE}/dist
+env_src=/frontend_app_${SITE}/.env
 
 mkdir -p "$dist_dir"
 if [ -f "$env_src" ]; then
@@ -24,8 +24,8 @@ echo "This build may take up to three minutes. It may be necessary to run 'docke
 
 echo "Building..."
 
-docker compose --env-file ./.env.compose -f ./docker-compose-prod.yaml -p upstage-frontend-prod down
-docker compose --env-file ./.env.compose -f ./docker-compose-prod.yaml -p upstage-frontend-prod up -d --build
-docker compose --env-file ./.env.compose -f ./docker-compose-prod.yaml -p upstage-frontend-prod ps
+docker compose -f ./docker-compose.yaml -p upstage-frontend-${SITE} down
+docker compose -f ./docker-compose.yaml -p upstage-frontend-${SITE} up -d --build
+docker compose -f ./docker-compose.yaml -p upstage-frontend-${SITE} ps
 
 echo "Done"

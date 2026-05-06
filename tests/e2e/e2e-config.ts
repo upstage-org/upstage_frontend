@@ -9,12 +9,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Default SPA when nginx (or similar) fronts the bundle during local dev (:80 implicit in URLs). */
-export const E2E_DEFAULT_DEV_ORIGIN = "http://localhost";
-
 /**
- * Port Playwright waits on when it starts embedded Vite (`pnpm dev`) — avoids
- * binding port 80 (often privileged outside containers).
+ * Port Playwright waits on when it starts embedded Vite (`pnpm dev`) for e2e when
+ * `E2E_BASE_URL` is not set.
  */
 export const E2E_PLAYWRIGHT_VITE_PORT = 3000;
 
@@ -70,7 +67,6 @@ function parsedBoolUnsetFalse(v: string | undefined): boolean {
 /** Lazy read of merged env — safe after {@link loadE2eDotenv} has run. */
 export function loadE2eConfig(): E2eConfig {
   const explicitBaseUrl = process.env.E2E_BASE_URL?.trim();
-  const viteFromFlag = parsedBoolUnsetFalse(process.env.E2E_PLAYWRIGHT_VITE);
   const ci = Boolean(process.env.CI);
 
   let baseUrl: string;
@@ -79,12 +75,9 @@ export function loadE2eConfig(): E2eConfig {
   if (explicitBaseUrl) {
     baseUrl = explicitBaseUrl;
     webServerStartsVite = false;
-  } else if (ci || viteFromFlag) {
+  } else {
     baseUrl = `http://127.0.0.1:${String(E2E_PLAYWRIGHT_VITE_PORT)}`;
     webServerStartsVite = true;
-  } else {
-    baseUrl = E2E_DEFAULT_DEV_ORIGIN;
-    webServerStartsVite = false;
   }
 
   const headlessExplicit = process.env.PWHEADLESS;
@@ -135,7 +128,7 @@ export function maskSecret(value: string, visibleEnd = 0): string {
 export function formatE2eConfigSummary(cfg: E2eConfig): string {
   const viteHint = cfg.webServerStartsVite
     ? `yes (embedded Vite on :${E2E_PLAYWRIGHT_VITE_PORT})`
-    : `no — nginx (or your stack) on baseURL, usually :80; E2E_PLAYWRIGHT_VITE=1 to auto-start Vite on :${E2E_PLAYWRIGHT_VITE_PORT}`;
+    : `no — use E2E_BASE_URL for a server you start yourself (e.g. preview)`;
   const lines = [
     "E2E configuration (effective after `.env.test` merge)",
     "",

@@ -7,28 +7,35 @@ services:
         FROM node:22-bookworm
 
         # Build context runs as root so corepack/pnpm land in /usr/local with
-        # world-readable+writable trees. At runtime the container is launched as
-        # ${HOST_UID}:${HOST_GID} (see user: below), so the actual `pnpm install`
-        # / `pnpm build` invocations are unprivileged.
+        # world-readable+writable trees. At runtime the container runs as the
+        # host UID/GID from compose `user:` below, so `pnpm install` / `pnpm build`
+        # are unprivileged inside the container.
 
         ENV PNPM_HOME=/usr/local/pnpm \
             COREPACK_HOME=/usr/local/corepack \
-            PATH=/usr/local/pnpm:/usr/local/corepack/shims:$PATH
+            PATH=/usr/local/pnpm:/usr/local/corepack/shims:$$PATH
 
-        RUN mkdir -p "$PNPM_HOME" "$COREPACK_HOME/shims" \
-         && corepack enable --install-directory "$COREPACK_HOME/shims" \
+        RUN mkdir -p "$$PNPM_HOME" "$$COREPACK_HOME/shims" \
+         && corepack enable --install-directory "$$COREPACK_HOME/shims" \
          && corepack prepare pnpm@10.7.1 --activate \
-         && chmod -R a+rwX "$PNPM_HOME" "$COREPACK_HOME"
+         && chmod -R a+rwX "$$PNPM_HOME" "$$COREPACK_HOME"
 
         WORKDIR /app
     image: upstage/frontend:local
     container_name: upstage_frontend_${SITE}
     user: "${HOST_UID}:${HOST_GID}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      FRONTEND_PORT: "${FRONTEND_PORT}"
+      # Host publish + vite preview listener (avoid <1024 in-container without root).
+      VITE_STUDIO_API_PROXY: "${VITE_STUDIO_API_PROXY:-http://host.docker.internal:3001}"
+    ports:
+      - "${FRONTEND_PORT}:4173"
     volumes:
       - .:/app
       - /frontend_app_${SITE}/dist:/app/dist
+    networks:
+      - upstage-network
     working_dir: /app
     command: >
       /bin/sh -c "
@@ -36,5 +43,12 @@ services:
       cat /app/dist/.env > /app/.env &&
       pnpm install --frozen-lockfile &&
       pnpm build:${SITE} &&
-      tail -f /dev/null
+      exec pnpm preview
       "
+
+networks:
+  upstage-network:
+    name: upstage-network-${SITE}
+    driver: bridge
+    external: true
+

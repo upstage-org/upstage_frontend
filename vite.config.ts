@@ -7,6 +7,13 @@ import AutoImport from "unplugin-auto-import/vite";
 import VueDevTools from "vite-plugin-vue-devtools";
 import { AntDesignVueResolver } from "unplugin-vue-components/resolvers";
 
+/** Studio REST/GraphQL for same-origin `/api` in dev and dockerized `pnpm preview`. */
+const studioApiTarget =
+  process.env.VITE_STUDIO_API_PROXY ?? "http://127.0.0.1:3001";
+
+/** Port for `vite preview` (e.g. `FRONTEND_PORT` from docker-compose.dev). */
+const previewPort = Number(process.env.FRONTEND_PORT) || 4173;
+
 export default defineConfig({
   base: "/",
   plugins: [
@@ -40,11 +47,20 @@ export default defineConfig({
     fs: {
       allow: [".."],
     },
-    // Same-origin /api/... in the browser (Apollo + e2e page.evaluate) — avoids
-    // CORS when the studio API is on a different port than Vite.
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:3001",
+        target: studioApiTarget,
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    host: "0.0.0.0",
+    port: previewPort,
+    strictPort: true,
+    proxy: {
+      "/api": {
+        target: studioApiTarget,
         changeOrigin: true,
       },
     },
