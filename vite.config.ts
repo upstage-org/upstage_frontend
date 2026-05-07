@@ -1,11 +1,29 @@
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
 import tsconfigPaths from "vite-tsconfig-paths";
 import Components from "unplugin-vue-components/vite";
 import AutoImport from "unplugin-auto-import/vite";
 import VueDevTools from "vite-plugin-vue-devtools";
 import { AntDesignVueResolver } from "unplugin-vue-components/resolvers";
+
+/**
+ * Hostname for `preview.allowedHosts` from the base URL (`origin`) of
+ * `VITE_GRAPHQL_ENDPOINT` only — path, query string, and hash are ignored
+ * (e.g. `https://dev.upstage.live/api/graphql?x=1` → `dev.upstage.live`).
+ */
+function previewAllowedHostsFromGraphqlEndpoint(
+  raw: string | undefined,
+): string[] | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    const parsed = new URL(raw.trim());
+    const base = new URL(parsed.origin);
+    return base.hostname ? [base.hostname] : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Studio REST/GraphQL for same-origin `/api` in dev and dockerized `pnpm preview`. */
 const studioApiTarget =
@@ -14,62 +32,70 @@ const studioApiTarget =
 /** Port for `vite preview` (e.g. `FRONTEND_PORT` from docker-compose.dev). */
 const previewPort = Number(process.env.FRONTEND_PORT) || 4173;
 
-export default defineConfig({
-  base: "/",
-  plugins: [
-    vue(),
-    VueDevTools(),
-    tsconfigPaths(),
-    AutoImport({
-      imports: [
-        "vue",
-        "vue-router",
-        "pinia",
-        "@vueuse/core",
-        { "vue-i18n": ["useI18n"] },
-        { vuex: ["useStore"] },
-      ],
-      dts: "src/auto-imports.d.ts",
-      eslintrc: { enabled: true },
-    }),
-    Components({
-      resolvers: [
-        AntDesignVueResolver({ importStyle: "less", resolveIcons: true }),
-      ],
-    }),
-  ],
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
-  },
-  server: {
-    fs: {
-      allow: [".."],
-    },
-    proxy: {
-      "/api": {
-        target: studioApiTarget,
-        changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const previewAllowedHosts = previewAllowedHostsFromGraphqlEndpoint(
+    env.VITE_GRAPHQL_ENDPOINT,
+  );
+
+  return {
+    base: "/",
+    plugins: [
+      vue(),
+      VueDevTools(),
+      tsconfigPaths(),
+      AutoImport({
+        imports: [
+          "vue",
+          "vue-router",
+          "pinia",
+          "@vueuse/core",
+          { "vue-i18n": ["useI18n"] },
+          { vuex: ["useStore"] },
+        ],
+        dts: "src/auto-imports.d.ts",
+        eslintrc: { enabled: true },
+      }),
+      Components({
+        resolvers: [
+          AntDesignVueResolver({ importStyle: "less", resolveIcons: true }),
+        ],
+      }),
+    ],
+    resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
       },
     },
-  },
-  preview: {
-    host: "0.0.0.0",
-    port: previewPort,
-    strictPort: true,
-    proxy: {
-      "/api": {
-        target: studioApiTarget,
-        changeOrigin: true,
+    server: {
+      fs: {
+        allow: [".."],
+      },
+      proxy: {
+        "/api": {
+          target: studioApiTarget,
+          changeOrigin: true,
+        },
       },
     },
-  },
-  css: {
-    preprocessorOptions: {
-      less: {
-        javascriptEnabled: true,
+    preview: {
+      host: "0.0.0.0",
+      port: previewPort,
+      strictPort: true,
+      ...(previewAllowedHosts ? { allowedHosts: previewAllowedHosts } : {}),
+      proxy: {
+        "/api": {
+          target: studioApiTarget,
+          changeOrigin: true,
+        },
       },
     },
-  },
+    css: {
+      preprocessorOptions: {
+        less: {
+          javascriptEnabled: true,
+        },
+      },
+    },
+  };
 });

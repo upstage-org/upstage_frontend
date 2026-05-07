@@ -39,7 +39,6 @@ services:
     working_dir: /app
     command: >
       /bin/sh -c "
-      rm -rf /app/.env &&
       cat /app/dist/.env > /app/.env &&
       pnpm install --frozen-lockfile &&
       pnpm build:${SITE} &&
