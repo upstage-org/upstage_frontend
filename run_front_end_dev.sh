@@ -1,36 +1,40 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
 
 set -a
 SITE=dev
-DOMAIN=dev.upstage.live
-# Published as host:container (${FRONTEND_PORT}:${FRONTEND_PORT}); also passed to vite `preview.port`.
-# Must be ≥1024 for typical non-root UIDs inside the container.
-FRONTEND_PORT=3001
-HOST_UID=0
-HOST_GID=0
+FRONTEND_HOST_PORT=3001
+HOST_UID=1000
+HOST_GID=1000
 
-# Build configs (package.json, vite.config.ts, tsconfig.json, index.html, etc.)
-# now live at the project root, so the build runs in-place. Only the env file
-# is still pulled out of /frontend_app_${SITE} (set up by the OS-level installer).
+# Passed through compose (docker-compose.yaml uses strict "${VITE_STUDIO_API_PROXY}" — no default there).
+VITE_STUDIO_API_PROXY=http://host.docker.internal:3001
 
-dist_root=/frontend_app_${SITE}
-dist_dir=${dist_root}/dist
-env_src=/frontend_app_${SITE}/.env
+# When 0, the frontend preview-server is not started; host nginx must serve built dist/ (or your deploy
+# path) and proxy /api. When 1, Docker runs preview-server (static + /api proxy) as today.
+ENABLE_FRONTEND_DOCKER_PREVIEW=1
 
-mkdir -p "$dist_dir"
-if [ -f "$env_src" ]; then
-  cp "$env_src" "$dist_dir/.env"
+env_src="/frontend_app_${SITE}/.env"
+if [[ -f "$env_src" ]]; then
+  cp "$env_src" .env
+else
+  echo "Warning: ${env_src} not found — build uses existing repo .env if present." >&2
 fi
 
-cp vite.config.ts.template vite.config.ts
-sed "s/REPLACE_THIS/${DOMAIN}/g" vite.config.ts
-echo "This build may take up to three minutes. It may be necessary to run 'docker compose rm -f' after the 'docker compose down' command to do a deep cleanup between builds."
+compose=(docker compose -f docker-compose.yaml -p "upstage-frontend-${SITE}")
 
-echo "Building..."
-sudo chown -R ${HOST_UID}:${HOST_GID} ${dist_root}
-docker compose -f ./docker-compose.yaml -p upstage-frontend-${SITE} down
-sudo chown -R ${HOST_UID}:${HOST_GID} ${dist_root}
-docker compose -f ./docker-compose.yaml -p upstage-frontend-${SITE} up -d --build
-docker compose -f ./docker-compose.yaml -p upstage-frontend-${SITE} ps
+if [[ "${ENABLE_FRONTEND_DOCKER_PREVIEW}" == "1" ]]; then
+  export COMPOSE_PROFILES=frontend-preview
+  "${compose[@]}" down --remove-orphans
+  "${compose[@]}" rm -f
+  "${compose[@]}" up -d --build
+  "${compose[@]}" ps
+else
+  unset COMPOSE_PROFILES
+  "${compose[@]}" down --remove-orphans
+  echo "Frontend Docker preview disabled; use host nginx for static assets and /api routing." >&2
+fi
 
 echo "Done"

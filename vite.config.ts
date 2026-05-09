@@ -67,20 +67,6 @@ export default defineConfig(({ mode }) => {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
       },
     },
-  },
-  preview: {
-    host: "0.0.0.0",
-    port: previewPort,
-    strictPort: true,
-          allowedHosts: ["REPLACE_THIS"],
-
-    proxy: {
-      "/api": {
-        target: studioApiTarget,
-        changeOrigin: true,
-        },
-      },
-    },
     preview: {
       host: "0.0.0.0",
       port: previewPort,

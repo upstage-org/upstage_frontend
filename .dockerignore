@@ -1,0 +1,35 @@
+# Exclude heavy or irrelevant paths from daemon build context (.env is intentionally not listed)
+
+.git/
+.cursor/
+
+node_modules/
+docker/node_modules/
+dist/
+
+**/.DS_Store
+Thumbs.db
+
+# Python / tooling leftovers (if present)
+.pytest_cache/
+.mypy_cache/
+**/__pycache__/
+*.py[cod]
+
+# Playwright / Vitest
+test-results/
+playwright-report/
+
+# Coverage / ESLint caches
+coverage/
+.cache/
+.parcel-cache/
+.turbo/
+
+# Editor / OS
+.idea/
+*.swp
+*.swo
+*~
+
+**/node_modules/.cache/
