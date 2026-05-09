@@ -64,6 +64,9 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "${FRONTEND_PORT}:4173"
+    environment:
+      VITE_STUDIO_API_PROXY: "${VITE_STUDIO_API_PROXY}"
+      FRONTEND_PORT: "${FRONTEND_PORT}"
     networks:
       - upstage-network
     working_dir: /usr/app
