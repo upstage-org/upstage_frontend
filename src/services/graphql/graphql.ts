@@ -25,6 +25,25 @@ const toLegacyError = (
   request: { query: document.loc?.source.body ?? "" },
 });
 
+/** Apollo Client rejects with ApolloError.graphQLErrors; legacy code expects response.errors. */
+function rethrowAsLegacyIfApollo(
+  err: unknown,
+  document: DocumentNode,
+): never {
+  const gqlErrors =
+    err &&
+    typeof err === "object" &&
+    "graphQLErrors" in err &&
+    Array.isArray((err as { graphQLErrors?: unknown }).graphQLErrors) &&
+    (err as { graphQLErrors: unknown[] }).graphQLErrors.length > 0
+      ? (err as { graphQLErrors: ReadonlyArray<unknown> }).graphQLErrors
+      : undefined;
+  if (gqlErrors) {
+    throw toLegacyError(gqlErrors, document);
+  }
+  throw err;
+}
+
 interface StudioClient {
   request: <TData = unknown, TVars extends Record<string, unknown> | undefined = undefined>(
     query: string | DocumentNode,
@@ -47,8 +66,24 @@ export const createClient = (_namespace: string): StudioClient => ({
     const operationIsMutation = isMutation(document);
 
     if (operationIsMutation) {
-      const result = await apolloClient.mutate({
-        mutation: document,
+      try {
+        const result = await apolloClient.mutate({
+          mutation: document,
+          variables: variables as Record<string, unknown> | undefined,
+          fetchPolicy: "no-cache",
+        });
+        if (result.errors?.length) {
+          throw toLegacyError(result.errors, document);
+        }
+        return result.data as never;
+      } catch (err) {
+        rethrowAsLegacyIfApollo(err, document);
+      }
+    }
+
+    try {
+      const result = await apolloClient.query({
+        query: document,
         variables: variables as Record<string, unknown> | undefined,
         fetchPolicy: "no-cache",
       });
@@ -56,16 +91,8 @@ export const createClient = (_namespace: string): StudioClient => ({
         throw toLegacyError(result.errors, document);
       }
       return result.data as never;
+    } catch (err) {
+      rethrowAsLegacyIfApollo(err, document);
     }
-
-    const result = await apolloClient.query({
-      query: document,
-      variables: variables as Record<string, unknown> | undefined,
-      fetchPolicy: "no-cache",
-    });
-    if (result.errors?.length) {
-      throw toLegacyError(result.errors, document);
-    }
-    return result.data as never;
   },
 });

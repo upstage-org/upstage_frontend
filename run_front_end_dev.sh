@@ -13,7 +13,7 @@ ENV_BACKUP=./env_backup_${SITE}
 # static-api-server in container: serves dist/ and proxies /api → studio API on shared Docker network :3000.
 # For API-on-host: set before running, e.g. VITE_STUDIO_API_PROXY=http://host.docker.internal:3001
 # (backend APP_PORT — never use FRONTEND_PORT here; host.docker.internal→172.17.0.1 often breaks on custom bridges).
-VITE_STUDIO_API_PROXY="${VITE_STUDIO_API_PROXY:-http://upstage_backend:3000}"
+#VITE_STUDIO_API_PROXY="${VITE_STUDIO_API_PROXY:-http://upstage_backend:3000}"
 
 sudo mkdir -p /frontend_app_${SITE} 
 env_src="/frontend_app_${SITE}/.env"

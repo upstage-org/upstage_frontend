@@ -52,9 +52,12 @@ export default {
               reject(resp);
             }
           }).catch((err) => {
-            message.error(
-              err.response?.errors ? err.response?.errors[0].message : "Error!"
-            );
+            const msg =
+              err?.response?.errors?.[0]?.message ??
+              err?.graphQLErrors?.[0]?.message ??
+              (typeof err?.message === "string" ? err.message : null) ??
+              "Error!";
+            message.error(msg);
             reject(err);
           });
       });
