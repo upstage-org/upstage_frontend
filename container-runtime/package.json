@@ -1,0 +1,9 @@
+{
+  "name": "upstage-frontend-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "http-proxy": "1.18.1",
+    "sirv": "2.0.4"
+  }
+}
