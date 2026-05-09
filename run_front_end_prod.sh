@@ -30,10 +30,6 @@ compose=(docker compose -f docker-compose.yaml -p "upstage-frontend-${SITE}")
 "${compose[@]}" up -d --build
 "${compose[@]}" ps
 
-if [[ "${FRONTEND_PUBLISH_LOCALHOST_ONLY}" == "1" ]]; then
-  echo "Frontend container up on 127.0.0.1:${FRONTEND_PORT} — point native nginx proxy_pass there." >&2
-else
-  echo "Frontend container up; open http://127.0.0.1:${FRONTEND_PORT}/ (or your host IP)." >&2
-fi
+echo "Frontend container up on 127.0.0.1:${FRONTEND_PORT} — point native nginx proxy_pass there, or browse directly on loopback." >&2
 
 echo "Done"

@@ -1,7 +1,9 @@
 /**
- * Minimal static server for dist/ + /api reverse proxy (replaces vite preview in Docker).
+ * Serves built Vue static assets from dist/ and reverse-proxies /api to the studio backend.
+ * Runs inside the production-style frontend Docker image (not Vite dev).
+ *
  * Env (both required):
- *   - PREVIEW_LISTEN_PORT: TCP port this process binds to (container side of compose `host:container`).
+ *   - STATIC_API_LISTEN_PORT: TCP port this process binds to (container side of compose host:container).
  *   - FRONTEND_PORT: host-published port from the same compose mapping (for logs; not the bind port).
  *   - VITE_STUDIO_API_PROXY: backend base URL for /api reverse proxy.
  */
@@ -11,18 +13,21 @@ import sirv from "sirv";
 
 function parsePort(name, raw) {
   if (raw === undefined || raw === "") {
-    console.error(`preview-server: ${name} must be set`);
+    console.error(`static-api-server: ${name} must be set`);
     process.exit(1);
   }
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > 65535) {
-    console.error(`preview-server: ${name} must be a valid TCP port number`);
+    console.error(`static-api-server: ${name} must be a valid TCP port number`);
     process.exit(1);
   }
   return n;
 }
 
-const listenPort = parsePort("PREVIEW_LISTEN_PORT", process.env.PREVIEW_LISTEN_PORT);
+const listenPort = parsePort(
+  "STATIC_API_LISTEN_PORT",
+  process.env.STATIC_API_LISTEN_PORT,
+);
 const publishedHostPort = parsePort("FRONTEND_PORT", process.env.FRONTEND_PORT);
 
 const apiTarget =
@@ -61,6 +66,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(listenPort, "0.0.0.0", () => {
   console.log(
-    `preview-server listening on 0.0.0.0:${listenPort} (browser: host:${publishedHostPort}) api-> ${apiTarget}`,
+    `static-api-server listening on 0.0.0.0:${listenPort} (browser: host:${publishedHostPort}) api-> ${apiTarget}`,
   );
 });
