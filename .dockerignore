@@ -7,7 +7,7 @@
 env_backup*
 
 node_modules/
-docker/node_modules/
+container-runtime/node_modules/
 dist/
 
 **/.DS_Store

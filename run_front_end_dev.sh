@@ -10,13 +10,10 @@ HOST_UID=1000
 HOST_GID=1000
 ENV_BACKUP=./env_backup_${SITE}
 
-# Passed through compose (docker-compose.yaml uses strict "${VITE_STUDIO_API_PROXY}" — no default there).
-VITE_STUDIO_API_PROXY=http://host.docker.internal:${FRONTEND_PORT}
-
-# When 0, the frontend preview-server is not started; host nginx must serve built dist/ (or your deploy
-# path) and proxy /api. When 1, Docker runs preview-server (static + /api proxy) as today.
-ENABLE_FRONTEND_DOCKER_PREVIEW=1
-
+# static-api-server in container: serves dist/ and proxies /api → studio API on shared Docker network :3000.
+# For API-on-host: set before running, e.g. VITE_STUDIO_API_PROXY=http://host.docker.internal:3001
+# (backend APP_PORT — never use FRONTEND_PORT here; host.docker.internal→172.17.0.1 often breaks on custom bridges).
+VITE_STUDIO_API_PROXY="${VITE_STUDIO_API_PROXY:-http://upstage_backend:3000}"
 
 sudo mkdir -p /frontend_app_${SITE} 
 env_src="/frontend_app_${SITE}/.env"
@@ -31,16 +28,15 @@ fi
 
 compose=(docker compose -f docker-compose.yaml -p "upstage-frontend-${SITE}")
 
-if [[ "${ENABLE_FRONTEND_DOCKER_PREVIEW}" == "1" ]]; then
-  export COMPOSE_PROFILES=frontend-preview
-  "${compose[@]}" down --remove-orphans
-  "${compose[@]}" rm -f
-  "${compose[@]}" up -d --build
-  "${compose[@]}" ps
+"${compose[@]}" down --remove-orphans
+"${compose[@]}" rm -f
+"${compose[@]}" up -d --build
+"${compose[@]}" ps
+
+if [[ "${FRONTEND_PUBLISH_LOCALHOST_ONLY}" == "1" ]]; then
+  echo "Frontend container up on 127.0.0.1:${FRONTEND_PORT} — point native nginx proxy_pass there." >&2
 else
-  unset COMPOSE_PROFILES
-  "${compose[@]}" down --remove-orphans
-  echo "Frontend Docker preview disabled; use host nginx for static assets and /api routing." >&2
+  echo "Frontend container up; open http://127.0.0.1:${FRONTEND_PORT}/ (or your host IP)." >&2
 fi
 
 echo "Done"

@@ -34,24 +34,22 @@ x-common-build: &common_build |
 
   WORKDIR /usr/app
 
-  COPY docker/package.json docker/package-lock.json ./
+  COPY container-runtime/package.json container-runtime/package-lock.json ./
   RUN npm ci --omit=dev --ignore-scripts \
       && npm cache clean --force
 
-  COPY docker/preview-server.mjs ./
+  COPY container-runtime/static-api-server.mjs ./
   COPY --from=builder /usr/app/dist ./dist
 
   RUN chown -R 1000:1000 /usr/app
 
   USER 1000:1000
 
-  CMD ["node", "preview-server.mjs"]
+  CMD ["node", "static-api-server.mjs"]
 
 # ====================== Services ======================
 services:
   upstage_frontend:
-    profiles:
-      - frontend-preview
     build:
       context: .
       dockerfile_inline: *common_build
@@ -63,9 +61,14 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${FRONTEND_PORT}:4173"
+      - "127.0.0.1:${FRONTEND_PORT}:4173"
     environment:
-      VITE_STUDIO_API_PROXY: "${VITE_STUDIO_API_PROXY}"
+      # Reverse-proxy /api → studio backend. Default: same Docker network as app_containers
+      # (service `upstage_backend`, container port 3000 — not the host-mapped APP_PORT).
+      # If the API runs on the host instead, set e.g. http://host.docker.internal:3001
+      # (use host.docker.internal, not 172.17.0.1 — custom bridges often cannot reach docker0).
+      VITE_STUDIO_API_PROXY: "${VITE_STUDIO_API_PROXY:-http://upstage_backend:3000}"
+      STATIC_API_LISTEN_PORT: "4173"
       FRONTEND_PORT: "${FRONTEND_PORT}"
     networks:
       - upstage-network
