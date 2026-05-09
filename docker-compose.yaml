@@ -63,7 +63,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${FRONTEND_HOST_PORT}:4173
+      - "${FRONTEND_HOST_PORT}:4173"
     networks:
       - upstage-network
     working_dir: /usr/app
