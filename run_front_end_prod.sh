@@ -16,6 +16,7 @@ VITE_STUDIO_API_PROXY=http://host.docker.internal:${FRONTEND_PORT}
 # path) and proxy /api. When 1, Docker runs preview-server (static + /api proxy) as today.
 ENABLE_FRONTEND_DOCKER_PREVIEW=1
 
+mkdir -p /frontend_app_${SITE}
 env_src="/frontend_app_${SITE}/.env"
 if [[ -f "$env_src" ]]; then
   cp "$env_src" .env
