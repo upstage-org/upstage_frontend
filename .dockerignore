@@ -2,6 +2,9 @@
 
 .git/
 .cursor/
+.env
+
+env_backup*
 
 node_modules/
 docker/node_modules/

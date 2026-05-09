@@ -8,6 +8,7 @@ SITE=prod
 FRONTEND_PORT=3002
 HOST_UID=1000
 HOST_GID=1000
+ENV_BACKUP=./env_backup_${SITE}
 
 # Passed through compose (docker-compose.yaml uses strict "${VITE_STUDIO_API_PROXY}" — no default there).
 VITE_STUDIO_API_PROXY=http://host.docker.internal:${FRONTEND_PORT}
@@ -16,12 +17,16 @@ VITE_STUDIO_API_PROXY=http://host.docker.internal:${FRONTEND_PORT}
 # path) and proxy /api. When 1, Docker runs preview-server (static + /api proxy) as today.
 ENABLE_FRONTEND_DOCKER_PREVIEW=1
 
-mkdir -p /frontend_app_${SITE}
+
+sudo mkdir -p /frontend_app_${SITE}
 env_src="/frontend_app_${SITE}/.env"
-if [[ -f "$env_src" ]]; then
-  cp "$env_src" .env
+
+if [[ -f "${ENV_BACKUP}" ]]; then
+  sudo cp ${ENV_BACKUP} "$env_src"
+  echo "Copying existing file: ${ENV_BACKUP} to ${env_src}" >&2
 else
-  echo "Warning: ${env_src} not found — build uses existing repo .env if present." >&2
+  echo "${ENV_BACKUP} is missing. Create this file from env.template" >&2
+  exit 1
 fi
 
 compose=(docker compose -f docker-compose.yaml -p "upstage-frontend-${SITE}")
