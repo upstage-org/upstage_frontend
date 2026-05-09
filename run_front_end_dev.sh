@@ -2,7 +2,7 @@
 
 set -a
 SITE=dev
-DOMAIN=de.upstage.live
+DOMAIN=dev.upstage.live
 # Published as host:container (${FRONTEND_PORT}:${FRONTEND_PORT}); also passed to vite `preview.port`.
 # Must be ≥1024 for typical non-root UIDs inside the container.
 FRONTEND_PORT=3001
