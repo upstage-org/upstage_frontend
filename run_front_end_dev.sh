@@ -5,12 +5,12 @@ cd "$(dirname "$0")"
 
 set -a
 SITE=dev
-FRONTEND_HOST_PORT=3001
+FRONTEND_PORT=3001
 HOST_UID=1000
 HOST_GID=1000
 
 # Passed through compose (docker-compose.yaml uses strict "${VITE_STUDIO_API_PROXY}" — no default there).
-VITE_STUDIO_API_PROXY=http://host.docker.internal:3001
+VITE_STUDIO_API_PROXY=http://host.docker.internal:${FRONTEND_PORT}
 
 # When 0, the frontend preview-server is not started; host nginx must serve built dist/ (or your deploy
 # path) and proxy /api. When 1, Docker runs preview-server (static + /api proxy) as today.
