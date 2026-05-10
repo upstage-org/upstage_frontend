@@ -78,12 +78,60 @@ function pauseAfterBeatMs(beat: Beat, pace: PaceKind): number {
  * Default: yes when headed (a human is watching and wants the replay), no
  * when headless (CI shouldn't pay an extra ~live-performance-length wall
  * clock just to re-watch the same events). Override with E2E_REPLAY=1|0.
+ *
+ * Only consulted as the *default* for the replay phase when E2E_PHASES is
+ * unset; once E2E_PHASES is set explicitly, this is ignored.
  */
 function shouldRunReplay(): boolean {
   const explicit = process.env.E2E_REPLAY?.trim().toLowerCase();
   if (explicit === "1" || explicit === "true") return true;
   if (explicit === "0" || explicit === "false") return false;
   return !loadE2eConfig().headless;
+}
+
+type Phase = "rehearsal" | "live" | "replay";
+const ALL_PHASES: readonly Phase[] = ["rehearsal", "live", "replay"];
+
+/**
+ * Comma-separated subset of `rehearsal,live,replay`. When unset, defaults
+ * to `rehearsal + live` always, plus `replay` per `shouldRunReplay()`
+ * (i.e. on for headed, off for headless).
+ *
+ *   E2E_PHASES=rehearsal             → just pass 1 (cast + admin)
+ *   E2E_PHASES=live                  → just pass 2 (cast + audience)
+ *   E2E_PHASES=replay                → just pass 3 against the most
+ *                                       recent existing Performance row
+ *                                       (admin + audience only — no cast)
+ *   E2E_PHASES=rehearsal,live        → skip replay
+ *   E2E_PHASES=live,replay           → skip rehearsal (saves several min)
+ *   E2E_PHASES=rehearsal,live,replay → all three (== full default headed)
+ */
+function parsePhases(): Set<Phase> {
+  const explicit = process.env.E2E_PHASES?.trim();
+  if (explicit) {
+    const parts = explicit
+      .toLowerCase()
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const set = new Set<Phase>();
+    for (const p of parts) {
+      if ((ALL_PHASES as readonly string[]).includes(p)) {
+        set.add(p as Phase);
+      } else {
+        throw new Error(
+          `E2E_PHASES: unknown phase "${p}" — valid values are: ${ALL_PHASES.join(", ")}`,
+        );
+      }
+    }
+    if (set.size === 0) {
+      throw new Error("E2E_PHASES is set but parsed to no phases.");
+    }
+    return set;
+  }
+  const phases = new Set<Phase>(["rehearsal", "live"]);
+  if (shouldRunReplay()) phases.add("replay");
+  return phases;
 }
 
 /**
@@ -110,17 +158,23 @@ test.describe("perform: re-enact Romeo & Juliet A1S1", () => {
     const runtime = readRuntime();
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     const pace = resolvePace();
-    const runReplayPhase = shouldRunReplay();
+    const phases = parsePhases();
+    const needsCast = phases.has("rehearsal") || phases.has("live");
+    const needsAudience = phases.has("live") || phases.has("replay");
     console.log(
-      `[perform] pace=${pace} headless=${loadE2eConfig().headless} replay=${runReplayPhase}`,
+      `[perform] phases=${[...phases].join(",")} pace=${pace} ` +
+        `headless=${loadE2eConfig().headless} cast=${needsCast} audience=${needsAudience}`,
     );
+
+    const beats = process.env.E2E_BEATS === "smoke" ? SMOKE_BEATS : BEATS;
+    expect(beats.length).toBeGreaterThan(0);
 
     // ---------- 0. Spin up admin browser FIRST --------------------------
     // The backend deletes prior UserSessionModel rows on each login (single-
     // session-per-user policy). If we did `loginAsAdmin()` from Node first,
     // then ran `adminLogin.login()` in the browser, the Node-side token
     // would be invalidated mid-test — fine for the first batch of GraphQL
-    // calls below, but we'd hit "Authenticated Failed" on the cross-pass
+    // calls below, but we'd hit "Authenticated Failed" on the cross-phase
     // mutations 3+ minutes later. Logging in the browser FIRST and pulling
     // its token from localStorage means there's only ever one live admin
     // session, and we keep using it throughout the suite.
@@ -139,151 +193,202 @@ test.describe("perform: re-enact Romeo & Juliet A1S1", () => {
       return t;
     };
 
-    // ---------- 1. Reset stage state for this run -----------------------
-    // Sweep first so any stray events from prior runs are archived.
+    // Sweep up any stray events from prior runs before we record anything
+    // new (otherwise pass 2's eventual `sweepStageReturningId` would bundle
+    // them into our new Performance row).
     let adminToken = await getAdminToken();
     await sweepStageIfNeeded(runtime.stageId, adminToken);
 
-    // Always restore status="live" before exit (success OR failure) so the
-    // next run's `validate-runtime.ts` reuses this stage instead of re-
-    // authoring from scratch. The validator requires status === "live".
-    let needsStatusRestore = true;
+    // The only path that flips status away from "live" is rehearsal, so
+    // this is the only phase that requires the finally-block restore. live
+    // and replay both leave status as-is. Set true the moment we change it.
+    let needsStatusRestore = false;
+
+    // Track the in-flight references for clean teardown. seats may be empty
+    // (replay-only mode), audience may be null (rehearsal-only mode).
+    const seats: CastSeat[] = [];
+    const seatByUsername = new Map<string, CastSeat>();
+    let audience: AudienceSeat | null = null;
 
     try {
+      // ---------- 1. Cast logins (only if a phase needs them) ---------
+      if (needsCast) {
+        console.log(`[perform] logging in ${PERSONAS.length} cast members…`);
+        for (const persona of PERSONAS) {
+          const ctx = await browser.newContext();
+          const page = await ctx.newPage();
+          const lp = new LoginPage(page);
+          await lp.login(persona.username, persona.password);
+          const live = new LiveStagePage(page);
+          await live.goto(runtime.stageSlug);
+          const seat: CastSeat = { persona, context: ctx, page, live };
+          seats.push(seat);
+          seatByUsername.set(persona.username, seat);
+        }
+      }
 
-    // Force rehearsal for pass 1. The stored attribute gates audience entry
-    // (rehearsal locks out non-players); it does NOT gate meSpeak — the TTS
-    // gate is `state.status === "LIVE"` (the MQTT lifecycle field), which
-    // every connected client reaches independently.
-    await setStageStatus(runtime.stageId, "rehearsal", adminToken);
+      // ---------- 2. PASS 1 — rehearsal walkthrough ------------------
+      if (phases.has("rehearsal")) {
+        await setStageStatus(runtime.stageId, "rehearsal", adminToken);
+        needsStatusRestore = true;
 
-    const beats = process.env.E2E_BEATS === "smoke" ? SMOKE_BEATS : BEATS;
-    expect(beats.length).toBeGreaterThan(0);
+        console.log("[perform] PASS 1: rehearsal mode (cast + admin observer)");
+        await runPass({
+          label: "rehearsal",
+          beats,
+          adminLive,
+          viewerLive: adminLive,
+          seatByUsername,
+          runtime,
+          pace,
+        });
+        await tailWait(adminPage, pace);
 
-    const seats: CastSeat[] = [];
-    for (const persona of PERSONAS) {
-      const ctx = await browser.newContext();
-      const page = await ctx.newPage();
-      const lp = new LoginPage(page);
-      await lp.login(persona.username, persona.password);
-      const live = new LiveStagePage(page);
-      await live.goto(runtime.stageSlug);
-      seats.push({ persona, context: ctx, page, live });
-    }
-    const seatByUsername = new Map(seats.map((s) => [s.persona.username, s] as const));
+        for (const seat of seats) {
+          await seat.page.screenshot({
+            path: path.join(SCREENSHOT_DIR, `rehearsal-${seat.persona.username}.png`),
+            fullPage: true,
+          });
+        }
+        await adminPage.screenshot({
+          path: path.join(SCREENSHOT_DIR, "rehearsal-admin.png"),
+          fullPage: true,
+        });
+      }
 
-    // ---------- 2. PASS 1 — rehearsal walkthrough -----------------------
-    console.log("[perform] PASS 1: rehearsal mode (cast + admin observer)");
-    await runPass({
-      label: "rehearsal",
-      beats,
-      adminLive,
-      viewerLive: adminLive,
-      seatByUsername,
-      runtime,
-      pace,
-    });
-    await tailWait(adminPage, pace);
+      // ---------- 3. Pre-live / pre-replay reset ---------------------
+      // Always sweep before pass 2 so any leftover orphan events (from
+      // pass 1, or from a previous interrupted run) don't get bundled
+      // into the recording we're about to make. For replay-only mode
+      // we still ensure status=live, but no sweep is needed (we're not
+      // recording).
+      if (phases.has("live")) {
+        adminToken = await getAdminToken();
+        await sweepStageIfNeeded(runtime.stageId, adminToken);
+        await setStageStatus(runtime.stageId, "live", adminToken);
+        // status is now live — that's the validator-required end state,
+        // so the finally block doesn't need to restore.
+        needsStatusRestore = false;
 
-    // Per-cast snapshot of the rehearsal end state, before we wipe and re-do.
-    for (const seat of seats) {
-      await seat.page.screenshot({
-        path: path.join(SCREENSHOT_DIR, `rehearsal-${seat.persona.username}.png`),
-        fullPage: true,
-      });
-    }
-    await adminPage.screenshot({
-      path: path.join(SCREENSHOT_DIR, "rehearsal-admin.png"),
-      fullPage: true,
-    });
+        // Cast clients still hold pass-1 board state in their local Vuex.
+        // Without a reload, pass 2's `enter` beats would add SECOND avatars
+        // (new uuids), and admin/audience would see double of every persona.
+        // Only needed when both phases ran on the same cast.
+        if (phases.has("rehearsal")) {
+          await reloadCastSeats({ admin: adminLive, adminPage, seats, runtime });
+        }
+      } else if (phases.has("replay")) {
+        // Replay-only: ensure status=live so the validator and audience
+        // route both work, but skip the sweep (we want the existing
+        // Performance recordings preserved).
+        adminToken = await getAdminToken();
+        await setStageStatus(runtime.stageId, "live", adminToken);
+        needsStatusRestore = false;
+      }
 
-    // ---------- 3. Reset between passes ---------------------------------
-    // Sweep archives every event from pass 1, but the cast clients still
-    // hold pass-1 board state in their local Vuex. Without a reload, when
-    // pass 2's `enter` beats place fresh avatars (new uuids), each cast
-    // member's local board would carry both copies — admin would see two
-    // of every persona, and pass 2's `move` lookups by name would race.
-    //
-    // Token may have expired during the multi-minute pass 1 (default JWT
-    // TTL is 15 minutes; slow pace + a long script gets close). Re-read
-    // from the admin browser, which holds the only live admin session.
-    adminToken = await getAdminToken();
-    await sweepStageIfNeeded(runtime.stageId, adminToken);
-    await setStageStatus(runtime.stageId, "live", adminToken);
-    await reloadCastSeats({ admin: adminLive, adminPage, seats, runtime });
+      // ---------- 4. Audience joins (only if a phase needs them) -----
+      if (needsAudience) {
+        audience = await openAudienceSeat({ browser, runtime });
+      }
 
-    // ---------- 4. Audience joins (no login) ---------------------------
-    const audience = await openAudienceSeat({ browser, runtime });
+      // ---------- 5. PASS 2 — live performance with audience ---------
+      if (phases.has("live")) {
+        console.log("[perform] PASS 2: live mode, audience present");
+        await runPass({
+          label: "live",
+          beats,
+          adminLive,
+          viewerLive: audience!.live,
+          seatByUsername,
+          runtime,
+          pace,
+        });
+        await tailWait(audience!.page, pace);
 
-    // ---------- 5. PASS 2 — live performance with audience watching ----
-    console.log("[perform] PASS 2: live mode, audience present");
-    await runPass({
-      label: "live",
-      beats,
-      adminLive,
-      viewerLive: audience.live,
-      seatByUsername,
-      runtime,
-      pace,
-    });
-    await tailWait(audience.page, pace);
+        for (const seat of seats) {
+          await seat.page.screenshot({
+            path: path.join(SCREENSHOT_DIR, `live-${seat.persona.username}.png`),
+            fullPage: true,
+          });
+        }
+        await adminPage.screenshot({
+          path: path.join(SCREENSHOT_DIR, "live-admin.png"),
+          fullPage: true,
+        });
+        await audience!.page.screenshot({
+          path: path.join(SCREENSHOT_DIR, "live-audience.png"),
+          fullPage: true,
+        });
+      }
 
-    // ---------- 6. Live-end screenshots ---------------------------------
-    for (const seat of seats) {
-      await seat.page.screenshot({
-        path: path.join(SCREENSHOT_DIR, `live-${seat.persona.username}.png`),
-        fullPage: true,
-      });
-    }
-    await adminPage.screenshot({
-      path: path.join(SCREENSHOT_DIR, "live-admin.png"),
-      fullPage: true,
-    });
-    await audience.page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "live-audience.png"),
-      fullPage: true,
-    });
+      // Cast contexts have nothing more to do — pass 3 only exercises the
+      // audience seat. Close now to free ~12 Chromium contexts before the
+      // long replay wait. (No-op for rehearsal-only / replay-only modes
+      // where seats is already empty or contexts already irrelevant.)
+      for (const seat of seats) await seat.context.close();
+      seats.length = 0;
+      seatByUsername.clear();
 
-    // Cast contexts have nothing more to do — pass 3 only exercises the
-    // audience seat (replay loads the recorded performance there). Closing
-    // them now frees ~12 Chromium contexts before the long replay wait.
-    for (const seat of seats) await seat.context.close();
+      // ---------- 6. PASS 3 — replay --------------------------------
+      if (phases.has("replay")) {
+        let performanceId: number | null = null;
+        if (phases.has("live")) {
+          // Just finished pass 2: sweep its events into a fresh Performance
+          // row. Wait for event_archive_dev to drain the MQTT tail first
+          // so the recording isn't missing the last few lines.
+          await audience!.page.waitForTimeout(eventArchiveSettleWaitMs(pace));
+          adminToken = await getAdminToken();
+          performanceId = await sweepStageReturningId(runtime.stageId, adminToken);
+          if (performanceId == null) {
+            console.warn(
+              "[perform] PASS 3: pass 2 produced no events to archive — skipping replay.",
+            );
+          }
+        } else {
+          // Replay-only mode: pull the most recent existing Performance.
+          adminToken = await getAdminToken();
+          performanceId = await getMostRecentPerformanceId(runtime.stageId, adminToken);
+          if (performanceId == null) {
+            throw new Error(
+              "[perform] PASS 3 (replay-only): no existing Performance for this stage. " +
+                "Run with E2E_PHASES=live (or rehearsal,live) at least once first to record one.",
+            );
+          }
+        }
 
-    // ---------- 7. PASS 3 — audience replay (optional) -----------------
-    if (runReplayPhase) {
-      // Let the event_archive worker drain the tail of pass 2 into the DB
-      // before we sweep, otherwise the Performance row would be missing the
-      // last few events and the replay would cut short.
-      await audience.page.waitForTimeout(eventArchiveSettleWaitMs(pace));
-      // JWT may have aged out across two long passes; refresh from the
-      // admin browser, which holds the only live admin session.
-      adminToken = await getAdminToken();
-      await runReplay({
-        audience,
-        stageId: runtime.stageId,
-        stageSlug: runtime.stageSlug,
-        adminToken,
-        pace,
-      });
-    } else {
-      console.log("[perform] PASS 3 skipped (E2E_REPLAY=0 or headless run).");
-    }
+        if (performanceId != null) {
+          await runReplay({
+            audience: audience!,
+            stageSlug: runtime.stageSlug,
+            performanceId,
+            pace,
+          });
+        }
+      }
 
-    await audience.context.close();
-    await adminCtx.close();
-
-    // We finished pass 2 in live mode, so status is already "live". Skip
-    // the extra mutation in the finally block.
-    needsStatusRestore = false;
-
+      // ---------- 7. Audience teardown -----------------------------
+      if (audience) {
+        await audience.context.close();
+        audience = null;
+      }
+      await adminCtx.close();
     } finally {
+      // Best-effort cleanup of contexts opened in the try block. Closing
+      // an already-closed context is a no-op (catch swallows the error).
+      for (const seat of seats) {
+        await seat.context.close().catch(() => {});
+      }
+      if (audience) {
+        await audience.context.close().catch(() => {});
+      }
+
       if (needsStatusRestore) {
-        // The test bailed out partway through. Pin the stage back to "live"
-        // so subsequent setup runs validate the existing runtime.json
-        // instead of re-authoring from scratch. We tolerate failure here:
-        // if the backend is unreachable the original error matters more.
-        // Re-read the token from the admin browser in case the long pass
-        // ran past the JWT TTL (default 15min).
+        // Test bailed out after we'd already set status=rehearsal. Pin it
+        // back to "live" so subsequent setup runs validate the existing
+        // runtime.json instead of re-authoring from scratch. Tolerate
+        // failure here: if the backend is unreachable the original error
+        // matters more. Re-read the token in case the test ran past JWT
+        // TTL (default 15min).
         try {
           const fresh = await getAdminToken();
           await setStageStatus(runtime.stageId, "live", fresh);
@@ -391,6 +496,45 @@ async function sweepStageReturningId(
  */
 async function sweepStageIfNeeded(stageId: string, adminToken: string): Promise<void> {
   await sweepStageReturningId(stageId, adminToken);
+}
+
+/**
+ * Look up the most recent `Performance` row for the stage and return its id,
+ * or `null` if the stage has no recordings. Used by replay-only mode
+ * (`E2E_PHASES=replay`) to point pass 3 at an existing recording instead
+ * of trying to sweep a fresh one out of an empty event stream.
+ *
+ * Sort key is `createdOn` (descending); ties fall back to numeric id
+ * descending so that two performances created in the same second still
+ * resolve deterministically.
+ */
+async function getMostRecentPerformanceId(
+  stageId: string,
+  adminToken: string,
+): Promise<number | null> {
+  const result = await gql<{
+    stage: { performances: Array<{ id: string; createdOn: string | null }> } | null;
+  }>(
+    `query StagePerformances($id: ID!) {
+       stage(id: $id) { performances { id createdOn } }
+     }`,
+    { id: String(stageId) },
+    adminToken,
+  );
+  if (result.errors?.length) {
+    throw new Error(
+      `[perform] getMostRecentPerformanceId failed: ${JSON.stringify(result.errors)}`,
+    );
+  }
+  const performances = result.data?.stage?.performances ?? [];
+  if (performances.length === 0) return null;
+  const sorted = [...performances].sort((a, b) => {
+    const ta = a.createdOn ? Date.parse(a.createdOn) : 0;
+    const tb = b.createdOn ? Date.parse(b.createdOn) : 0;
+    if (tb !== ta) return tb - ta;
+    return Number(b.id) - Number(a.id);
+  });
+  return Number(sorted[0].id);
 }
 
 /**
@@ -589,10 +733,17 @@ async function reloadCastSeats({
 // ---------------------------------------------------------------------------
 
 /**
- * Sweep pass 2's events into a Performance row, navigate the audience seat
- * to the SPA's actual replay route (/replay/:url/:id), pin speed to 1x,
- * dispatch `stage/replayRecording`, and wait for it to self-pause when the
- * recording reaches its end.
+ * Navigate the audience seat to the SPA's actual replay route
+ * (`/replay/:url/:id`), pin speed to 1x, dispatch `stage/replayRecording`,
+ * and wait for it to self-pause when the recording reaches its end.
+ *
+ * The caller supplies `performanceId`. Two callsites today:
+ *
+ *   1. After pass 2 (live), the caller sweeps the just-emitted events into
+ *      a fresh Performance row and passes the new id here.
+ *   2. In replay-only mode (E2E_PHASES=replay), the caller resolves the
+ *      most recent existing Performance via `getMostRecentPerformanceId`
+ *      and passes that id here.
  *
  * Why navigate instead of reusing `loadStage` via the dev hook:
  *
@@ -612,30 +763,18 @@ async function reloadCastSeats({
  * (NOT `replicateEvent`), so they are NOT muted, so meSpeak fires for every
  * speech beat. Faster speeds chop or stack TTS audibly. (The on-screen
  * Controls bar lets a human override mid-replay if desired.)
- *
- * If sweepStage reports there were no events to archive, we log a warning
- * and skip the replay rather than failing the whole test.
  */
 async function runReplay({
   audience,
-  stageId,
   stageSlug,
-  adminToken,
+  performanceId,
   pace,
 }: {
   audience: AudienceSeat;
-  stageId: string;
   stageSlug: string;
-  adminToken: string;
+  performanceId: number;
   pace: PaceKind;
 }): Promise<void> {
-  const performanceId = await sweepStageReturningId(stageId, adminToken);
-  if (performanceId == null) {
-    console.warn(
-      "[perform] PASS 3: sweepStage reports no events to archive — skipping replay.",
-    );
-    return;
-  }
   console.log(
     `[perform] PASS 3: replay performance #${performanceId} on audience seat ` +
       `via /replay/${stageSlug}/${performanceId}`,

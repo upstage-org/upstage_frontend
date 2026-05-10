@@ -22,8 +22,20 @@ To generate the necessary environment scripts and start up the application using
 
 Testing:
 
- PWHEADLESS=0 pnpm e2e:perform                   # watch + hear, default slow pace
+ # Default (today's behavior): all three phases headed, no replay headless.
+  PWHEADLESS=0 pnpm e2e:perform
+  # Just rehearsal: cast walks the script in rehearsal mode, no audience.
+  PWHEADLESS=0 pnpm e2e:perform:rehearsal
+  # Just live: cast performs while audience watches; no rehearsal, no replay.
+  PWHEADLESS=0 pnpm e2e:perform:live
+  # Just replay: no cast logins. Audience watches the most recent recording.
+  # Errors clearly if no Performance exists for the stage yet.
+  PWHEADLESS=0 pnpm e2e:perform:replay
+  # Arbitrary combos via the env var:
+  PWHEADLESS=0 E2E_PHASES=live,replay pnpm e2e:perform   # skip rehearsal
+  PWHEADLESS=0 E2E_PHASES=rehearsal,replay pnpm e2e:perform  # rare; replay against latest existing recording
+  # Smoke beats still works on top of any phase selection:
+  PWHEADLESS=0 E2E_PHASES=live E2E_BEATS=smoke pnpm e2e:perform
 
-  PWHEADLESS=0 E2E_PACE=normal pnpm e2e:perform   # watch + hear, half pace
+  E2E_REPLAY still works as a fallback default when E2E_PHASES is unset.
 
-  pnpm e2e:perform      
