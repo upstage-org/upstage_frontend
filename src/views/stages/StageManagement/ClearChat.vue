@@ -1,9 +1,5 @@
 <template>
-  <button
-    class="button ml-2 is-warning"
-    @click="clearChat"
-    :class="{ 'is-loading': clearing }"
-  >
+  <button class="button ml-2 is-warning" @click="clearChat" :class="{ 'is-loading': clearing }">
     Clear Chat
   </button>
 </template>
@@ -27,14 +23,9 @@ export default {
       clearing.value = true;
       await new Promise((resolve) => {
         mqttClient.connect().on("connect", () => {
-          const topicChat = namespaceTopic(
-            TOPICS.CHAT,
-            stage.value.fileLocation,
-          );
+          const topicChat = namespaceTopic(TOPICS.CHAT, stage.value.fileLocation);
           mqttClient.sendMessage(topicChat, { clear: true }, true);
-          mqttClient
-            .sendMessage(topicChat, { clearPlayerChat: true }, true)
-            .then(resolve);
+          mqttClient.sendMessage(topicChat, { clearPlayerChat: true }, true).then(resolve);
         });
       });
       clearing.value = false;

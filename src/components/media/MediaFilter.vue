@@ -23,7 +23,7 @@ const { result: response, loading } = useQuery(gql`
       username
       displayName
     }
-    stages(input:{}) {
+    stages(input: {}) {
       edges {
         id
         name
@@ -35,9 +35,9 @@ const { result: response, loading } = useQuery(gql`
       }
     }
     getAllStages {
-        id
-        name
-        permission
+      id
+      name
+      permission
     }
     tags {
       id
@@ -58,9 +58,7 @@ const result = computed(() => response?.value);
 const sharedAuth = getSharedAuth();
 
 const name = ref("");
-const owners = ref(
-  sharedAuth && sharedAuth.username ? [sharedAuth.username] : [],
-);
+const owners = ref(sharedAuth && sharedAuth.username ? [sharedAuth.username] : []);
 const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
@@ -69,25 +67,25 @@ const dormant = ref(false);
 
 const ranges = [
   {
-    label: 'Today',
+    label: "Today",
     value: [dayjs(), dayjs()],
   },
   {
-    label: 'Yesterday',
-    value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')],
+    label: "Yesterday",
+    value: [dayjs().add(-1, "d"), dayjs().add(-1, "d")],
   },
   {
-    label: 'Last 7 days',
-    value: [dayjs().add(-7, 'd'), dayjs()],
+    label: "Last 7 days",
+    value: [dayjs().add(-7, "d"), dayjs()],
   },
   {
-    label: 'Last month',
-    value: [dayjs().add(-1, 'month'), dayjs()],
+    label: "Last month",
+    value: [dayjs().add(-1, "month"), dayjs()],
   },
   {
-    label: 'This year',
+    label: "This year",
     value: [dayjs().startOf("year"), dayjs()],
-  }
+  },
 ];
 
 const updateInquiry = (vars: any) =>
@@ -109,7 +107,7 @@ watchEffect(() => {
     stages: stages.value,
     tags: tags.value,
     mediaTypes: types.value,
-    dormant: dormant.value
+    dormant: dormant.value,
   });
 });
 watch(
@@ -122,17 +120,14 @@ watch(
 const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) => {
   updateInquiry({
     createdBetween: _dates
-      ? [
-        _dates[0]?.format("YYYY-MM-DD"),
-        _dates[1]?.format("YYYY-MM-DD"),
-      ]
+      ? [_dates[0]?.format("YYYY-MM-DD"), _dates[1]?.format("YYYY-MM-DD")]
       : undefined,
   });
 };
 
 onMounted(() => {
   updateInquiry({
-    createdBetween: undefined
+    createdBetween: undefined,
   });
 });
 
@@ -157,10 +152,7 @@ const hasFilter = computed(
 );
 const handleFilterOwnerName = (keyword: string, option: any) => {
   const s = keyword.toLowerCase();
-  return (
-    option.value.toLowerCase().includes(s) ||
-    option.label.toLowerCase().includes(s)
-  );
+  return option.value.toLowerCase().includes(s) || option.label.toLowerCase().includes(s);
 };
 const handleFilterStageName = (keyword: string, option: any) => {
   return option.label.toLowerCase().includes(keyword.toLowerCase());
@@ -174,7 +166,7 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
 };
 const onVisibleDropzone = () => {
   editingMediaVar(undefined);
-}
+};
 </script>
 
 <template>
@@ -187,63 +179,112 @@ const onVisibleDropzone = () => {
           </template>
           Back to editing
         </a-button>
-        <a-button type="primary" v-else @click="visibleDropzone = true; onVisibleDropzone();">
+        <a-button
+          type="primary"
+          v-else
+          @click="
+            visibleDropzone = true;
+            onVisibleDropzone();
+          "
+        >
           <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
         </a-button>
         <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="name" />
-        <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags" style="min-width: 124px"
-          placeholder="Owners" :loading="loading" v-model:value="owners" :options="result
-            ? result.users.map((e: any) => ({
-              value: e.username,
-              label: e.displayName || e.username,
-            }))
-            : []
-            ">
+        <a-select
+          allowClear
+          showArrow
+          :filterOption="handleFilterOwnerName"
+          mode="tags"
+          style="min-width: 124px"
+          placeholder="Owners"
+          :loading="loading"
+          v-model:value="owners"
+          :options="
+            result
+              ? result.users.map((e: any) => ({
+                  value: e.username,
+                  label: e.displayName || e.username,
+                }))
+              : []
+          "
+        >
           <template #dropdownRender="{ menuNode: menu }">
             <v-nodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
-            <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="owners = []">
+            <div
+              class="w-full cursor-pointer text-center"
+              @mousedown.prevent
+              @click.stop.prevent="owners = []"
+            >
               <team-outlined />&nbsp;All players
             </div>
           </template>
         </a-select>
-        <a-select allowClear showArrow filterOption mode="tags" style="min-width: 128px" placeholder="Media types"
-          :loading="loading" v-model:value="types" :options="result
-            ? result.mediaTypes
-              .filter(
-                (e: any) =>
-                  !['shape', 'media'].includes(e.name.toLowerCase()),
-              )
-              .map((e: any) => ({
-                value: e.name,
-                label: capitalize(e.name),
-              }))
-            : []
-            ">
+        <a-select
+          allowClear
+          showArrow
+          filterOption
+          mode="tags"
+          style="min-width: 128px"
+          placeholder="Media types"
+          :loading="loading"
+          v-model:value="types"
+          :options="
+            result
+              ? result.mediaTypes
+                  .filter((e: any) => !['shape', 'media'].includes(e.name.toLowerCase()))
+                  .map((e: any) => ({
+                    value: e.name,
+                    label: capitalize(e.name),
+                  }))
+              : []
+          "
+        >
         </a-select>
-        <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags" style="min-width: 160px"
-          placeholder="Stages assigned" :loading="loading" v-model:value="stages" :options="result
-            ? result.getAllStages.map((e: any) => ({
-              value: e.id,
-              label: e.name,
-            }))
-            : []
-            ">
+        <a-select
+          allowClear
+          showArrow
+          :filterOption="handleFilterStageName"
+          mode="tags"
+          style="min-width: 160px"
+          placeholder="Stages assigned"
+          :loading="loading"
+          v-model:value="stages"
+          :options="
+            result
+              ? result.getAllStages.map((e: any) => ({
+                  value: e.id,
+                  label: e.name,
+                }))
+              : []
+          "
+        >
         </a-select>
-        <a-select allowClear showArrow mode="tags" style="min-width: 160px" placeholder="Tags" :loading="loading"
-          v-model:value="tags" :options="result
-            ? result.tags.map((e: any) => ({
-              value: e.name,
-              label: e.name,
-            }))
-            : []
-            "></a-select>
-        <a-range-picker :placeholder="['Created from', 'to date']" :presets="ranges as any"
-          :onChange="onRangeChange as any" v-model:value="dates as any" />
+        <a-select
+          allowClear
+          showArrow
+          mode="tags"
+          style="min-width: 160px"
+          placeholder="Tags"
+          :loading="loading"
+          v-model:value="tags"
+          :options="
+            result
+              ? result.tags.map((e: any) => ({
+                  value: e.name,
+                  label: e.name,
+                }))
+              : []
+          "
+        ></a-select>
+        <a-range-picker
+          :placeholder="['Created from', 'to date']"
+          :presets="ranges as any"
+          :onChange="onRangeChange as any"
+          v-model:value="dates as any"
+        />
         <a-space v-if="isAdmin">
-          <span>
-            Dormant:
-          </span>
+          <span> Dormant: </span>
           <a-switch v-model:checked="dormant" />
         </a-space>
         <a-button v-if="hasFilter" type="dashed" @click="clearFilters">

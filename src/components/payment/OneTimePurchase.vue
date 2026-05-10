@@ -39,10 +39,7 @@
         </div>
       </div>
       <div class="column">
-        <button
-          class="button is-primary is-fullwidth"
-          @click="openPurchasePopup()"
-        >
+        <button class="button is-primary is-fullwidth" @click="openPurchasePopup()">
           <span>Donate to UpStage (amounts shown in US dollars)</span>
         </button>
       </div>

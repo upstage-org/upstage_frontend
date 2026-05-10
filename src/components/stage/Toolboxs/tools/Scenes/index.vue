@@ -41,9 +41,9 @@ export default {
 
 <style lang="scss" scoped>
 @mixin gradientText($from, $to) {
-    background: linear-gradient(to top, $from, $to);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  background: linear-gradient(to top, $from, $to);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 .fas.fa-plus {
   @include gradientText(#30ac45, #6fb1fc);

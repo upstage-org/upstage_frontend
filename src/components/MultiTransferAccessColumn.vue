@@ -123,11 +123,8 @@ export default {
         if (props.data) {
           for (let i = 0; i < val.length; i++) {
             for (let j = 0; j < (val[i] ?? []).length; j++) {
-              positions[
-                props.data.findIndex(
-                  (item) => props.renderValue(item) === val[i][j],
-                )
-              ] = i + 1;
+              positions[props.data.findIndex((item) => props.renderValue(item) === val[i][j])] =
+                i + 1;
             }
           }
         }
@@ -136,9 +133,7 @@ export default {
     );
 
     const count = (i) =>
-      props.data
-        ? props.data.filter((item, p) => (positions[p] ?? 0) === i).length
-        : 0;
+      props.data ? props.data.filter((item, p) => (positions[p] ?? 0) === i).length : 0;
 
     const moveAll = (from, to) => {
       for (let i = 0; i < props.data.length; i++) {

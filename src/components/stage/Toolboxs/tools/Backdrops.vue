@@ -18,11 +18,7 @@
       <Skeleton :data="background" nodrop>
         <Image :src="background.src" @click="setBackground(background)" />
         <template v-if="background.multi">
-          <Icon
-            class="is-multi"
-            title="This is a multiframe backdrop"
-            src="multi-frame.svg"
-          />
+          <Icon class="is-multi" title="This is a multiframe backdrop" src="multi-frame.svg" />
         </template>
       </Skeleton>
     </template>
@@ -43,10 +39,7 @@
       >
         <p class="control menu-group-item" @click="toggleAutoplayFrames()">
           <button class="button is-light">
-            <Icon
-              :src="currentBackground.speed > 0 ? 'pause.svg' : 'play.svg'"
-              size="24" 
-            />
+            <Icon :src="currentBackground.speed > 0 ? 'pause.svg' : 'play.svg'" size="24" />
           </button>
         </p>
         <p
@@ -117,9 +110,7 @@ export default {
   components: { Image, Icon, ContextMenu, Skeleton },
   setup: () => {
     const store = useStore();
-    const currentBackground = computed(
-      () => store.state.stage.background ?? {},
-    );
+    const currentBackground = computed(() => store.state.stage.background ?? {});
 
     const backgrounds = computed(() => store.state.stage.tools.backdrops);
 

@@ -58,7 +58,7 @@ export default {
   fill: "preencher",
   none: "nenhum",
   avatar: "avatar",
-  upload: "baixar",  
+  upload: "baixar",
   username: "Nome do usuário",
   password: "senha",
   new: "Novo",
@@ -102,8 +102,7 @@ export default {
   no_content: "Sem conteúdo",
   drag_files_here_or_click_to_upload: "Arraste os arquivos aqui ou clique para baixar",
   choose_an_image: "Escolha uma imagem",
-  choose_an_existing_image_or_upload_new:
-    "Escolha uma imagem existente ou baixa uma nova",
+  choose_an_existing_image_or_upload_new: "Escolha uma imagem existente ou baixa uma nova",
   hold_this_avatar: "Mantenha este avatar",
   remove_from_avatar: "Remover o avatar",
   add_to_avatar: "Adicionar o avatar",
@@ -222,5 +221,5 @@ export default {
   introduction: "Introdução",
   new_object: "Novo {0}",
   new_stream: "My Stream",
-  default_backgroundcolor: "Default Background Colour"
+  default_backgroundcolor: "Default Background Colour",
 };

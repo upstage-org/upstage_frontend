@@ -11,10 +11,7 @@ import { createInterface } from "node:readline/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  formatE2eConfigSummary,
-  loadE2eConfig,
-} from "./e2e-config";
+import { formatE2eConfigSummary, loadE2eConfig } from "./e2e-config";
 
 async function promptContinue(): Promise<boolean> {
   if (process.env.CI) return true;
@@ -28,9 +25,7 @@ async function promptContinue(): Promise<boolean> {
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const answer = (
-      await rl.question("Proceed with Playwright using the settings above? [y/N] ")
-    )
+    const answer = (await rl.question("Proceed with Playwright using the settings above? [y/N] "))
       .trim()
       .toLowerCase();
     return answer === "y" || answer === "yes";
@@ -39,11 +34,7 @@ async function promptContinue(): Promise<boolean> {
   }
 }
 
-const frontendRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-);
+const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const cfg = loadE2eConfig();
 console.log("");
@@ -56,14 +47,13 @@ if (!proceed) {
   process.exit(process.exitCode);
 }
 
-const passArgs =
-  process.argv.slice(2).length > 0 ? process.argv.slice(2) : ["test"];
+const passArgs = process.argv.slice(2).length > 0 ? process.argv.slice(2) : ["test"];
 
 const result = spawnSync("pnpm", ["exec", "playwright", ...passArgs], {
-    cwd: frontendRoot,
-    stdio: "inherit",
-    env: process.env,
-    shell: platform() === "win32",
-  });
+  cwd: frontendRoot,
+  stdio: "inherit",
+  env: process.env,
+  shell: platform() === "win32",
+});
 
 process.exit(typeof result.status === "number" ? result.status : 1);

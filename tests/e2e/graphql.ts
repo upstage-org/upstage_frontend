@@ -9,10 +9,7 @@ import "./e2e-env-bootstrap";
  * after `.env.test` loading via `e2e-env-bootstrap`.
  */
 
-import {
-  getE2eGraphQlEndpoint,
-  loadE2eConfig,
-} from "./e2e-config";
+import { getE2eGraphQlEndpoint, loadE2eConfig } from "./e2e-config";
 
 export { getE2eGraphQlEndpoint };
 
@@ -36,9 +33,7 @@ export async function gql<T = unknown>(
     body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) {
-    throw new Error(
-      `GraphQL HTTP ${res.status} from ${endpoint}: ${await res.text()}`,
-    );
+    throw new Error(`GraphQL HTTP ${res.status} from ${endpoint}: ${await res.text()}`);
   }
   return (await res.json()) as GqlResult<T>;
 }
@@ -54,9 +49,7 @@ export async function loginAsAdmin(): Promise<string> {
     { payload: { username, password } },
   );
   if (result.errors?.length || !result.data?.login?.access_token) {
-    throw new Error(
-      `Admin login failed: ${JSON.stringify(result.errors ?? result.data)}`,
-    );
+    throw new Error(`Admin login failed: ${JSON.stringify(result.errors ?? result.data)}`);
   }
   return result.data.login.access_token;
 }

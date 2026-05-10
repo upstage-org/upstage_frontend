@@ -36,9 +36,7 @@ test.describe("auth flow @smoke", () => {
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.locator("body")).toBeVisible();
 
-    const usernameField = page
-      .locator('input[name="username"], input[type="text"]')
-      .first();
+    const usernameField = page.locator('input[name="username"], input[type="text"]').first();
     const passwordField = page.locator('input[type="password"]').first();
     if (await usernameField.count()) {
       await usernameField.fill("tester");

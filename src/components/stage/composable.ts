@@ -81,7 +81,7 @@ export const useClearStage = (stageUrl, color) => {
               type: BACKGROUND_ACTIONS.SET_BACKDROP_COLOR,
               color: color || COLORS.DEFAULT_BACKDROP,
             },
-            true
+            true,
           )
           .then(resolve);
       });

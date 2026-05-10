@@ -1,30 +1,39 @@
 <template>
   <transition :css="false" @enter="enter" @leave="leave">
-    <div id="chatbox" :key="chatPosition" v-show="chatVisibility" class="card is-light"
-      :class="{ collapsed, dark: chatDarkMode }" :style="{
-    opacity,
-    fontSize,
-    width: `calc(20% + 3*${fontSize}`,
-    height: `calc(100vh - ${stageSize.height}px - 64px)`,
-    left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
-  }">
+    <div
+      id="chatbox"
+      :key="chatPosition"
+      v-show="chatVisibility"
+      class="card is-light"
+      :class="{ collapsed, dark: chatDarkMode }"
+      :style="{
+        opacity,
+        fontSize,
+        width: `calc(20% + 3*${fontSize}`,
+        height: `calc(100vh - ${stageSize.height}px - 64px)`,
+        left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
+      }"
+    >
       <transition @enter="bounceUnread">
-        <a-tooltip :title="`${unreadMessages} new message${unreadMessages > 1 ? 's' : ''
-    }`">
-          <span v-if="collapsed && unreadMessages" :key="unreadMessages" class="unread clickable tag is-danger is-small"
+        <a-tooltip :title="`${unreadMessages} new message${unreadMessages > 1 ? 's' : ''}`">
+          <span
+            v-if="collapsed && unreadMessages"
+            :key="unreadMessages"
+            class="unread clickable tag is-danger is-small"
             @click="collapsed = false"
-            style="position: absolute;
-            left: 12px;
-            top: 6px;
-            background-color: #f14668 !important;
-            "
-            >{{ unreadMessages }}</span>
+            style="position: absolute; left: 12px; top: 6px; background-color: #f14668 !important"
+            >{{ unreadMessages }}</span
+          >
         </a-tooltip>
       </transition>
       <div class="actions">
         <Reaction v-if="collapsed" />
         <a-tooltip :title="collapsed ? 'Maximise' : 'Minimise'">
-          <button class="chat-setting button is-rounded is-outlined" @click="collapsed = !collapsed" :key="collapsed">
+          <button
+            class="chat-setting button is-rounded is-outlined"
+            @click="collapsed = !collapsed"
+            :key="collapsed"
+          >
             <span class="icon">
               <Icon v-if="collapsed" src="maximise.svg" size="20" />
               <Icon v-else src="minimise.svg" size="24" class="mt-4" />
@@ -49,19 +58,32 @@
             <Reaction :custom-emoji="true" />
             <div class="font-size-controls">
               <a-tooltip title="Increase font size">
-                <button class="button is-small is-rounded mx-1" @click="increateFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
+                <button
+                  class="button is-small is-rounded mx-1"
+                  @click="increateFontSize()"
+                  style="width: 24px; height: 24px; padding: 0px; padding-top: 4px"
+                >
                   ➕
                 </button>
               </a-tooltip>
               <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded mx-1" @click="decreaseFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
+                <button
+                  class="button is-small is-rounded mx-1"
+                  @click="decreaseFontSize()"
+                  style="width: 24px; height: 24px; padding: 0px; padding-top: 4px"
+                >
                   ➖
                 </button>
               </a-tooltip>
             </div>
           </div>
           <div class="control has-icons-right is-fullwidth">
-            <ChatInput v-model="message" placeholder="Type message" :loading="loadingUser" @submit="sendChat" />
+            <ChatInput
+              v-model="message"
+              placeholder="Type message"
+              :loading="loadingUser"
+              @submit="sendChat"
+            />
           </div>
         </div>
       </footer>
@@ -84,12 +106,8 @@ export default {
   setup: () => {
     const theContent = ref();
     const store = useStore();
-    const chatVisibility = computed(
-      () => store.state.stage.settings.chatVisibility,
-    );
-    const chatDarkMode = computed(
-      () => store.state.stage.settings.chatDarkMode,
-    );
+    const chatVisibility = computed(() => store.state.stage.settings.chatVisibility);
+    const chatDarkMode = computed(() => store.state.stage.settings.chatDarkMode);
 
     store.dispatch("stage/loadPermission");
 
@@ -151,9 +169,7 @@ export default {
         fontSize: `${incValue}px`,
       };
       store.commit("stage/SET_CHAT_PARAMETERS", parameters);
-      setTimeout(
-        () => (theContent.value.scrollTop = theContent.value.scrollHeight),
-      );
+      setTimeout(() => (theContent.value.scrollTop = theContent.value.scrollHeight));
     };
 
     const decreaseFontSize = () => {
@@ -178,9 +194,7 @@ export default {
         });
       }
     });
-    const unreadMessages = computed(
-      () => messages.value.filter((message) => !message.read).length,
-    );
+    const unreadMessages = computed(() => messages.value.filter((message) => !message.read).length);
     const bounceUnread = (el) => {
       {
         animate(el, {
@@ -299,7 +313,7 @@ export default {
       padding: 0;
       height: 0;
 
-      >div {
+      > div {
         display: none;
       }
     }

@@ -25,9 +25,7 @@ import ConnectionStatus from "views/live/ConnectionStatus.vue";
 import Controls from "./Controls.vue";
 
 const store = useStore();
-const ready = computed<boolean>(
-  () => store.state.stage.model && !store.state.stage.preloading,
-);
+const ready = computed<boolean>(() => store.state.stage.model && !store.state.stage.preloading);
 
 const route = useRoute();
 store.dispatch("stage/loadStage", {

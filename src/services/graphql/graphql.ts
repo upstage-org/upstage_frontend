@@ -8,9 +8,7 @@ const ensureDocument = (query: string | DocumentNode): DocumentNode =>
   typeof query === "string" ? gql(query) : query;
 
 const isMutation = (doc: DocumentNode): boolean =>
-  doc.definitions.some(
-    (def) => def.kind === "OperationDefinition" && def.operation === "mutation",
-  );
+  doc.definitions.some((def) => def.kind === "OperationDefinition" && def.operation === "mutation");
 
 interface ApolloErrorShape {
   response: { errors: ReadonlyArray<unknown> };
@@ -26,10 +24,7 @@ const toLegacyError = (
 });
 
 /** Apollo Client rejects with ApolloError.graphQLErrors; legacy code expects response.errors. */
-function rethrowAsLegacyIfApollo(
-  err: unknown,
-  document: DocumentNode,
-): never {
+function rethrowAsLegacyIfApollo(err: unknown, document: DocumentNode): never {
   const gqlErrors =
     err &&
     typeof err === "object" &&

@@ -12,11 +12,7 @@
               :key="item"
               :class="columnClass(item)"
             >
-              <Selectable
-                multiple
-                :selected="modelValue.includes(item)"
-                @select="select(item)"
-              >
+              <Selectable multiple :selected="modelValue.includes(item)" @select="select(item)">
                 <slot name="render" :item="item">
                   {{ item.name }}
                 </slot>
@@ -44,11 +40,7 @@
           <Loading v-if="loading" />
           <div v-else class="columns is-multiline">
             <template v-for="item in modelValue" :key="item">
-              <div
-                class="column item is-3"
-                @click="remove(item)"
-                :class="columnClass(item)"
-              >
+              <div class="column item is-3" @click="remove(item)" :class="columnClass(item)">
                 <Selectable revert @select="remove(item)">
                   <slot name="render" :item="item">
                     {{ item.name }}

@@ -158,9 +158,4 @@ export interface AvatarVoice {
   amplitude: number;
 }
 
-export type Privilege =
-  | "NONE"
-  | "OWNER"
-  | "APPROVED"
-  | "PENDING_APPROVAL"
-  | "REQUIRE_APPROVAL";
+export type Privilege = "NONE" | "OWNER" | "APPROVED" | "PENDING_APPROVAL" | "REQUIRE_APPROVAL";

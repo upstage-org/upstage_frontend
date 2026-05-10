@@ -35,9 +35,7 @@ const handleOk = async () => {
 </script>
 
 <template>
-  <a-button type="dashed" @click="visible = true">
-    <SendOutlined />Request permission
-  </a-button>
+  <a-button type="dashed" @click="visible = true"> <SendOutlined />Request permission </a-button>
   <a-modal
     v-model:visible="visible"
     :confirm-loading="loading"

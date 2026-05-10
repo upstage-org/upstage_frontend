@@ -84,9 +84,7 @@ export function useLoading<T extends unknown[], U>(
   };
 }
 
-export function useUpdateUser(
-  messages?: LoadingMessages<unknown>,
-) {
+export function useUpdateUser(messages?: LoadingMessages<unknown>) {
   return useLoading(async (user: UpdateUserPayload, includingPassword?: boolean) => {
     const {
       username,

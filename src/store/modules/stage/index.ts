@@ -10,13 +10,7 @@ import {
   randomMessageColor,
   randomRange,
 } from "utils/common";
-import {
-  TOPICS,
-  BOARD_ACTIONS,
-  BACKGROUND_ACTIONS,
-  COLORS,
-  DRAW_ACTIONS,
-} from "utils/constants";
+import { TOPICS, BOARD_ACTIONS, BACKGROUND_ACTIONS, COLORS, DRAW_ACTIONS } from "utils/constants";
 import {
   deserializeObject,
   recalcFontSize,
@@ -115,7 +109,7 @@ export default {
       donationDetails: { amount: 0, date: "" },
     },
     reloadStreams: null,
-    enabledLiveStreaming: true
+    enabledLiveStreaming: true,
   },
   getters: {
     ready(state) {
@@ -135,12 +129,27 @@ export default {
     },
     preloadableAssets(state) {
       const assets = []
-        .concat(state.tools.avatars.filter(a => !a.multi).map((a) => a.src))
-        .concat(state.tools.avatars.filter((a) => a.multi).map((a) => a.frames ?? []).flat())
+        .concat(state.tools.avatars.filter((a) => !a.multi).map((a) => a.src))
+        .concat(
+          state.tools.avatars
+            .filter((a) => a.multi)
+            .map((a) => a.frames ?? [])
+            .flat(),
+        )
         .concat(state.tools.props.filter((a) => !a.multi).map((p) => p.src))
-        .concat(state.tools.props.filter((a) => a.multi).map((a) => a.frames ?? []).flat())
+        .concat(
+          state.tools.props
+            .filter((a) => a.multi)
+            .map((a) => a.frames ?? [])
+            .flat(),
+        )
         .concat(state.tools.backdrops.filter((a) => !a.multi).map((b) => b.src))
-        .concat(state.tools.backdrops.filter((a) => a.multi).map((a) => a.frames ?? []).flat())
+        .concat(
+          state.tools.backdrops
+            .filter((a) => a.multi)
+            .map((a) => a.frames ?? [])
+            .flat(),
+        )
         .concat(state.tools.curtains.map((b) => b.src));
       // Drop falsy so we never block on a slot that will never @load
       return assets.filter((src) => Boolean(src));
@@ -195,9 +204,7 @@ export default {
       return state.sessions.filter((s) => !s.isPlayer);
     },
     unreadPrivateMessageCount(state) {
-      return state.chat.privateMessages.filter(
-        (m) => m.at > state.lastSeenPrivateMessage,
-      ).length;
+      return state.chat.privateMessages.filter((m) => m.at > state.lastSeenPrivateMessage).length;
     },
     whiteboard(state) {
       return state.board.whiteboard;
@@ -212,8 +219,8 @@ export default {
       return state.board.objects.find((o) => o.id == state.activeMovable);
     },
     enabledLiveStreaming(stage) {
-      return stage.enabledLiveStreaming
-    }
+      return stage.enabledLiveStreaming;
+    },
   },
   mutations: {
     SET_MODEL(state, model) {
@@ -248,12 +255,12 @@ export default {
         if (config) {
           Object.assign(state.config, config);
           state.config.ratio = config.ratio.width / config.ratio.height;
-          state.enabledLiveStreaming = typeof (config?.enabledLiveStreaming) === 'boolean' ? config?.enabledLiveStreaming : true
+          state.enabledLiveStreaming =
+            typeof config?.enabledLiveStreaming === "boolean" ? config?.enabledLiveStreaming : true;
         }
         // Match Stage Management default (#30AC45): new stages often have no saved config yet,
         // so do not leave backdropColor on CLEAN_STAGE's "gray".
-        state.backdropColor =
-          config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
+        state.backdropColor = config?.defaultcolor || COLORS.DEFAULT_BACKDROP;
         const cover = useAttribute({ value: model }, "cover", false).value;
         state.model.cover = cover && absolutePath(cover);
       }
@@ -285,14 +292,10 @@ export default {
     },
     SET_BACKGROUND(state, background) {
       if (background) {
-        if (
-          !state.background ||
-          !state.background.at ||
-          state.background.at < background.at
-        ) {
+        if (!state.background || !state.background.at || state.background.at < background.at) {
           if (!state.background || state.background.id !== background.id) {
             // Not playing animation if only opacity change
-            animate('#board', {
+            animate("#board", {
               opacity: [0, 1],
               duration: 5000,
             });
@@ -317,8 +320,7 @@ export default {
     },
     PUSH_PLAYER_CHAT_MESSAGE(state, message) {
       message.hash = hash(message);
-      const lastMessage =
-        state.chat.privateMessages[state.chat.privateMessages.length - 1];
+      const lastMessage = state.chat.privateMessages[state.chat.privateMessages.length - 1];
       if (lastMessage && lastMessage.hash === message.hash) {
         return;
       }
@@ -421,34 +423,22 @@ export default {
       state.settingPopup = setting;
     },
     SEND_TO_BACK(state, object) {
-      const index = state.board.objects.findIndex(
-        (avatar) => avatar.id === object.id,
-      );
+      const index = state.board.objects.findIndex((avatar) => avatar.id === object.id);
       if (index > -1) {
         state.board.objects.unshift(state.board.objects.splice(index, 1)[0]);
       }
     },
     BRING_TO_FRONT(state, object) {
-      const index = state.board.objects.findIndex(
-        (avatar) => avatar.id === object.id,
-      );
+      const index = state.board.objects.findIndex((avatar) => avatar.id === object.id);
       if (index > -1) {
         state.board.objects.push(state.board.objects.splice(index, 1)[0]);
       }
     },
     BRING_TO_FRONT_OF(state, { front, back }) {
-      const frontIndex = state.board.objects.findIndex(
-        (avatar) => avatar.id === front,
-      );
-      const backIndex = state.board.objects.findIndex(
-        (avatar) => avatar.id === back,
-      );
+      const frontIndex = state.board.objects.findIndex((avatar) => avatar.id === front);
+      const backIndex = state.board.objects.findIndex((avatar) => avatar.id === back);
       if (frontIndex > -1 && backIndex > -1) {
-        state.board.objects.splice(
-          backIndex,
-          0,
-          state.board.objects.splice(frontIndex, 1)[0],
-        );
+        state.board.objects.splice(backIndex, 0, state.board.objects.splice(frontIndex, 1)[0]);
       }
     },
     SET_PREFERENCES(state, preferences) {
@@ -458,9 +448,7 @@ export default {
       state.board.drawings.push(cloneDeep(drawing));
     },
     POP_DRAWING(state, drawingId) {
-      state.board.drawings = state.board.drawings.filter(
-        (d) => d.drawingId !== drawingId,
-      );
+      state.board.drawings = state.board.drawings.filter((d) => d.drawingId !== drawingId);
     },
     PUSH_TEXT(state, text) {
       state.board.texts.push(text);
@@ -565,11 +553,7 @@ export default {
         snapshot.board.tracks = state.board.tracks;
 
         Object.keys(snapshot).forEach((key) => {
-          if (
-            key == "audioPlayers" &&
-            snapshot[key].length == 0 &&
-            state[key].length > 0
-          ) {
+          if (key == "audioPlayers" && snapshot[key].length == 0 && state[key].length > 0) {
             state[key].forEach((audioPlayer) => {
               audioPlayer.currentTime = 0;
             });
@@ -597,12 +581,8 @@ export default {
     SEEN_PRIVATE_MESSAGES(state) {
       const length = state.chat.privateMessages.length;
       if (length > 0) {
-        state.lastSeenPrivateMessage =
-          state.chat.privateMessages[length - 1].at;
-        localStorage.setItem(
-          "lastSeenPrivateMessage",
-          state.lastSeenPrivateMessage,
-        );
+        state.lastSeenPrivateMessage = state.chat.privateMessages[length - 1].at;
+        localStorage.setItem("lastSeenPrivateMessage", state.lastSeenPrivateMessage);
       }
     },
     UPDATE_WHITEBOARD(state, message) {
@@ -611,14 +591,10 @@ export default {
       }
       switch (message.type) {
         case DRAW_ACTIONS.NEW_LINE:
-          state.board.whiteboard = state.board.whiteboard.concat(
-            message.command,
-          );
+          state.board.whiteboard = state.board.whiteboard.concat(message.command);
           break;
         case DRAW_ACTIONS.UNDO:
-          state.board.whiteboard = state.board.whiteboard.filter(
-            (e, i) => i !== message.index,
-          );
+          state.board.whiteboard = state.board.whiteboard.filter((e, i) => i !== message.index);
           break;
         case DRAW_ACTIONS.CLEAR:
           state.board.whiteboard = [];
@@ -648,24 +624,16 @@ export default {
         }
       } else if (from.drawingId) {
         // is drawing
-        const fromIndex = state.board.drawings.findIndex(
-          (t) => t.drawingId === from.drawingId,
-        );
-        const toIndex = state.board.drawings.findIndex(
-          (t) => t.drawingId === to.drawingId,
-        );
+        const fromIndex = state.board.drawings.findIndex((t) => t.drawingId === from.drawingId);
+        const toIndex = state.board.drawings.findIndex((t) => t.drawingId === to.drawingId);
         if (fromIndex > -1 && toIndex > -1) {
           const tool = state.board.drawings.splice(fromIndex, 1)[0];
           state.board.drawings.splice(toIndex, 0, tool);
         }
       } else if (from.textId) {
         // is text
-        const fromIndex = state.board.texts.findIndex(
-          (t) => t.textId === from.textId,
-        );
-        const toIndex = state.board.texts.findIndex(
-          (t) => t.textId === to.textId,
-        );
+        const fromIndex = state.board.texts.findIndex((t) => t.textId === from.textId);
+        const toIndex = state.board.texts.findIndex((t) => t.textId === to.textId);
         if (fromIndex > -1 && toIndex > -1) {
           const tool = state.board.texts.splice(fromIndex, 1)[0];
           state.board.texts.splice(toIndex, 0, tool);
@@ -673,12 +641,8 @@ export default {
       } else {
         const toolName = from.type + "s";
         if (state.tools[toolName]) {
-          const fromIndex = state.tools[toolName].findIndex(
-            (t) => t.id === from.id,
-          );
-          const toIndex = state.tools[toolName].findIndex(
-            (t) => t.id === to.id,
-          );
+          const fromIndex = state.tools[toolName].findIndex((t) => t.id === from.id);
+          const toIndex = state.tools[toolName].findIndex((t) => t.id === to.id);
           if (fromIndex > -1 && toIndex > -1) {
             const tool = state.tools[toolName].splice(fromIndex, 1)[0];
             state.tools[toolName].splice(toIndex, 0, tool);
@@ -903,11 +867,7 @@ export default {
             commit("SEEN_PRIVATE_MESSAGES");
           } else {
             const nickname = rootGetters["user/nickname"];
-            if (
-              message.message
-                .toLowerCase()
-                .includes(`@${nickname.trim().toLowerCase()}`)
-            ) {
+            if (message.message.toLowerCase().includes(`@${nickname.trim().toLowerCase()}`)) {
               dispatch("showPlayerChat", true);
             }
           }
@@ -927,16 +887,14 @@ export default {
         rotate: 0,
         ...data,
         id: uuidv4(),
-        type: data.assetType?.name || data.type
+        type: data.assetType?.name || data.type,
       };
       if (object.type === "video") {
         object.hostId = state.session;
         try {
           const description = JSON.parse(data.description);
-          if (description.w && description.h) object.h = description.h * 100 / description.w;
-        } catch (e) {
-
-        }
+          if (description.w && description.h) object.h = (description.h * 100) / description.w;
+        } catch (e) {}
       }
       commit("PUSH_OBJECT", serializeObject(object));
       if (object.type === "avatar") {
@@ -1089,7 +1047,7 @@ export default {
       });
     },
     setBackdropColor(action, color) {
-      console.log("SET_BACKDROP_COLOR", color)
+      console.log("SET_BACKDROP_COLOR", color);
       mqtt.sendMessage(TOPICS.BACKGROUND, {
         type: BACKGROUND_ACTIONS.SET_BACKDROP_COLOR,
         color,
@@ -1148,9 +1106,7 @@ export default {
           break;
         case BACKGROUND_ACTIONS.BLANK_SCENE: {
           const blankBackdrop =
-            state.config?.defaultcolor ||
-            state.backdropColor ||
-            COLORS.DEFAULT_BACKDROP;
+            state.config?.defaultcolor || state.backdropColor || COLORS.DEFAULT_BACKDROP;
           commit("REPLACE_SCENE", {
             payload: JSON.stringify({
               background: null,
@@ -1258,12 +1214,8 @@ export default {
     },
     async reloadMissingEvents({ state, dispatch }) {
       if (state.model.events) {
-        const lastEventId =
-          state.model.events[state.model.events.length - 1]?.id ?? 0;
-        const events = await stageGraph.loadEvents(
-          state.model.fileLocation,
-          lastEventId,
-        );
+        const lastEventId = state.model.events[state.model.events.length - 1]?.id ?? 0;
+        const events = await stageGraph.loadEvents(state.model.fileLocation, lastEventId);
         if (events) {
           events.forEach((event) => dispatch("replicateEvent", event));
           state.model.events = state.model.events.concat(events);
@@ -1317,9 +1269,7 @@ export default {
     async replayRecording({ state, dispatch, commit }, timestamp) {
       stopSpeaking();
       await dispatch("pauseReplay");
-      const current = timestamp
-        ? Number(timestamp)
-        : state.replay.timestamp.begin;
+      const current = timestamp ? Number(timestamp) : state.replay.timestamp.begin;
       state.replay.timestamp.current = current;
       // Preserve persistent stage-config values across CLEAN_STAGE. Backdrop
       // color and config live on stage attributes (not in the MQTT event
@@ -1368,9 +1318,7 @@ export default {
     },
     seekForwardReplay({ state, dispatch }) {
       const current = state.replay.timestamp.current + 10000;
-      const nextEvent = state.model.events.find(
-        (e) => e.mqttTimestamp > current,
-      );
+      const nextEvent = state.model.events.find((e) => e.mqttTimestamp > current);
       if (nextEvent) {
         dispatch("replayRecording", nextEvent.mqttTimestamp);
       }
@@ -1409,10 +1357,7 @@ export default {
       await dispatch("sendStatistics");
     },
     async leaveStage({ dispatch }) {
-      await Promise.all([
-        dispatch("sendStatisticsBeforeDisconnect"),
-        dispatch("sendCounterLeave"),
-      ]);
+      await Promise.all([dispatch("sendStatisticsBeforeDisconnect"), dispatch("sendCounterLeave")]);
     },
     async sendStatisticsBeforeDisconnect({ rootGetters }) {
       const isPlayer = rootGetters["auth/loggedIn"];
@@ -1468,11 +1413,7 @@ export default {
       }
     },
     autoFocusMoveable({ commit, getters, state }, id) {
-      if (
-        getters.canPlay &&
-        !state.preferences.isDrawing &&
-        !state.replay.isReplaying
-      ) {
+      if (getters.canPlay && !state.preferences.isDrawing && !state.replay.isReplaying) {
         commit("SET_ACTIVE_MOVABLE", id);
       }
     },

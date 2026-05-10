@@ -1,6 +1,11 @@
 <template>
-  <div v-for="(audio, i) in audios" :key="audio" class="audio has-text-centered"
-    :class="{ 'is-playing': audio.isPlaying }" @mouseenter="i > audios.length - 3 ? scrollToEnd() : null">
+  <div
+    v-for="(audio, i) in audios"
+    :key="audio"
+    class="audio has-text-centered"
+    :class="{ 'is-playing': audio.isPlaying }"
+    @mouseenter="i > audios.length - 3 ? scrollToEnd() : null"
+  >
     <div>
       <div class="audio-name">
         <span v-if="i < 10">{{ i + 1 }}.</span>
@@ -20,7 +25,11 @@
             <Icon size="24" src="play.svg" />
           </div>
         </template>
-        <div class="icon" :class="{ grayscale: !audio.loop }" @click="toggleLoop(audio, audioPlayers[i]?.currentTime)">
+        <div
+          class="icon"
+          :class="{ grayscale: !audio.loop }"
+          @click="toggleLoop(audio, audioPlayers[i]?.currentTime)"
+        >
           <Icon size="24" src="loop.svg" />
         </div>
       </div>
@@ -29,11 +38,24 @@
           <div class="icon">
             <Icon size="24" src="voice-setting.svg" />
           </div>
-          <input class="slider is-fullwidth is-dark my-0" step="0.01" min="0" max="1" v-model="audio.volume"
-            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)" type="range" />
+          <input
+            class="slider is-fullwidth is-dark my-0"
+            step="0.01"
+            min="0"
+            max="1"
+            v-model="audio.volume"
+            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)"
+            type="range"
+          />
         </div>
-        <input class="slider is-fullwidth is-primary mt-0" min="0" :max="audioPlayers[i]?.duration"
-          :value="audioPlayers[i]?.currentTime ?? 0" @change="seek(audio, $event)" type="range" />
+        <input
+          class="slider is-fullwidth is-primary mt-0"
+          min="0"
+          :max="audioPlayers[i]?.duration"
+          :value="audioPlayers[i]?.currentTime ?? 0"
+          @change="seek(audio, $event)"
+          type="range"
+        />
         <div class="addon">
           <span v-if="audio.isPlaying">{{
             displayTimestamp(audioPlayers[i]?.currentTime ?? 0)
@@ -136,7 +158,7 @@ export default {
   margin-top: -6px;
   height: 86px !important;
 
-  >div {
+  > div {
     width: 100%;
   }
 
@@ -155,7 +177,7 @@ export default {
       }
     }
 
-    >* {
+    > * {
       margin: 4px 8px;
       display: none;
 
@@ -191,7 +213,7 @@ export default {
 
       .slider::-webkit-slider-thumb {
         background-color: #007011;
-        border-color: #F5F5F5;
+        border-color: #f5f5f5;
       }
     }
   }
@@ -218,7 +240,7 @@ export default {
     }
 
     .buttons {
-      >* {
+      > * {
         display: block;
       }
 

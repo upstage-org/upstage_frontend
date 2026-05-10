@@ -29,7 +29,7 @@ import { stageGraph } from "services/graphql";
 import { useRouter } from "vue-router";
 
 const props = defineProps({
-  stage: Object
+  stage: Object,
 });
 
 const router = useRouter();
@@ -43,16 +43,11 @@ const duplicateStage = async (complete) => {
     id: props.stage.id,
     name: name.value || defaultName.value,
   };
-  const result = await save(
-    `${payload.name} was duplicated successfully!`,
-    payload,
-  );
+  const result = await save(`${payload.name} was duplicated successfully!`, payload);
   complete();
   ClearCache();
   refresh();
-  router.push(
-    `/stages/stage-management/${result.duplicateStage.id}/`,
-  );
+  router.push(`/stages/stage-management/${result.duplicateStage.id}/`);
   console.log(result);
 };
 </script>

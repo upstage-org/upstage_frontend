@@ -2,10 +2,7 @@
 import config from "config";
 import { v4 as uuidv4 } from "uuid";
 import { connect } from "mqtt/dist/mqtt";
-import {
-  namespaceTopic,
-  unnamespaceTopic,
-} from "store/modules/stage/reusable";
+import { namespaceTopic, unnamespaceTopic } from "store/modules/stage/reusable";
 import { isJson } from "utils/common";
 
 export default function buildClient() {
@@ -18,7 +15,7 @@ export default function buildClient() {
       const connectUrl = url;
       if (!connectUrl || typeof connectUrl !== "string") {
         console.error(
-          "[MQTT] No connection URL. Set VITE_MQTT_ENDPOINT to the broker WebSocket URL (e.g. ws://localhost:9001)."
+          "[MQTT] No connection URL. Set VITE_MQTT_ENDPOINT to the broker WebSocket URL (e.g. ws://localhost:9001).",
         );
       }
       const clientId = uuidv4();
@@ -85,8 +82,7 @@ export default function buildClient() {
       }
       const namespacedTopics = {};
       Object.keys(topics).forEach(
-        (key) =>
-          (namespacedTopics[namespaceTopic(key, stageUrl)] = topics[key]),
+        (key) => (namespacedTopics[namespaceTopic(key, stageUrl)] = topics[key]),
       );
       return new Promise((resolve, reject) => {
         this.client.subscribe(namespacedTopics, (error, res) => {
@@ -101,7 +97,7 @@ export default function buildClient() {
     sendMessage(topic, payload, namespaced, retain = false) {
       if (!this.client) {
         return Promise.reject(
-          new Error("[MQTT] Not connected. Call connect() first or check MQTT connection.")
+          new Error("[MQTT] Not connected. Call connect() first or check MQTT connection."),
         );
       }
       if (!namespaced) {
@@ -113,18 +109,13 @@ export default function buildClient() {
       }
       console.log(topic, message);
       return new Promise((resolve, reject) => {
-        this.client.publish(
-          topic,
-          message,
-          { qos: 1, retain },
-          (error, res) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(res);
-            }
-          },
-        );
+        this.client.publish(topic, message, { qos: 1, retain }, (error, res) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(res);
+          }
+        });
       });
     },
     receiveMessage(handler) {

@@ -92,8 +92,7 @@ export default {
   esc: "ESK",
   warning: "Varning",
   under_construction: "Under uppbyggnad",
-  enter_username_and_password_to_login:
-    "Ange användarnamn och lösenord för att logga in",
+  enter_username_and_password_to_login: "Ange användarnamn och lösenord för att logga in",
   reset_your_password: "Återställ ditt lösenord",
   change_password: "Ändra lösenord",
   full_name: "Fullständigt namn",
@@ -101,11 +100,9 @@ export default {
   last_name: "Efternamn",
   this_is_page_is_under_construction: "Det här är sidan under uppbyggnad",
   no_content: "Inget innehåll",
-  drag_files_here_or_click_to_upload:
-    "Dra filer här eller klicka för att ladda upp",
+  drag_files_here_or_click_to_upload: "Dra filer här eller klicka för att ladda upp",
   choose_an_image: "Välj en bild",
-  choose_an_existing_image_or_upload_new:
-    "Välj en befintlig bild eller ladda upp ny",
+  choose_an_existing_image_or_upload_new: "Välj en befintlig bild eller ladda upp ny",
   hold_this_avatar: "Håll denna avatar",
   remove_from_avatar: "Ta bort från avatar",
   add_to_avatar: "Lägg till avatar",
@@ -177,8 +174,7 @@ export default {
   stage_management: "Administrera Scenområdet",
   create_new_stage: "Skapa nytt Scenområde",
   general_information: "Allmän Information",
-  click_anywhere_to_enter_the_stage:
-    " Klicka var som helst för att komma in i Scenområde",
+  click_anywhere_to_enter_the_stage: " Klicka var som helst för att komma in i Scenområde",
   enter_as_audience: "Inträde som Publik",
   player_login: "Spelarens Inloggning",
   approve: "Godkänn",
@@ -225,5 +221,5 @@ export default {
   introduction: "Inledning",
   new_object: "Ny {0}",
   new_stream: "My Stream",
-  default_backgroundcolor: "Default Background Colour"
+  default_backgroundcolor: "Default Background Colour",
 };

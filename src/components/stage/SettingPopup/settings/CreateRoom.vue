@@ -14,9 +14,7 @@
         >
         </Field>
       </HorizontalField>
-      <SaveButton :disabled="!form.name.trim()">{{
-        $t("create_room")
-      }}</SaveButton>
+      <SaveButton :disabled="!form.name.trim()">{{ $t("create_room") }}</SaveButton>
     </form>
   </div>
 </template>

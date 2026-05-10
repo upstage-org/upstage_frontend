@@ -1,12 +1,8 @@
 <template>
-  <div
-    v-for="assetType in types"
-    :key="assetType"
-    class="columns is-vcentered has-text-centered"
-  >
+  <div v-for="assetType in types" :key="assetType" class="columns is-vcentered has-text-centered">
     <div class="column is-1">
       <h4 class="subtitle">
-        <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px;" />
+        <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px" />
         <br />
         {{ assetType }}
         <br />
@@ -61,10 +57,7 @@ const props = defineProps({
   },
 });
 
-
-const types = computed(() => [
-  ...new Set(props.modelValue.map((media) => media.assetType)),
-]);
+const types = computed(() => [...new Set(props.modelValue.map((media) => media.assetType))]);
 
 const mediaGroups = computed(() => {
   const res = {};
@@ -102,17 +95,13 @@ const drop = (e) => {
     const media = props.modelValue.splice(fromIndex, 1)[0];
     emit(
       "update:modelValue",
-      props.modelValue
-        .slice(0, toIndex)
-        .concat(media)
-        .concat(props.modelValue.slice(toIndex)),
+      props.modelValue.slice(0, toIndex).concat(media).concat(props.modelValue.slice(toIndex)),
     );
   }
 };
 </script>
 
 <style scoped lang="scss">
-
 .subtitle {
   text-transform: capitalize;
   margin-bottom: 0;
@@ -145,19 +134,13 @@ const drop = (e) => {
     }
     &:hover {
       img {
-        -webkit-filter: drop-shadow(0 0 4px #F5F5F5);
-        filter: drop-shadow(0 0 4px #F5F5F5);
+        -webkit-filter: drop-shadow(0 0 4px #f5f5f5);
+        filter: drop-shadow(0 0 4px #f5f5f5);
       }
     }
   }
   .dropzone {
-    background: repeating-radial-gradient(
-      circle,
-      green,
-      green 10px,
-      #007011 10px,
-      #007011 20px
-    );
+    background: repeating-radial-gradient(circle, green, green 10px, #007011 10px, #007011 20px);
     > * {
       transform: translateX(50%) !important;
     }

@@ -70,16 +70,14 @@ export default {
   esc: "Thoát",
   warning: "Lưu ý",
   under_construction: "Đang xây dựng",
-  enter_username_and_password_to_login:
-    "Nhập tên người dùng và mật khẩu để đăng nhập",
+  enter_username_and_password_to_login: "Nhập tên người dùng và mật khẩu để đăng nhập",
   reset_your_password: "Đặt lại mật khẩu của bạn",
   full_name: "Họ và tên",
   this_is_page_is_under_construction: "Đây là trang đang được xây dựng",
   no_content: "Không có nội dung",
   drag_files_here_or_click_to_upload: "Kéo tệp vào đây hoặc nhấp để tải lên",
   choose_an_image: "Chọn một hình ảnh",
-  choose_an_existing_image_or_upload_new:
-    "Chọn một hình ảnh hiện có hoặc tải lên hình ảnh mới",
+  choose_an_existing_image_or_upload_new: "Chọn một hình ảnh hiện có hoặc tải lên hình ảnh mới",
   hold_this_avatar: "Giữ hình đại diện này",
   remove_from_avatar: "Xóa khỏi hình đại diện",
   add_to_avatar: "Thêm vào hình đại diện",
@@ -188,5 +186,5 @@ export default {
   studio: "Studio",
   display_name: "Tên hiển thị",
   new_stream: "My Stream",
-  default_backgroundcolor: "Default Background Colour"
+  default_backgroundcolor: "Default Background Colour",
 };

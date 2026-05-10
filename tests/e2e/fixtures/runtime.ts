@@ -77,9 +77,7 @@ export function clearRuntimeFile(): void {
 
 export function readRuntime(): RuntimeState {
   if (!existsSync(FILE)) {
-    throw new Error(
-      `[e2e] runtime.json missing at ${FILE} — run 'pnpm e2e:setup' first.`,
-    );
+    throw new Error(`[e2e] runtime.json missing at ${FILE} — run 'pnpm e2e:setup' first.`);
   }
   return JSON.parse(readFileSync(FILE, "utf8")) as RuntimeState;
 }

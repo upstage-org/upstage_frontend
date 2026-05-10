@@ -102,8 +102,7 @@ export default {
   last_name: "Nom de famille",
   this_is_page_is_under_construction: "Cette page est en cours de construction",
   no_content: "Pas de contenu",
-  drag_files_here_or_click_to_upload:
-    "Glisser les fichiers ici ou cliquer pour télécharger",
+  drag_files_here_or_click_to_upload: "Glisser les fichiers ici ou cliquer pour télécharger",
   choose_an_image: "Choisissez une image",
   choose_an_existing_image_or_upload_new:
     "Choisissez une image existante ou téléchargez une nouvelle",
@@ -178,8 +177,7 @@ export default {
   stage_management: "Gérer le Plateau",
   create_new_stage: "Créer un nouveau Plateau",
   general_information: "Informations générales",
-  click_anywhere_to_enter_the_stage:
-    "Cliquez où vous voulez pour entrer dans le Plateau",
+  click_anywhere_to_enter_the_stage: "Cliquez où vous voulez pour entrer dans le Plateau",
   enter_as_audience: "Entrer en tant qu’audience",
   player_login: "Connexion du joueur",
   approve: "Approuver",
@@ -225,5 +223,5 @@ export default {
   introduction: "Introduction",
   new_object: "Nouveau {0}",
   new_stream: "My Stream",
-  default_backgroundcolor: "Default Background Colour"
+  default_backgroundcolor: "Default Background Colour",
 };

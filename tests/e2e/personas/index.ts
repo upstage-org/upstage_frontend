@@ -75,7 +75,13 @@ export const PERSONAS: Persona[] = [
     email: "abram@upstage-e2e.com",
     avatar: "abram.png",
     house: "montague",
-    voice: { voice: ACCENT_BY_HOUSE.montague, variant: "m4", pitch: 25, speed: 165, amplitude: 100 },
+    voice: {
+      voice: ACCENT_BY_HOUSE.montague,
+      variant: "m4",
+      pitch: 25,
+      speed: 165,
+      amplitude: 100,
+    },
   },
   {
     username: "balthasar",
@@ -84,7 +90,13 @@ export const PERSONAS: Persona[] = [
     email: "balthasar@upstage-e2e.com",
     avatar: "balthasar.png",
     house: "montague",
-    voice: { voice: ACCENT_BY_HOUSE.montague, variant: "m1", pitch: 12, speed: 160, amplitude: 100 },
+    voice: {
+      voice: ACCENT_BY_HOUSE.montague,
+      variant: "m1",
+      pitch: 12,
+      speed: 160,
+      amplitude: 100,
+    },
   },
   {
     username: "benvolio",
@@ -93,7 +105,13 @@ export const PERSONAS: Persona[] = [
     email: "benvolio@upstage-e2e.com",
     avatar: "benvolio.png",
     house: "montague",
-    voice: { voice: ACCENT_BY_HOUSE.montague, variant: "m5", pitch: 30, speed: 155, amplitude: 100 },
+    voice: {
+      voice: ACCENT_BY_HOUSE.montague,
+      variant: "m5",
+      pitch: 30,
+      speed: 155,
+      amplitude: 100,
+    },
   },
   {
     username: "tybalt",
@@ -138,7 +156,13 @@ export const PERSONAS: Persona[] = [
     email: "montague@upstage-e2e.com",
     avatar: "montague.png",
     house: "montague",
-    voice: { voice: ACCENT_BY_HOUSE.montague, variant: "m1", pitch: 10, speed: 145, amplitude: 100 },
+    voice: {
+      voice: ACCENT_BY_HOUSE.montague,
+      variant: "m1",
+      pitch: 10,
+      speed: 145,
+      amplitude: 100,
+    },
   },
   {
     username: "ladymontague",
@@ -147,7 +171,13 @@ export const PERSONAS: Persona[] = [
     email: "ladymontague@upstage-e2e.com",
     avatar: "ladymontague.png",
     house: "montague",
-    voice: { voice: ACCENT_BY_HOUSE.montague, variant: "f4", pitch: 40, speed: 150, amplitude: 100 },
+    voice: {
+      voice: ACCENT_BY_HOUSE.montague,
+      variant: "f4",
+      pitch: 40,
+      speed: 150,
+      amplitude: 100,
+    },
   },
   {
     username: "prince",
@@ -165,7 +195,13 @@ export const PERSONAS: Persona[] = [
     email: "romeo@upstage-e2e.com",
     avatar: "romeo.png",
     house: "montague",
-    voice: { voice: ACCENT_BY_HOUSE.montague, variant: "m3", pitch: 32, speed: 165, amplitude: 100 },
+    voice: {
+      voice: ACCENT_BY_HOUSE.montague,
+      variant: "m3",
+      pitch: 32,
+      speed: 165,
+      amplitude: 100,
+    },
   },
 ];
 

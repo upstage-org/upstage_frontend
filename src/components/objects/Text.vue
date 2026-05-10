@@ -1,11 +1,7 @@
 <template>
   <Object :object="object">
     <template #menu="slotProps">
-      <MenuContent
-        :object="object"
-        v-bind="slotProps"
-        v-model:active="active"
-      />
+      <MenuContent :object="object" v-bind="slotProps" v-model:active="active" />
     </template>
     <template #render>
       <p
@@ -58,9 +54,7 @@ export default {
       },
     );
 
-    const activeMovable = computed(
-      () => store.getters["stage/activeMovable"] === props.object.id,
-    );
+    const activeMovable = computed(() => store.getters["stage/activeMovable"] === props.object.id);
     const mousedown = (e) => {
       if (activeMovable.value && props.object.editing) {
         e.stopPropagation();

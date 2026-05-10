@@ -34,25 +34,25 @@ export default {
 
     const ranges = [
       {
-        label: 'Today',
+        label: "Today",
         value: [dayjs(), dayjs()],
       },
       {
-        label: 'Yesterday',
-        value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')],
+        label: "Yesterday",
+        value: [dayjs().add(-1, "d"), dayjs().add(-1, "d")],
       },
       {
-        label: 'Last 7 days',
-        value: [dayjs().add(-7, 'd'), dayjs()],
+        label: "Last 7 days",
+        value: [dayjs().add(-7, "d"), dayjs()],
       },
       {
-        label: 'Last month',
-        value: [dayjs().add(-1, 'month'), dayjs()],
+        label: "Last month",
+        value: [dayjs().add(-1, "month"), dayjs()],
       },
       {
-        label: 'This year',
+        label: "This year",
         value: [dayjs().startOf("year"), dayjs()],
-      }
+      },
     ];
 
     const updateInquiry = (vars: any) =>
@@ -74,16 +74,13 @@ export default {
     );
     onMounted(() => {
       updateInquiry({
-        createdBetween: undefined
+        createdBetween: undefined,
       });
     });
     watch(dates, (_dates: any) => {
       updateInquiry({
         createdBetween: _dates
-          ? [
-            _dates[0]?.format("YYYY-MM-DD"),
-            _dates[1]?.format("YYYY-MM-DD"),
-          ]
+          ? [_dates[0]?.format("YYYY-MM-DD"), _dates[1]?.format("YYYY-MM-DD")]
           : undefined,
       });
     });
@@ -136,22 +133,22 @@ export default {
               "onUpdate:value": (value: [Dayjs, Dayjs]) => {
                 dates.value = value;
               },
-              presets: ranges
+              presets: ranges,
             }),
             hasFilter.value &&
-            h(
-              Button,
-              {
-                type: "dashed",
-                onClick: clearFilters,
-              },
-              [
-                h("a-icon", {
-                  type: "close-circle",
-                }),
-                "Clear Filters",
-              ],
-            ),
+              h(
+                Button,
+                {
+                  type: "dashed",
+                  onClick: clearFilters,
+                },
+                [
+                  h("a-icon", {
+                    type: "close-circle",
+                  }),
+                  "Clear Filters",
+                ],
+              ),
           ],
         ),
       ]),

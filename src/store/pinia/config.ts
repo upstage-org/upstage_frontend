@@ -37,9 +37,7 @@ export const useConfigStore = defineStore("config", () => {
     foyer: null,
   });
 
-  const uploadLimit = computed<number>(
-    () => state.nginx.uploadLimit ?? 1024 * 1024,
-  );
+  const uploadLimit = computed<number>(() => state.nginx.uploadLimit ?? 1024 * 1024);
   const termsOfService = computed(() => state.system.termsOfService?.value);
   const manual = computed(() => state.system.manual?.value);
   const esp = computed(() => state.system.esp?.value);

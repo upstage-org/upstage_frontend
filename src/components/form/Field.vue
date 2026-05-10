@@ -115,9 +115,7 @@ export default {
   setup: (props, { emit }) => {
     const stateTouched = ref(false);
     const isTouched = computed(() => props.touched || stateTouched.value);
-    const isRequired = computed(
-      () => props.required && isTouched.value && !props.modelValue,
-    );
+    const isRequired = computed(() => props.required && isTouched.value && !props.modelValue);
 
     const handleBlur = (e) => {
       stateTouched.value = true;

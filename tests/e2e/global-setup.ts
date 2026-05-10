@@ -84,9 +84,7 @@ export default async function globalSetup() {
     {},
     adminToken,
   );
-  const known = new Set(
-    (existing.data?.users ?? []).map((u) => u.username.toLowerCase()),
-  );
+  const known = new Set((existing.data?.users ?? []).map((u) => u.username.toLowerCase()));
   const missing = PERSONAS.filter((p) => !known.has(p.username.toLowerCase()));
 
   if (missing.length === 0) {
@@ -162,16 +160,13 @@ export default async function globalSetup() {
             console.log(`[e2e] global-setup: new run — not reusing runtime.json (${v.reason})`);
           }
         } catch (e) {
-          console.warn(
-            `[e2e] global-setup: runtime validation threw — ${(e as Error).message}`,
-          );
+          console.warn(`[e2e] global-setup: runtime validation threw — ${(e as Error).message}`);
         }
       }
     } else {
       console.log("[e2e] global-setup: E2E_FORCE_FRESH_SETUP — skipping runtime.json reuse");
     }
-    process.env.E2E_RUN_ID =
-      runId ?? `${Date.now()}-${shortHash(String(process.pid))}`;
+    process.env.E2E_RUN_ID = runId ?? `${Date.now()}-${shortHash(String(process.pid))}`;
   }
   process.env.E2E_ADMIN_TOKEN = adminToken;
 
@@ -180,8 +175,6 @@ export default async function globalSetup() {
   const portraitsDir = path.join(__dirname, "assets", "portraits");
   const samplePortrait = path.join(portraitsDir, "romeo.png");
   if (!existsSync(samplePortrait)) {
-    console.warn(
-      `[e2e] WARNING: ${samplePortrait} missing — run 'pnpm e2e:assets' first.`,
-    );
+    console.warn(`[e2e] WARNING: ${samplePortrait} missing — run 'pnpm e2e:assets' first.`);
   }
 }

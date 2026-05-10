@@ -7,10 +7,7 @@
             class="p-2 is-fullwidth is-flex is-flex-direction-column is-justify-content-space-between"
             :title="scene.name"
           >
-            <Image
-              :src="scene.scenePreview"
-              style="height: auto; border-radius: 4px"
-            />
+            <Image :src="scene.scenePreview" style="height: auto; border-radius: 4px" />
             <span class="tag mt-1 is-block">{{ scene.name }}</span>
           </div>
         </Skeleton>

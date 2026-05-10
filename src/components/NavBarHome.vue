@@ -1,7 +1,7 @@
 <template>
   <nav class="navbar" role="navigation" aria-label="main navigation">
     <div class="navbar-brand">
-      <Logo link="https://www.upstage.org.nz" target="_blank"/>
+      <Logo link="https://www.upstage.org.nz" target="_blank" />
       <LanguageSelector class="is-hidden-desktop" />
       <a
         role="button"
@@ -19,20 +19,12 @@
 
     <div :class="{ 'navbar-menu': true, 'is-active': expanded }">
       <div class="navbar-start">
-        <div
-          v-if="!navigations"
-          class="navbar-item"
-          style="text-transform: none"
-        >
-          Cannot display navigation properly, please check your menu syntax in
-          Admin section!
+        <div v-if="!navigations" class="navbar-item" style="text-transform: none">
+          Cannot display navigation properly, please check your menu syntax in Admin section!
         </div>
         <template v-else>
           <template v-for="(menu, i) in navigations" :key="i">
-            <div
-              v-if="menu.children"
-              class="navbar-item has-dropdown is-hoverable"
-            >
+            <div v-if="menu.children" class="navbar-item has-dropdown is-hoverable">
               <a
                 v-if="menu.url"
                 class="navbar-link is-arrowless"
@@ -62,21 +54,14 @@
             >
               {{ menu.title }}
             </a>
-            <div
-              v-if="isAdmin && i < navigations.length - 1"
-              class="vertical-divider"
-            />
+            <div v-if="isAdmin && i < navigations.length - 1" class="vertical-divider" />
           </template>
         </template>
       </div>
 
       <div class="navbar-end">
         <template v-if="loggedIn">
-          <RouterLink
-            v-if="!isGuest"
-            to="/stages"
-            class="button is-primary m-2"
-          >
+          <RouterLink v-if="!isGuest" to="/stages" class="button is-primary m-2">
             <strong>{{ $t("studio") }}</strong>
           </RouterLink>
           <button @click="logout" class="button m-2 mr-6">
@@ -87,11 +72,7 @@
           <router-link to="/login" class="button is-primary m-2">
             <strong>{{ $t("login") }}</strong>
           </router-link>
-          <router-link
-            v-if="showRegistration"
-            to="/register"
-            class="button is-primary m-2 mr-6"
-          >
+          <router-link v-if="showRegistration" to="/register" class="button is-primary m-2 mr-6">
             <strong>{{ $t("register") }}</strong>
           </router-link>
         </template>
@@ -121,7 +102,9 @@ export default {
     const toggleExpanded = () => (expanded.value = !expanded.value);
 
     const navigations = computed(() => store.getters["config/navigations"]);
-    const showRegistration = computed(() => store.getters["config/foyer"]?.showRegistration?.value ?? false);
+    const showRegistration = computed(
+      () => store.getters["config/foyer"]?.showRegistration?.value ?? false,
+    );
     const isAdmin = computed(() => store.getters["user/isAdmin"]);
     const isGuest = computed(() => store.getters["user/isGuest"]);
 

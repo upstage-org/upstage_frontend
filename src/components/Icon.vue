@@ -8,10 +8,11 @@ import { computed } from "vue";
 export default {
   props: {
     src: { type: String, required: true },
-    size: {
-      type: Number,
-      default: 16,
-    } | String,
+    size:
+      {
+        type: Number,
+        default: 16,
+      } | String,
     width: Number | String,
     height: Number | String,
   },

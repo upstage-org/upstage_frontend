@@ -1,7 +1,7 @@
 <template>
   <div class="columns">
     <div class="column">
-      <b><span >Media assigned to this Stage</span></b>
+      <b><span>Media assigned to this Stage</span></b>
     </div>
   </div>
 
@@ -33,7 +33,7 @@ export default {
   setup: () => {
     const stage = inject("stage");
 
-    return {  selectedMedia: stage.value.assets || [] };
+    return { selectedMedia: stage.value.assets || [] };
   },
 };
 </script>

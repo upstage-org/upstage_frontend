@@ -170,9 +170,7 @@ export default {
       }
     };
 
-    const activeMovable = computed(
-      () => store.getters["stage/activeMovable"] === props.object.id,
-    );
+    const activeMovable = computed(() => store.getters["stage/activeMovable"] === props.object.id);
 
     const clickInside = (e) => {
       if (props.controlable && canPlay.value) {
@@ -182,11 +180,7 @@ export default {
     };
 
     const clickOutside = (e) => {
-      if (
-        (!e || e.target.id === "board") &&
-        props.controlable &&
-        canPlay.value
-      ) {
+      if ((!e || e.target.id === "board") && props.controlable && canPlay.value) {
         store.commit("stage/SET_ACTIVE_MOVABLE", null);
       }
     };
@@ -252,9 +246,7 @@ export default {
     });
 
     const transformOrigin = computed(() => {
-      const wearer = store.state.stage.board.objects.find(
-        (a) => a.id === props.object.wornBy,
-      );
+      const wearer = store.state.stage.board.objects.find((a) => a.id === props.object.wornBy);
       if (wearer) {
         return `${wearer.x + wearer.w / 2 - props.object.x}px ${
           wearer.y + wearer.h / 2 - props.object.y

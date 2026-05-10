@@ -16,7 +16,7 @@ export default {
       participantId: null,
       w: 100,
       h: 100,
-      volume: 50
+      volume: 50,
     });
 
     const jitsi = inject("jitsi");
@@ -30,16 +30,16 @@ export default {
             tracks.push(t);
             if (t.type === "video") {
               t.attach(el.value);
-              
+
               if (el.value) {
                 el.value.disablePictureInPicture = true;
-                
-                el.value.addEventListener('enterpictureinpicture', (e) => {
+
+                el.value.addEventListener("enterpictureinpicture", (e) => {
                   e.preventDefault();
-                  console.log('Picture-in-Picture đã bị chặn');
+                  console.log("Picture-in-Picture đã bị chặn");
                 });
               }
-              
+
               el.value.addEventListener("loadedmetadata", () => {
                 const width = el.value.videoWidth;
                 const height = el.value.videoHeight;
@@ -75,18 +75,18 @@ export default {
 
     const loadeddata = () => {
       loading.value = false;
-      
+
       if (el.value) {
         el.value.disablePictureInPicture = true;
       }
-    }
+    };
 
     const disableAllPictureInPicture = () => {
       if (el.value) {
         el.value.disablePictureInPicture = true;
       }
-      
-      document.querySelectorAll('video').forEach(video => {
+
+      document.querySelectorAll("video").forEach((video) => {
         video.disablePictureInPicture = true;
       });
     };
@@ -106,8 +106,8 @@ export default {
       nickname,
       loading,
       loadeddata,
-      disableAllPictureInPicture
-    }
+      disableAllPictureInPicture,
+    };
   },
 };
 </script>
@@ -115,17 +115,23 @@ export default {
 <template>
   <div>
     <img v-if="loading" class="overlay" src="/img/videoloading.gif" />
-    <Skeleton v-if="!blocked" :data="data" class="p-2" :onDragstart="join" style="flex-direction: column;">
-      <video 
+    <Skeleton
+      v-if="!blocked"
+      :data="data"
+      class="p-2"
+      :onDragstart="join"
+      style="flex-direction: column"
+    >
+      <video
         :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"
-        :onClick="join" 
-        autoplay 
-        ref="el"  
+        :onClick="join"
+        autoplay
+        ref="el"
         @loadeddata="loadeddata"
         disablePictureInPicture
         @contextmenu.prevent
-        controlslist="nodownload nofullscreen noremoteplayback">
-      </video>
+        controlslist="nodownload nofullscreen noremoteplayback"
+      ></video>
       <span class="tag">{{ nickname }}</span>
     </Skeleton>
   </div>

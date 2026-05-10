@@ -1,4 +1,3 @@
-
 const {
   VITE_GRAPHQL_ENDPOINT,
   VITE_STATIC_ASSETS_ENDPOINT,
@@ -10,7 +9,7 @@ const {
   VITE_JITSI_ENDPOINT,
   VITE_STRIPE_KEY,
   VITE_RELEASE_VERSION,
-  VITE_ALIAS_RELEASE_VERSION
+  VITE_ALIAS_RELEASE_VERSION,
 } = import.meta.env;
 
 // Fallback when env was not set at build time (e.g. wrong .env path or CI build)
@@ -45,12 +44,12 @@ function resolveGraphqlEndpoint(): string {
 
 const graphqlEndpoint = resolveGraphqlEndpoint();
 const staticAssetsEndpoint =
-  (typeof VITE_STATIC_ASSETS_ENDPOINT === "string" && VITE_STATIC_ASSETS_ENDPOINT)
+  typeof VITE_STATIC_ASSETS_ENDPOINT === "string" && VITE_STATIC_ASSETS_ENDPOINT
     ? ensureTrailingSlash(VITE_STATIC_ASSETS_ENDPOINT)
     : ensureTrailingSlash(`${window.location.origin}/resources/`);
 
 const jitsiEndpoint =
-  (typeof VITE_JITSI_ENDPOINT === "string" && VITE_JITSI_ENDPOINT)
+  typeof VITE_JITSI_ENDPOINT === "string" && VITE_JITSI_ENDPOINT
     ? VITE_JITSI_ENDPOINT.replace(/\/$/, "")
     : window.location.origin;
 
@@ -72,14 +71,12 @@ const configs = {
     {
       value: 0,
       name: "✅ Copyright free",
-      description:
-        "Can be used by other players in any way without need for permission",
+      description: "Can be used by other players in any way without need for permission",
     },
     {
       value: 1,
       name: "👌 Use with acknowledgement",
-      description:
-        "Other players can use the media item as long as the owner is acknowledged",
+      description: "Other players can use the media item as long as the owner is acknowledged",
     },
     {
       value: 2,
@@ -111,8 +108,8 @@ const configs = {
     retain: true,
   },
   STRIPE_KEY: VITE_STRIPE_KEY,
-  RELEASE_VERSION: VITE_RELEASE_VERSION || '2026.05.05',
-  ALIAS_RELEASE_VERSION: VITE_ALIAS_RELEASE_VERSION || '84a231c',
+  RELEASE_VERSION: VITE_RELEASE_VERSION || "2026.05.05",
+  ALIAS_RELEASE_VERSION: VITE_ALIAS_RELEASE_VERSION || "84a231c",
 };
 
 export default configs;

@@ -12,9 +12,7 @@ import { AntDesignVueResolver } from "unplugin-vue-components/resolvers";
  * `VITE_GRAPHQL_ENDPOINT` only — path, query string, and hash are ignored
  * (e.g. `https://dev.upstage.live/api/graphql?x=1` → `dev.upstage.live`).
  */
-function previewAllowedHostsFromGraphqlEndpoint(
-  raw: string | undefined,
-): string[] | undefined {
+function previewAllowedHostsFromGraphqlEndpoint(raw: string | undefined): string[] | undefined {
   if (!raw?.trim()) return undefined;
   try {
     const parsed = new URL(raw.trim());
@@ -26,17 +24,14 @@ function previewAllowedHostsFromGraphqlEndpoint(
 }
 
 /** Studio REST/GraphQL for same-origin `/api` in dev and when serving a built app via `pnpm serve:dist`. */
-const studioApiTarget =
-  process.env.VITE_STUDIO_API_PROXY ?? "http://127.0.0.1:3001";
+const studioApiTarget = process.env.VITE_STUDIO_API_PROXY ?? "http://127.0.0.1:3001";
 
 /** Port for `vite preview` / `pnpm serve:dist` (e.g. `FRONTEND_PORT` from docker compose). */
 const previewPort = Number(process.env.FRONTEND_PORT) || 4173;
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const previewAllowedHosts = previewAllowedHostsFromGraphqlEndpoint(
-    env.VITE_GRAPHQL_ENDPOINT,
-  );
+  const previewAllowedHosts = previewAllowedHostsFromGraphqlEndpoint(env.VITE_GRAPHQL_ENDPOINT);
 
   return {
     base: "/",
@@ -57,9 +52,7 @@ export default defineConfig(({ mode }) => {
         eslintrc: { enabled: true },
       }),
       Components({
-        resolvers: [
-          AntDesignVueResolver({ importStyle: "less", resolveIcons: true }),
-        ],
+        resolvers: [AntDesignVueResolver({ importStyle: "less", resolveIcons: true })],
       }),
     ],
     resolve: {

@@ -5,8 +5,14 @@
       <thead>
         <tr>
           <th align="right" v-if="numbered">#</th>
-          <th v-for="header in headers" :key="header" align="left" :style="{ 'text-align': header.align }"
-            class="clickable" @click="sort(header)">
+          <th
+            v-for="header in headers"
+            :key="header"
+            align="left"
+            :style="{ 'text-align': header.align }"
+            class="clickable"
+            @click="sort(header)"
+          >
             <a-tooltip :title="header.description">
               <abbr class="has-tooltip-bottom">
                 {{ header.title }}
@@ -14,10 +20,14 @@
             </a-tooltip>
             &nbsp;
             <template v-if="sortBy?.title === header.title">
-              <i v-if="header.type === 'date'" :class="`fas ${sortOrder ? 'fa-sort-amount-down' : 'fa-sort-amount-down-alt'
-    }`" />
-              <i v-else :class="`fas ${sortOrder ? 'fa-sort-alpha-down' : 'fa-sort-alpha-down-alt'
-    }`" />
+              <i
+                v-if="header.type === 'date'"
+                :class="`fas ${sortOrder ? 'fa-sort-amount-down' : 'fa-sort-amount-down-alt'}`"
+              />
+              <i
+                v-else
+                :class="`fas ${sortOrder ? 'fa-sort-alpha-down' : 'fa-sort-alpha-down-alt'}`"
+              />
             </template>
             <template v-else-if="header.sortable">
               <i class="fas fa-sort" />
@@ -37,8 +47,18 @@
         <transition-group :css="false">
           <tr v-for="(item, index) in rows" :key="item">
             <td align="right" v-if="numbered">{{ offset + index + 1 }}</td>
-            <td v-for="header in headers" :key="header" :style="{ 'text-align': header.align }" :class="header.slot">
-              <slot :name="header.slot" :item="item" :header="header" :refresh="refresh ?? (() => { })">
+            <td
+              v-for="header in headers"
+              :key="header"
+              :style="{ 'text-align': header.align }"
+              :class="header.slot"
+            >
+              <slot
+                :name="header.slot"
+                :item="item"
+                :header="header"
+                :refresh="refresh ?? (() => {})"
+              >
                 <template v-if="header.render">
                   {{ header.render(item) }}
                 </template>

@@ -30,7 +30,6 @@
           </template>
         </a-input-search>
       </a-form-item>
-
     </template>
     <SaveButton v-if="!modelValue" @click="save" />
   </div>
@@ -41,11 +40,7 @@ import { computed, reactive, ref } from "vue";
 import SaveButton from "components/form/SaveButton.vue";
 import { useStore } from "vuex";
 import { avatarSpeak } from "services/speech";
-import {
-  getDefaultVariant,
-  getVariantList,
-  getVoiceList,
-} from "services/speech/voice";
+import { getDefaultVariant, getVariantList, getVoiceList } from "services/speech/voice";
 
 export default {
   components: {
@@ -58,9 +53,7 @@ export default {
     const currentAvatar = computed(() => store.getters["stage/currentAvatar"]);
     const voices = getVoiceList();
     const variants = getVariantList();
-    const parameters = reactive(
-      props.modelValue ? props.modelValue : currentAvatar.value?.voice,
-    );
+    const parameters = reactive(props.modelValue ? props.modelValue : currentAvatar.value?.voice);
     if (!parameters.variant) {
       parameters.variant = getDefaultVariant();
     }
@@ -89,10 +82,9 @@ export default {
 }
 
 .voice-parameters {
-
   .dropdown,
   .dropdown-trigger,
-  .dropdown-trigger>button,
+  .dropdown-trigger > button,
   .dropdown-menu {
     width: 100%;
   }

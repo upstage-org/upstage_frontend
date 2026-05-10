@@ -35,29 +35,23 @@ export const useJitsi = () => {
       bosh: `https://${domain}/http-bind`,
     });
 
-    jitsi.connection.addEventListener(
-      JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
-      (e) => {
-        console.log("Connection established", e);
-        jitsi.room = jitsi.connection.initJitsiConference(stageUrl, {});
-        jitsi.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track) => {
-          store.dispatch("stage/addTrack", track);
-        });
-        jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e) => {
-          console.log("Conference joined", e);
-          joined.value = true;
-        });
+    jitsi.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED, (e) => {
+      console.log("Connection established", e);
+      jitsi.room = jitsi.connection.initJitsiConference(stageUrl, {});
+      jitsi.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track) => {
+        store.dispatch("stage/addTrack", track);
+      });
+      jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e) => {
+        console.log("Conference joined", e);
+        joined.value = true;
+      });
 
-        jitsi.room.join();
-      },
-    );
-    jitsi.connection.addEventListener(
-      JitsiMeetJS.events.connection.CONNECTION_FAILED,
-      (e) => {
-        console.error("Connection failed", e);
-        joined.value = false;
-      },
-    );
+      jitsi.room.join();
+    });
+    jitsi.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, (e) => {
+      console.error("Connection failed", e);
+      joined.value = false;
+    });
     jitsi.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
       (e) => {

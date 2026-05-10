@@ -3,10 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
-import {
-  E2E_PLAYWRIGHT_VITE_PORT,
-  loadE2eConfig,
-} from "./tests/e2e/e2e-config";
+import { E2E_PLAYWRIGHT_VITE_PORT, loadE2eConfig } from "./tests/e2e/e2e-config";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,10 +18,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   globalSetup: path.join(__dirname, "tests/e2e/global-setup.ts"),
-  reporter: [
-    ["html", { open: "never" }],
-    ["list"],
-  ],
+  reporter: [["html", { open: "never" }], ["list"]],
   use: {
     baseURL: BASE_URL,
     trace: "on-first-retry",
@@ -40,9 +34,7 @@ export default defineConfig({
       //     Chromium's autoplay-needs-user-gesture policy so meSpeak's
       //     audio element can `.play()` from an MQTT callback rather than a
       //     real click. Without this flag headed runs are still silent.
-      args: HEADLESS
-        ? ["--mute-audio"]
-        : ["--autoplay-policy=no-user-gesture-required"],
+      args: HEADLESS ? ["--mute-audio"] : ["--autoplay-policy=no-user-gesture-required"],
     },
   },
   projects: [

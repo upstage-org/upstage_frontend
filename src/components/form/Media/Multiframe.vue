@@ -15,9 +15,7 @@ const props = defineProps({
   form: Object,
 });
 
-const { nodes: allMedia, loading: loadingAllMedia } = useQuery(
-  stageGraph.mediaList,
-);
+const { nodes: allMedia, loading: loadingAllMedia } = useQuery(stageGraph.mediaList);
 
 const uploadedFrames = reactive([]);
 
@@ -61,11 +59,7 @@ watch(uploadedFrames, (val) => {
         <Asset :asset="{ src }" />
       </template>
       <template #extras>
-        <div
-          v-for="(base64, i) in uploadedFrames"
-          :key="i"
-          class="column item is-3 is-4"
-        >
+        <div v-for="(base64, i) in uploadedFrames" :key="i" class="column item is-3 is-4">
           <Selectable revert @select="removeUploaded(i)">
             <Asset :asset="{ base64 }" />
           </Selectable>

@@ -1,12 +1,7 @@
 // @ts-nocheck
 import { userGraph } from "services/graphql";
 
-import {
-  setToken,
-  removeToken,
-  setRefreshToken,
-  removeRefreshToken,
-} from "utils/auth";
+import { setToken, removeToken, setRefreshToken, removeRefreshToken } from "utils/auth";
 import { message } from "ant-design-vue";
 
 export default {
@@ -46,12 +41,11 @@ export default {
               commit("SET_REFRESH_TOKEN", refresh_token);
               resolve();
             } else {
-              message.error(
-                resp?.errors[0]?.message
-              );
+              message.error(resp?.errors[0]?.message);
               reject(resp);
             }
-          }).catch((err) => {
+          })
+          .catch((err) => {
             const msg =
               err?.response?.errors?.[0]?.message ??
               err?.graphQLErrors?.[0]?.message ??
@@ -70,7 +64,6 @@ export default {
       window.location.href = "/";
     },
 
-
     // eslint-disable-next-line no-unused-vars
     fetchRefreshToken({ commit, state }) {
       return userGraph
@@ -86,7 +79,8 @@ export default {
           const token = response.refreshToken.access_token;
           commit("SET_TOKEN", token);
           return token;
-        }).catch(err => {
+        })
+        .catch((err) => {
           commit("CLEAR_USER_DATA");
           localStorage.clear();
           removeToken();

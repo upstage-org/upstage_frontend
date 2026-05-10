@@ -25,11 +25,7 @@
               the "closed" copy but skips the v-else block — no imgs mount, @load never
               fires, and preloading/ready never clear (infinite "loading").
             -->
-            <div
-              v-if="preloadableAssets.length"
-              id="preloading-area"
-              aria-hidden="true"
-            >
+            <div v-if="preloadableAssets.length" id="preloading-area" aria-hidden="true">
               <img
                 v-for="(src, idx) in preloadableAssets"
                 :key="`${idx}-${src}`"
@@ -39,7 +35,8 @@
               />
             </div>
             <template v-if="status !== 'live' && !canPlay">
-              <span v-if="status" class="tag is-dark">{{ status.toUpperCase() }}</span>&nbsp;
+              <span v-if="status" class="tag is-dark">{{ status.toUpperCase() }}</span
+              >&nbsp;
               <span>This stage is not currently open to the public. Please come back later!</span>
             </template>
             <h2 v-else-if="ready" class="subtitle">

@@ -1,13 +1,6 @@
 import type { Page } from "@playwright/test";
 
-export type MediaType =
-  | "avatar"
-  | "prop"
-  | "media"
-  | "backdrop"
-  | "audio"
-  | "video"
-  | "scene";
+export type MediaType = "avatar" | "prop" | "media" | "backdrop" | "audio" | "video" | "scene";
 
 export interface UploadOptions {
   /** Absolute path to the file on disk. */
@@ -32,9 +25,7 @@ export class MediaLibraryPage {
   async goto(): Promise<void> {
     await this.page.goto("/media");
     await this.page.waitForLoadState("networkidle").catch(() => undefined);
-    await this.page
-      .locator("#app")
-      .waitFor({ state: "visible", timeout: 15_000 });
+    await this.page.locator("#app").waitFor({ state: "visible", timeout: 15_000 });
   }
 
   /**
@@ -47,9 +38,7 @@ export class MediaLibraryPage {
    * is the most stable selector for the input inside it.
    */
   async upload({ filePath, name, mediaType, ownerUsername }: UploadOptions): Promise<void> {
-    const newMediaBtn = this.page
-      .locator("button", { hasText: /\bnew\s+media\b/i })
-      .first();
+    const newMediaBtn = this.page.locator("button", { hasText: /\bnew\s+media\b/i }).first();
     if (await newMediaBtn.count()) {
       await newMediaBtn.click();
     } else {
@@ -60,17 +49,13 @@ export class MediaLibraryPage {
       });
     }
 
-    const fileInput = this.page
-      .locator('.fullscreen-dragzone input[type="file"]')
-      .first();
+    const fileInput = this.page.locator('.fullscreen-dragzone input[type="file"]').first();
     await fileInput.waitFor({ state: "attached", timeout: 10_000 });
     await fileInput.setInputFiles(filePath);
 
     // MediaForm modal opens once `files` is populated; the type/save controls
     // live on its toolbar/footer (see src/components/media/MediaForm/index.vue).
-    const typeSelect = this.page
-      .locator('[data-testid="media-form-type"]')
-      .first();
+    const typeSelect = this.page.locator('[data-testid="media-form-type"]').first();
     await typeSelect.waitFor({ state: "visible", timeout: 15_000 });
 
     // Set the friendly name first so a save later shows the row we expect.
@@ -86,9 +71,7 @@ export class MediaLibraryPage {
     const ownerTab = this.page.locator('div[role="tab"]', { hasText: "Change Owner" }).first();
     if (await ownerTab.count()) {
       await ownerTab.click();
-      const ownerSelect = this.page
-        .locator('[data-testid="media-form-owner"]')
-        .first();
+      const ownerSelect = this.page.locator('[data-testid="media-form-owner"]').first();
       await ownerSelect.waitFor({ state: "visible", timeout: 5_000 });
       // That select uses show-search; options are not fully listed — type to filter.
       // rc-select surfaces the username on each option in the a11y tree; match
@@ -111,10 +94,7 @@ export class MediaLibraryPage {
     // ant-design renders dropdown options to body via teleport.
     // Options often show display names (e.g. "Sampson") while the harness
     // passes usernames (e.g. "sampson") — match case-insensitively.
-    const needle = new RegExp(
-      value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-      "i",
-    );
+    const needle = new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     if (options?.useSearch) {
       // `show-search` + virtual list; the option's a11y `name` is the username
       // (see error-context snapshots) — use anchored username so `montague` ≠
@@ -130,10 +110,7 @@ export class MediaLibraryPage {
       await option.click({ force: true });
       return;
     }
-    const option = this.page
-      .locator(".ant-select-item-option")
-      .filter({ hasText: needle })
-      .first();
+    const option = this.page.locator(".ant-select-item-option").filter({ hasText: needle }).first();
     await option.waitFor({ state: "visible", timeout: 10_000 });
     await option.click();
   }

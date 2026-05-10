@@ -27,10 +27,7 @@ export class StageManagementPage {
     const urlInput = this.fieldInput("stage-url-input");
     await urlInput.fill(fileLocation);
     // Field has a debounced @input -> checkURL call; wait for the green check.
-    await this.page
-      .locator(".fa-check")
-      .first()
-      .waitFor({ state: "visible", timeout: 10_000 });
+    await this.page.locator(".fa-check").first().waitFor({ state: "visible", timeout: 10_000 });
 
     const createBtn = this.page.locator('[data-testid="stage-create"]').first();
     await createBtn.click();
@@ -71,7 +68,10 @@ export class StageManagementPage {
         if (!token) throw new Error("[e2e] no auth token in localStorage");
         // Same origin as the SPA (Vite proxy → studio API) — never hit :3001 from
         // a page on :3000 (CORS) unless the backend lists that origin.
-        const graphQlEndpoint = new URL("studio_graphql", `${window.location.origin}/api/`).toString();
+        const graphQlEndpoint = new URL(
+          "studio_graphql",
+          `${window.location.origin}/api/`,
+        ).toString();
 
         const resp = await fetch(graphQlEndpoint, {
           method: "POST",
@@ -126,10 +126,7 @@ export class StageManagementPage {
         const token = raw ? (JSON.parse(raw)?.auth?.token ?? null) : null;
         if (!token) throw new Error("[e2e] no auth token in localStorage");
         const endpoint = new URL("studio_graphql", `${window.location.origin}/api/`).toString();
-        const playerAccess = JSON.stringify([
-          userIdsByLevel.player,
-          userIdsByLevel.playerEdit,
-        ]);
+        const playerAccess = JSON.stringify([userIdsByLevel.player, userIdsByLevel.playerEdit]);
         const headers = { "content-type": "application/json", authorization: `Bearer ${token}` };
         const resp = await fetch(endpoint, {
           method: "POST",

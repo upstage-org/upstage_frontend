@@ -2,7 +2,14 @@
   <div class="file">
     <a-tooltip :title="tooltip">
       <label class="file-label has-tooltip-right">
-        <input :id="id" class="file-input" type="file" name="resume" :accept="accept" @input="handleInputFile" />
+        <input
+          :id="id"
+          class="file-input"
+          type="file"
+          name="resume"
+          :accept="accept"
+          @input="handleInputFile"
+        />
         <span class="file-cta">
           <slot>
             <span class="file-icon">
@@ -34,11 +41,7 @@ import { ref } from "vue";
 import { computed, watch } from "vue";
 import { humanFileSize } from "utils/common";
 import { useStore } from "vuex";
-import {
-  imageExtensions,
-  audioExtensions,
-  videoExtensions,
-} from "utils/constants";
+import { imageExtensions, audioExtensions, videoExtensions } from "utils/constants";
 export default {
   props: {
     modelValue: String,
@@ -130,7 +133,8 @@ export default {
     const isImage = computed(() => file.value?.type?.startsWith("image"));
     const tooltip = computed(
       () =>
-        `Permitted file formats are ${accept.value
+        `Permitted file formats are ${
+          accept.value
         }. Maximum file size is ${humanFileSize(mediaLimit.value)}`,
     );
 

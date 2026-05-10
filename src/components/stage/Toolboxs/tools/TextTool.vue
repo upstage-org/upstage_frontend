@@ -1,10 +1,15 @@
 <template>
-  <section v-show="isWriting" class="writing" @click="onClickWriting" :style="{
-    width: stageSize.width + 'px',
-    height: stageSize.height + 'px',
-    top: stageSize.top + 'px',
-    left: stageSize.left + 'px',
-  }">
+  <section
+    v-show="isWriting"
+    class="writing"
+    @click="onClickWriting"
+    :style="{
+      width: stageSize.width + 'px',
+      height: stageSize.height + 'px',
+      top: stageSize.top + 'px',
+      left: stageSize.left + 'px',
+    }"
+  >
     <p ref="el" :style="options" contenteditable="true">
       Write or paste
       <br />your text here
@@ -36,7 +41,12 @@
   <template v-else>
     <div class="text-tool" style="width: 200px; z-index: 1005">
       <span class="tag muted is-block">{{ $t("font") }}</span>
-      <Dropdown class="font-dropdown" v-model="options.fontFamily" :data="fontFamilies" @open="fontDropdownOpen">
+      <Dropdown
+        class="font-dropdown"
+        v-model="options.fontFamily"
+        :data="fontFamilies"
+        @open="fontDropdownOpen"
+      >
         <template #option="{ label }">
           <span :style="{ 'font-family': label }">{{ label }}</span>
         </template>
@@ -44,7 +54,11 @@
     </div>
     <div class="text-tool" style="z-index: 1004">
       <span class="tag muted is-block">Size (px)</span>
-      <Field :modelValue="options.fontSize.slice(0, -2)" @update:modelValue="changeFontSize" type="number" />
+      <Field
+        :modelValue="options.fontSize.slice(0, -2)"
+        @update:modelValue="changeFontSize"
+        type="number"
+      />
     </div>
     <div class="text-tool" style="z-index: 1003">
       <span class="tag muted is-block">{{ $t("colour") }}</span>
@@ -217,9 +231,7 @@ export default {
     const fontDropdownOpen = (visible) => {
       const topbar = document.querySelector("#topbar");
       if (topbar) {
-        topbar.style.overflow = visible
-          ? "visible"
-          : "auto";
+        topbar.style.overflow = visible ? "visible" : "auto";
       }
     };
 
@@ -240,8 +252,7 @@ export default {
     };
     onUnmounted(() => {
       const topbar = document.querySelector("#topbar");
-      if (topbar)
-        topbar.style.overflow = "auto";
+      if (topbar) topbar.style.overflow = "auto";
     });
 
     return {
@@ -272,7 +283,7 @@ export default {
   z-index: 1000;
   background-color: rgba($color: white, $alpha: 0.8);
 
-  >p {
+  > p {
     position: absolute;
   }
 }
@@ -284,7 +295,7 @@ export default {
 }
 
 .saved-text {
-  >div {
+  > div {
     width: 100%;
     overflow: hidden;
     p {

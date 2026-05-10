@@ -1,6 +1,8 @@
 <template>
   <div class="columns is-mobile is-centered is-vcentered foyer-background">
-    <div class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen">
+    <div
+      class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen"
+    >
       <LoginForm @success="onLoginSuccess" />
     </div>
   </div>
@@ -14,11 +16,10 @@ import { useStore } from "vuex";
 const store = useStore();
 const router = useRouter();
 
-
 const onLoginSuccess = () => {
   store.dispatch("user/fetchCurrent");
-  store.dispatch("config/fetchConfig")
-  router.push({ name: 'Stages' })
+  store.dispatch("config/fetchConfig");
+  router.push({ name: "Stages" });
 };
 </script>
 

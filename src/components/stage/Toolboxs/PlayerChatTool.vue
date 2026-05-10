@@ -1,12 +1,14 @@
 <template>
   <a-tooltip placement="rightBottom">
     <template #title>Player Chat</template>
-    <a @click="togglePlayerChat" :class="{ 'is-active': showPlayerChat }" class="panel-block button">
+    <a
+      @click="togglePlayerChat"
+      :class="{ 'is-active': showPlayerChat }"
+      class="panel-block button"
+    >
       <span class="panel-icon">
         <Icon src="chat.svg" />
-        <span v-if="unread" class="unread tag is-danger is-small">{{
-      unread
-    }}</span>
+        <span v-if="unread" class="unread tag is-danger is-small">{{ unread }}</span>
       </span>
     </a>
   </a-tooltip>
@@ -24,9 +26,7 @@ export default {
     const togglePlayerChat = () => {
       store.dispatch("stage/showPlayerChat", !showPlayerChat.value);
     };
-    const unread = computed(
-      () => store.getters["stage/unreadPrivateMessageCount"],
-    );
+    const unread = computed(() => store.getters["stage/unreadPrivateMessageCount"]);
 
     return { showPlayerChat, togglePlayerChat, unread };
   },

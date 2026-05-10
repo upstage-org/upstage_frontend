@@ -22,7 +22,7 @@ const tableParams = reactive({
   page: 1,
   limit: 10,
   sort: ["LAST_ACCESS_DESC"],
-  access: []
+  access: [],
 });
 const { result: inquiryResult } = useQuery(gql`
   {
@@ -45,36 +45,38 @@ const { result, loading, fetchMore, refetch } = useQuery(
       $sort: [StageSortEnum]
       $access: [String]
     ) {
-      stages(input:{
-        page: $page
-        limit: $limit
-        name: $name
-        createdBetween: $createdBetween
-        owners: $owners
-        sort: $sort
-        access: $access
-      }) {
+      stages(
+        input: {
+          page: $page
+          limit: $limit
+          name: $name
+          createdBetween: $createdBetween
+          owners: $owners
+          sort: $sort
+          access: $access
+        }
+      ) {
         totalCount
         edges {
+          id
+          name
+          fileLocation
+          status
+          visibility
+          cover
+          description
+          playerAccess
+          permission
+          lastAccess
+          owner {
+            username
+            displayName
+          }
+          assets {
             id
             name
-            fileLocation
-            status
-            visibility
-            cover
-            description
-            playerAccess
-            permission
-            lastAccess
-            owner {
-              username
-              displayName
-            }
-            assets {
-              id
-              name
-            }
-            createdOn
+          }
+          createdOn
         }
       }
     }
@@ -156,7 +158,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     key: "permission",
     sorter: {
       multiple: 1,
-    }
+    },
   },
   {
     title: `${t("manage")} ${t("stage")}`,
@@ -187,10 +189,7 @@ const handleTableChange = (
   sorter: SorterResult<Media> | SorterResult<Media>[],
 ) => {
   const sort = (Array.isArray(sorter) ? sorter : [sorter])
-    .sort(
-      (a, b) =>
-        (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple,
-    )
+    .sort((a, b) => (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple)
     .map(({ columnKey, order }) =>
       `${columnKey == "permission" ? "access" : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
     );
@@ -202,7 +201,7 @@ const handleTableChange = (
   });
 };
 const dataSource = computed(() => {
-  return result.value ? result.value.stages.edges : []
+  return result.value ? result.value.stages.edges : [];
 });
 
 provide("refresh", () => {
@@ -230,15 +229,13 @@ const {
   mutate: updateVisibility,
   loading: loadingUpdateVisibility,
   onDone: onVisibilityUpdated,
-} = useMutation<{ updateVisibility: { result: string } }, { id: string }>(
-  gql`
-    mutation UpdateVisibility($id: ID!) {
-      updateVisibility(id: $id) {
-        result
-      }
+} = useMutation<{ updateVisibility: { result: string } }, { id: string }>(gql`
+  mutation UpdateVisibility($id: ID!) {
+    updateVisibility(id: $id) {
+      result
     }
-  `,
-);
+  }
+`);
 const handleChangeVisibility = async (record: Stage) => {
   await updateVisibility({
     id: record.id,
@@ -260,16 +257,27 @@ onVisibilityUpdated(handleUpdate);
 
 <template>
   <a-layout class="w-full rounded-xl bg-white overflow-hidden">
-    <a-table class="w-full shadow overflow-auto" :columns="columns as ColumnType<Stage>[]" :data-source="dataSource"
-      rowKey="id" :loading="loading" @change="handleTableChange" :pagination="{
-        showQuickJumper: true,
-        showSizeChanger: true,
-        total: result ? result.stages.totalCount : 0,
-      } as Pagination
-        ">
+    <a-table
+      class="w-full shadow overflow-auto"
+      :columns="columns as ColumnType<Stage>[]"
+      :data-source="dataSource"
+      rowKey="id"
+      :loading="loading"
+      @change="handleTableChange"
+      :pagination="
+        {
+          showQuickJumper: true,
+          showSizeChanger: true,
+          total: result ? result.stages.totalCount : 0,
+        } as Pagination
+      "
+    >
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'cover'">
-          <a-image :src="text ? absolutePath(text) : '/img/greencurtain.jpg'" class="w-24 max-h-24 object-contain" />
+          <a-image
+            :src="text ? absolutePath(text) : '/img/greencurtain.jpg'"
+            class="w-24 max-h-24 object-contain"
+          />
         </template>
         <template v-if="column.key === 'owner_id'">
           <span v-if="text.displayName">
@@ -282,11 +290,14 @@ onVisibilityUpdated(handleUpdate);
           </span>
         </template>
         <template v-if="['created_on', 'last_access'].includes(column.key as string)">
-          <div style="text-align: center;">
+          <div style="text-align: center">
             <d-date v-if="text" :value="text" />
             <br />
-            <PlayerAudienceCounter v-if="column.key == 'last_access'" :stage-url="record.fileLocation"
-              class="counter" />
+            <PlayerAudienceCounter
+              v-if="column.key == 'last_access'"
+              :stage-url="record.fileLocation"
+              class="counter"
+            />
           </div>
         </template>
         <template v-if="column.key === 'permission'">
@@ -297,18 +308,28 @@ onVisibilityUpdated(handleUpdate);
             {{ capitalize(text) }}
           </a-tag>
           <a-tooltip v-else :title="capitalize(text)">
-            <a-switch checked-children="L" un-checked-children="R" :checked="text === 'live'"
-              :loading="loadingUpdateStatus" @change="handleChangeStatus(record as Stage)" />
+            <a-switch
+              checked-children="L"
+              un-checked-children="R"
+              :checked="text === 'live'"
+              :loading="loadingUpdateStatus"
+              @change="handleChangeStatus(record as Stage)"
+            />
           </a-tooltip>
         </template>
         <template v-if="column.key === 'visibility'">
-          <a-switch :checked="!!text" :loading="loadingUpdateVisibility"
-            @change="handleChangeVisibility(record as Stage)" />
+          <a-switch
+            :checked="!!text"
+            :loading="loadingUpdateVisibility"
+            @change="handleChangeVisibility(record as Stage)"
+          />
         </template>
         <template v-if="column.key === 'actions'">
-          <a-space class="flex" style="justify-content: flex-end;">
-            <router-link v-if="isAdmin || record.permission == 'editor' || record.permission == 'owner'"
-              :to="`/stages/stage-management/${record.id}/`">
+          <a-space class="flex" style="justify-content: flex-end">
+            <router-link
+              v-if="isAdmin || record.permission == 'editor' || record.permission == 'owner'"
+              :to="`/stages/stage-management/${record.id}/`"
+            >
               <a-button>
                 <setting-outlined />
                 Manage

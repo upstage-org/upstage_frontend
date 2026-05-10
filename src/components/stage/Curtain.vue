@@ -31,9 +31,7 @@ export default {
     const canPlay = computed(() => store.getters["stage/canPlay"]);
     const curtain = computed(() => store.state.stage.curtain);
     const config = computed(() => store.getters["stage/config"]);
-    const curtainSpeed = computed(
-      () => config.value?.animations?.curtainSpeed ?? 3000,
-    );
+    const curtainSpeed = computed(() => config.value?.animations?.curtainSpeed ?? 3000);
 
     const curtainEnter = (el, complete) => {
       const duration = curtainSpeed.value;
@@ -88,9 +86,7 @@ export default {
       }
     };
 
-    const dualCurtain = computed(
-      () => config.value?.animations?.curtain === "close",
-    );
+    const dualCurtain = computed(() => config.value?.animations?.curtain === "close");
 
     const dualCurtainEnter = (el, complete) => {
       const duration = curtainSpeed.value;

@@ -1,18 +1,8 @@
 <script lang="ts" setup>
-import {
-  computed,
-  inject,
-  Ref,
-  defineProps,
-  defineEmits
-} from "vue";
+import { computed, inject, Ref, defineProps, defineEmits } from "vue";
 import { editingMediaVar, inquiryVar } from "apollo";
 import configs from "config";
-import {
-  Media,
-  MediaAttributes,
-  UploadFile,
-} from "models/studio";
+import { Media, MediaAttributes, UploadFile } from "models/studio";
 import { absolutePath } from "utils/common";
 import { ColumnType, TablePaginationConfig } from "ant-design-vue/lib/table";
 import { SorterResult } from "ant-design-vue/lib/table/interface";
@@ -36,16 +26,18 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   data: () => [],
-  viewDetailAction: 'view'
+  viewDetailAction: "view",
 });
 
 const emit = defineEmits<{
   viewDetail: [item: Media];
-  change: [params: {
-    current: number;
-    pageSize: number;
-    sorter?: SorterResult<Media> | SorterResult<Media>[];
-  }];
+  change: [
+    params: {
+      current: number;
+      pageSize: number;
+      sorter?: SorterResult<Media> | SorterResult<Media>[];
+    },
+  ];
 }>();
 
 const { t } = useI18n();
@@ -121,10 +113,10 @@ const handleTableChange = (
   filters: any,
   sorter: SorterResult<Media> | SorterResult<Media>[],
 ) => {
-  emit('change', {
+  emit("change", {
     current: pagination.current || 1,
     pageSize: pagination.pageSize || 20,
-    sorter
+    sorter,
   });
 };
 
@@ -172,18 +164,17 @@ const filterTag = (tag: string) => {
     tags: [tag],
   });
 };
-
 </script>
 
 <template>
   <a-layout class="w-full shadow rounded-xl bg-white overflow-hidden">
-    <a-table 
-      class="w-full overflow-auto" 
-      :columns="columns as ColumnType<Media>[]" 
+    <a-table
+      class="w-full overflow-auto"
+      :columns="columns as ColumnType<Media>[]"
       :data-source="dataSource"
-      rowKey="id" 
-      :loading="loading" 
-      @change="handleTableChange" 
+      rowKey="id"
+      :loading="loading"
+      @change="handleTableChange"
       :pagination="paginationConfig"
     >
       <template #bodyCell="{ column, record, text }">
@@ -207,12 +198,23 @@ const filterTag = (tag: string) => {
           </span>
         </template>
         <template v-if="column.key === 'stages'">
-          <a v-for="(stage, i) in text" :key="i" :href="`${configs.UPSTAGE_URL}/${stage.fileLocation}`" target="_blank">
+          <a
+            v-for="(stage, i) in text"
+            :key="i"
+            :href="`${configs.UPSTAGE_URL}/${stage.fileLocation}`"
+            target="_blank"
+          >
             <a-tag color="#007011">{{ stage.name }}</a-tag>
           </a>
         </template>
         <template v-if="column.key === 'tags'">
-          <a-tag v-for="(tag, i) in text" :key="i" :color="tag" @click="filterTag(tag)" class="cursor-pointer">{{ tag }}
+          <a-tag
+            v-for="(tag, i) in text"
+            :key="i"
+            :color="tag"
+            @click="filterTag(tag)"
+            class="cursor-pointer"
+            >{{ tag }}
           </a-tag>
         </template>
         <template v-if="column.key === 'size'">
@@ -223,9 +225,7 @@ const filterTag = (tag: string) => {
         </template>
         <template v-if="column.key === 'copyrightLevel'">
           <span class="leading-4">{{
-            configs.MEDIA_COPYRIGHT_LEVELS.find(
-              (l) => l.value === record.copyrightLevel,
-            )?.name
+            configs.MEDIA_COPYRIGHT_LEVELS.find((l) => l.value === record.copyrightLevel)?.name
           }}</span>
         </template>
         <template v-if="column.key === 'created_on'">

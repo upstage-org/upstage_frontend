@@ -53,7 +53,7 @@ export default {
       tool,
       changeTool,
       isScene,
-      enabledLiveStreaming
+      enabledLiveStreaming,
     };
   },
 };

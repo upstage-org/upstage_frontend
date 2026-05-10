@@ -39,11 +39,7 @@ const system = computed(() => store.getters["config/system"]);
 const filterOption = (keyword: string, option: { title?: string }) =>
   option.title?.toLowerCase().includes(keyword.toLowerCase()) ?? false;
 
-const onToggleDirect = (
-  checked: boolean | string | number,
-  e: Event,
-  key: string,
-) => {
+const onToggleDirect = (checked: boolean | string | number, e: Event, key: string) => {
   directToEmails.value = directToEmails.value
     .filter((email) => email !== key)
     .concat(checked ? [] : key);
@@ -57,11 +53,7 @@ const addCustomRecipient = () => {
       if (!receiverEmails.value.includes(email)) {
         receiverEmails.value = receiverEmails.value.concat(email);
       }
-      if (
-        !receivers?.value?.adminPlayers?.edges.some(
-          (e: any) => e?.email === email
-        )
-      ) {
+      if (!receivers?.value?.adminPlayers?.edges.some((e: any) => e?.email === email)) {
         customRecipients.value = customRecipients.value.concat(email);
       }
     } else {
@@ -88,7 +80,7 @@ const { result: receivers, loading: isReady } = useQuery(
     }
   `,
   {},
-  { notifyOnNetworkStatusChange: true }
+  { notifyOnNetworkStatusChange: true },
 );
 
 const dataSource = computed<TransferItem[]>(() => {
@@ -100,14 +92,12 @@ const dataSource = computed<TransferItem[]>(() => {
     .concat(
       receivers.value?.adminPlayers?.edges
         .filter((user: any) =>
-          filterRole.value
-            ? String(user.role) == String(filterRole.value)
-            : true
+          filterRole.value ? String(user.role) == String(filterRole.value) : true,
         )
         .map((user: any, i: any) => ({
           key: user?.email ?? `${i}`,
           title: user ? `${displayName(user)} <${user.email}>` : "",
-        })) ?? []
+        })) ?? [],
     );
 });
 
@@ -129,9 +119,7 @@ const { proceed, loading } = useLoading(
       throw "Please provide a body for your email";
     }
     const visibleReceivers = receiverEmails.value.filter((email) =>
-      receivers.value.adminPlayers?.edges.some(
-        (edge: any) => edge?.email === email
-      )
+      receivers.value.adminPlayers?.edges.some((edge: any) => edge?.email === email),
     );
     if (!visibleReceivers.length) {
       throw "Please select at least one recipient";
@@ -145,20 +133,16 @@ const { proceed, loading } = useLoading(
       recipients: receiverEmails.value
         .filter((email) => directToEmails.value.includes(email))
         .join(","),
-      bcc: receiverEmails.value
-        .filter((email) => !directToEmails.value.includes(email))
-        .join(","),
+      bcc: receiverEmails.value.filter((email) => !directToEmails.value.includes(email)).join(","),
     });
     successMessage.value = `Email has been successfully sent to ${receiverEmails.value
-      .map((email) =>
-        directToEmails.value.includes(email) ? email : `${email} (BCC)`
-      )
+      .map((email) => (directToEmails.value.includes(email) ? email : `${email} (BCC)`))
       .join(", ")}!`;
   },
   {
     loading: "Email sending...",
     success: () => `Email sent! ✈️`,
-  }
+  },
 );
 </script>
 
@@ -167,41 +151,50 @@ const { proceed, loading } = useLoading(
     <Space><span /></Space>
   </Header>
   <Layout v-if="successMessage" class="bg-white rounded-lg overflow-y-auto justify-center">
-    <AResult status="success" title="Email notification sent" class="text-center" :sub-title="successMessage">
+    <AResult
+      status="success"
+      title="Email notification sent"
+      class="text-center"
+      :sub-title="successMessage"
+    >
       <AButton class="m-auto" @click="reset()">Send another email</AButton>
     </AResult>
   </Layout>
   <Layout v-else class="bg-white rounded-lg overflow-y-auto">
     <div
-      class="bg-white shadow rounded-tl rounded-tr p-2 px-4 sticky top-0 z-50 mb-6 flex justify-between items-center">
-      <a-tag color="#007011">
-        <MailOutlined /> Email Notification
-      </a-tag>
+      class="bg-white shadow rounded-tl rounded-tr p-2 px-4 sticky top-0 z-50 mb-6 flex justify-between items-center"
+    >
+      <a-tag color="#007011"> <MailOutlined /> Email Notification </a-tag>
       <a-button type="primary" @click="proceed" :loading="loading">
         <send-outlined />
         Send
       </a-button>
     </div>
     <div class="px-4">
-      From the list on the left, select the player or players that you want to
-      email and click the arrow to move them to the recipient list.<br />
-      If you want to email a specific group, e.g. all Admins, use the dropdown
-      menu on the left to filter the player list by role. To send to multiple
-      role groups, use the dropdown again to select the next role, and transfer
-      the desired players to the recipient list. Then clear the filter by
-      hovering over the arrow in the dropdown, which will change to an
-      <CloseCircleFilled />. Once the filter is cleared, all the players you
-      have selected will show in the recipient list.
+      From the list on the left, select the player or players that you want to email and click the
+      arrow to move them to the recipient list.<br />
+      If you want to email a specific group, e.g. all Admins, use the dropdown menu on the left to
+      filter the player list by role. To send to multiple role groups, use the dropdown again to
+      select the next role, and transfer the desired players to the recipient list. Then clear the
+      filter by hovering over the arrow in the dropdown, which will change to an
+      <CloseCircleFilled />. Once the filter is cleared, all the players you have selected will show
+      in the recipient list.
       <ADivider />
       <a-form-item :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
         <template #label>
           <a-space direction="vertical">
             {{ t("to") }}
-            <a-select allow-clear placeholder="Filter by role" :options="Object.entries(configs.ROLES).map(([key, id]) => ({
-              value: id,
-              label: titleCase(key),
-            }))
-              " v-model:value="filterRole" />
+            <a-select
+              allow-clear
+              placeholder="Filter by role"
+              :options="
+                Object.entries(configs.ROLES).map(([key, id]) => ({
+                  value: id,
+                  label: titleCase(key),
+                }))
+              "
+              v-model:value="filterRole"
+            />
             <a-button type="dashed" @click="addCustomRecipient">
               <plus-circle-outlined />
               Custom recipient
@@ -209,23 +202,37 @@ const { proceed, loading } = useLoading(
           </a-space>
         </template>
         <a-spin :spinning="isReady">
-          <a-transfer :locale="{
-            itemUnit: 'recipient',
-            itemsUnit: 'recipients',
-            notFoundContent: '',
-            searchPlaceholder: 'Search by email or name',
-          }" :list-style="{
+          <a-transfer
+            :locale="{
+              itemUnit: 'recipient',
+              itemsUnit: 'recipients',
+              notFoundContent: '',
+              searchPlaceholder: 'Search by email or name',
+            }"
+            :list-style="{
               flex: '1',
               height: '300px',
-            }" :titles="[' available', ' selected']" v-model:target-keys="receiverEmails" :data-source="dataSource"
-            show-search :filter-option="filterOption">
+            }"
+            :titles="[' available', ' selected']"
+            v-model:target-keys="receiverEmails"
+            :data-source="dataSource"
+            show-search
+            :filter-option="filterOption"
+          >
             <template #render="item">
               <a-space class="flex justify-between">
                 <span>
                   {{ item?.title }}
                   <a-tag v-if="!item?.title?.includes('<')">Custom recipient</a-tag>
                 </span>
-                <a-switch size="small" :checked="!directToEmails.includes(item?.key as string)" @change="(checked: boolean | string | number, e: Event) => onToggleDirect(checked, e, item?.key as string)">
+                <a-switch
+                  size="small"
+                  :checked="!directToEmails.includes(item?.key as string)"
+                  @change="
+                    (checked: boolean | string | number, e: Event) =>
+                      onToggleDirect(checked, e, item?.key as string)
+                  "
+                >
                   <template #checkedChildren>
                     <span class="text-[8px] leading-none">BCC</span>
                   </template>
@@ -238,13 +245,21 @@ const { proceed, loading } = useLoading(
           </a-transfer>
         </a-spin>
       </a-form-item>
-      <a-form-item label="Subject" :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
+      <a-form-item
+        label="Subject"
+        :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }"
+        :colon="false"
+      >
         <a-input v-model:value="subject" />
       </a-form-item>
       <a-form-item label="Body" :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
         <RichTextEditor v-model="body" @click="console.log(body)" />
       </a-form-item>
-      <a-form-item label="Attach signature" :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
+      <a-form-item
+        label="Attach signature"
+        :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }"
+        :colon="false"
+      >
         <div>
           <a-switch v-model:checked="showSignature">
             <template #checkedChildren>On</template>
@@ -258,7 +273,6 @@ const { proceed, loading } = useLoading(
             to view and edit the email signature.
           </p>
         </div>
-
       </a-form-item>
     </div>
   </Layout>

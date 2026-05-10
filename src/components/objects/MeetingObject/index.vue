@@ -63,7 +63,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-
 .frame {
   border: 2px solid black;
   border-top: 10px solid #007011;

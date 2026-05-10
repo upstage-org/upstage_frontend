@@ -168,9 +168,7 @@ router.beforeEach(
       return next("/stages");
     }
 
-    setViewportMeta(
-      to.name === "Live" ? "" : "width=device-width,initial-scale=1.0",
-    );
+    setViewportMeta(to.name === "Live" ? "" : "width=device-width,initial-scale=1.0");
 
     if (to.fullPath.includes("admin") && loggedIn) {
       const isAdmin: boolean = await store.dispatch("user/checkIsAdmin");

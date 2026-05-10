@@ -7,14 +7,10 @@ import { gql } from "@apollo/client/core";
 import { uploadDefault } from "models/studio";
 import i18n from "../i18n";
 import { humanFileSize } from "utils/common";
-import {
-  Media,
-  StudioGraph,
-  UploadFile,
-} from "models/studio";
+import { Media, StudioGraph, UploadFile } from "models/studio";
 import { useQuery } from "@vue/apollo-composable";
 
-const model = defineModel()
+const model = defineModel();
 const { load, refetch } = useLazyQuery<StudioGraph>(
   gql`
     query WhoAmI {
@@ -76,22 +72,26 @@ const handleUpload = async (file: UploadFile) => {
   }
   if (editingMediaResult.value?.editingMedia?.id) {
     const { assetType } = editingMediaResult.value?.editingMedia;
-    if (["video", "audio"].includes(assetType?.name) && !fileType.includes(assetType?.name) ||
-      (fileType.includes("video") || fileType.includes("audio")) && !["video", "audio"].includes(assetType?.name)
+    if (
+      (["video", "audio"].includes(assetType?.name) && !fileType.includes(assetType?.name)) ||
+      ((fileType.includes("video") || fileType.includes("audio")) &&
+        !["video", "audio"].includes(assetType?.name))
     ) {
       message.error("Invalid file type!");
       return;
     }
   }
   if (model.value) {
-    files.value = [{
-      ...file,
-      id: files.value.length,
-      preview: toSrc(file),
-      status: "local",
-    }];
+    files.value = [
+      {
+        ...file,
+        id: files.value.length,
+        preview: toSrc(file),
+        status: "local",
+      },
+    ];
 
-    model.value = !model.value
+    model.value = !model.value;
   } else {
     files.value = files.value.concat({
       ...file,
@@ -109,9 +109,21 @@ const uploadFile = async (file: any) => {
 </script>
 
 <template>
-  <a-modal :footer="null" :visible="visible" @cancel="visible = false" width="100%" wrapClassName="fullscreen-dragzone"
-    class="h-full top-0 p-0" data-testid="dropzone">
-    <a-upload-dragger data-testid="dropzone-input" :show-upload-list="false" :custom-request="uploadFile" multiple>
+  <a-modal
+    :footer="null"
+    :visible="visible"
+    @cancel="visible = false"
+    width="100%"
+    wrapClassName="fullscreen-dragzone"
+    class="h-full top-0 p-0"
+    data-testid="dropzone"
+  >
+    <a-upload-dragger
+      data-testid="dropzone-input"
+      :show-upload-list="false"
+      :custom-request="uploadFile"
+      multiple
+    >
       <p class="ant-upload-drag-icon">
         <UploadOutlined />
       </p>

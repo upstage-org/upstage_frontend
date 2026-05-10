@@ -80,8 +80,7 @@ export default {
   no_content: "No Content",
   drag_files_here_or_click_to_upload: "Drag files here or click to upload",
   choose_an_image: "Choose an image",
-  choose_an_existing_image_or_upload_new:
-    "Choose an existing image or upload new",
+  choose_an_existing_image_or_upload_new: "Choose an existing image or upload new",
   hold_this_avatar: "Hold this avatar",
   remove_from_avatar: "Remove from avatar",
   add_to_avatar: "Add to avatar",
@@ -171,8 +170,7 @@ export default {
     register: "I agree to the",
     terms_of_service: "Terms & Conditions",
   },
-  upload_hint:
-    "Drag files here to upload. You can drop multiple files to make a multiframes media",
+  upload_hint: "Drag files here to upload. You can drop multiple files to make a multiframes media",
   upload_accepted_format:
     "Accepted file formats: {image} for images, {audio} for audios and {video} for videos",
   over_limit_upload:
@@ -207,5 +205,5 @@ export default {
   introduction: "Introduction",
   new_object: "New {0}",
   new_stream: "My Stream",
-  default_backgroundcolor: "Default Background Colour"
+  default_backgroundcolor: "Default Background Colour",
 };

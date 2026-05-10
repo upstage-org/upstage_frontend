@@ -29,10 +29,7 @@ const showStreamInstruction = ref(false);
     </video>
   </template>
   <template v-else>
-    <a-image
-      :src="absolutePath(props.media.fileLocation)"
-      class="w-24 max-h-24 object-contain"
-    />
+    <a-image :src="absolutePath(props.media.fileLocation)" class="w-24 max-h-24 object-contain" />
     <a-popover v-if="attributes.multi" placement="right">
       <template #title>
         <b>{{ $t("multiframes") }}</b>
@@ -46,11 +43,7 @@ const showStreamInstruction = ref(false);
           </div>
         </div>
       </template>
-      <img
-        src="assets/multi-frame.svg"
-        alt="Multiframe"
-        class="absolute left-4 bottom-4"
-      />
+      <img src="assets/multi-frame.svg" alt="Multiframe" class="absolute left-4 bottom-4" />
     </a-popover>
   </template>
 </template>

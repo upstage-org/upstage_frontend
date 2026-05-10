@@ -21,7 +21,11 @@
         </span>
         <span>{{ $t("remove_from_avatar") }}</span>
       </a>
-      <a v-else-if="currentAvatar && object.type !== 'video'" class="panel-block" @click="wearCostume">
+      <a
+        v-else-if="currentAvatar && object.type !== 'video'"
+        class="panel-block"
+        @click="wearCostume"
+      >
         <span class="panel-icon">
           <Icon src="prop.svg" />
         </span>
@@ -93,10 +97,16 @@
         </span>
         <span>{{ "Animation speed" }}</span>
       </span>
-      <input class="input anmation-input" type="number" step="0.5" min="0" :value="animationSpeed"
-        @input="handleChangeAnimationSpeed" placeholder="seconds" />
+      <input
+        class="input anmation-input"
+        type="number"
+        step="0.5"
+        min="0"
+        :value="animationSpeed"
+        @input="handleChangeAnimationSpeed"
+        placeholder="seconds"
+      />
     </div>
-
 
     <div class="field has-addons menu-group">
       <p class="control menu-group-title">
@@ -107,33 +117,45 @@
       </p>
       <p class="control menu-group-item">
         <a-tooltip title="Opacity slider" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-primary-light': sliderMode === 'opacity',
-          }" @click="changeSliderMode('opacity')">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-primary-light': sliderMode === 'opacity',
+            }"
+            @click="changeSliderMode('opacity')"
+          >
             <span class="mt-1">
-              <Icon src="opacity-slider.svg" style="width: 16px; height: 16px;" />
+              <Icon src="opacity-slider.svg" style="width: 16px; height: 16px" />
             </span>
           </button>
         </a-tooltip>
       </p>
       <p v-if="object.type == 'jitsi'" class="control menu-group-item">
         <a-tooltip title="Volume" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-warning-light': sliderMode === 'volume',
-          }" @click="changeSliderMode('volume')">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-warning-light': sliderMode === 'volume',
+            }"
+            @click="changeSliderMode('volume')"
+          >
             <span class="mt-1">
-              <Icon src="animation-slider.svg" style="width: 16px; height: 16px;" />
+              <Icon src="animation-slider.svg" style="width: 16px; height: 16px" />
             </span>
           </button>
         </a-tooltip>
       </p>
       <p class="control menu-group-item">
         <a-tooltip title="Move speed" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-danger-light': sliderMode === 'speed',
-          }" @click="changeSliderMode('speed')">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-danger-light': sliderMode === 'speed',
+            }"
+            @click="changeSliderMode('speed')"
+          >
             <span class="mt-1">
-              <Icon src="movement-slider.svg" style="width: 16px; height: 16px;" />
+              <Icon src="movement-slider.svg" style="width: 16px; height: 16px" />
             </span>
           </button>
         </a-tooltip>
@@ -149,18 +171,26 @@
       </p>
       <p class="control menu-group-item">
         <a-tooltip title="Flip Horizontal" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-primary-light': object.scaleX === -1,
-          }" @click="flipHorizontal">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-primary-light': object.scaleX === -1,
+            }"
+            @click="flipHorizontal"
+          >
             <span class="mt-1">{{ $t("horizontal") }}</span>
           </button>
         </a-tooltip>
       </p>
       <p class="control menu-group-item">
         <a-tooltip title="Flip Vertical" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-primary-light': object.scaleY === -1,
-          }" @click="flipVertical">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-primary-light': object.scaleY === -1,
+            }"
+            @click="flipVertical"
+          >
             <span class="mt-1">{{ $t("vertical") }}</span>
           </button>
         </a-tooltip>
@@ -183,7 +213,11 @@
       </span>
       <span>{{ $t("remove") }}</span>
     </a>
-    <a v-if="object.drawingId || object.textId" class="panel-block has-text-danger" @click="deletePermanently">
+    <a
+      v-if="object.drawingId || object.textId"
+      class="panel-block has-text-danger"
+      @click="deletePermanently"
+    >
       <span class="panel-icon">
         <Icon src="remove.svg" />
       </span>
@@ -195,7 +229,12 @@
           <Icon :src="object.autoplayFrames > 0 ? 'pause.svg' : 'play.svg'" size="24" />
         </button>
       </p>
-      <p v-for="frame in object.frames" :key="frame" @click="switchFrame(frame)" class="control menu-group-item">
+      <p
+        v-for="frame in object.frames"
+        :key="frame"
+        @click="switchFrame(frame)"
+        class="control menu-group-item"
+      >
         <button class="button is-light">
           <img :src="frame" style="height: 100%" />
         </button>
@@ -210,14 +249,7 @@ import { computed, inject, ref } from "vue";
 import Icon from "components/Icon.vue";
 
 export default {
-  props: [
-    "object",
-    "closeMenu",
-    "active",
-    "sliderMode",
-    "setSliderMode",
-    "keepActive",
-  ],
+  props: ["object", "closeMenu", "active", "sliderMode", "setSliderMode", "keepActive"],
   emits: ["update:active", "hold"],
   components: { Icon },
   setup: (props, { emit }) => {
@@ -262,12 +294,14 @@ export default {
       store
         .dispatch("stage/toggleAutoplayFrames", {
           ...props.object,
-          ...props.object.autoplayFrames ? {
-            autoplayFrames: null,
-            lastAutoplayFrames: props.object.autoplayFrames
-          } : {
-            autoplayFrames: props.object.lastAutoplayFrames || 1
-          }
+          ...(props.object.autoplayFrames
+            ? {
+                autoplayFrames: null,
+                lastAutoplayFrames: props.object.autoplayFrames,
+              }
+            : {
+                autoplayFrames: props.object.lastAutoplayFrames || 1,
+              }),
         })
         .then(() => {
           emit("update:active", true);
@@ -297,9 +331,7 @@ export default {
 
     const holdable = inject("holdable") ?? ref();
     const isHolding = computed(
-      () =>
-        props.object.holder &&
-        props.object.holder.id === store.state.stage.session,
+      () => props.object.holder && props.object.holder.id === store.state.stage.session,
     );
 
     const openVoiceSetting = () => {
@@ -338,15 +370,11 @@ export default {
 
     const deletePermanently = () => {
       if (props.object.drawingId) {
-        store
-          .dispatch("stage/deleteObject", props.object)
-          .then(props.closeMenu);
+        store.dispatch("stage/deleteObject", props.object).then(props.closeMenu);
         store.commit("stage/POP_DRAWING", props.object.drawingId);
       }
       if (props.object.textId) {
-        store
-          .dispatch("stage/deleteObject", props.object)
-          .then(props.closeMenu);
+        store.dispatch("stage/deleteObject", props.object).then(props.closeMenu);
         store.commit("stage/POP_TEXT", props.object.textId);
       }
     };
@@ -374,7 +402,7 @@ export default {
           isPlaying: false,
         })
         .then(props.closeMenu);
-    }
+    };
     const playVideo = () => {
       store
         .dispatch("stage/shapeObject", {
@@ -382,14 +410,14 @@ export default {
           isPlaying: true,
         })
         .then(props.closeMenu);
-    }
+    };
     const openVolumePopup = () => {
       store
         .dispatch("stage/openSettingPopup", {
           type: "VolumeParameters",
         })
         .then(props.closeMenu);
-    }
+    };
     const toggleVideoLoop = () => {
       store
         .dispatch("stage/shapeObject", {
@@ -397,7 +425,7 @@ export default {
           loop: !props.object.loop,
         })
         .then(props.closeMenu);
-    }
+    };
     const restartVideo = () => {
       store
         .dispatch("stage/shapeObject", {
@@ -405,7 +433,7 @@ export default {
           replayed: (props.object.replayed || 0) + 1,
         })
         .then(props.closeMenu);
-    }
+    };
     return {
       switchFrame,
       holdAvatar,
@@ -435,7 +463,7 @@ export default {
       playVideo,
       openVolumePopup,
       toggleVideoLoop,
-      restartVideo
+      restartVideo,
     };
   },
 };
@@ -466,7 +494,7 @@ export default {
       width: 100px;
       white-space: nowrap;
 
-      >button {
+      > button {
         justify-content: start;
         padding-left: 12px;
       }

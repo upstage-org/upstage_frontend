@@ -12,11 +12,7 @@
             <p class="modal-card-title">
               <slot name="header" />
             </p>
-            <button
-              class="delete"
-              aria-label="close"
-              @click="closeModal"
-            ></button>
+            <button class="delete" aria-label="close" @click="closeModal"></button>
           </header>
           <section v-if="$slots.content" class="modal-card-body">
             <slot name="content" :close-modal="closeModal" />
@@ -47,7 +43,7 @@ export default {
     styles: {
       type: String,
       default: null,
-    }
+    },
   },
   emits: ["update:modelValue"],
   setup: (props, { emit }) => {

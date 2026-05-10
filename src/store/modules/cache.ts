@@ -48,9 +48,7 @@ export default {
         await refresh();
         if (nodes.value) {
           nodes.value.forEach((node) => {
-            node.attributes.forEach(
-              (attr) => (node[attr.name] = attr.description),
-            );
+            node.attributes.forEach((attr) => (node[attr.name] = attr.description));
           });
         }
         commit("SET_STAGE_LIST", nodes);

@@ -37,13 +37,9 @@ export default {
         mqttClient.connect().on("connect", () => {
           const topicChat = namespaceTopic(TOPICS.CHAT, route.params.url);
           if (props.option == "public-chat") {
-            mqttClient
-              .sendMessage(topicChat, { clear: true }, true)
-              .then(resolve);
+            mqttClient.sendMessage(topicChat, { clear: true }, true).then(resolve);
           } else {
-            mqttClient
-              .sendMessage(topicChat, { clearPlayerChat: true }, true)
-              .then(resolve);
+            mqttClient.sendMessage(topicChat, { clearPlayerChat: true }, true).then(resolve);
           }
         });
       });
@@ -55,9 +51,7 @@ export default {
       }
     };
 
-    const clearChatVisibility = computed(
-      () => store.state.stage.showClearChatSetting,
-    );
+    const clearChatVisibility = computed(() => store.state.stage.showClearChatSetting);
 
     return { clearChat, clearing, clearChatVisibility };
   },

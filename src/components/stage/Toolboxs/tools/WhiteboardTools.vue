@@ -81,8 +81,7 @@ export default {
     const isDrawing = computed(() => {
       return store.state.stage.preferences.isDrawing;
     });
-    const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } =
-      useDrawable();
+    const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } = useDrawable();
 
     onMounted(() => {
       store.commit("stage/UPDATE_IS_DRAWING", true);

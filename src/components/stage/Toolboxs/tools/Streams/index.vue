@@ -1,10 +1,7 @@
 <template>
-  <div
-    v-for="video in videos"
-    :key="video"
-  >
+  <div v-for="video in videos" :key="video">
     <img class="overlay" src="/img/videoloading.gif" />
-    <div style="z-index: 1;">
+    <div style="z-index: 1">
       <Skeleton :data="video">
         <video :src="video.url"></video>
       </Skeleton>
@@ -40,9 +37,9 @@ export default {
 
 <style lang="scss" scoped>
 @mixin gradientText($from, $to) {
-    background: linear-gradient(to top, $from, $to);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  background: linear-gradient(to top, $from, $to);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 .fas.fa-plus {
   @include gradientText(#30ac45, #6fb1fc);

@@ -32,14 +32,11 @@ import { editingMediaVar, inquiryVar } from "apollo";
 import MediaPermissions from "./MediaPermissions.vue";
 import AvatarVoice from "./AvatarVoice.vue";
 import PropLink from "./PropLink.vue";
-import {
-  getDefaultAvatarVoice,
-  getDefaultVariant,
-} from "services/speech/voice";
+import { getDefaultAvatarVoice, getDefaultVariant } from "services/speech/voice";
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 
-const model = defineModel()
+const model = defineModel();
 const files = inject<Ref<UploadFile[]>>("files");
 
 const { result: editingMediaResult, refetch } = useQuery<{
@@ -64,21 +61,19 @@ const { result: usersResult } = useQuery<{ users: User[] }>(gql`
 const users = computed(() => usersResult.value?.users || []);
 
 // Add these reactive variables for filtering
-const searchValue = ref('');
+const searchValue = ref("");
 const filteredUsers = computed(() => {
   if (!searchValue.value) {
     return users.value;
   }
-  
+
   const search = searchValue.value.toLowerCase();
-  return users.value.filter(user => {
+  return users.value.filter((user) => {
     const displayName = getUserDisplayName(user).toLowerCase();
-    const username = user.username?.toLowerCase() || '';
-    const email = user.email?.toLowerCase() || '';
-    
-    return displayName.includes(search) || 
-           username.includes(search) || 
-           email.includes(search);
+    const username = user.username?.toLowerCase() || "";
+    const email = user.email?.toLowerCase() || "";
+
+    return displayName.includes(search) || username.includes(search) || email.includes(search);
   });
 });
 
@@ -90,7 +85,7 @@ const handleSearch = (value: string) => {
 // Clear search when dropdown closes
 const handleDropdownVisibleChange = (open: boolean) => {
   if (!open) {
-    searchValue.value = '';
+    searchValue.value = "";
   }
 };
 
@@ -177,11 +172,7 @@ const handleFrameClick = ({ event, index }: { event: any; index: number }) => {
     Modal.confirm({
       title: "Are you sure you want to remove this frame?",
       icon: createVNode(ExclamationCircleOutlined),
-      content: createVNode(
-        "div",
-        { style: "color: orange;" },
-        "There is no undo!"
-      ),
+      content: createVNode("div", { style: "color: orange;" }, "There is no undo!"),
       onOk() {
         files.value = filesCopy.filter((_, i) => i !== index);
         if (files.value.length === 1) {
@@ -200,7 +191,7 @@ const handleClose = () => {
     if (editingMediaResult.value) {
       editingMediaVar(undefined);
       files.value = [];
-      editingMediaResult.value = undefined
+      editingMediaResult.value = undefined;
       refetch();
     } else {
       Modal.confirm({
@@ -209,11 +200,11 @@ const handleClose = () => {
         content: createVNode(
           "div",
           { style: "color: orange;" },
-          "All selected frames will be lost, there is no undo!"
+          "All selected frames will be lost, there is no undo!",
         ),
         onOk() {
           files.value = [];
-          editingMediaResult.value = undefined
+          editingMediaResult.value = undefined;
         },
         okButtonProps: {
           danger: true,
@@ -239,18 +230,16 @@ const { result, loading } = useQuery<StudioGraph>(
     }
   `,
   null,
-  { fetchPolicy: "cache-only" }
+  { fetchPolicy: "cache-only" },
 );
 const mediaTypes = computed(() => {
   if (result.value?.mediaTypes) {
     return result.value.mediaTypes
       .filter(
         (node) =>
-          !(
-            editingMediaResult.value
-              ? ["media", "video", "shape"]
-              : ["media", "shape"]
-          ).includes(node.name.toLowerCase())
+          !(editingMediaResult.value ? ["media", "video", "shape"] : ["media", "shape"]).includes(
+            node.name.toLowerCase(),
+          ),
       )
       .map((node) => ({ label: capitalize(node.name), value: node.name }));
   }
@@ -283,11 +272,11 @@ const { progress, saveMedia, saving } = useSaveMedia(
   (id) => {
     if (files && refresh) {
       editingMediaVar(undefined);
-      editingMediaResult.value = undefined
+      editingMediaResult.value = undefined;
       files.value = [];
       refresh();
     }
-  }
+  },
 );
 const { loading: deleting, mutate: deleteMedia } = useMutation(gql`
   mutation deleteMedia($id: ID!) {
@@ -298,11 +287,7 @@ const { loading: deleting, mutate: deleteMedia } = useMutation(gql`
   }
 `);
 watch(files as Ref, ([firstFile]) => {
-  if (
-    firstFile &&
-    firstFile.status === "local" &&
-    firstFile.file.type.includes("audio")
-  ) {
+  if (firstFile && firstFile.status === "local" && firstFile.file.type.includes("audio")) {
     type.value = "audio";
   } else if (
     firstFile &&
@@ -369,8 +354,7 @@ const handleImageLoad = (e: Event, index: number) => {
 };
 const handleVideoLoad = (e: any) => {
   if (e.target) {
-    const { videoWidth: width, videoHeight: height } =
-      e.target as HTMLVideoElement;
+    const { videoWidth: width, videoHeight: height } = e.target as HTMLVideoElement;
     if (width > height) {
       frameSize.value = {
         width: 100,
@@ -408,7 +392,7 @@ const handleReplace = (): void => {
     visibleDropzone.value = true;
   }
   model.value = true;
-}
+};
 
 const { loading: dormanting, mutate: updateStatus } = useMutation(gql`
   mutation updateMediaStatus($id: ID!, $status: MediaStatusEnum!) {
@@ -421,9 +405,7 @@ const { loading: dormanting, mutate: updateStatus } = useMutation(gql`
 const onUpdateStatus = async () => {
   const res = await updateStatus({
     id: editingMediaResult.value?.editingMedia?.id,
-    status: editingMediaResult.value?.editingMedia.dormant
-      ? "Active"
-      : "Dormant",
+    status: editingMediaResult.value?.editingMedia.dormant ? "Active" : "Dormant",
   });
   if (res?.data.updateMediaStatus) {
     message.success(res?.data.updateMediaStatus.message);
@@ -461,7 +443,11 @@ const getUserDisplayName = (user: User) => {
             v-model:value="type"
             style="min-width: 110px"
           ></a-select>
-          <a-input data-testid="media-form-name" v-model:value="name" :placeholder="mediaName"></a-input>
+          <a-input
+            data-testid="media-form-name"
+            v-model:value="name"
+            :placeholder="mediaName"
+          ></a-input>
         </a-input-group>
         <template v-if="!['video', 'audio'].includes(type)">
           <a-button type="primary" @click="visibleDropzone = true">
@@ -497,12 +483,7 @@ const getUserDisplayName = (user: User) => {
           >
             <Icon
               src="replace.webp"
-              style="
-                width: 14px;
-                height: 14px;
-                margin-right: 8px;
-                margin-bottom: 3px;
-              "
+              style="width: 14px; height: 14px; margin-right: 8px; margin-bottom: 3px"
             />
             Replace
           </a-button>
@@ -525,12 +506,7 @@ const getUserDisplayName = (user: User) => {
               >
                 <Icon
                   src="icons8-sun.svg"
-                  style="
-                    width: 14px;
-                    height: 14px;
-                    margin-right: 8px;
-                    margin-bottom: 3px;
-                  "
+                  style="width: 14px; height: 14px; margin-right: 8px; margin-bottom: 3px"
                 />
                 Active
               </a-button>
@@ -548,14 +524,10 @@ const getUserDisplayName = (user: User) => {
               <template #title>
                 <div>
                   <p>Are you sure you want to make this media as dormant?</p>
-                  <p>
-                    It will be available for any replay recordings that require it,
-                  </p>
+                  <p>It will be available for any replay recordings that require it,</p>
                   <p>but you will not see it in your Media list.</p>
                   <p>Only an Admin can see it and reactivate it.</p>
-                  <p>
-                    If it isn't needed, please delete it rather than making it dormant.
-                  </p>
+                  <p>If it isn't needed, please delete it rather than making it dormant.</p>
                 </div>
               </template>
 
@@ -566,12 +538,7 @@ const getUserDisplayName = (user: User) => {
               >
                 <Icon
                   src="icons8-sun.svg"
-                  style="
-                    width: 14px;
-                    height: 14px;
-                    margin-right: 8px;
-                    margin-bottom: 3px;
-                  "
+                  style="width: 14px; height: 14px; margin-right: 8px; margin-bottom: 3px"
                 />
                 Dormant
               </a-button>
@@ -601,16 +568,8 @@ const getUserDisplayName = (user: User) => {
     </template>
     <a-row :gutter="12">
       <a-col :span="6">
-        <div
-          class="bg-gray-200 flex items-center justify-center h-full"
-          style="max-height: 600px"
-        >
-          <audio
-            v-if="type === 'audio'"
-            controls
-            class="w-48"
-            :key="files?.[0]?.preview"
-          >
+        <div class="bg-gray-200 flex items-center justify-center h-full" style="max-height: 600px">
+          <audio v-if="type === 'audio'" controls class="w-48" :key="files?.[0]?.preview">
             <source v-if="files && files.length" :src="files[0].preview" />
             Your browser does not support the audio element.
           </audio>
@@ -639,12 +598,7 @@ const getUserDisplayName = (user: User) => {
             :class="{ 'cursor-not-allowed': clearMode }"
             @sort-start="handleFrameClick"
           >
-            <SlickItem
-              v-for="(file, i) in files"
-              :key="file.id"
-              :index="i"
-              style="z-index: 99999"
-            >
+            <SlickItem v-for="(file, i) in files" :key="file.id" :index="i" style="z-index: 99999">
               <div class="my-2 px-8 text-center">
                 <img
                   show-handle
@@ -659,9 +613,7 @@ const getUserDisplayName = (user: User) => {
         <a-alert
           v-if="files!.length > 1"
           :message="
-            clearMode
-              ? 'Click a frame to remove it'
-              : 'Drag a frame to reorder its position'
+            clearMode ? 'Click a frame to remove it' : 'Drag a frame to reorder its position'
           "
           :type="clearMode ? 'error' : 'success'"
           show-icon
@@ -688,11 +640,7 @@ const getUserDisplayName = (user: User) => {
             <a-tab-pane v-if="type === 'avatar'" key="voice" tab="Voice">
               <AvatarVoice :voice="voice" />
             </a-tab-pane>
-            <a-tab-pane
-              v-if="type === 'avatar' || type === 'prop'"
-              key="link"
-              tab="Link"
-            >
+            <a-tab-pane v-if="type === 'avatar' || type === 'prop'" key="link" tab="Link">
               <PropLink :link="link" />
             </a-tab-pane>
             <a-tab-pane key="changeowner" tab="Change Owner">
@@ -707,11 +655,13 @@ const getUserDisplayName = (user: User) => {
                     :filter-option="false"
                     @search="handleSearch"
                     @dropdown-visible-change="handleDropdownVisibleChange"
-                    :options="filteredUsers.map(user => ({
-                      value: user.username,
-                      label: getUserDisplayName(user),
-                      key: user.id
-                    }))"
+                    :options="
+                      filteredUsers.map((user) => ({
+                        value: user.username,
+                        label: getUserDisplayName(user),
+                        key: user.id,
+                      }))
+                    "
                   />
                 </a-form-item>
               </div>

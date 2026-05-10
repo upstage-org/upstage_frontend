@@ -69,8 +69,7 @@ export default {
     const closeMenu = () => (isActive.value = false);
 
     const contextAppear = (el) => {
-      const { width, height, right, bottom } =
-        el?.getBoundingClientRect() ?? {};
+      const { width, height, right, bottom } = el?.getBoundingClientRect() ?? {};
       if (right > window.innerWidth - props.padRight) {
         position.x = position.x - width;
       }

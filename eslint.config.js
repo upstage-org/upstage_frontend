@@ -72,10 +72,7 @@ export default [
       "vue/no-mutating-props": "warn",
       "vue/require-default-prop": "off",
       "vue/component-name-in-template-casing": ["warn", "PascalCase"],
-      "vue/component-tags-order": [
-        "warn",
-        { order: ["script", "template", "style"] },
-      ],
+      "vue/component-tags-order": ["warn", { order: ["script", "template", "style"] }],
     },
   },
   {

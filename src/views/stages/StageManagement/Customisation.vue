@@ -43,8 +43,7 @@
                   { value: 'fade', label: 'Fades in and out' },
                   {
                     value: 'close',
-                    label:
-                      'Closes from the sides in and opens from the middle out',
+                    label: 'Closes from the sides in and opens from the middle out',
                   },
                 ]"
                 :render-value="(item) => item.value"
@@ -85,28 +84,21 @@
           <h3 class="title">{{ $t("default_backgroundcolor") }}</h3>
         </td>
         <td>
-          <ColorPicker
-            v-model="defaultcolor"
-            @update:modelValue="sendBackdropColor"
-          />
+          <ColorPicker v-model="defaultcolor" @update:modelValue="sendBackdropColor" />
         </td>
       </tr>
       <tr>
         <td>
           <h3 class="title">
             Stage Ratio
-            <span v-if="selectedRatio"
-              >: {{ selectedRatio.width }}/{{ selectedRatio.height }}</span
-            >
+            <span v-if="selectedRatio">: {{ selectedRatio.width }}/{{ selectedRatio.height }}</span>
           </h3>
         </td>
         <td>
           <div class="columns">
             <div class="column is-3">
               <Selectable
-                :selected="
-                  selectedRatio.width == 4 && selectedRatio.height == 3
-                "
+                :selected="selectedRatio.width == 4 && selectedRatio.height == 3"
                 @select="
                   selectedRatio.width = 4;
                   selectedRatio.height = 3;
@@ -119,9 +111,7 @@
             </div>
             <div class="column is-3">
               <Selectable
-                :selected="
-                  selectedRatio.width == 16 && selectedRatio.height == 9
-                "
+                :selected="selectedRatio.width == 16 && selectedRatio.height == 9"
                 @select="
                   selectedRatio.width = 16;
                   selectedRatio.height = 9;
@@ -134,9 +124,7 @@
             </div>
             <div class="column is-3">
               <Selectable
-                :selected="
-                  selectedRatio.width == 2 && selectedRatio.height == 1
-                "
+                :selected="selectedRatio.width == 2 && selectedRatio.height == 1"
                 @select="
                   selectedRatio.width = 2;
                   selectedRatio.height = 1;
@@ -151,9 +139,7 @@
               <div
                 class="box size-option has-primary-background"
                 :style="{
-                  'padding-bottom': `${
-                    (selectedRatio.height * 100) / selectedRatio.width
-                  }%`,
+                  'padding-bottom': `${(selectedRatio.height * 100) / selectedRatio.width}%`,
                 }"
               >
                 <div>
@@ -230,26 +216,26 @@ export default {
           refresh(stage.value.id);
         },
         stage.value.id,
-        configData
+        configData,
       );
       const mqtt = buildClient();
       const client = mqtt.connect();
-      client.publish(namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
-        JSON.stringify(
-          {
-            type: "setBackdropColor",
-            color: defaultcolor.value,
-          }),
-          { qos: 1, retain: false },
-          (error, res) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(res);
-              mqtt.disconnect();
-            }
+      client.publish(
+        namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
+        JSON.stringify({
+          type: "setBackdropColor",
+          color: defaultcolor.value,
+        }),
+        { qos: 1, retain: false },
+        (error, res) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(res);
+            mqtt.disconnect();
           }
-        );
+        },
+      );
     };
 
     const sendBackdropColor = (color) => {

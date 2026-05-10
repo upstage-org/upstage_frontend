@@ -1,6 +1,8 @@
 <template>
   <div class="columns is-mobile is-centered is-vcentered foyer-background">
-    <div class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen">
+    <div
+      class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen"
+    >
       <form @submit.prevent="submit">
         <div class="card">
           <header class="card-header">
@@ -10,12 +12,28 @@
           </header>
           <div class="card-content">
             <div class="content">
-              <Field v-model="form.username" left="fas fa-user" placeholder="Username" required
-                requiredMessage="Username is required" :touched="touched" />
-              <Password v-model="form.password" left="fas fa-lock" placeholder="Password" required
-                requiredMessage="Password is required" :touched="touched" />
-              <Password v-model="form.confirmPassword" left="fas fa-lock" placeholder="Confirm Password"
-                :error="confirmPasswordError" />
+              <Field
+                v-model="form.username"
+                left="fas fa-user"
+                placeholder="Username"
+                required
+                requiredMessage="Username is required"
+                :touched="touched"
+              />
+              <Password
+                v-model="form.password"
+                left="fas fa-lock"
+                placeholder="Password"
+                required
+                requiredMessage="Password is required"
+                :touched="touched"
+              />
+              <Password
+                v-model="form.confirmPassword"
+                left="fas fa-lock"
+                placeholder="Confirm Password"
+                :error="confirmPasswordError"
+              />
               <div class="columns">
                 <div class="column pr-0 pb-0">
                   <Field v-model="form.firstName" left="fas fa-user" placeholder="First Name" />
@@ -24,22 +42,42 @@
                   <Field v-model="form.lastName" placeholder="Last Name" />
                 </div>
               </div>
-              <Field v-model="form.email" left="fas fa-envelope" placeholder="Email" type="email" required
-                requiredMessage="Email is required" :touched="touched" />
-              <Field v-model="form.intro"
-                placeholder="Please say briefly who you are and why you would like an UpStage account." type="textarea"
-                required requiredMessage="Introduction is required" :touched="touched" />
+              <Field
+                v-model="form.email"
+                left="fas fa-envelope"
+                placeholder="Email"
+                type="email"
+                required
+                requiredMessage="Email is required"
+                :touched="touched"
+              />
+              <Field
+                v-model="form.intro"
+                placeholder="Please say briefly who you are and why you would like an UpStage account."
+                type="textarea"
+                required
+                requiredMessage="Introduction is required"
+                :touched="touched"
+              />
               <label class="checkbox">
                 <input type="checkbox" v-model="agreed" />
                 {{ $t("tos.register") }}
                 <TermsOfService />.
               </label>
-              <turnstile v-if="isProduction" ref="captcha" :site-key="siteKey" v-model="form.token" />
+              <turnstile
+                v-if="isProduction"
+                ref="captcha"
+                :site-key="siteKey"
+                v-model="form.token"
+              />
             </div>
           </div>
           <footer class="card-footer">
-            <button class="card-footer-item is-white button has-text-primary" :class="{ 'is-loading': loading }"
-              type="submit">
+            <button
+              class="card-footer-item is-white button has-text-primary"
+              :class="{ 'is-loading': loading }"
+              type="submit"
+            >
               <span>{{ $t("register") }}</span>
               <span class="icon is-medium">
                 <i class="fas fa-check"></i>
@@ -73,7 +111,9 @@ export default {
     const confirmPasswordError = computed(() =>
       form.password !== form.confirmPassword
         ? "Confirm password mismatch"
-        : ((form.password || "").length < 8 ? "Make your password at least 8 characters long" : false),
+        : (form.password || "").length < 8
+          ? "Make your password at least 8 characters long"
+          : false,
     );
     const touched = ref(false);
     const agreed = ref(false);
@@ -81,17 +121,18 @@ export default {
 
     const submit = async () => {
       touched.value = true;
-      if (!form.username || !form.password || !form.email || (form.password || "").length < 8) return;
+      if (!form.username || !form.password || !form.email || (form.password || "").length < 8)
+        return;
       if (confirmPasswordError.value) return;
-      if(form.username.length < 2) {
+      if (form.username.length < 2) {
         message.error("Make your user name at least 2 characters long");
         return;
       }
-      if (configs.MODE === 'Production' && !form.token) {
-        return
+      if (configs.MODE === "Production" && !form.token) {
+        return;
       }
-      if (configs.MODE !== 'Production') {
-        form["token"] = null
+      if (configs.MODE !== "Production") {
+        form["token"] = null;
       }
       if (!agreed.value) {
         message.error("Please agree to the Terms & Conditions");
@@ -127,7 +168,7 @@ export default {
       touched,
       agreed,
       siteKey: configs.CLOUDFLARE_CAPTCHA_SITEKEY,
-      isProduction: configs.MODE === 'Production',
+      isProduction: configs.MODE === "Production",
       captcha,
     };
   },

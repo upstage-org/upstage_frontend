@@ -1,6 +1,9 @@
 <template>
   <div v-if="saved">
-    <router-link :to="`/replay/${stage.fileLocation}/${saved.id}`" class="button is-small is-light is-success">
+    <router-link
+      :to="`/replay/${stage.fileLocation}/${saved.id}`"
+      class="button is-small is-light is-success"
+    >
       <span class="icon is-small">
         <i class="fas fa-play"></i>
       </span>
@@ -40,8 +43,8 @@
       <p>
         <i class="fas fa-exclamation-triangle has-text-warning"></i>
         By starting a recording, you acknowledge that the stage
-        <span class="has-text-danger">will be cleared!</span> You might wish to
-        save your scene before proceed.
+        <span class="has-text-danger">will be cleared!</span> You might wish to save your scene
+        before proceed.
       </p>
       <template #no>{{ $t("cancel") }}</template>
       <template #yes>
@@ -59,7 +62,10 @@
       </template>
     </CustomConfirm>
     <a-tooltip title="View recordings">
-      <router-link :to="`/stage-management/${stage.id}/archive`" class="button is-small is-light is-success">
+      <router-link
+        :to="`/stage-management/${stage.id}/archive`"
+        class="button is-small is-light is-success"
+      >
         <span class="icon is-small">
           <i class="fas fa-list"></i>
         </span>
@@ -115,25 +121,17 @@ export default {
       if (recording) {
         const name = recording.name;
         const from = dayjs.utc(recording.createdOn);
-        const duration = humanizeDuration(
-          now.value.diff(from, "milliseconds"),
-          {
-            round: true,
-          },
-        );
+        const duration = humanizeDuration(now.value.diff(from, "milliseconds"), {
+          round: true,
+        });
         return `${name} - ${duration}`;
       }
       return "";
     });
 
-    const { loading: deleting, save: deleteMutation } = useMutation(
-      stageGraph.deletePerformance,
-    );
+    const { loading: deleting, save: deleteMutation } = useMutation(stageGraph.deletePerformance);
     const deleteRecording = async (complete) => {
-      await deleteMutation(
-        "Recording deleted successfully!",
-        props.stage.activeRecording.id,
-      );
+      await deleteMutation("Recording deleted successfully!", props.stage.activeRecording.id);
       Object.assign(props.stage, {
         activeRecording: null,
       });
@@ -142,9 +140,7 @@ export default {
     };
 
     const saved = ref(false);
-    const { loading: saving, save: saveMutation } = useMutation(
-      stageGraph.saveRecording,
-    );
+    const { loading: saving, save: saveMutation } = useMutation(stageGraph.saveRecording);
     const saveRecording = async () => {
       await saveMutation(() => {
         notification.success("Recording saved successfully!");

@@ -1,11 +1,7 @@
 <template>
   <Object :object="object">
     <template #menu="slotProps">
-      <MenuContent
-        :object="object"
-        v-bind="slotProps"
-        v-model:active="active"
-      />
+      <MenuContent :object="object" v-bind="slotProps" v-model:active="active" />
     </template>
   </Object>
 </template>

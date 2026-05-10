@@ -1,35 +1,59 @@
 <template>
-  <div class="is-flex is-align-items-center is-justify-content-center skeleton" :class="{ dropzone }" draggable="true"
-    @dragstart="dragstart" @dragend="dragend" @dragenter.prevent @dragover.prevent="dropzone = true"
-    @dragleave.prevent="dropzone = false" @drop.prevent="drop" @touchmove="touchmove" @touchend="touchend"
-    @dblclick="hold" @mouseenter="showMovable" :style="{
+  <div
+    class="is-flex is-align-items-center is-justify-content-center skeleton"
+    :class="{ dropzone }"
+    draggable="true"
+    @dragstart="dragstart"
+    @dragend="dragend"
+    @dragenter.prevent
+    @dragover.prevent="dropzone = true"
+    @dragleave.prevent="dropzone = false"
+    @drop.prevent="drop"
+    @touchmove="touchmove"
+    @touchend="touchend"
+    @dblclick="hold"
+    @mouseenter="showMovable"
+    :style="{
       position: position.isDragging ? 'fixed' : 'static',
       width: position.isDragging ? '100px' : '100%',
       height: position.isDragging ? '100px' : '100%',
       top: position.y - topbarPosition.top + 'px',
       left: position.x - topbarPosition.left + 'px',
-    }" :title="data.name">
+    }"
+    :title="data.name"
+  >
     <slot v-if="$slots.default" />
     <SavedDrawing v-else-if="data.drawingId" :drawing="data" />
-    <p v-else-if="data.type === 'text'" :style="{
-      ...data,
-      transform: `scale(${76 / data.w})`,
-      'transform-origin': 0,
-      'max-width': '100%'
-    }" v-html="data.content"></p>
+    <p
+      v-else-if="data.type === 'text'"
+      :style="{
+        ...data,
+        transform: `scale(${76 / data.w})`,
+        'transform-origin': 0,
+        'max-width': '100%',
+      }"
+      v-html="data.content"
+    ></p>
     <div :title="`Stream key: ${data.name}`" class="is-fullwidth" v-else-if="data.type === 'video'">
       <Icon src="stream.svg" size="36" />
-      <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7);">{{ data.name }}</span>
+      <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7)">{{
+        data.name
+      }}</span>
     </div>
     <div v-else-if="data.type === 'meeting'" class="is-flex-grow-1 pt-2">
       <Icon src="meeting.svg" size="48" />
       <span class="tag is-light is-block stream-key">{{ data.name }}</span>
     </div>
-    <a-tooltip v-else-if="!data.src" :title=data.displayName>
-      <Icon src='meeting.svg' size="36" />
+    <a-tooltip v-else-if="!data.src" :title="data.displayName">
+      <Icon src="meeting.svg" size="36" />
     </a-tooltip>
     <Image v-else :src="data.src" />
-    <Icon v-if="data.multi" class="is-multi" title="This is a multiframe avatar" src="multi-frame.svg" />
+    <Icon
+      v-if="data.multi"
+      class="is-multi"
+      title="This is a multiframe avatar"
+      src="multi-frame.svg"
+    />
   </div>
 </template>
 
@@ -82,9 +106,7 @@ export default {
     };
 
     const dragend = () => {
-      document
-        .getElementById("meeting-room")
-        ?.classList.remove("disable-pointer");
+      document.getElementById("meeting-room")?.classList.remove("disable-pointer");
       if (props.real) {
         store.commit("stage/SET_ACTIVE_MOVABLE", null);
       }
@@ -102,14 +124,11 @@ export default {
 
     const touchend = () => {
       position.isDragging = false;
-      store.dispatch(
-        props.real ? "stage/shapeObject" : "stage/placeObjectOnStage",
-        {
-          ...props.data,
-          x: position.x,
-          y: position.y,
-        },
-      );
+      store.dispatch(props.real ? "stage/shapeObject" : "stage/placeObjectOnStage", {
+        ...props.data,
+        x: position.x,
+        y: position.y,
+      });
     };
 
     const holdable = computed(() => ["avatar"].includes(props.data.type));
@@ -148,7 +167,7 @@ export default {
 
     const dropzone = ref(false);
 
-    console.log(props.data)
+    console.log(props.data);
 
     return {
       dragstart,
@@ -174,19 +193,15 @@ export default {
 }
 
 .skeleton {
-  >* {
+  > * {
     transition-duration: 0.25s;
   }
 }
 
 .dropzone {
-  background: repeating-radial-gradient(circle,
-      green,
-      green 10px,
-      #007011 10px,
-      #007011 20px);
+  background: repeating-radial-gradient(circle, green, green 10px, #007011 10px, #007011 20px);
 
-  >* {
+  > * {
     transform: translateX(50%) !important;
   }
 }

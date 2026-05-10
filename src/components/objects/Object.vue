@@ -15,16 +15,23 @@
     Moving them onto the sized `.object` div fixes both without changing the
     pointer event path (clicks on the visible asset already bubble to .object).
   -->
-  <ContextMenu :pad-left="-stageSize.left" :pad-top="-stageSize.top" :pad-right="250" :opacity="0.8">
+  <ContextMenu
+    :pad-left="-stageSize.left"
+    :pad-top="-stageSize.top"
+    :pad-right="250"
+    :opacity="0.8"
+  >
     <template #trigger>
-      <div :style="{
-        position: 'absolute',
-        left: object.x + 'px',
-        top: object.y + 'px',
-        width: object.w + 'px',
-        height: object.h + 'px',
-        transform: `rotate(${object.rotate}deg)`,
-      }">
+      <div
+        :style="{
+          position: 'absolute',
+          left: object.x + 'px',
+          top: object.y + 'px',
+          width: object.w + 'px',
+          height: object.h + 'px',
+          transform: `rotate(${object.rotate}deg)`,
+        }"
+      >
         <OpacitySlider v-model:active="active" v-model:slider-mode="sliderMode" :object="object" />
         <QuickAction :object="object" v-model:active="active" />
         <Topping :object="object" v-model:active="active" />
@@ -41,11 +48,7 @@
           :style="{
             width: '100%',
             height: '100%',
-            cursor: controlable
-              ? 'grab'
-              : object.link && object.link.url
-                ? 'pointer'
-                : 'normal',
+            cursor: controlable ? 'grab' : object.link && object.link.url ? 'pointer' : 'normal',
             ...(activeMovable ? { position: 'relative', 'z-index': 1 } : {}),
           }"
           @keyup.delete="deleteObject"
@@ -54,11 +57,17 @@
           @dragstart.prevent
         >
           <slot name="render">
-            <video v-if="object.assetType?.name == 'video'" class="the-object-video" :src="object.url" ref="video"
-              preload="auto" @ended="object.isPlaying = false" :loop="object.loop"
+            <video
+              v-if="object.assetType?.name == 'video'"
+              class="the-object-video"
+              :src="object.url"
+              ref="video"
+              preload="auto"
+              @ended="object.isPlaying = false"
+              :loop="object.loop"
               @loadeddata="loadeddata"
               v-bind:id="'video' + object.id"
-              ></video>
+            ></video>
             <Image v-else class="the-object" :src="src" />
           </slot>
         </div>
@@ -66,8 +75,13 @@
     </template>
     <template #context="slotProps">
       <div v-if="isWearing || controlable">
-        <slot name="menu" v-bind="slotProps" :slider-mode="sliderMode"
-          :set-slider-mode="(mode) => (sliderMode = mode)" :keep-active="() => (active = true)" />
+        <slot
+          name="menu"
+          v-bind="slotProps"
+          :slider-mode="sliderMode"
+          :set-slider-mode="(mode) => (sliderMode = mode)"
+          :keep-active="() => (active = true)"
+        />
       </div>
     </template>
   </ContextMenu>
@@ -106,15 +120,11 @@ export default {
     const active = ref(false);
     const sliderMode = ref("opacity");
     const beforeDragPosition = ref();
-    const isHolding = computed(
-      () => props.object.holder?.id === store.state.stage.session,
-    );
+    const isHolding = computed(() => props.object.holder?.id === store.state.stage.session);
     const holdable = computed(() => ["avatar"].includes(props.object.type));
     const canPlay = computed(() => store.getters["stage/canPlay"]);
     const controlable = computed(() => {
-      return holdable.value
-        ? isHolding.value
-        : canPlay.value && !props.object.wornBy;
+      return holdable.value ? isHolding.value : canPlay.value && !props.object.wornBy;
     });
     provide("holdable", holdable);
 
@@ -136,13 +146,16 @@ export default {
           clearInterval(frameAnimation.interval);
           if (autoplayFrames) {
             frameAnimation.currentFrame = src;
-            frameAnimation.interval = setInterval(() => {
-              let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
-              if (nextFrame >= frames.length) {
-                nextFrame = 0;
-              }
-              frameAnimation.currentFrame = frames[nextFrame];
-            }, parseFloat(autoplayFrames) * 1000);
+            frameAnimation.interval = setInterval(
+              () => {
+                let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
+                if (nextFrame >= frames.length) {
+                  nextFrame = 0;
+                }
+                frameAnimation.currentFrame = frames[nextFrame];
+              },
+              parseFloat(autoplayFrames) * 1000,
+            );
           }
         },
         {
@@ -163,20 +176,14 @@ export default {
         store.dispatch("user/setAvatarId", props.object.id);
       }
     };
-    const activeMovable = computed(
-      () => store.getters["stage/activeMovable"] === props.object.id,
-    );
+    const activeMovable = computed(() => store.getters["stage/activeMovable"] === props.object.id);
 
     const isWearing = computed(
-      () =>
-        props.object.wornBy &&
-        store.getters["stage/currentAvatar"]?.id === props.object.wornBy,
+      () => props.object.wornBy && store.getters["stage/currentAvatar"]?.id === props.object.wornBy,
     );
     provide("isWearing", isWearing);
 
-    const hasLink = computed(
-      () => !canPlay.value && props.object.link && props.object.link.url,
-    );
+    const hasLink = computed(() => !canPlay.value && props.object.link && props.object.link.url);
     const openLink = () => {
       if (hasLink.value) {
         const { url, blank } = props.object.link;
@@ -224,7 +231,7 @@ export default {
       hasLink,
       openLink,
       loadeddata,
-      video
+      video,
     };
   },
 };

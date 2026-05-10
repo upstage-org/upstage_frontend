@@ -457,10 +457,7 @@ async function tailWait(page: Page, pace: PaceKind): Promise<void> {
  * that only care about idempotent cleanup ignore the return value, callers
  * that need the id (replay) treat null as "skip the next step".
  */
-async function sweepStageReturningId(
-  stageId: string,
-  adminToken: string,
-): Promise<number | null> {
+async function sweepStageReturningId(stageId: string, adminToken: string): Promise<number | null> {
   const result = await gql<{
     sweepStage: { success: boolean; performanceId: number | string };
   }>(
@@ -688,10 +685,9 @@ async function openAudienceSeat({
   // didn't dismiss it, that's a real LoginPrompt regression we want to
   // surface — fail loudly rather than let pass 2 run with the audience
   // staring at an opaque overlay.
-  await page.waitForFunction(
-    () => document.querySelectorAll(".modal.is-active").length === 0,
-    { timeout: 10_000 },
-  );
+  await page.waitForFunction(() => document.querySelectorAll(".modal.is-active").length === 0, {
+    timeout: 10_000,
+  });
   console.log("[perform] audience: LoginPrompt dismissed ✓ — board visible");
 
   return { context, page, live };
@@ -807,7 +803,12 @@ async function runReplay({
   await audience.page.waitForFunction(
     () => {
       type DevStore = {
-        state: { stage: { replay: { timestamp: { begin: number; end: number } }; model: { events?: unknown[] } } };
+        state: {
+          stage: {
+            replay: { timestamp: { begin: number; end: number } };
+            model: { events?: unknown[] };
+          };
+        };
       };
       const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
       const ts = store?.state?.stage?.replay?.timestamp;
@@ -928,55 +929,56 @@ async function runBeat({
     if (!ref) throw new Error(`${tag}: unknown backdrop key ${beat.backdrop}`);
 
     // 1. Persist via GraphQL.
-    await adminLive["page"].evaluate(async ({ stageId, mediaId }) => {
-      const raw = window.localStorage.getItem("vuex");
-      const token = raw ? (JSON.parse(raw)?.auth?.token ?? null) : null;
-      if (!token) throw new Error("no admin token in localStorage");
-      const gqlHeaders = {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      };
+    await adminLive["page"].evaluate(
+      async ({ stageId, mediaId }) => {
+        const raw = window.localStorage.getItem("vuex");
+        const token = raw ? (JSON.parse(raw)?.auth?.token ?? null) : null;
+        if (!token) throw new Error("no admin token in localStorage");
+        const gqlHeaders = {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        };
 
-      const stageResp = await fetch("/api/studio_graphql", {
-        method: "POST",
-        headers: gqlHeaders,
-        body: JSON.stringify({
-          query: `query StageBackdropAsset($id: ID!) {
+        const stageResp = await fetch("/api/studio_graphql", {
+          method: "POST",
+          headers: gqlHeaders,
+          body: JSON.stringify({
+            query: `query StageBackdropAsset($id: ID!) {
             stage(id: $id) {
               assets { id fileLocation }
             }
           }`,
-          variables: { id: String(stageId) },
-        }),
-      });
-      const stageJson = await stageResp.json();
-      if (stageJson.errors) throw new Error(JSON.stringify(stageJson.errors));
-      const assets = stageJson.data?.stage?.assets ?? [];
-      const asset = assets.find((a: { id: string }) => String(a.id) === String(mediaId));
-      if (!asset?.fileLocation) {
-        throw new Error(
-          `backdrop asset ${mediaId} not found on stage or missing fileLocation`,
-        );
-      }
+            variables: { id: String(stageId) },
+          }),
+        });
+        const stageJson = await stageResp.json();
+        if (stageJson.errors) throw new Error(JSON.stringify(stageJson.errors));
+        const assets = stageJson.data?.stage?.assets ?? [];
+        const asset = assets.find((a: { id: string }) => String(a.id) === String(mediaId));
+        if (!asset?.fileLocation) {
+          throw new Error(`backdrop asset ${mediaId} not found on stage or missing fileLocation`);
+        }
 
-      const resp = await fetch("/api/studio_graphql", {
-        method: "POST",
-        headers: gqlHeaders,
-        body: JSON.stringify({
-          query: `mutation SaveBackdropCover($input: StageInput!) {
+        const resp = await fetch("/api/studio_graphql", {
+          method: "POST",
+          headers: gqlHeaders,
+          body: JSON.stringify({
+            query: `mutation SaveBackdropCover($input: StageInput!) {
             updateStage(input: $input) { id cover }
           }`,
-          variables: {
-            input: {
-              id: String(stageId),
-              cover: asset.fileLocation,
+            variables: {
+              input: {
+                id: String(stageId),
+                cover: asset.fileLocation,
+              },
             },
-          },
-        }),
-      });
-      const result = await resp.json();
-      if (result.errors) throw new Error(JSON.stringify(result.errors));
-    }, { stageId: runtime.stageId, mediaId: ref.id });
+          }),
+        });
+        const result = await resp.json();
+        if (result.errors) throw new Error(JSON.stringify(result.errors));
+      },
+      { stageId: runtime.stageId, mediaId: ref.id },
+    );
 
     // 2. Broadcast over MQTT from the admin's seat. We pull the backdrop
     //    object straight out of `state.stage.tools.backdrops` because that
@@ -985,46 +987,47 @@ async function runBeat({
     //    multi-frame metadata. SET_BACKGROUND does change-detection on
     //    `id` and `at`, so a synthetic minimal object would risk being
     //    dropped on observers that already saw a same-id no-op.
-    await adminLive["page"].evaluate(async ({ mediaId }) => {
-      type Backdrop = Record<string, unknown> & { id: string | number };
-      type DevStore = {
-        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
-        state: { stage: { tools: { backdrops?: Backdrop[] }; status: string } };
-      };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
+    await adminLive["page"].evaluate(
+      async ({ mediaId }) => {
+        type Backdrop = Record<string, unknown> & { id: string | number };
+        type DevStore = {
+          dispatch: (type: string, payload?: unknown) => Promise<unknown>;
+          state: { stage: { tools: { backdrops?: Backdrop[] }; status: string } };
+        };
+        const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+        if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
 
-      const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+        const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-      // Toolbox is populated by SET_MODEL after `loadStage` resolves; on a
-      // freshly reloaded admin page it may not be there yet. Poll briefly.
-      let backdrop: Backdrop | undefined;
-      for (let attempt = 0; attempt < 60; attempt += 1) {
-        const list = store.state.stage.tools.backdrops ?? [];
-        backdrop = list.find((b) => String(b.id) === String(mediaId));
-        if (backdrop) break;
-        await sleep(250);
-      }
-      if (!backdrop) {
-        const ids = (store.state.stage.tools.backdrops ?? [])
-          .map((b) => String(b.id))
-          .join(", ");
-        throw new Error(
-          `setBackground: backdrop ${mediaId} not in admin tools.backdrops; available: [${ids}]`,
-        );
-      }
+        // Toolbox is populated by SET_MODEL after `loadStage` resolves; on a
+        // freshly reloaded admin page it may not be there yet. Poll briefly.
+        let backdrop: Backdrop | undefined;
+        for (let attempt = 0; attempt < 60; attempt += 1) {
+          const list = store.state.stage.tools.backdrops ?? [];
+          backdrop = list.find((b) => String(b.id) === String(mediaId));
+          if (backdrop) break;
+          await sleep(250);
+        }
+        if (!backdrop) {
+          const ids = (store.state.stage.tools.backdrops ?? []).map((b) => String(b.id)).join(", ");
+          throw new Error(
+            `setBackground: backdrop ${mediaId} not in admin tools.backdrops; available: [${ids}]`,
+          );
+        }
 
-      // setBackground stamps `at = +new Date()` itself before publishing,
-      // so we don't need to set it. MQTT must be LIVE on the admin page
-      // (it always is — admin has been on the stage since the start), but
-      // assert just in case so a regression here surfaces clearly.
-      if (store.state.stage.status !== "LIVE") {
-        throw new Error(
-          `setBackground: admin MQTT status=${store.state.stage.status}, expected LIVE`,
-        );
-      }
-      await store.dispatch("stage/setBackground", backdrop);
-    }, { mediaId: ref.id });
+        // setBackground stamps `at = +new Date()` itself before publishing,
+        // so we don't need to set it. MQTT must be LIVE on the admin page
+        // (it always is — admin has been on the stage since the start), but
+        // assert just in case so a regression here surfaces clearly.
+        if (store.state.stage.status !== "LIVE") {
+          throw new Error(
+            `setBackground: admin MQTT status=${store.state.stage.status}, expected LIVE`,
+          );
+        }
+        await store.dispatch("stage/setBackground", backdrop);
+      },
+      { mediaId: ref.id },
+    );
     return;
   }
 
@@ -1053,10 +1056,7 @@ async function runBeat({
     // in pass 2). The audience case is the load-bearing one: it proves the
     // PLACE_OBJECT_ON_STAGE MQTT broadcast reached an unauthenticated client.
     await expect
-      .poll(
-        async () => await viewerLive.objectByName(mediaRef.name).count(),
-        { timeout: 12_000 },
-      )
+      .poll(async () => await viewerLive.objectByName(mediaRef.name).count(), { timeout: 12_000 })
       .toBeGreaterThan(0);
     return;
   }
@@ -1109,13 +1109,12 @@ async function runBeat({
       // log. We sample the first few words of the line; for shouts,
       // speakAsAvatar uppercases the message, so we check both forms.
       const expectedPrefix = beat.line.split(/\s+/).slice(0, 4).join(" ");
-      const needles = beat.kind === "shout"
-        ? [expectedPrefix, expectedPrefix.toUpperCase()]
-        : [expectedPrefix];
+      const needles =
+        beat.kind === "shout" ? [expectedPrefix, expectedPrefix.toUpperCase()] : [expectedPrefix];
       for (const needle of needles) {
-        await expect(
-          viewerLive.chatLogEntryFor(mediaRef.name, needle),
-        ).toHaveCount(0, { timeout: 1_000 });
+        await expect(viewerLive.chatLogEntryFor(mediaRef.name, needle)).toHaveCount(0, {
+          timeout: 1_000,
+        });
       }
     }
     return;
@@ -1280,7 +1279,11 @@ async function moveAvatar({
   await seat.page.evaluate(
     async ({ mediaName, to }) => {
       type StageSlice = {
-        board: { objects: Array<Record<string, unknown> & { id: string; name?: string; published?: boolean }> };
+        board: {
+          objects: Array<
+            Record<string, unknown> & { id: string; name?: string; published?: boolean }
+          >;
+        };
       };
       type DevStore = {
         dispatch: (type: string, payload?: unknown) => Promise<unknown>;
@@ -1299,16 +1302,12 @@ async function moveAvatar({
       // settled. Poll briefly so we don't race the placement.
       let target: (Record<string, unknown> & { id: string; published?: boolean }) | undefined;
       for (let attempt = 0; attempt < 40; attempt += 1) {
-        target = store.state.stage.board.objects.find(
-          (o) => o.name === mediaName,
-        );
+        target = store.state.stage.board.objects.find((o) => o.name === mediaName);
         if (target) break;
         await sleep(150);
       }
       if (!target) {
-        throw new Error(
-          `move: object name=${mediaName} not in board.objects on this seat`,
-        );
+        throw new Error(`move: object name=${mediaName} not in board.objects on this seat`);
       }
 
       // shapeObject with liveAction: true emits BOARD_ACTIONS.MOVE_TO when the

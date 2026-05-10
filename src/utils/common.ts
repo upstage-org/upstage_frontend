@@ -39,10 +39,7 @@ export function humanFileSize(bytes: number, si = false, dp = 1) {
   do {
     bytes /= thresh;
     ++u;
-  } while (
-    Math.round(Math.abs(bytes) * r) / r >= thresh &&
-    u < units.length - 1
-  );
+  } while (Math.round(Math.abs(bytes) * r) / r >= thresh && u < units.length - 1);
 
   return bytes.toFixed(dp) + " " + units[u];
 }
@@ -57,17 +54,13 @@ export function titleCase(str: string) {
   }
   var splitStr = str.toLowerCase().replace(/_/g, " ").split(" ");
   for (var i = 0; i < splitStr.length; i++) {
-    splitStr[i] =
-      splitStr[i].charAt(0).toUpperCase() + splitStr[i].substring(1);
+    splitStr[i] = splitStr[i].charAt(0).toUpperCase() + splitStr[i].substring(1);
   }
   return splitStr.join(" ");
 }
 
 export function displayName(
-  user: Pick<
-    any | LegacyUser,
-    "displayName" | "firstName" | "lastName" | "username"
-  >,
+  user: Pick<any | LegacyUser, "displayName" | "firstName" | "lastName" | "username">,
 ) {
   if (!user) return "";
   if (user.displayName?.trim()) return user.displayName;
@@ -169,12 +162,8 @@ export function linkify(inputText: string) {
   var replacedText, replacePattern1, replacePattern2, replacePattern3;
 
   //URLs starting with http://, https://, or ftp://
-  replacePattern1 =
-    /(\b(https?|ftp):\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gim;
-  replacedText = inputText.replace(
-    replacePattern1,
-    '<a href="$1" target="_blank">$1</a>',
-  );
+  replacePattern1 = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gim;
+  replacedText = inputText.replace(replacePattern1, '<a href="$1" target="_blank">$1</a>');
 
   //URLs starting with "www." (without // before it, or it'd re-link the ones done above).
   replacePattern2 = /(^|[^/])(www\.[\S]+(\b|$))/gim;
@@ -185,10 +174,7 @@ export function linkify(inputText: string) {
 
   //Change email addresses to mailto:: links.
   replacePattern3 = /(([a-zA-Z0-9\-_.])+@[a-zA-Z_]+?(\.[a-zA-Z]{2,6})+)/gim;
-  replacedText = replacedText.replace(
-    replacePattern3,
-    '<a href="mailto:$1">$1</a>',
-  );
+  replacedText = replacedText.replace(replacePattern3, '<a href="mailto:$1">$1</a>');
 
   return replacedText;
 }
@@ -201,14 +187,10 @@ export function outOfViewportPosition(el) {
   if (rect.left < 0) {
     return "left";
   }
-  if (
-    rect.bottom > (window.innerHeight || document.documentElement.clientHeight)
-  ) {
+  if (rect.bottom > (window.innerHeight || document.documentElement.clientHeight)) {
     return "bottom";
   }
-  if (
-    rect.right > (window.innerWidth || document.documentElement.clientWidth)
-  ) {
+  if (rect.right > (window.innerWidth || document.documentElement.clientWidth)) {
     return "right";
   }
   return false;
@@ -227,10 +209,10 @@ export function throttle(callback, limit) {
 }
 
 export function handleError(e) {
-  console.log("====e", e)
+  console.log("====e", e);
   if (e & e.response?.errors && e.response?.errors[0] && e.response?.errors[0].message) {
-    message.error(e.response?.errors[0].message)
+    message.error(e.response?.errors[0].message);
   } else {
-    message.error(typeof e == "string" ? e : "Error!")
+    message.error(typeof e == "string" ? e : "Error!");
   }
 }

@@ -85,7 +85,7 @@ export default {
             ...avatar,
             name: nickname,
           },
-          { root: true }
+          { root: true },
         );
       } else {
         commit("SET_NICK_NAME", nickname);
@@ -101,9 +101,7 @@ export default {
       commit("SET_LOADING_USER", true);
       try {
         const { currentUser } = await userGraph.currentUser();
-        return [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(
-          String(currentUser?.role)
-        );
+        return [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(String(currentUser?.role));
       } catch (error) {
         handleAuthFailure(error.message);
       } finally {
@@ -144,9 +142,7 @@ export default {
       return name;
     },
     isAdmin(state) {
-      return [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(
-        String(state.user?.role)
-      );
+      return [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(String(state.user?.role));
     },
     isGuest(state) {
       if (!state.user) {
@@ -162,9 +158,7 @@ export default {
     },
     avatar(state, getters, rootState) {
       if (state.avatarId) {
-        const avatar = rootState.stage.board.objects.find(
-          (o) => o.id === state.avatarId
-        );
+        const avatar = rootState.stage.board.objects.find((o) => o.id === state.avatarId);
         return avatar;
       }
     },

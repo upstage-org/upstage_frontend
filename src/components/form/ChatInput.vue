@@ -1,20 +1,39 @@
 <template>
   <a-tooltip :title="dynamicTooltip">
-    <div style="position: relative" class="has-tooltip-left" data-testid="chat-input" :data-chat-mode="behavior">
-      <ElasticInput v-if="!pickerOnly" v-bind="$attrs" :model-value="modelValue"
-        @update:model-value="$emit('update:modelValue', $event)" @ref="(el) => (input = el)" @submit="$emit('submit')"
+    <div
+      style="position: relative"
+      class="has-tooltip-left"
+      data-testid="chat-input"
+      :data-chat-mode="behavior"
+    >
+      <ElasticInput
+        v-if="!pickerOnly"
+        v-bind="$attrs"
+        :model-value="modelValue"
+        @update:model-value="$emit('update:modelValue', $event)"
+        @ref="(el) => (input = el)"
+        @submit="$emit('submit')"
         :style="{
-    'border-top-right-radius': '20px',
-    'border-bottom-right-radius': '20px',
-    'padding-right': '40px',
-  }" :class="dynamicClass" />
+          'border-top-right-radius': '20px',
+          'border-bottom-right-radius': '20px',
+          'padding-right': '40px',
+        }"
+        :class="dynamicClass"
+      />
       <div v-click-outside="() => (isPicking = false)" class="emoji-picker-wrapper">
-        <button type="button" class="button is-right clickable is-rounded" :class="{
-    'is-loading': loading,
-    'is-primary': !className,
-    [className]: true,
-    'picker-only': pickerOnly,
-  }" :disabled="loading" :style="style" @click="isPicking = !isPicking">
+        <button
+          type="button"
+          class="button is-right clickable is-rounded"
+          :class="{
+            'is-loading': loading,
+            'is-primary': !className,
+            [className]: true,
+            'picker-only': pickerOnly,
+          }"
+          :disabled="loading"
+          :style="style"
+          @click="isPicking = !isPicking"
+        >
           <slot name="icon">
             <span class="icon" v-if="!loading">
               <Icon size="48" src="emoji.svg" />
@@ -22,7 +41,12 @@
           </slot>
         </button>
         <transition :css="false" @enter="pickerEnter" @leave="pickerLeave">
-          <emoji-picker v-show="isPicking" :class="{ dark: chatDarkMode, light: !chatDarkMode }" :style="emojiPickerStyle" ref="emojiPicker" />
+          <emoji-picker
+            v-show="isPicking"
+            :class="{ dark: chatDarkMode, light: !chatDarkMode }"
+            :style="emojiPickerStyle"
+            ref="emojiPicker"
+          />
         </transition>
       </div>
     </div>
@@ -48,9 +72,7 @@ export default {
     const emojiPicker = ref();
     const store = useStore();
     const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const chatDarkMode = computed(
-      () => store.state.stage.settings.chatDarkMode,
-    );
+    const chatDarkMode = computed(() => store.state.stage.settings.chatDarkMode);
 
     const isHoldingShift = useHoldingShift();
 
@@ -63,10 +85,7 @@ export default {
         const value = props.modelValue ?? "";
         emit(
           "update:modelValue",
-          `${value.substring(0, start)}${unicode}${value.substring(
-            end,
-            value.length,
-          )}`,
+          `${value.substring(0, start)}${unicode}${value.substring(end, value.length)}`,
         );
       }
       if (!isHoldingShift.value) {
@@ -107,61 +126,61 @@ export default {
       }[behavior.value];
     });
 
-    // Detect chat position for responsive emoji picker  
+    // Detect chat position for responsive emoji picker
     const detectChatPosition = () => {
       return new Promise((resolve) => {
         nextTick(() => {
           // Find the closest chat container to this ChatInput
           let currentElement = input.value;
           let chatBox = null;
-          let chatPosition = 'right'; // Default fallback
-          
+          let chatPosition = "right"; // Default fallback
+
           // Traverse up the DOM to find the closest chat container
           while (currentElement && currentElement !== document.body) {
-            if (currentElement.id === 'player-chatbox') {
+            if (currentElement.id === "player-chatbox") {
               chatBox = currentElement;
-              console.log('🎭 Found PlayerChat container');
+              console.log("🎭 Found PlayerChat container");
               break;
             }
-            if (currentElement.id === 'chatbox') {
+            if (currentElement.id === "chatbox") {
               chatBox = currentElement;
-              console.log('💬 Found PublicChat container');
+              console.log("💬 Found PublicChat container");
               break;
             }
             currentElement = currentElement.parentElement;
           }
-          
+
           // Fallback: if not found in DOM traversal, use global detection
           if (!chatBox) {
-            console.log('🔍 Fallback to global detection...');
+            console.log("🔍 Fallback to global detection...");
             // Only use public chat as fallback since player chat should be within DOM tree
-            const publicChat = document.querySelector('#chatbox');
-            if (publicChat && window.getComputedStyle(publicChat).display !== 'none') {
+            const publicChat = document.querySelector("#chatbox");
+            if (publicChat && window.getComputedStyle(publicChat).display !== "none") {
               chatBox = publicChat;
-              console.log('💬 Fallback: Found PublicChat');
+              console.log("💬 Fallback: Found PublicChat");
             }
           }
-          
+
           if (chatBox) {
             const rect = chatBox.getBoundingClientRect();
             const windowWidth = window.innerWidth;
             const chatCenterX = rect.left + rect.width / 2;
-            
+
             console.log(`📏 Chat Box Info:`, {
               chatId: chatBox.id,
               left: rect.left,
               width: rect.width,
               centerX: chatCenterX,
               windowWidth,
-              centerOfScreen: windowWidth / 2
+              centerOfScreen: windowWidth / 2,
             });
-            
-            chatPosition = chatCenterX > windowWidth / 2 ? 'right' : 'left';
+
+            chatPosition = chatCenterX > windowWidth / 2 ? "right" : "left";
             console.log(`🎯 Chat Position: ${chatPosition}`);
           } else {
-            console.log('❌ No chat box found, using default');
+            console.log("❌ No chat box found, using default");
           }
-          
+
           console.log(`🎪 Final emoji picker position: ${chatPosition}`);
           resolve(chatPosition);
         });
@@ -169,42 +188,41 @@ export default {
     };
 
     const emojiPickerStyle = ref({});
-    
+
     const updateEmojiPickerPosition = async () => {
       const chatPosition = await detectChatPosition();
-      
+
       console.log(`🎨 Updating emoji picker for chat position: ${chatPosition}`);
-      
-      if (chatPosition === 'right') {
+
+      if (chatPosition === "right") {
         // Chat is on the right, emoji picker should open to the left
         emojiPickerStyle.value = {
-          '--emoji-transform-origin': 'bottom right',
-          right: '0px',
-          left: 'auto'
+          "--emoji-transform-origin": "bottom right",
+          right: "0px",
+          left: "auto",
         };
-        console.log('📝 Setting emoji picker to LEFT (chat on right)');
+        console.log("📝 Setting emoji picker to LEFT (chat on right)");
       } else {
         // Chat is on the left, emoji picker should open to the right
         emojiPickerStyle.value = {
-          '--emoji-transform-origin': 'bottom left',
-          left: '0px', 
-          right: 'auto'
+          "--emoji-transform-origin": "bottom left",
+          left: "0px",
+          right: "auto",
         };
-        console.log('📝 Setting emoji picker to RIGHT (chat on left)');
+        console.log("📝 Setting emoji picker to RIGHT (chat on left)");
       }
-      
-      console.log('🎯 Final style:', emojiPickerStyle.value);
+
+      console.log("🎯 Final style:", emojiPickerStyle.value);
     };
 
     const pickerEnter = async (el, complete) => {
       await updateEmojiPickerPosition();
       el.addEventListener("emoji-click", handleEmoji);
-      el.shadowRoot.querySelector("#search").placeholder =
-        'Hold "Shift" key to select multiple';
-      
+      el.shadowRoot.querySelector("#search").placeholder = 'Hold "Shift" key to select multiple';
+
       // Apply positioning to the element
       Object.assign(el.style, emojiPickerStyle.value);
-      
+
       animate(el, {
         scaleX: [0, 1],
         scaleY: [0, 1],

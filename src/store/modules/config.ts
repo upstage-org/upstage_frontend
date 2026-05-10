@@ -44,9 +44,7 @@ export default {
           const url = line.match(/\(([^)]+)\)/); // get the url part
           const role = line.match(/\(\d,\d\d\)/); // Role can access
           let title = line.replace(">", "");
-          title = title.includes("(")
-            ? title.split("(")[0].trim()
-            : title.trim(); // get the title part
+          title = title.includes("(") ? title.split("(")[0].trim() : title.trim(); // get the title part
           const menu = {
             title,
             url: url ? url[1] : null,

@@ -1,10 +1,16 @@
 <template>
   <transition :css="false" @enter="enter" @leave="leave">
-    <div id="player-chatbox" ref="theChatbox" v-show="playerChatVisibility" class="card is-light"
-      :class="{ collapsed, 'is-movingable': isMovingable }" :style="{
-    opacity,
-    fontSize,
-  }">
+    <div
+      id="player-chatbox"
+      ref="theChatbox"
+      v-show="playerChatVisibility"
+      class="card is-light"
+      :class="{ collapsed, 'is-movingable': isMovingable }"
+      :style="{
+        opacity,
+        fontSize,
+      }"
+    >
       <div class="actions">
         <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
           <span class="icon">
@@ -12,14 +18,19 @@
             <Icon v-else src="minimise.svg" size="24" class="mt-4" />
           </span>
         </button>
-        <button class="chat-setting button is-rounded is-outlined"
-          :class="{ 'has-background-primary-light': isMovingable }" @click="toggleMoveable">
+        <button
+          class="chat-setting button is-rounded is-outlined"
+          :class="{ 'has-background-primary-light': isMovingable }"
+          @click="toggleMoveable"
+        >
           <span class="icon">
             <Icon src="prop.svg" size="20" />
           </span>
         </button>
-        <button class="chat-setting button is-rounded is-outlined drag-icon-button"
-          @mousedown.prevent="startDrag">
+        <button
+          class="chat-setting button is-rounded is-outlined drag-icon-button"
+          @mousedown.prevent="startDrag"
+        >
           <span class="icon">
             <Icon src="movement-slider.svg" size="20" />
           </span>
@@ -39,15 +50,18 @@
                 </button>
               </a-tooltip>
               <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded" @click="decreaseFontSize()">
-                  ➖
-                </button>
+                <button class="button is-small is-rounded" @click="decreaseFontSize()">➖</button>
               </a-tooltip>
             </div>
           </div>
           <div class="control has-icons-right is-fullwidth">
-            <ChatInput v-model="chat.privateMessage" placeholder="Type message" :loading="loadingUser"
-              :disabled="isMovingable" @submit="sendChat" />
+            <ChatInput
+              v-model="chat.privateMessage"
+              placeholder="Type message"
+              :loading="loadingUser"
+              :disabled="isMovingable"
+              @submit="sendChat"
+            />
           </div>
         </div>
       </footer>
@@ -126,43 +140,37 @@ export default {
     onMounted(() => {
       moveable.on("drag", ({ target, left, top, height }) => {
         target.style.left = `${left}px`;
-        if (
-          top + height + 8 <
-          (window.innerHeight || document.documentElement.clientHeight)
-        ) {
+        if (top + height + 8 < (window.innerHeight || document.documentElement.clientHeight)) {
           target.style.top = `${top}px`;
         }
       });
-      moveable.on(
-        "resize",
-        ({ target, width, height, drag: { left, top } }) => {
-          // console.log(left, top);
-          if (width > 100) {
-            target.style.width = `${width}px`;
-          }
-          if (height > 160) {
-            target.style.height = `${height}px`;
-          }
-          target.style.left = `${left}px`;
-          target.style.top = `${top}px`;
-        },
-      );
+      moveable.on("resize", ({ target, width, height, drag: { left, top } }) => {
+        // console.log(left, top);
+        if (width > 100) {
+          target.style.width = `${width}px`;
+        }
+        if (height > 160) {
+          target.style.height = `${height}px`;
+        }
+        target.style.left = `${left}px`;
+        target.style.top = `${top}px`;
+      });
     });
 
     const collapsed = ref(false);
     const isMovingable = ref(false);
     const canDrag = ref(false);
-    
+
     const toggleMoveable = () => {
       moveable.setState({
         target: isMovingable.value ? null : theChatbox.value,
       });
       isMovingable.value = !isMovingable.value;
     };
-    
+
     const toggleDragMode = () => {
       canDrag.value = !canDrag.value;
-      
+
       // Disable moveable mode when enabling drag mode
       if (canDrag.value && isMovingable.value) {
         isMovingable.value = false;
@@ -170,9 +178,7 @@ export default {
       }
     };
 
-    const playerChatVisibility = computed(
-      () => store.state.stage.showPlayerChat,
-    );
+    const playerChatVisibility = computed(() => store.state.stage.showPlayerChat);
     const minimiseToToolbox = () => {
       store.dispatch("stage/showPlayerChat", false);
       moveable.setState({ target: null });
@@ -186,9 +192,7 @@ export default {
         playerFontSize: `${incValue}px`,
       };
       store.commit("stage/SET_PLAYER_CHAT_PARAMETERS", parameters);
-      setTimeout(
-        () => (theContent.value.scrollTop = theContent.value.scrollHeight),
-      );
+      setTimeout(() => (theContent.value.scrollTop = theContent.value.scrollHeight));
     };
 
     const decreaseFontSize = () => {
@@ -203,39 +207,37 @@ export default {
     // Click and drag functionality
     const startDrag = (e) => {
       e.preventDefault();
-      
+
       const chatbox = theChatbox.value;
       if (!chatbox) return;
-      
-      
+
       // Get current computed styles
       const rect = chatbox.getBoundingClientRect();
       let startX = e.clientX - rect.left;
       let startY = e.clientY - rect.top;
-      
+
       const handleMouseMove = (moveEvent) => {
         const newX = moveEvent.clientX - startX;
         const newY = moveEvent.clientY - startY;
-        
+
         // Boundary checks
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
         const clampedX = Math.max(0, Math.min(newX, windowWidth - rect.width));
         const clampedY = Math.max(0, Math.min(newY, windowHeight - rect.height));
-        
+
         chatbox.style.left = `${clampedX}px`;
         chatbox.style.top = `${clampedY}px`;
-        chatbox.style.position = 'fixed';
-        
+        chatbox.style.position = "fixed";
       };
-      
+
       const handleMouseUp = () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
       };
-      
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
     };
 
     return {
@@ -323,12 +325,12 @@ export default {
 
   .drag-icon-button {
     cursor: grab;
-    
+
     &:active {
       cursor: grabbing;
       background-color: rgba(255, 0, 0, 0.2) !important;
     }
-    
+
     &:hover {
       background-color: rgba(255, 0, 0, 0.1) !important;
     }

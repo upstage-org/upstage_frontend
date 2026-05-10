@@ -1,15 +1,7 @@
 <template>
   <div class="locale-changer m-3">
-    <a-select
-      v-model:value="$i18n.locale"
-      @update="persistLocale"
-      class="w-full"
-    >
-      <a-select-option
-        v-for="locale in $i18n.availableLocales"
-        :key="locale"
-        :value="locale"
-      >
+    <a-select v-model:value="$i18n.locale" @update="persistLocale" class="w-full">
+      <a-select-option v-for="locale in $i18n.availableLocales" :key="locale" :value="locale">
         {{ flags[locale] ?? "🏳️‍🌈" }} {{ labels[locale] ?? locale }}
       </a-select-option>
     </a-select>

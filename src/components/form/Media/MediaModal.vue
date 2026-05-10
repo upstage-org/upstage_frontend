@@ -5,7 +5,11 @@
       <footer class="modal-card-foot">
         <div class="columns is-fullwidth">
           <div class="column is-narrow">
-            <SaveButton @click="save" :loading="loading" :disabled="!form.name || !form.assetType" />
+            <SaveButton
+              @click="save"
+              :loading="loading"
+              :disabled="!form.name || !form.assetType"
+            />
           </div>
           <div class="column is-narrow">
             <Field horizontal label="Media Type">
@@ -33,30 +37,44 @@
         </template>
         <template #copyright>
           <HorizontalField title="Copyright Level">
-            <Dropdown v-model="form.copyrightLevel" :data="copyrightLevels" :render-label="(item) => item.name"
-              :render-value="(item) => item.value" :render-description="(item) => item.description" />
+            <Dropdown
+              v-model="form.copyrightLevel"
+              :data="copyrightLevels"
+              :render-label="(item) => item.name"
+              :render-value="(item) => item.value"
+              :render-description="(item) => item.description"
+            />
           </HorizontalField>
           <HorizontalField v-show="[2].includes(form.copyrightLevel)">
             <div style="margin-right: 32px">
-              <MultiTransferColumn :columns="['No access', 'Readonly access', 'Editor access']" :data="users"
-                :renderLabel="displayName" :renderValue="(item) => item.id" :renderKeywords="(item) =>
-                  `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
-                  " v-model="playerAccess" />
+              <MultiTransferColumn
+                :columns="['No access', 'Readonly access', 'Editor access']"
+                :data="users"
+                :renderLabel="displayName"
+                :renderValue="(item) => item.id"
+                :renderKeywords="
+                  (item) =>
+                    `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
+                "
+                v-model="playerAccess"
+              />
             </div>
           </HorizontalField>
         </template>
         <template #stages>
-          <MultiSelectList :loading="loadingAllStages" :data="availableStages" v-model="form.assignedStages"
-            :columnClass="() => 'is-12 p-0'">
+          <MultiSelectList
+            :loading="loadingAllStages"
+            :data="availableStages"
+            v-model="form.assignedStages"
+            :columnClass="() => 'is-12 p-0'"
+          >
             <template #render="{ item }">
               <div class="box m-0 p-2">
                 <div class="content">
                   <strong>{{ item.name }}</strong>
                   <span style="float: right">
                     Created by
-                    <span class="has-text-primary">{{
-                      displayName(item.owner)
-                      }}</span>
+                    <span class="has-text-primary">{{ displayName(item.owner) }}</span>
                   </span>
                 </div>
               </div>
@@ -68,7 +86,10 @@
         </template>
         <template #link>
           <HorizontalField title="URL">
-            <Field placeholder="The destination when audience click on the link" v-model="form.link.url" />
+            <Field
+              placeholder="The destination when audience click on the link"
+              v-model="form.link.url"
+            />
           </HorizontalField>
           <HorizontalField title="Open in new tab">
             <Switch v-model="form.link.blank" />
@@ -149,14 +170,7 @@ export default {
     const save = async () => {
       try {
         loading.value = true;
-        const {
-          name,
-          base64,
-          assetType,
-          filename,
-          copyrightLevel,
-          playerAccess,
-        } = form;
+        const { name, base64, assetType, filename, copyrightLevel, playerAccess } = form;
         let msg = "Media updated successfully!";
         if (!form.id) {
           const response = await uploadMedia({
@@ -169,17 +183,7 @@ export default {
           msg = "Media created successfully!";
         }
         const stageIds = form.assignedStages.map((s) => s.id);
-        const {
-          id,
-          multi,
-          frames,
-          voice,
-          link,
-          src,
-          w,
-          h,
-          uploadedFrames,
-        } = form;
+        const { id, multi, frames, voice, link, src, w, h, uploadedFrames } = form;
         const payload = {
           id,
           name,
@@ -230,7 +234,7 @@ export default {
 
     const tabs = computed(() => {
       const res = [
-      { key: "extra", label: "Preview", icon: "fas fa-image" },
+        { key: "extra", label: "Preview", icon: "fas fa-image" },
         { key: "preview", label: "Preview", icon: "fas fa-image" },
         { key: "copyright", label: "Copyright", icon: "fas fa-copyright" },
         { key: "stages", label: "Stage", icon: "fas fa-person-booth" },
@@ -250,14 +254,11 @@ export default {
       }
       return res;
     });
-    const { nodes: stageList, loading: loadingAllStages } = useQuery(
-      stageGraph.stageList,
-    );
+    const { nodes: stageList, loading: loadingAllStages } = useQuery(stageGraph.stageList);
     const availableStages = computed(() => {
       if (!stageList.value) return [];
       const res = stageList.value.filter(
-        (stage) =>
-          stage.permission === "owner" || stage.permission === "editor",
+        (stage) => stage.permission === "owner" || stage.permission === "editor",
       );
       res.sort((a, b) => (a.name > b.name ? 1 : -1));
       return res;
@@ -266,9 +267,7 @@ export default {
       stageList,
       (val) => {
         if (val) {
-          form.assignedStages = form.stages.map((stage) =>
-            val.find((s) => s.id === stage.id),
-          );
+          form.assignedStages = form.stages.map((stage) => val.find((s) => s.id === stage.id));
         } else {
           form.assignedStages = [];
         }
@@ -290,9 +289,7 @@ export default {
 
     const copyrightLevels = MEDIA_COPYRIGHT_LEVELS;
     const { nodes: users } = useQuery(userGraph.userList);
-    const playerAccess = ref(
-      form.playerAccess ? JSON.parse(form.playerAccess) : [],
-    );
+    const playerAccess = ref(form.playerAccess ? JSON.parse(form.playerAccess) : []);
     watch(playerAccess, (val) => {
       form.playerAccess = JSON.stringify(val);
     });

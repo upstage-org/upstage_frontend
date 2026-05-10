@@ -8,11 +8,7 @@
       }"
       src="my-avatar.svg"
     />
-    <Skeleton
-      :real="true"
-      :data="object"
-      :ghost="object.holder && object.id !== currentAvatar"
-    />
+    <Skeleton :real="true" :data="object" :ghost="object.holder && object.id !== currentAvatar" />
   </div>
 </template>
 

@@ -11,9 +11,7 @@
       <Icon size="24" src="firefox-logo.svg" />&nbsp;Caution Firefox Users!
     </template>
     <template #content>
-      <p>
-        A Firefox setting needs to be changed to allow you to access UpStage on Firefox.
-      </p>
+      <p>A Firefox setting needs to be changed to allow you to access UpStage on Firefox.</p>
       <div class="columns">
         <div class="column is-3 mt-6">
           <b>Step 1:</b>&nbsp;Open a new tab and go to
@@ -23,9 +21,9 @@
           <img :src="`${publicPath}/instruction/firefox/1.png`" alt="Step 1" />
           <div class="columns">
             <div class="column is-4 mt-6">
-              <code>Note:</code>&nbsp;If you see this screen, click to continue. Don't worry,
-              the setting change needed for UpStage to work will not impact on performance or
-              security of Firefox.
+              <code>Note:</code>&nbsp;If you see this screen, click to continue. Don't worry, the
+              setting change needed for UpStage to work will not impact on performance or security
+              of Firefox.
             </div>
             <div class="column">
               <img :src="`${publicPath}/instruction/firefox/1.2.png`" alt="Step 1.2" />

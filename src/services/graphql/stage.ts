@@ -88,17 +88,23 @@ const stageOps = {
           $name: String
           $fileLocation: String
           $status: String
-          $owner: ID,
+          $owner: ID
           $playerAccess: String
         ) {
           createStage(
-            input: { name: $name, fileLocation: $fileLocation, status: $status, owner: $owner, playerAccess: $playerAccess }
+            input: {
+              name: $name
+              fileLocation: $fileLocation
+              status: $status
+              owner: $owner
+              playerAccess: $playerAccess
+            }
           ) {
             id
           }
         }
       `,
-      variables
+      variables,
     );
     if (result) {
       variables.id = result.createStage.id;
@@ -138,7 +144,7 @@ const stageOps = {
         }
         ${stageFragment}
       `,
-      variables
+      variables,
     ),
   updateStatus: (stageId) =>
     studioClient.request(gql`
@@ -174,7 +180,7 @@ const stageOps = {
           }
         }
       `,
-      variables
+      variables,
     ),
   stageList: (variables) =>
     studioClient.request(
@@ -189,7 +195,7 @@ const stageOps = {
         }
         ${stageFragment}
       `,
-      variables
+      variables,
     ),
   getStage: (id) =>
     studioClient.request(
@@ -223,19 +229,14 @@ const stageOps = {
         }
         ${stageFragment}
       `,
-      { id }
+      { id },
     ),
   loadStage: (fileLocation, performanceId) =>
     studioClient
       .request(
         gql`
           query ListStage($fileLocation: String, $performanceId: ID) {
-            stageList(
-              input: {
-                fileLocation: $fileLocation
-                performanceId: $performanceId
-              }
-            ) {
+            stageList(input: { fileLocation: $fileLocation, performanceId: $performanceId }) {
               ...stageFragment
               permission
               scenes {
@@ -253,7 +254,7 @@ const stageOps = {
           ${stageFragment}
           ${sceneFragment}
         `,
-        { fileLocation, performanceId }
+        { fileLocation, performanceId },
       )
       .then((response) => {
         return {
@@ -270,7 +271,7 @@ const stageOps = {
             }
           }
         `,
-        { fileLocation }
+        { fileLocation },
       )
       .then((response) => response.stageList[0]?.permission),
   loadScenes: (fileLocation) =>
@@ -286,7 +287,7 @@ const stageOps = {
           }
           ${sceneFragment}
         `,
-        { fileLocation }
+        { fileLocation },
       )
       .then((response) => response.stageList[0]?.scenes),
   loadEvents: (fileLocation, cursor) =>
@@ -304,7 +305,7 @@ const stageOps = {
             }
           }
         `,
-        { fileLocation, ...(cursor ? { cursor: parseInt(cursor) } : {}) }
+        { fileLocation, ...(cursor ? { cursor: parseInt(cursor) } : {}) },
       )
       .then((response) => response.stageList[0]?.events),
   uploadMedia: (variables) =>
@@ -317,19 +318,14 @@ const stageOps = {
           $filename: String!
         ) {
           uploadMedia(
-            input: {
-              name: $name
-              base64: $base64
-              mediaType: $mediaType
-              filename: $filename
-            }
+            input: { name: $name, base64: $base64, mediaType: $mediaType, filename: $filename }
           ) {
             ...assetFragment
           }
         }
         ${assetFragment}
       `,
-      variables
+      variables,
     ),
   mediaList: (variables) =>
     studioClient.request(
@@ -359,7 +355,7 @@ const stageOps = {
         }
         ${assetFragment}
       `,
-      variables
+      variables,
     ),
   mediaTypeList: (variables) =>
     studioClient.request(
@@ -371,7 +367,7 @@ const stageOps = {
           }
         }
       `,
-      variables
+      variables,
     ),
   saveStageMedia: (id, mediaIds) =>
     studioClient.request(
@@ -383,7 +379,7 @@ const stageOps = {
         }
         ${stageFragment}
       `,
-      { id, mediaIds }
+      { id, mediaIds },
     ),
   assignStages: (id, stageIds) =>
     studioClient.request(
@@ -394,7 +390,7 @@ const stageOps = {
           }
         }
       `,
-      { id, stageIds }
+      { id, stageIds },
     ),
   saveStageConfig: (id, config) =>
     studioClient.request(
@@ -406,7 +402,7 @@ const stageOps = {
         }
         ${stageFragment}
       `,
-      { id, config }
+      { id, config },
     ),
   assignableMedia: () =>
     studioClient.request(gql`
@@ -463,7 +459,7 @@ const stageOps = {
           }
         }
       `,
-      variables
+      variables,
     ),
   deleteMedia: (id) =>
     studioClient.request(
@@ -475,7 +471,7 @@ const stageOps = {
           }
         }
       `,
-      { id }
+      { id },
     ),
   deleteStage: (id) =>
     studioClient.request(
@@ -486,30 +482,20 @@ const stageOps = {
           }
         }
       `,
-      { id }
+      { id },
     ),
   saveScene: (variables) =>
     studioClient.request(
       gql`
-        mutation SaveScene(
-          $stageId: ID
-          $payload: String
-          $preview: String
-          $name: String
-        ) {
+        mutation SaveScene($stageId: ID, $payload: String, $preview: String, $name: String) {
           saveScene(
-            input: {
-              stageId: $stageId
-              payload: $payload
-              preview: $preview
-              name: $name
-            }
+            input: { stageId: $stageId, payload: $payload, preview: $preview, name: $name }
           ) {
             id
           }
         }
       `,
-      variables
+      variables,
     ),
   deleteScene: (id) =>
     studioClient.request(
@@ -521,7 +507,7 @@ const stageOps = {
           }
         }
       `,
-      { id }
+      { id },
     ),
   duplicateStage: ({ id, name }) =>
     studioClient.request(
@@ -534,7 +520,7 @@ const stageOps = {
           }
         }
       `,
-      { id, name }
+      { id, name },
     ),
   deletePerformance: (id) =>
     studioClient.request(
@@ -545,45 +531,31 @@ const stageOps = {
           }
         }
       `,
-      { id }
+      { id },
     ),
   updatePerformance: (id, name, description) =>
     studioClient.request(
       gql`
-        mutation updatePerformance(
-          $id: ID!
-          $name: String!
-          $description: String
-        ) {
-          updatePerformance(
-            input: { id: $id, name: $name, description: $description }
-          ) {
+        mutation updatePerformance($id: ID!, $name: String!, $description: String) {
+          updatePerformance(input: { id: $id, name: $name, description: $description }) {
             success
           }
         }
       `,
-      { id, name, description }
+      { id, name, description },
     ),
   startRecording: (stageId, name, description) =>
     studioClient.request(
       gql`
-        mutation startRecording(
-          $stageId: ID!
-          $name: String
-          $description: String
-        ) {
-          startRecording(
-            stageId: $stageId
-            name: $name
-            description: $description
-          ) {
+        mutation startRecording($stageId: ID!, $name: String, $description: String) {
+          startRecording(stageId: $stageId, name: $name, description: $description) {
             recording {
               id
             }
           }
         }
       `,
-      { stageId, name, description }
+      { stageId, name, description },
     ),
   saveRecording: (id) =>
     studioClient.request(
@@ -596,7 +568,7 @@ const stageOps = {
           }
         }
       `,
-      { id }
+      { id },
     ),
   getStreamSign: (key) =>
     studioClient
@@ -612,7 +584,7 @@ const stageOps = {
             }
           }
         `,
-        { key }
+        { key },
       )
       .then((response) => response.assetList.edges[0]?.node?.sign),
   getSearchOption: () =>
@@ -640,10 +612,10 @@ const stageOps = {
           }
         }
         getAllStages {
-            id
-            name
-            permission
-          }
+          id
+          name
+          permission
+        }
         tags {
           id
           name

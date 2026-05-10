@@ -1,11 +1,7 @@
 <template>
   <Object :object="object">
     <template #menu="slotProps">
-      <MenuContent
-        :object="object"
-        :closeMenu="slotProps.closeMenu"
-        v-model:active="active"
-      />
+      <MenuContent :object="object" :closeMenu="slotProps.closeMenu" v-model:active="active" />
     </template>
     <template #render>
       <canvas ref="el"></canvas>

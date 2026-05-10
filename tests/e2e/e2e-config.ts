@@ -80,8 +80,7 @@ export function loadE2eConfig(): E2eConfig {
   const headlessExplicit = process.env.PWHEADLESS;
   let headless: boolean;
   if (headlessExplicit !== undefined) {
-    headless =
-      headlessExplicit !== "0" && headlessExplicit.toLowerCase() !== "false";
+    headless = headlessExplicit !== "0" && headlessExplicit.toLowerCase() !== "false";
   } else {
     headless = ci;
   }
@@ -91,9 +90,7 @@ export function loadE2eConfig(): E2eConfig {
     baseUrl,
     webServerStartsVite,
     headless,
-    graphqlEndpoint:
-      process.env.E2E_GRAPHQL_ENDPOINT ??
-      "http://127.0.0.1:3001/api/studio_graphql",
+    graphqlEndpoint: process.env.E2E_GRAPHQL_ENDPOINT ?? "http://127.0.0.1:3001/api/studio_graphql",
     mqttHost: process.env.E2E_MQTT_HOST ?? "localhost",
     mqttWsPort: Number(process.env.E2E_MQTT_PORT ?? "9001"),
     adminUsername: process.env.E2E_ADMIN_USERNAME ?? "admin",
@@ -102,8 +99,7 @@ export function loadE2eConfig(): E2eConfig {
     runIdExplicit: Boolean(process.env.E2E_RUN_ID),
     runId: process.env.E2E_RUN_ID,
     forceFreshSetup: parsedBoolUnsetFalse(process.env.E2E_FORCE_FRESH_SETUP),
-    beatsSmoke:
-      (process.env.E2E_BEATS ?? "").trim().toLowerCase() === "smoke",
+    beatsSmoke: (process.env.E2E_BEATS ?? "").trim().toLowerCase() === "smoke",
   };
 }
 
@@ -115,10 +111,7 @@ export function maskSecret(value: string, visibleEnd = 0): string {
   if (!value) return "****";
   const tailChars = visibleEnd <= 0 ? 0 : Math.min(visibleEnd, value.length);
   const tail = tailChars ? value.slice(-tailChars) : "";
-  const maskLen = Math.min(
-    12,
-    Math.max(4, value.length - tailChars),
-  );
+  const maskLen = Math.min(12, Math.max(4, value.length - tailChars));
   return `${"*".repeat(maskLen)}${tail}`;
 }
 

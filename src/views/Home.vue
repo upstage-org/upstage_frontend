@@ -35,20 +35,23 @@ export default {
   components: { Loading, Entry, MasonryWall },
   setup: () => {
     const store = useStore();
-    const { result, loading } = useQuery(gql`
-      query ListFoyerStage {
-        foyerStageList {
-          id
-          name
-          owner {
-            displayName
-            username
+    const { result, loading } = useQuery(
+      gql`
+        query ListFoyerStage {
+          foyerStageList {
+            id
+            name
+            owner {
+              displayName
+              username
+            }
+            fileLocation
+            cover
           }
-          fileLocation
-          cover
         }
-      }
-    `, null);
+      `,
+      null,
+    );
     const foyer = computed(() => store.getters["config/foyer"]);
     const visibleStages = computed(() => result?.value?.foyerStageList || []);
     return {
@@ -125,7 +128,7 @@ export default {
       font-size: inherit !important;
     }
 
-    >:after {
+    > :after {
       content: "";
       pointer-events: none;
       position: absolute;

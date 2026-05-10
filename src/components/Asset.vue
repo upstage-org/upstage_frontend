@@ -3,12 +3,7 @@
   <template v-else-if="asset.assetType === 'video'">
     <video controls :src="src"></video>
   </template>
-  <img
-    v-else
-    :src="src"
-    style="max-width: 100%; max-height: 100%"
-    @load="handleLoad"
-  />
+  <img v-else :src="src" style="max-width: 100%; max-height: 100%" @load="handleLoad" />
 </template>
 
 <script>
@@ -18,7 +13,7 @@ import { absolutePath } from "utils/common";
 export default {
   props: ["asset"],
   emits: ["detectSize"],
-  components: { },
+  components: {},
   setup: (props, { emit }) => {
     if (props.asset.assetType?.name) {
       Object.assign(props.asset, { assetType: props.asset.assetType.name });

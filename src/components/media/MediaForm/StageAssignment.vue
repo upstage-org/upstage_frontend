@@ -18,20 +18,23 @@ const isAdmin = computed(() => store.getters["user/isAdmin"]);
 
 const { result, loading } = useQuery(
   gql`
-  {
-    getAllStages {
+    {
+      getAllStages {
         id
         name
         permission
       }
-  }
+    }
   `,
   null,
   { fetchPolicy: "cache-and-network" },
 );
 const stages = computed(() => {
   if (result.value?.getAllStages) {
-    return result.value.getAllStages.filter((el: any) => isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
+    return result.value.getAllStages
+      .filter((el: any) =>
+        isAdmin.value ? true : el.permission == "editor" || el.permission == "owner",
+      )
       .map(({ id, name }: any) => ({ key: id, name }));
   }
   return [];
@@ -54,14 +57,22 @@ const renderItem = (item: TransferItem) => item.name;
 </script>
 
 <template>
-  <a-transfer :locale="{
-    itemUnit: 'stage',
-    itemsUnit: 'stages',
-    notFoundContent: 'No stage available',
-    searchPlaceholder: 'Search stage name',
-  }" :list-style="{
-    flex: '1',
-    height: '300px',
-  }" :titles="[' available', ' assigned']" v-model:target-keys="targetKeys" :data-source="stages as any" show-search
-    :filter-option="filterOption" :render="renderItem" />
+  <a-transfer
+    :locale="{
+      itemUnit: 'stage',
+      itemsUnit: 'stages',
+      notFoundContent: 'No stage available',
+      searchPlaceholder: 'Search stage name',
+    }"
+    :list-style="{
+      flex: '1',
+      height: '300px',
+    }"
+    :titles="[' available', ' assigned']"
+    v-model:target-keys="targetKeys"
+    :data-source="stages as any"
+    show-search
+    :filter-option="filterOption"
+    :render="renderItem"
+  />
 </template>

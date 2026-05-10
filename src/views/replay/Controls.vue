@@ -48,11 +48,7 @@
           >
             <i class="fas fa-minus"></i>
           </button>
-          <select
-            class="speed-select mx-1"
-            :value="speed"
-            @change="onSpeedSelect"
-          >
+          <select class="speed-select mx-1" :value="speed" @change="onSpeedSelect">
             <option v-for="s in speeds" :key="s" :value="s">{{ s }}x</option>
           </select>
           <button
@@ -81,8 +77,7 @@
           <template #content>
             <p>
               Replay controls are hidden! You can toggle the
-              <code>{{ $t("esc") }}</code> key to quickly hide the replay
-              controls or bring it back.
+              <code>{{ $t("esc") }}</code> key to quickly hide the replay controls or bring it back.
             </p>
           </template>
         </Modal>
@@ -125,16 +120,13 @@
           <div class="card-content">
             <div class="content">
               <p>
-                Audio and avatar speeches won't be able to play in 16x speed
-                or more. You should only use these playback rates for
-                seeking purposes.
+                Audio and avatar speeches won't be able to play in 16x speed or more. You should
+                only use these playback rates for seeking purposes.
               </p>
             </div>
           </div>
           <footer class="card-footer">
-            <a class="card-footer-item" @click="showSpeedWarning = false">
-              OK
-            </a>
+            <a class="card-footer-item" @click="showSpeedWarning = false"> OK </a>
           </footer>
         </div>
       </div>
@@ -205,10 +197,7 @@ const applySpeed = (newSpeed: number) => {
 };
 
 const stepSpeed = (delta: number) => {
-  const next = Math.min(
-    speeds.length - 1,
-    Math.max(0, speedIndex.value + delta),
-  );
+  const next = Math.min(speeds.length - 1, Math.max(0, speedIndex.value + delta));
   if (speeds[next] !== speed.value) applySpeed(speeds[next]);
 };
 

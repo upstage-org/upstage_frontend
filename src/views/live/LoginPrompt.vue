@@ -33,11 +33,7 @@
       <span class="icon"><i class="fas fa-chevron-left"></i></span>
       <span>{{ $t("enter_as_audience") }}</span>
     </button>
-    <button
-      v-else
-      class="button is-light is-outlined mt-4"
-      @click="showLoginForm = true"
-    >
+    <button v-else class="button is-light is-outlined mt-4" @click="showLoginForm = true">
       <span>{{ $t("player_login") }}</span>
       <span class="icon"><i class="fas fa-chevron-right"></i></span>
     </button>

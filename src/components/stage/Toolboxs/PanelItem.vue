@@ -1,10 +1,14 @@
 <template>
   <a-tooltip placement="rightBottom">
     <template #title>{{ label ?? name }}</template>
-    <a @click="
-      changeTool(name);
-    $emit('click');
-    " :class="{ 'is-active': tool?.value === name }" class="panel-block button">
+    <a
+      @click="
+        changeTool(name);
+        $emit('click');
+      "
+      :class="{ 'is-active': tool?.value === name }"
+      class="panel-block button"
+    >
       <span class="panel-icon">
         <Icon :src="icon" />
       </span>

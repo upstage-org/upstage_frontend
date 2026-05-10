@@ -22,7 +22,7 @@ const { result, loading } = useQuery<StudioGraph>(gql`
       username
       displayName
     }
-    stages(input:{}) {
+    stages(input: {}) {
       edges {
         id
         name
@@ -51,37 +51,37 @@ const owners = ref([]);
 const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
-const access = ref(['owner', 'editor', 'player']);
+const access = ref(["owner", "editor", "player"]);
 const dates = ref<[Dayjs, Dayjs] | undefined>();
 
 const ranges = [
   {
-    label: 'Today',
+    label: "Today",
     value: [dayjs(), dayjs()],
   },
   {
-    label: 'Yesterday',
-    value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')],
+    label: "Yesterday",
+    value: [dayjs().add(-1, "d"), dayjs().add(-1, "d")],
   },
   {
-    label: 'Last 7 days',
-    value: [dayjs().add(-7, 'd'), dayjs()],
+    label: "Last 7 days",
+    value: [dayjs().add(-7, "d"), dayjs()],
   },
   {
-    label: 'Last month',
-    value: [dayjs().add(-1, 'month'), dayjs()],
+    label: "Last month",
+    value: [dayjs().add(-1, "month"), dayjs()],
   },
   {
-    label: 'This year',
+    label: "This year",
     value: [dayjs().startOf("year"), dayjs()],
-  }
+  },
 ];
 
 const accessOptions = [
-  { value: 'owner', label: 'Owner' },
-  { value: 'editor', label: 'Editor' },
-  { value: 'player', label: 'Player' },
-  { value: 'audience', label: 'Audience' }
+  { value: "owner", label: "Owner" },
+  { value: "editor", label: "Editor" },
+  { value: "player", label: "Player" },
+  { value: "audience", label: "Audience" },
 ];
 
 const updateInquiry = (vars: any) =>
@@ -110,7 +110,7 @@ watchEffect(() => {
 
 onMounted(() => {
   updateInquiry({
-    createdBetween: undefined
+    createdBetween: undefined,
   });
 });
 
@@ -124,10 +124,7 @@ watch(
 const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) => {
   updateInquiry({
     createdBetween: _dates
-      ? [
-        _dates[0]?.format("YYYY-MM-DD"),
-        _dates[1]?.format("YYYY-MM-DD"),
-      ]
+      ? [_dates[0]?.format("YYYY-MM-DD"), _dates[1]?.format("YYYY-MM-DD")]
       : undefined,
   });
 };
@@ -155,10 +152,7 @@ const hasFilter = computed(
 
 const handleFilterOwnerName = (keyword: string, option: any) => {
   const s = keyword.toLowerCase();
-  return (
-    option.value.toLowerCase().includes(s) ||
-    option.label.toLowerCase().includes(s)
-  );
+  return option.value.toLowerCase().includes(s) || option.label.toLowerCase().includes(s);
 };
 
 const VNodes = (_: any, { attrs }: { attrs: any }) => {
@@ -171,44 +165,65 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
     <a-space class="shadow rounded-xl px-4 py-2 bg-white flex justify-between">
       <a-space class="flex-wrap">
         <RouterLink to="/stages/new-stage">
-          <a-button type="primary">
-            <PlusOutlined /> {{ $t("new") }} {{ $t("stage") }}
-          </a-button>
+          <a-button type="primary"> <PlusOutlined /> {{ $t("new") }} {{ $t("stage") }} </a-button>
         </RouterLink>
         <a-input-search allowClear class="w-48" placeholder="Search stage" v-model:value="name" />
-        <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags" style="min-width: 124px"
-          placeholder="Owners" :loading="loading" v-model:value="owners" :options="result
+        <a-select
+          allowClear
+          showArrow
+          :filterOption="handleFilterOwnerName"
+          mode="tags"
+          style="min-width: 124px"
+          placeholder="Owners"
+          :loading="loading"
+          v-model:value="owners"
+          :options="
+            result
               ? result.users.map((e) => ({
-                value: e.username,
-                label: e.displayName || e.username,
-              }))
+                  value: e.username,
+                  label: e.displayName || e.username,
+                }))
               : []
-            ">
+          "
+        >
           <template #dropdownRender="{ menuNode: menu }">
             <v-nodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
-            <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="owners = []">
+            <div
+              class="w-full cursor-pointer text-center"
+              @mousedown.prevent
+              @click.stop.prevent="owners = []"
+            >
               <team-outlined />&nbsp;All players
             </div>
           </template>
         </a-select>
-        <a-select 
-          allowClear 
-          mode="multiple" 
+        <a-select
+          allowClear
+          mode="multiple"
           style="min-width: 124px"
-          placeholder="Access Level" 
-          v-model:value="access" 
-          :options="accessOptions">
+          placeholder="Access Level"
+          v-model:value="access"
+          :options="accessOptions"
+        >
           <template #dropdownRender="{ menuNode: menu }">
             <v-nodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
-            <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="access = ['owner', 'editor', 'player', 'audience']">
+            <div
+              class="w-full cursor-pointer text-center"
+              @mousedown.prevent
+              @click.stop.prevent="access = ['owner', 'editor', 'player', 'audience']"
+            >
               <unlock-outlined />&nbsp;All Access
             </div>
           </template>
         </a-select>
-        <a-range-picker :placeholder="['Created from', 'to date']" v-model:value="dates as any" :presets="ranges as any"
-          @change="onRangeChange as any" />
+        <a-range-picker
+          :placeholder="['Created from', 'to date']"
+          v-model:value="dates as any"
+          :presets="ranges as any"
+          @change="onRangeChange as any"
+        />
         <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
           <ClearOutlined />Clear Filters
         </a-button>

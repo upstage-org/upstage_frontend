@@ -39,7 +39,7 @@ export default {
           { style: "color: black; white-space: pre-line;" },
           props.archive
             ? "Archiving will create a replay recording and chat files from the stage since it was last archived. It will also sweep the stage and start a new recording. Sweeping the stage removes all media items from the stage, including text and drawings. Media assigned to the stage will still be available in the toolbars, as will any scenes that have been saved.\n Do you want to archive now?"
-            : "Sweeping the stage removes all media items from the stage, including text and drawings. Media assigned to the stage will still be available in the toolbars, as will any scenes that have been saved.\n Do you want to sweep the stage?"
+            : "Sweeping the stage removes all media items from the stage, including text and drawings. Media assigned to the stage will still be available in the toolbars, as will any scenes that have been saved.\n Do you want to sweep the stage?",
         ),
         onOk() {
           sweep();
@@ -57,8 +57,11 @@ export default {
         status.value = "Send live stage sweeping signal...";
 
         const config = stage.value.attributes.find((i) => i.name === "config");
-        
-        const clearStage = useClearStage(stage.value.fileLocation, config ? JSON.parse(config.description)?.defaultcolor : null);
+
+        const clearStage = useClearStage(
+          stage.value.fileLocation,
+          config ? JSON.parse(config.description)?.defaultcolor : null,
+        );
         await clearStage();
         message.success(`${stage.value.name} swept successfully!`);
         if (refresh) {

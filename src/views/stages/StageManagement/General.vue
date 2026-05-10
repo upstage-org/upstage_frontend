@@ -2,8 +2,13 @@
   <div class="columns">
     <div class="column" align="right">
       <template v-if="stage.id">
-        <button data-testid="stage-save" class="button ml-2 is-primary" :class="{ 'is-loading': loading }" @click="updateStage"
-          :disabled="!urlValid">
+        <button
+          data-testid="stage-save"
+          class="button ml-2 is-primary"
+          :class="{ 'is-loading': loading }"
+          @click="updateStage"
+          :disabled="!urlValid"
+        >
           {{ $t("save_stage") }}
         </button>
         <ClearChatInStage />
@@ -18,8 +23,13 @@
         </DeleteStage>
       </template>
       <template v-else>
-        <button data-testid="stage-create" class="button ml-2 is-primary" :class="{ 'is-loading': loading }" @click="createStage"
-          :disabled="!urlValid">
+        <button
+          data-testid="stage-create"
+          class="button ml-2 is-primary"
+          :class="{ 'is-loading': loading }"
+          @click="createStage"
+          :disabled="!urlValid"
+        >
           {{ $t("create_stage") }}
         </button>
       </template>
@@ -31,19 +41,42 @@
         <label class="label">{{ $t("stage_name") }}</label>
       </div>
       <div class="field-body">
-        <Field data-testid="stage-name-input" placeholder="Full Name" v-model="form.name" required requiredMessage="Stage name is required" expanded
-          class="half-flex" />
-        <Field data-testid="stage-url-input" required placeholder="URL" v-model="form.fileLocation" requiredMessage="URL is required" expanded
-          @keyup="urlValid = null" @input="checkURL" :right="validatingURL
-            ? 'fas fa-circle-notch fa-spin'
-            : urlValid === true
-              ? 'fas fa-check'
-              : urlValid === false
-                ? 'fas fa-times'
-                : 'fas'
-            " :help="!form.fileLocation &&
-              `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
-              " :error="urlError" :disabled="!!stage.id" class="half-flex" maxlength="20" />
+        <Field
+          data-testid="stage-name-input"
+          placeholder="Full Name"
+          v-model="form.name"
+          required
+          requiredMessage="Stage name is required"
+          expanded
+          class="half-flex"
+        />
+        <Field
+          data-testid="stage-url-input"
+          required
+          placeholder="URL"
+          v-model="form.fileLocation"
+          requiredMessage="URL is required"
+          expanded
+          @keyup="urlValid = null"
+          @input="checkURL"
+          :right="
+            validatingURL
+              ? 'fas fa-circle-notch fa-spin'
+              : urlValid === true
+                ? 'fas fa-check'
+                : urlValid === false
+                  ? 'fas fa-times'
+                  : 'fas'
+          "
+          :help="
+            !form.fileLocation &&
+            `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
+          "
+          :error="urlError"
+          :disabled="!!stage.id"
+          class="half-flex"
+          maxlength="20"
+        />
       </div>
     </div>
 
@@ -54,9 +87,11 @@
       <div class="field-body">
         <div class="field">
           <div class="control">
-            <textarea class="textarea"
+            <textarea
+              class="textarea"
               placeholder="enter a description that will appear on the screen while your Stage is loading."
-              v-model="form.description"></textarea>
+              v-model="form.description"
+            ></textarea>
           </div>
         </div>
       </div>
@@ -69,14 +104,16 @@
       <div class="field-body">
         <div class="field is-narrow">
           <a-tooltip placement="bottom">
-            <template #title>{{ form.status === 'live' ? 'Live' : 'Rehearsal' }}</template>
-            <Switch :model-value="form.status === 'live'"
-              @update:model-value="form.status = $event ? 'live' : 'rehearsal'" />
+            <template #title>{{ form.status === "live" ? "Live" : "Rehearsal" }}</template>
+            <Switch
+              :model-value="form.status === 'live'"
+              @update:model-value="form.status = $event ? 'live' : 'rehearsal'"
+            />
           </a-tooltip>
         </div>
         <p class="help">
-          The public can only enter your stage when its status is Live. With
-          Rehearsal status, only players who have access to the stage can enter.
+          The public can only enter your stage when its status is Live. With Rehearsal status, only
+          players who have access to the stage can enter.
         </p>
       </div>
     </div>
@@ -88,13 +125,11 @@
       <div class="field-body">
         <div class="field is-narrow">
           <a-tooltip placement="bottom">
-            <template #title>{{ form.visibility ? 'On' : 'Off' }}</template>
+            <template #title>{{ form.visibility ? "On" : "Off" }}</template>
             <Switch v-model="form.visibility" />
           </a-tooltip>
         </div>
-        <p class="help">
-          Select whether this Stage is visible in the Foyer or not.
-        </p>
+        <p class="help">Select whether this Stage is visible in the Foyer or not.</p>
       </div>
     </div>
     <div class="field is-horizontal" v-if="stage">
@@ -104,18 +139,26 @@
       <div class="field-body">
         <div class="field is-narrow">
           <div class="control">
-            <a-select v-model:value="form.owner" placeholder="Select stage owner" :loading="loadingUsers" show-search
-              :filter-option="false" @search="handleOwnerSearch" @dropdown-visible-change="handleOwnerDropdownChange"
-              style="width: 300px" :options="filteredOwnerUsers.map(user => ({
-                value: user.id,
-                label: getOwnerDisplayName(user),
-                key: user.id
-              }))" />
+            <a-select
+              v-model:value="form.owner"
+              placeholder="Select stage owner"
+              :loading="loadingUsers"
+              show-search
+              :filter-option="false"
+              @search="handleOwnerSearch"
+              @dropdown-visible-change="handleOwnerDropdownChange"
+              style="width: 300px"
+              :options="
+                filteredOwnerUsers.map((user) => ({
+                  value: user.id,
+                  label: getOwnerDisplayName(user),
+                  key: user.id,
+                }))
+              "
+            />
           </div>
         </div>
-        <p class="help">
-          Select the user who will own and manage this stage.
-        </p>
+        <p class="help">Select the user who will own and manage this stage.</p>
       </div>
     </div>
 
@@ -123,18 +166,23 @@
       <div class="field-label is-normal">
         <label class="label">{{ $t("player_access") }}</label>
         <p class="help">
-          Click on a player's name to move them to the column to the right. Use
-          a right-click to move them back to the left.
+          Click on a player's name to move them to the column to the right. Use a right-click to
+          move them back to the left.
         </p>
       </div>
       <div class="field-body" style="flex-wrap: wrap">
-        <MultiTransferAccessColumn :columns="[
-          'Audience access only',
-          'Player access',
-          'Player and edit access'
-        ]" :data="users" :owner="owner" :renderLabel="displayName" :renderValue="(item) => item.id" :renderKeywords="(item) =>
-          `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
-          " v-model="playerAccess" />
+        <MultiTransferAccessColumn
+          :columns="['Audience access only', 'Player access', 'Player and edit access']"
+          :data="users"
+          :owner="owner"
+          :renderLabel="displayName"
+          :renderValue="(item) => item.id"
+          :renderKeywords="
+            (item) =>
+              `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
+          "
+          v-model="playerAccess"
+        />
       </div>
     </div>
 
@@ -152,12 +200,7 @@
 </template>
 
 <script>
-import {
-  useAttribute,
-  useMutation,
-  useQuery,
-  useRequest,
-} from "services/graphql/composable";
+import { useAttribute, useMutation, useQuery, useRequest } from "services/graphql/composable";
 import { stageGraph, userGraph } from "services/graphql";
 import { inject, reactive, ref, watch, computed, provide } from "vue";
 import Field from "components/form/Field.vue";
@@ -172,7 +215,7 @@ import DeleteStage from "components/stage/DeleteStage.vue";
 import { useStore } from "vuex";
 import Switch from "components/form/Switch.vue";
 import { message } from "ant-design-vue";
-import { handleError } from 'utils/common';
+import { handleError } from "utils/common";
 
 export default {
   components: {
@@ -201,9 +244,7 @@ export default {
       cover: useAttribute(stage, "cover").value,
     });
 
-    const playerAccess = ref(
-      useAttribute(stage, "playerAccess", true).value ?? [],
-    );
+    const playerAccess = ref(useAttribute(stage, "playerAccess", true).value ?? []);
 
     watch(playerAccess, (val) => {
       form.playerAccess = JSON.stringify(val);
@@ -213,26 +254,26 @@ export default {
     const users = computed(() =>
       nodes.value
         ? nodes.value.filter((u) => {
-          if (stage.value && stage.value.owner) {
-            return u.username !== stage.value.owner.username;
-          }
-          return u.username !== whoami?.value.username;
-        })
+            if (stage.value && stage.value.owner) {
+              return u.username !== stage.value.owner.username;
+            }
+            return u.username !== whoami?.value.username;
+          })
         : [],
     );
 
     const owner = computed(() =>
       nodes.value
         ? nodes.value.find((u) => {
-          if (stage.value && stage.value.owner) {
-            return u.username === stage.value.owner.username;
-          }
-          return u.username === whoami?.value.username;
-        })
+            if (stage.value && stage.value.owner) {
+              return u.username === stage.value.owner.username;
+            }
+            return u.username === whoami?.value.username;
+          })
         : [],
     );
 
-    const ownerSearchValue = ref('');
+    const ownerSearchValue = ref("");
     const allUsers = computed(() => nodes.value || []);
 
     const filteredOwnerUsers = computed(() => {
@@ -241,18 +282,20 @@ export default {
       }
 
       const search = ownerSearchValue.value.toLowerCase();
-      return allUsers.value.filter(user => {
+      return allUsers.value.filter((user) => {
         const displayName = getOwnerDisplayName(user).toLowerCase();
-        const username = user.username?.toLowerCase() || '';
-        const email = user.email?.toLowerCase() || '';
-        const firstName = user.firstName?.toLowerCase() || '';
-        const lastName = user.lastName?.toLowerCase() || '';
+        const username = user.username?.toLowerCase() || "";
+        const email = user.email?.toLowerCase() || "";
+        const firstName = user.firstName?.toLowerCase() || "";
+        const lastName = user.lastName?.toLowerCase() || "";
 
-        return displayName.includes(search) ||
+        return (
+          displayName.includes(search) ||
           username.includes(search) ||
           email.includes(search) ||
           firstName.includes(search) ||
-          lastName.includes(search);
+          lastName.includes(search)
+        );
       });
     });
 
@@ -262,7 +305,7 @@ export default {
 
     const handleOwnerDropdownChange = (open) => {
       if (!open) {
-        ownerSearchValue.value = '';
+        ownerSearchValue.value = "";
       }
     };
 
@@ -273,34 +316,41 @@ export default {
       return user.username;
     };
 
-    watch(whoami, () => {
-      if (whoami.value && !stage.value.id) {
-        form.owner = whoami.value.id;
-      }
-    }, { immediate: true });
+    watch(
+      whoami,
+      () => {
+        if (whoami.value && !stage.value.id) {
+          form.owner = whoami.value.id;
+        }
+      },
+      { immediate: true },
+    );
 
-    watch(() => form.owner, (newOwnerId, oldOwnerId) => {
-      if (oldOwnerId && newOwnerId !== oldOwnerId && whoami.value) {
-        if (newOwnerId !== whoami.value.id) {
-          const currentPlayerAccess = [...playerAccess.value];
+    watch(
+      () => form.owner,
+      (newOwnerId, oldOwnerId) => {
+        if (oldOwnerId && newOwnerId !== oldOwnerId && whoami.value) {
+          if (newOwnerId !== whoami.value.id) {
+            const currentPlayerAccess = [...playerAccess.value];
 
-          while (currentPlayerAccess.length < 2) {
-            currentPlayerAccess.push([]);
-          }
+            while (currentPlayerAccess.length < 2) {
+              currentPlayerAccess.push([]);
+            }
 
-          const currentUserIdStr = String(whoami.value.id);
+            const currentUserIdStr = String(whoami.value.id);
 
-          const userAlreadyInAccess = currentPlayerAccess.some(accessLevel =>
-            accessLevel.some(userId => userId === currentUserIdStr)
-          );
+            const userAlreadyInAccess = currentPlayerAccess.some((accessLevel) =>
+              accessLevel.some((userId) => userId === currentUserIdStr),
+            );
 
-          if (!userAlreadyInAccess) {
-            currentPlayerAccess[1].push(currentUserIdStr);
-            playerAccess.value = currentPlayerAccess;
+            if (!userAlreadyInAccess) {
+              currentPlayerAccess[1].push(currentUserIdStr);
+              playerAccess.value = currentPlayerAccess;
+            }
           }
         }
-      }
-    });
+      },
+    );
 
     const { loading, mutation } = useMutation(
       stage.value.id ? stageGraph.updateStage : stageGraph.createStage,
@@ -330,15 +380,7 @@ export default {
       }
     };
 
-    const preservedPaths = [
-      "backstage",
-      "login",
-      "register",
-      "static",
-      "studio",
-      "replay",
-      "api",
-    ];
+    const preservedPaths = ["backstage", "login", "register", "static", "studio", "replay", "api"];
     const urlValid = ref(!!stage.value.id);
     const { loading: validatingURL, fetch } = useRequest(stageGraph.stageList);
 

@@ -18,8 +18,8 @@ const copy = () => {
   </code>
   <a-tooltip title="Copy to clipboard">
     <code @click="copy" class="has-background-dark clickable has-tooltip-right">
-    <i class="fas fa-clipboard-list"></i>
-  </code>
+      <i class="fas fa-clipboard-list"></i>
+    </code>
   </a-tooltip>
 </template>
 

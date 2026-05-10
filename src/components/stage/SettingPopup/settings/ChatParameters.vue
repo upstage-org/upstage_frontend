@@ -8,8 +8,11 @@
         <li :class="{ 'is-active': currentTab === 'params' }" @click="currentTab = 'params'">
           <a>{{ $t("parameters") }}</a>
         </li>
-        <li v-if="downloadChatVisibility" :class="{ 'is-active': currentTab === 'download' }"
-          @click="currentTab = 'download'">
+        <li
+          v-if="downloadChatVisibility"
+          :class="{ 'is-active': currentTab === 'download' }"
+          @click="currentTab = 'download'"
+        >
           <a>{{ $t("download_chat") }}</a>
         </li>
       </ul>
@@ -18,17 +21,33 @@
   <div class="card-content">
     <div class="content" v-if="currentTab === 'nickname'">
       <HorizontalField title="Nickname">
-        <input class="input" type="text" :placeholder="nickname" v-model="form.nickname" @keyup.enter="saveNickname" />
+        <input
+          class="input"
+          type="text"
+          :placeholder="nickname"
+          v-model="form.nickname"
+          @keyup.enter="saveNickname"
+        />
       </HorizontalField>
       <SaveButton @click="saveNickname" :loading="loading" />
     </div>
     <div class="content" v-else-if="currentTab === 'params'">
       <HorizontalField title="Chat transparency">
-        <input v-model="parameters.opacity" type="range" class="slider is-fullwidth is-primary" step="0.01" min="0.2"
-          max="1" />
+        <input
+          v-model="parameters.opacity"
+          type="range"
+          class="slider is-fullwidth is-primary"
+          step="0.01"
+          min="0.2"
+          max="1"
+        />
       </HorizontalField>
       <HorizontalField title="Size (px)">
-        <Field :modelValue="parameters.fontSize?.slice(0, -2)" @update:modelValue="changeFontSize" type="number" />
+        <Field
+          :modelValue="parameters.fontSize?.slice(0, -2)"
+          @update:modelValue="changeFontSize"
+          type="number"
+        />
       </HorizontalField>
 
       <save-button @click="saveParameters" />
@@ -60,7 +79,10 @@
         </div>
       </div>
 
-      <DownloadButton @click="downloadChatLog" v-if="downloadOptions.audienceChat || downloadOptions.playerChat" />
+      <DownloadButton
+        @click="downloadChatLog"
+        v-if="downloadOptions.audienceChat || downloadOptions.playerChat"
+      />
       <DownloadButton disabled v-else />
     </div>
   </div>
@@ -89,9 +111,7 @@ export default {
     });
 
     const chats = computed(() => store.state.stage.chat);
-    const downloadChatVisibility = computed(
-      () => store.state.stage.showDownloadChatSetting,
-    );
+    const downloadChatVisibility = computed(() => store.state.stage.showDownloadChatSetting);
     const stageUrl = store.getters["stage/url"];
 
     const saveNickname = () => {
@@ -118,10 +138,7 @@ export default {
       if (downloadOptions.value.audienceChat) {
         let link = document.createElement("a");
         let content = [];
-        link.setAttribute(
-          "download",
-          `${stageUrl}-Audience-chat-${timeStamp()}.txt`,
-        );
+        link.setAttribute("download", `${stageUrl}-Audience-chat-${timeStamp()}.txt`);
         content = chats.value.messages.map((item) => {
           let line = "";
           if (item.clear) {
@@ -143,10 +160,7 @@ export default {
       if (downloadOptions.value.playerChat) {
         let link = document.createElement("a");
         let content = [];
-        link.setAttribute(
-          "download",
-          `${stageUrl}-Player-chat-${timeStamp()}.txt`,
-        );
+        link.setAttribute("download", `${stageUrl}-Player-chat-${timeStamp()}.txt`);
         content = chats.value.privateMessages.map((item) => {
           let line = "";
           if (item.clearPlayerChat) {
@@ -173,15 +187,11 @@ export default {
     };
     const formatDate = (date) => {
       return (
-        [padTo2Digits(date.getHours()), padTo2Digits(date.getMinutes())].join(
-          "",
-        ) +
+        [padTo2Digits(date.getHours()), padTo2Digits(date.getMinutes())].join("") +
         "-" +
-        [
-          padTo2Digits(date.getDate()),
-          padTo2Digits(date.getMonth() + 1),
-          date.getFullYear(),
-        ].join("")
+        [padTo2Digits(date.getDate()), padTo2Digits(date.getMonth() + 1), date.getFullYear()].join(
+          "",
+        )
       );
     };
     const timeStamp = () => {

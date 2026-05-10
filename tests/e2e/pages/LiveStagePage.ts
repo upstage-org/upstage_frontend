@@ -37,9 +37,7 @@ export class LiveStagePage {
           "no `h1.title` after GraphQL; check /api → studio, auth, and VITE_GRAPHQL_ENDPOINT (not MQTT).",
       );
     }
-    const heroTitle = (
-      await this.page.locator("section.hero h1.title").first().innerText()
-    ).trim();
+    const heroTitle = (await this.page.locator("section.hero h1.title").first().innerText()).trim();
     // Match the copy in Preloader.vue — not a substring of a long play title.
     if (heroTitle === "Stage not found!") {
       throw new Error(`[e2e] Stage not found: /${stageSlug}`);

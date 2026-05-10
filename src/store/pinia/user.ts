@@ -29,9 +29,7 @@ export const useUserStore = defineStore("user", () => {
     () => nickname.value ?? (user.value ? displayName(user.value) : "Guest"),
   );
   const isAdmin = computed<boolean>(() =>
-    [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(
-      String(user.value?.role),
-    ),
+    [String(ROLES.ADMIN), String(ROLES.SUPER_ADMIN)].includes(String(user.value?.role)),
   );
   const isGuest = computed<boolean>(() => {
     if (!user.value) return true;

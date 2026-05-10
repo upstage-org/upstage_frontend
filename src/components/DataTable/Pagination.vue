@@ -1,9 +1,5 @@
 <template>
-  <nav
-    class="pagination is-centered is-rounded"
-    role="navigation"
-    aria-label="pagination"
-  >
+  <nav class="pagination is-centered is-rounded" role="navigation" aria-label="pagination">
     <button
       class="button pagination-previous"
       :disabled="modelValue === 1"
@@ -49,12 +45,7 @@
           {{ page }}
         </a>
       </li>
-      <li
-        v-if="
-          visibleNavigationButtons[visibleNavigationButtons.length - 1] <
-          totalPages - 1
-        "
-      >
+      <li v-if="visibleNavigationButtons[visibleNavigationButtons.length - 1] < totalPages - 1">
         <span class="pagination-ellipsis">&hellip;</span>
       </li>
       <li v-if="totalPages > 1">
@@ -103,9 +94,7 @@ export default {
     const totalPages = computed(() => Math.ceil(props.total / props.limit));
     const visibleNavigationButtons = computed(() => {
       const buttons = [];
-      let begin = Math.ceil(
-        props.modelValue - (props.maxNavigationButtons - 2) / 2,
-      );
+      let begin = Math.ceil(props.modelValue - (props.maxNavigationButtons - 2) / 2);
       if (begin < 2) {
         begin = 2;
       }

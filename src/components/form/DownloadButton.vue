@@ -1,9 +1,5 @@
 <template>
-  <button
-    class="button is-primary"
-    :class="{ 'is-loading': loading }"
-    v-bind="$attrs"
-  >
+  <button class="button is-primary" :class="{ 'is-loading': loading }" v-bind="$attrs">
     <slot>
       <span class="icon is-small">
         <i class="fas fa-download"></i>

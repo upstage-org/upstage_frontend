@@ -1,10 +1,5 @@
 <template>
-  <div
-    @mouseenter="show"
-    @mouseleave="hide"
-    v-click-outside="hide"
-    class="popover"
-  >
+  <div @mouseenter="show" @mouseleave="hide" v-click-outside="hide" class="popover">
     <slot name="trigger" />
 
     <transition @enter="enter">

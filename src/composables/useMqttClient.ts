@@ -18,9 +18,11 @@ export const useMqttClient = () => {
 
   onScopeDispose(() => {
     try {
-      const mqttClient = (client as unknown as {
-        client?: { end?: (force?: boolean) => void };
-      }).client;
+      const mqttClient = (
+        client as unknown as {
+          client?: { end?: (force?: boolean) => void };
+        }
+      ).client;
       mqttClient?.end?.(true);
     } catch (err) {
       console.warn("[MQTT] disposal failed", err);

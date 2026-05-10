@@ -1,14 +1,27 @@
 <template>
-  <input class="opacity-slider slider is-fullwidth" :class="{
-    'is-primary': sliderMode === 'opacity',
-    'is-warning': sliderMode === 'volume',
-    'is-danger': sliderMode === 'speed',
-  }" step="0.01" min="0" max="1" :value="value" type="range" :style="{
-    top: '-26px',
-    left: '-15px',
-    width: object.h + 'px',
-  }" v-show="showSlider" @change="handleChange" @mousedown.stop="keepActive" @mouseover.stop="keepActive"
-    @mouseup.stop="keepActive" />
+  <input
+    class="opacity-slider slider is-fullwidth"
+    :class="{
+      'is-primary': sliderMode === 'opacity',
+      'is-warning': sliderMode === 'volume',
+      'is-danger': sliderMode === 'speed',
+    }"
+    step="0.01"
+    min="0"
+    max="1"
+    :value="value"
+    type="range"
+    :style="{
+      top: '-26px',
+      left: '-15px',
+      width: object.h + 'px',
+    }"
+    v-show="showSlider"
+    @change="handleChange"
+    @mousedown.stop="keepActive"
+    @mouseover.stop="keepActive"
+    @mouseup.stop="keepActive"
+  />
 </template>
 
 <script>
@@ -24,9 +37,7 @@ export default {
     const value = computed(() => {
       switch (props.sliderMode) {
         case "speed":
-          return props.object.moveSpeed == 0
-            ? 0
-            : maxMoveSpeed / props.object.moveSpeed;
+          return props.object.moveSpeed == 0 ? 0 : maxMoveSpeed / props.object.moveSpeed;
         case "volume":
           return props.object.volume;
         default:
@@ -41,8 +52,7 @@ export default {
       });
     };
 
-    const calcMoveSpeed = (e) =>
-      e.target.value == 0 ? 10000 : maxMoveSpeed / e.target.value;
+    const calcMoveSpeed = (e) => (e.target.value == 0 ? 10000 : maxMoveSpeed / e.target.value);
 
     const sendChangeMoveSpeed = (e) => {
       store.dispatch("stage/shapeObject", {
@@ -77,15 +87,11 @@ export default {
       }
     };
 
-    const isHolding = computed(
-      () => props.object.id === store.state.user.avatarId,
-    );
+    const isHolding = computed(() => props.object.id === store.state.user.avatarId);
     const holdable = computed(() => ["avatar"].includes(props.object.type));
     const activeMovable = computed(() => store.getters["stage/activeMovable"]);
     const showSlider = computed(
-      () =>
-        (isHolding.value || !holdable.value) &&
-        activeMovable.value === props.object.id,
+      () => (isHolding.value || !holdable.value) && activeMovable.value === props.object.id,
     );
 
     return { keepActive, handleChange, value, isHolding, showSlider };

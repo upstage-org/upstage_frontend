@@ -80,9 +80,7 @@ function planUploads(runId: string): {
 
   for (const u of [...personas, ...props, ...backdrops]) {
     if (!existsSync(u.filePath)) {
-      throw new Error(
-        `[e2e] missing asset ${u.filePath}. Run 'pnpm e2e:assets' to regenerate.`,
-      );
+      throw new Error(`[e2e] missing asset ${u.filePath}. Run 'pnpm e2e:assets' to regenerate.`);
     }
   }
   return { personas, props, backdrops };
@@ -107,8 +105,7 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
         if (v.ok) {
           const login = new LoginPage(page);
           await login.login(ADMIN.username, ADMIN.password);
-          const adminToken =
-            (await login.getAuthToken()) ?? (await loginAsAdmin());
+          const adminToken = (await login.getAuthToken()) ?? (await loginAsAdmin());
           const live = new LiveStagePage(page);
           await live.goto(persisted.stageSlug);
           await page.screenshot({
@@ -138,12 +135,7 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
 
     const mediaByPersona: Record<string, MediaRef> = {};
     for (const u of personas) {
-      let ref = await findMediaRefMaybe(
-        adminToken,
-        u.name,
-        u.ownerUsername,
-        u.mediaType,
-      );
+      let ref = await findMediaRefMaybe(adminToken, u.name, u.ownerUsername, u.mediaType);
       if (!ref) {
         await library.upload({
           filePath: u.filePath,
@@ -151,24 +143,14 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
           mediaType: u.mediaType,
           ownerUsername: u.ownerUsername,
         });
-        ref = await fetchMediaIdByName(
-          adminToken,
-          u.name,
-          u.ownerUsername,
-          u.mediaType,
-        );
+        ref = await fetchMediaIdByName(adminToken, u.name, u.ownerUsername, u.mediaType);
       }
       mediaByPersona[u.persona.username] = ref;
     }
 
     const propRefs: Record<string, MediaRef> = {};
     for (const u of props) {
-      let ref = await findMediaRefMaybe(
-        adminToken,
-        u.name,
-        u.ownerUsername,
-        u.mediaType,
-      );
+      let ref = await findMediaRefMaybe(adminToken, u.name, u.ownerUsername, u.mediaType);
       if (!ref) {
         await library.upload({
           filePath: u.filePath,
@@ -176,12 +158,7 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
           mediaType: u.mediaType,
           ownerUsername: u.ownerUsername,
         });
-        ref = await fetchMediaIdByName(
-          adminToken,
-          u.name,
-          u.ownerUsername,
-          u.mediaType,
-        );
+        ref = await fetchMediaIdByName(adminToken, u.name, u.ownerUsername, u.mediaType);
       }
       const key = path.basename(u.filePath, ".png");
       propRefs[key] = ref;
@@ -189,12 +166,7 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
 
     const backdropRefs: Record<string, MediaRef> = {};
     for (const u of backdrops) {
-      let ref = await findMediaRefMaybe(
-        adminToken,
-        u.name,
-        u.ownerUsername,
-        u.mediaType,
-      );
+      let ref = await findMediaRefMaybe(adminToken, u.name, u.ownerUsername, u.mediaType);
       if (!ref) {
         await library.upload({
           filePath: u.filePath,
@@ -202,12 +174,7 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
           mediaType: u.mediaType,
           ownerUsername: u.ownerUsername,
         });
-        ref = await fetchMediaIdByName(
-          adminToken,
-          u.name,
-          u.ownerUsername,
-          u.mediaType,
-        );
+        ref = await fetchMediaIdByName(adminToken, u.name, u.ownerUsername, u.mediaType);
       }
       const key = path.basename(u.filePath, ".png");
       backdropRefs[key] = ref;
@@ -229,8 +196,10 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
       ...Object.values(backdropRefs).map((m) => m.id),
     ];
     const updated = await stageMgmt.assignMediaIds(stageId, allMediaIds);
-    expect(updated, "All Romeo & Juliet media should be assigned to the stage")
-      .toBeGreaterThanOrEqual(allMediaIds.length);
+    expect(
+      updated,
+      "All Romeo & Juliet media should be assigned to the stage",
+    ).toBeGreaterThanOrEqual(allMediaIds.length);
 
     const playerIds = await fetchUserIdsByUsername(
       adminToken,

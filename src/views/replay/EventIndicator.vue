@@ -1,10 +1,6 @@
 <template>
   <div class="event-indicator">
-    <div
-      v-for="event in events"
-      :key="event.id"
-      :style="{ left: position(event) + '%' }"
-    ></div>
+    <div v-for="event in events" :key="event.id" :style="{ left: position(event) + '%' }"></div>
   </div>
 </template>
 

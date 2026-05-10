@@ -6,9 +6,7 @@ type ViteExport = UserConfig | Promise<UserConfig> | undefined;
 
 export default defineConfig(async (env) => {
   const resolved: ViteExport =
-    typeof viteBase === "function"
-      ? await viteBase(env)
-      : await Promise.resolve(viteBase);
+    typeof viteBase === "function" ? await viteBase(env) : await Promise.resolve(viteBase);
   return mergeConfig(
     resolved ?? {},
     defineConfig({

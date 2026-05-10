@@ -23,27 +23,19 @@ export default {
   login: (variables) =>
     studioClient.request(
       gql`
-        mutation login(
-          $username: String!
-          $password: String!
-          $token: String
-        ) {
-          login(payload: {
-              username: $username
-              password: $password
-              token: $token
-          }) {
-              user_id
-              access_token
-              refresh_token
-              role
-              first_name
-              groups {
-                  id
-                  name
-              }
-              username
-              title
+        mutation login($username: String!, $password: String!, $token: String) {
+          login(payload: { username: $username, password: $password, token: $token }) {
+            user_id
+            access_token
+            refresh_token
+            role
+            first_name
+            groups {
+              id
+              name
+            }
+            username
+            title
           }
         }
       `,
@@ -52,34 +44,34 @@ export default {
   refreshUser: (variables, headers) =>
     studioClient.request(
       gql`
-          mutation {
-              refreshToken {
-                  access_token
-                  refresh_token
-              }
+        mutation {
+          refreshToken {
+            access_token
+            refresh_token
           }
-        `,
+        }
+      `,
       variables,
       headers,
     ),
   currentUser: () =>
     studioClient.request(gql`
-        query {
-            currentUser {
-                id
-                username
-                firstName
-                lastName
-                displayName
-                email
-                active
-                createdOn
-                role
-                uploadLimit
-                intro
-            }
+      query {
+        currentUser {
+          id
+          username
+          firstName
+          lastName
+          displayName
+          email
+          active
+          createdOn
+          role
+          uploadLimit
+          intro
         }
-      `),
+      }
+    `),
 
   createUser: (variables) =>
     studioClient.request(
@@ -153,8 +145,8 @@ export default {
       `,
       {
         ..._.omitBy(variables, _.isNil),
-        ...variables.role ? { role: parseInt(variables.role) } : {},
-        binName: ""
+        ...(variables.role ? { role: parseInt(variables.role) } : {}),
+        binName: "",
       },
     ),
 
@@ -162,7 +154,7 @@ export default {
     studioClient.request(gql`
       query UserList {
         users(active: true) {
-            ...userFragment
+          ...userFragment
         }
       }
       ${userFragment}
@@ -171,18 +163,8 @@ export default {
   changePassword: (variables) =>
     studioClient.request(
       gql`
-        mutation ChangePassword(
-          $id: ID!
-          $oldPassword: String!
-          $newPassword: String!
-        ) {
-          changePassword(
-            input: {
-              id: $id
-              oldPassword: $oldPassword
-              newPassword: $newPassword
-            }
-          ) {
+        mutation ChangePassword($id: ID!, $oldPassword: String!, $newPassword: String!) {
+          changePassword(input: { id: $id, oldPassword: $oldPassword, newPassword: $newPassword }) {
             success
             message
           }
@@ -205,7 +187,7 @@ export default {
     studioClient.request(
       gql`
         mutation verifyPasswordReset($email: String!, $token: String!) {
-          verifyPasswordReset(input: { email: $email, token: $token} ) {
+          verifyPasswordReset(input: { email: $email, token: $token }) {
             message
           }
         }
@@ -215,12 +197,8 @@ export default {
   passwordReset: (variables) =>
     studioClient.request(
       gql`
-        mutation resetPassword(
-          $email: String!, 
-          $token: String!
-          $password: String
-        ) {
-          resetPassword(input: {email: $email, token: $token, password: $password}) {
+        mutation resetPassword($email: String!, $token: String!, $password: String) {
+          resetPassword(input: { email: $email, token: $token, password: $password }) {
             message
           }
         }
@@ -229,18 +207,18 @@ export default {
     ),
   adminPlayers: () =>
     studioClient.request(gql`
-        query adminPlayers {
-          adminPlayers {
-              edges {
-                id
-                username
-                email
-                role
-                firstName
-                lastName
-                displayName
-              }
+      query adminPlayers {
+        adminPlayers {
+          edges {
+            id
+            username
+            email
+            role
+            firstName
+            lastName
+            displayName
           }
         }
-      `),
+      }
+    `),
 };

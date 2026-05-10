@@ -47,9 +47,7 @@ export default {
               await deleteUser({ id: props.player.id });
               await props.onDone?.(props.player);
             } catch (error) {
-              message.error(
-                error instanceof Error ? error.message : (error as string),
-              );
+              message.error(error instanceof Error ? error.message : (error as string));
             }
           },
         },

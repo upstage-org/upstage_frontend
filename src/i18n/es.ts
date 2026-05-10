@@ -58,7 +58,7 @@ export default {
   fill: "llenar",
   none: "ninguno",
   avatar: "avatar",
-  upload: "descargar",  
+  upload: "descargar",
   username: "Nombre del usuario",
   password: "contraseña",
   new: "Nuevo",
@@ -92,8 +92,9 @@ export default {
   esc: "ESC",
   warning: "Aviso",
   under_construction: "En construcción",
-  enter_username_and_password_to_login: "Escribe el nombre de usuario y la contraseña para conectarse",
-    reset_your_password: "Redefinir su contraseña",
+  enter_username_and_password_to_login:
+    "Escribe el nombre de usuario y la contraseña para conectarse",
+  reset_your_password: "Redefinir su contraseña",
   change_password: "Cambiar la contraseña",
   full_name: "Nombre completo",
   first_name: "Apellido",
@@ -102,8 +103,7 @@ export default {
   no_content: "Sin contenido",
   drag_files_here_or_click_to_upload: "Arrastre los archivos aquí o clic para descargar",
   choose_an_image: "Escoje una imagen",
-  choose_an_existing_image_or_upload_new:
-    "Elija una imagen existente o descargue una nueva",
+  choose_an_existing_image_or_upload_new: "Elija una imagen existente o descargue una nueva",
   hold_this_avatar: "Mantenga este avatar",
   remove_from_avatar: "Quitar el avatar",
   add_to_avatar: "Añadir el avatar",
@@ -222,5 +222,5 @@ export default {
   introduction: "Introducción",
   new_object: "Nuevo {0}",
   new_stream: "My Stream",
-  default_backgroundcolor: "Default Background Colour"
+  default_backgroundcolor: "Default Background Colour",
 };

@@ -3,14 +3,7 @@ import { message } from "ant-design-vue";
 import { gql } from "@apollo/client/core";
 import { ref, computed } from "vue";
 import { permissionFragment } from "models/fragment";
-import {
-  AvatarVoice,
-  CopyrightLevel,
-  Link,
-  Media,
-  Permission,
-  UploadFile,
-} from "models/studio";
+import { AvatarVoice, CopyrightLevel, Link, Media, Permission, UploadFile } from "models/studio";
 
 interface SaveMediaPayload {
   files: UploadFile[];

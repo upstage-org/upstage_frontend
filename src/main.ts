@@ -34,14 +34,10 @@ if ("serviceWorker" in navigator) {
 
         // Check for updates
         registration.onupdatefound = () => {
-          const installingWorker: ServiceWorker | null =
-            registration.installing;
+          const installingWorker: ServiceWorker | null = registration.installing;
           if (installingWorker) {
             installingWorker.onstatechange = () => {
-              if (
-                installingWorker.state === "installed" &&
-                navigator.serviceWorker.controller
-              ) {
+              if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
                 // New content is available
                 window.dispatchEvent(new Event("newVersionAvailable"));
               }

@@ -14,13 +14,26 @@
           </div>
           <div class="card-content">
             <form v-if="isActive" @submit.prevent="donateToUpstage">
-              <StripeElements :stripe-key="stripeKey" :instance-options="stripeOptions"
-                :elements-options="elementsOptions" ref="elementsComponent">
-                <StripeElement type="payment" :options="paymentElementOptions" ref="paymentComponent" />
+              <StripeElements
+                :stripe-key="stripeKey"
+                :instance-options="stripeOptions"
+                :elements-options="elementsOptions"
+                ref="elementsComponent"
+              >
+                <StripeElement
+                  type="payment"
+                  :options="paymentElementOptions"
+                  ref="paymentComponent"
+                />
               </StripeElements>
               <br />
               <div class="button-purchase">
-                <button class="button is-primary" type="submit" :class="{ 'is-loading': loading }" :disabled="loading">
+                <button
+                  class="button is-primary"
+                  type="submit"
+                  :class="{ 'is-loading': loading }"
+                  :disabled="loading"
+                >
                   <span>Donate USD$ {{ amount }}</span>
                 </button>
               </div>
@@ -85,11 +98,16 @@
               <div class="field">
                 <label class="label">Description</label>
                 <div class="control">
-                  <input class="input" type="text" value="Donation" disabled/>
+                  <input class="input" type="text" value="Donation" disabled />
                 </div>
               </div>
               <div class="buttons">
-                <button class="button is-primary" type="submit" :class="{ 'is-loading': generating }" :disabled="generating">
+                <button
+                  class="button is-primary"
+                  type="submit"
+                  :class="{ 'is-loading': generating }"
+                  :disabled="generating"
+                >
                   Download PDF
                 </button>
                 <button class="button" @click="closeReceiptForm">Cancel</button>
@@ -182,7 +200,7 @@ export default {
             }
           });
         }
-      }
+      },
     );
 
     const donateToUpstage = async () => {
@@ -230,7 +248,7 @@ export default {
           receivedFrom: donorName.value,
           description: "Donation",
           amount: donationDetails.value.amount.toString(),
-          date: donationDetails.value.date
+          date: donationDetails.value.date,
         });
 
         if (!result.generateReceipt) {
@@ -308,38 +326,38 @@ export default {
   font-family: inherit;
 }
 
-	card-input:focus {
-	  border-color: inherit;
-	  -webkit-box-shadow: none;
-	  box-shadow: none;
-	}
+card-input:focus {
+  border-color: inherit;
+  -webkit-box-shadow: none;
+  box-shadow: none;
+}
 
-	.block-input {
-	  margin-bottom: 18px;
-	}
+.block-input {
+  margin-bottom: 18px;
+}
 
-	.card-secret-info {
-	  display: grid;
-	  grid-template-columns: 1fr 1fr;
-	}
+.card-secret-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
 
-	.button-purchase {
-	  display: grid;
-	  grid-template-columns: 1fr;
-	}
+.button-purchase {
+  display: grid;
+  grid-template-columns: 1fr;
+}
 
-	.card-header-icon {
-	  position: absolute;
-	  right: 0;
-	}
+.card-header-icon {
+  position: absolute;
+  right: 0;
+}
 
-	.modal {
-	  z-index: 1000;
-	}
+.modal {
+  z-index: 1000;
+}
 
-	.buttons {
-	  display: flex;
-	  justify-content: flex-end;
-	  gap: 10px;
-	}
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 </style>

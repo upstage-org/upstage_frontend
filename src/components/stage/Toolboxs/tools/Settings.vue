@@ -38,14 +38,9 @@
   </div>
   <div>
     <div class="icon is-large">
-      <ColorPicker
-        v-model="backdropColor"
-        @update:modelValue="sendBackdropColor"
-      />
+      <ColorPicker v-model="backdropColor" @update:modelValue="sendBackdropColor" />
     </div>
-    <span class="tag is-light is-block p-0 long-label">{{
-      $t("background_colour")
-    }}</span>
+    <span class="tag is-light is-block p-0 long-label">{{ $t("background_colour") }}</span>
   </div>
   <div @click="masqueradeAudience">
     <div class="icon is-large">
@@ -57,17 +52,13 @@
     <div class="icon is-large">
       <i class="fas fa-sun fa-2x has-text-warning"></i>
     </div>
-    <span class="tag is-light is-block long-label">{{
-      $t("light_mode_chat")
-    }}</span>
+    <span class="tag is-light is-block long-label">{{ $t("light_mode_chat") }}</span>
   </div>
   <div v-else @click="enableDarkModeChat(true)">
     <div class="icon is-large">
       <i class="fas fa-moon fa-2x"></i>
     </div>
-    <span class="tag is-light is-block long-label">{{
-      $t("dark_mode_chat")
-    }}</span>
+    <span class="tag is-light is-block long-label">{{ $t("dark_mode_chat") }}</span>
   </div>
 </template>
 
@@ -81,15 +72,9 @@ export default {
   components: { Icon, ColorPicker },
   setup: () => {
     const store = useStore();
-    const chatVisibility = computed(
-      () => store.state.stage.settings.chatVisibility,
-    );
-    const chatDarkMode = computed(
-      () => store.state.stage.settings.chatDarkMode,
-    );
-    const reactionVisibility = computed(
-      () => store.state.stage.settings.reactionVisibility,
-    );
+    const chatVisibility = computed(() => store.state.stage.settings.chatVisibility);
+    const chatDarkMode = computed(() => store.state.stage.settings.chatDarkMode);
+    const reactionVisibility = computed(() => store.state.stage.settings.reactionVisibility);
 
     const showChat = (value) => {
       store.dispatch("stage/showChatBox", value);
@@ -116,10 +101,7 @@ export default {
 
     const chatPosition = computed(() => store.state.stage.chatPosition);
     const toggleChatPosition = () => {
-      store.dispatch(
-        "stage/setChatPosition",
-        chatPosition.value === "left" ? "right" : "left",
-      );
+      store.dispatch("stage/setChatPosition", chatPosition.value === "left" ? "right" : "left");
     };
 
     const masqueradeAudience = () => {

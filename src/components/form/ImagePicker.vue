@@ -1,14 +1,18 @@
 <template>
   <modal :styles="{ zIndex: `999 !important` }">
     <template #trigger>
-      <Asset class="clickable" v-if="modelValue" :asset="{
-        src: modelValue,
-      }" />
+      <Asset
+        class="clickable"
+        v-if="modelValue"
+        :asset="{
+          src: modelValue,
+        }"
+      />
       <button v-else class="button">{{ $t("choose_an_image") }}</button>
     </template>
-    <template #header><span>{{
-      $t("choose_an_existing_image_or_upload_new")
-        }}</span></template>
+    <template #header
+      ><span>{{ $t("choose_an_existing_image_or_upload_new") }}</span></template
+    >
     <template #content="{ closeModal }">
       <Loading v-if="loadingMedia" />
       <div v-else class="columns is-multiline">
@@ -16,64 +20,116 @@
           <div class="columns">
             <a-space class="shadow rounded-xl px-4 py-2 bg-white flex justify-between">
               <a-space class="flex-wrap">
-                <a-button type="primary" @click="visibleDropzone = true; onVisibleDropzone()">
+                <a-button
+                  type="primary"
+                  @click="
+                    visibleDropzone = true;
+                    onVisibleDropzone();
+                  "
+                >
                   <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
                 </a-button>
-                <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="searchInput" />
-                <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags"
-                  style="min-width: 124px" placeholder="Owners" :loading="loading" v-model:value="formData.owners"
-                  :options="result
-                    ? result.users.map((e) => {
-                      return {
-                        value: e.username,
-                        label: e.displayName || e.username,
-                      }
-                    })
-                    : []
-                    ">
+                <a-input-search
+                  allowClear
+                  class="w-48"
+                  placeholder="Search media"
+                  v-model:value="searchInput"
+                />
+                <a-select
+                  allowClear
+                  showArrow
+                  :filterOption="handleFilterOwnerName"
+                  mode="tags"
+                  style="min-width: 124px"
+                  placeholder="Owners"
+                  :loading="loading"
+                  v-model:value="formData.owners"
+                  :options="
+                    result
+                      ? result.users.map((e) => {
+                          return {
+                            value: e.username,
+                            label: e.displayName || e.username,
+                          };
+                        })
+                      : []
+                  "
+                >
                   <template #dropdownRender="{ menuNode: menu }">
                     <v-nodes :vnodes="menu" />
                     <a-divider style="margin: 4px 0" />
-                    <div class="w-full cursor-pointer text-center" @mousedown.prevent
-                      @click.stop.prevent="formData.owners = []">
+                    <div
+                      class="w-full cursor-pointer text-center"
+                      @mousedown.prevent
+                      @click.stop.prevent="formData.owners = []"
+                    >
                       <team-outlined />&nbsp;All players
                     </div>
                   </template>
                 </a-select>
-                <a-select allowClear showArrow filterOption mode="tags" style="min-width: 128px"
-                  placeholder="Media types" :loading="loading" v-model:value="formData.types" :options="result
-                    ? result.mediaTypes
-                      .filter(
-                        (e) =>
-                          !['shape', 'media'].includes(e.name.toLowerCase()),
-                      )
-                      .map((e) => ({
-                        value: e.name,
-                        label: capitalize(e.name),
-                      }))
-                    : []
-                    ">
+                <a-select
+                  allowClear
+                  showArrow
+                  filterOption
+                  mode="tags"
+                  style="min-width: 128px"
+                  placeholder="Media types"
+                  :loading="loading"
+                  v-model:value="formData.types"
+                  :options="
+                    result
+                      ? result.mediaTypes
+                          .filter((e) => !['shape', 'media'].includes(e.name.toLowerCase()))
+                          .map((e) => ({
+                            value: e.name,
+                            label: capitalize(e.name),
+                          }))
+                      : []
+                  "
+                >
                 </a-select>
-                <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags"
-                  style="min-width: 160px" placeholder="Stages assigned" :loading="loading"
-                  v-model:value="formData.stages" :options="result
-                    ? result.getAllStages.map((e) => ({
-                      value: e.id,
-                      label: e.name,
-                    }))
-                    : []
-                    ">
+                <a-select
+                  allowClear
+                  showArrow
+                  :filterOption="handleFilterStageName"
+                  mode="tags"
+                  style="min-width: 160px"
+                  placeholder="Stages assigned"
+                  :loading="loading"
+                  v-model:value="formData.stages"
+                  :options="
+                    result
+                      ? result.getAllStages.map((e) => ({
+                          value: e.id,
+                          label: e.name,
+                        }))
+                      : []
+                  "
+                >
                 </a-select>
-                <a-select allowClear showArrow mode="tags" style="min-width: 160px" placeholder="Tags"
-                  :loading="loading" v-model:value="formData.tags" :options="result
-                    ? result.tags.map((e) => ({
-                      value: e.name,
-                      label: e.name,
-                    }))
-                    : []
-                    "></a-select>
-                <a-range-picker :placeholder="['Created from', 'to date']" :presets="ranges"
-                  v-model:value="formData.dates" :popupStyle="{ zIndex: 5000 }" />
+                <a-select
+                  allowClear
+                  showArrow
+                  mode="tags"
+                  style="min-width: 160px"
+                  placeholder="Tags"
+                  :loading="loading"
+                  v-model:value="formData.tags"
+                  :options="
+                    result
+                      ? result.tags.map((e) => ({
+                          value: e.name,
+                          label: e.name,
+                        }))
+                      : []
+                  "
+                ></a-select>
+                <a-range-picker
+                  :placeholder="['Created from', 'to date']"
+                  :presets="ranges"
+                  v-model:value="formData.dates"
+                  :popupStyle="{ zIndex: 5000 }"
+                />
                 <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
                   <ClearOutlined />Clear Filters
                 </a-button>
@@ -81,15 +137,15 @@
             </a-space>
           </div>
         </div>
-        
-        <StageMediaTable 
-          :data="availableImages" 
-          :loading="loadingMedia" 
+
+        <StageMediaTable
+          :data="availableImages"
+          :loading="loadingMedia"
           :pagination="paginationConfig"
           :totalCount="totalCount"
           view-detail-action="select"
-          @viewDetail="(item) => select(item, closeModal)" 
-          @change="handleTableChange" 
+          @viewDetail="(item) => select(item, closeModal)"
+          @change="handleTableChange"
         />
       </div>
     </template>
@@ -98,9 +154,9 @@
 </template>
 
 <script>
-import dayjs from 'dayjs';
-import isBetween from 'dayjs/plugin/isBetween'
-import { assign, get, debounce } from 'lodash';
+import dayjs from "dayjs";
+import isBetween from "dayjs/plugin/isBetween";
+import { assign, get, debounce } from "lodash";
 import { editingMediaVar } from "apollo";
 import Modal from "components/Modal.vue";
 import Loading from "components/Loading.vue";
@@ -111,9 +167,9 @@ import Dropdown from "./Dropdown.vue";
 import { stageGraph } from "services/graphql";
 import { useQuery } from "services/graphql/composable";
 import MediaUpload from "./Media/MediaUpload.vue";
-import MediaForm from 'components/media/MediaForm/index.vue';
-import VNodes from './VNodes';
-import StageMediaTable from './StageMediaTable.vue';
+import MediaForm from "components/media/MediaForm/index.vue";
+import VNodes from "./VNodes";
+import StageMediaTable from "./StageMediaTable.vue";
 import { useQuery as useApolloQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
 import { permissionFragment } from "models/fragment";
@@ -146,8 +202,8 @@ export default {
       dates: [],
     });
 
-    const searchInput = ref('');
-    
+    const searchInput = ref("");
+
     const debouncedSearch = debounce((value) => {
       formData.name = value;
     }, 2000);
@@ -164,22 +220,26 @@ export default {
         mediaTypes: formData.types.length ? formData.types : undefined,
         stages: formData.stages.length ? formData.stages : undefined,
         tags: formData.tags.length ? formData.tags : undefined,
-        createdBetween: formData.dates.length ? [
-          formData.dates[0].format('YYYY-MM-DD'),
-          formData.dates[1].format('YYYY-MM-DD')
-        ] : undefined,
+        createdBetween: formData.dates.length
+          ? [formData.dates[0].format("YYYY-MM-DD"), formData.dates[1].format("YYYY-MM-DD")]
+          : undefined,
       };
-      
-      Object.keys(params).forEach(key => {
+
+      Object.keys(params).forEach((key) => {
         if (params[key] === undefined) {
           delete params[key];
         }
       });
-      
+
       return params;
     });
 
-    const { result: mediaResult, loading: loadingMedia, fetchMore, refetch } = useApolloQuery(
+    const {
+      result: mediaResult,
+      loading: loadingMedia,
+      fetchMore,
+      refetch,
+    } = useApolloQuery(
       gql`
         query MediaTable(
           $page: Int
@@ -193,18 +253,20 @@ export default {
           $sort: [AssetSortEnum]
           $dormant: Boolean
         ) {
-          media(input:{
-            page: $page
-            limit: $limit
-            name: $name
-            createdBetween: $createdBetween
-            mediaTypes: $mediaTypes
-            owners: $owners
-            stages: $stages
-            tags: $tags
-            sort: $sort
-            dormant: $dormant
-          }) {
+          media(
+            input: {
+              page: $page
+              limit: $limit
+              name: $name
+              createdBetween: $createdBetween
+              mediaTypes: $mediaTypes
+              owners: $owners
+              stages: $stages
+              tags: $tags
+              sort: $sort
+              dormant: $dormant
+            }
+          ) {
             totalCount
             edges {
               id
@@ -238,12 +300,16 @@ export default {
         ${permissionFragment}
       `,
       queryParams,
-      { notifyOnNetworkStatusChange: true }
+      { notifyOnNetworkStatusChange: true },
     );
 
-    watch(queryParams, () => {
-      refetch();
-    }, { deep: true });
+    watch(
+      queryParams,
+      () => {
+        refetch();
+      },
+      { deep: true },
+    );
 
     watch(visibleDropzone, (visible) => {
       if (visible) {
@@ -262,45 +328,47 @@ export default {
 
     const ranges = [
       {
-        label: 'Today',
+        label: "Today",
         value: [dayjs(), dayjs()],
       },
       {
-        label: 'Yesterday',
-        value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')],
+        label: "Yesterday",
+        value: [dayjs().add(-1, "d"), dayjs().add(-1, "d")],
       },
       {
-        label: 'Last 7 days',
-        value: [dayjs().add(-7, 'd'), dayjs()],
+        label: "Last 7 days",
+        value: [dayjs().add(-7, "d"), dayjs()],
       },
       {
-        label: 'Last month',
-        value: [dayjs().add(-1, 'month'), dayjs()],
+        label: "Last month",
+        value: [dayjs().add(-1, "month"), dayjs()],
       },
       {
-        label: 'This year',
+        label: "This year",
         value: [dayjs().startOf("year"), dayjs()],
-      }
+      },
     ];
 
     const hasFilter = computed(() => {
-      return formData.name || 
-             formData.owners.length > 0 || 
-             formData.types.length > 0 || 
-             formData.stages.length > 0 || 
-             formData.tags.length > 0 || 
-             formData.dates.length > 0;
+      return (
+        formData.name ||
+        formData.owners.length > 0 ||
+        formData.types.length > 0 ||
+        formData.stages.length > 0 ||
+        formData.tags.length > 0 ||
+        formData.dates.length > 0
+      );
     });
 
     const availableImages = computed(() => {
       if (!mediaResult.value?.media?.edges) return [];
-      
+
       return mediaResult.value.media.edges
-        .filter(media => !["audio", "video"].includes(get(media, "assetType.name")))
-        .filter(media => ![0, 3, 4].includes(media.privilege))
-        .map(media => ({
+        .filter((media) => !["audio", "video"].includes(get(media, "assetType.name")))
+        .filter((media) => ![0, 3, 4].includes(media.privilege))
+        .map((media) => ({
           ...media,
-          src: media.fileLocation
+          src: media.fileLocation,
         }));
     });
 
@@ -325,23 +393,23 @@ export default {
       if (sorter && !Array.isArray(sorter)) {
         sorter = [sorter];
       }
-      
+
       if (sorter && sorter.length > 0) {
         const sortOrder = sorter
-          .filter(s => s.order)
+          .filter((s) => s.order)
           .map(({ columnKey, order }) => {
             const fieldMap = {
-              'name': 'NAME',
-              'asset_type_id': 'ASSET_TYPE',
-              'owner_id': 'OWNER',
-              'copyrightLevel': 'COPYRIGHT_LEVEL',
-              'size': 'SIZE',
-              'created_on': 'CREATED_ON'
+              name: "NAME",
+              asset_type_id: "ASSET_TYPE",
+              owner_id: "OWNER",
+              copyrightLevel: "COPYRIGHT_LEVEL",
+              size: "SIZE",
+              created_on: "CREATED_ON",
             };
             const field = fieldMap[columnKey] || columnKey.toUpperCase();
             return `${field}_${order === "ascend" ? "ASC" : "DESC"}`;
           });
-        
+
         if (sortOrder.length > 0) {
           tableParams.sort = sortOrder;
         }
@@ -354,10 +422,7 @@ export default {
 
     const handleFilterOwnerName = (keyword, option) => {
       const s = keyword.toLowerCase();
-      return (
-        option.value.toLowerCase().includes(s) ||
-        option.label.toLowerCase().includes(s)
-      );
+      return option.value.toLowerCase().includes(s) || option.label.toLowerCase().includes(s);
     };
 
     const handleFilterStageName = (keyword, option) => {
@@ -373,9 +438,9 @@ export default {
         tags: [],
         dates: [],
       });
-      
-      searchInput.value = '';
-      
+
+      searchInput.value = "";
+
       tableParams.page = 1;
     };
 

@@ -1,5 +1,8 @@
 <template>
-  <a-tooltip v-if="masquerading" title="You are masquerading as audience. Click to go back to the player mode!">
+  <a-tooltip
+    v-if="masquerading"
+    title="You are masquerading as audience. Click to go back to the player mode!"
+  >
     <div id="masquerading-status" class="clickable has-tooltip-left" @click="exitAudienceView">
       <Icon src="incognito.svg" :size="36" />
     </div>

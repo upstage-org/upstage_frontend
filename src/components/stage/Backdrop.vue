@@ -1,7 +1,15 @@
 <template>
-  <Image v-if="src" class="background-image" :src="src" :style="{
-    opacity: backgroundOpacity,
-  }" :transition="transitionDuration" :no-fallback="true" fit="cover" />
+  <Image
+    v-if="src"
+    class="background-image"
+    :src="src"
+    :style="{
+      opacity: backgroundOpacity,
+    }"
+    :transition="transitionDuration"
+    :no-fallback="true"
+    fit="cover"
+  />
 </template>
 
 <script>
@@ -15,12 +23,8 @@ export default {
   setup: () => {
     const store = useStore();
     const background = computed(() => store.state.stage.background);
-    const backgroundOpacity = computed(
-      () => store.state.stage.background?.opacity ?? 1,
-    );
-    const transitionDuration = computed(
-      () => (store.state.stage.background?.speed || 0) * 1000,
-    );
+    const backgroundOpacity = computed(() => store.state.stage.background?.opacity ?? 1);
+    const transitionDuration = computed(() => (store.state.stage.background?.speed || 0) * 1000);
 
     const frameAnimation = reactive({
       interval: null,
@@ -47,13 +51,16 @@ export default {
         }
         clearInterval(frameAnimation.interval);
         if (frames) {
-          frameAnimation.interval = setInterval(() => {
-            let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
-            if (nextFrame >= frames.length) {
-              nextFrame = 0;
-            }
-            frameAnimation.currentFrame = frames[nextFrame];
-          }, parseFloat(speed || 0) * 1000);
+          frameAnimation.interval = setInterval(
+            () => {
+              let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
+              if (nextFrame >= frames.length) {
+                nextFrame = 0;
+              }
+              frameAnimation.currentFrame = frames[nextFrame];
+            },
+            parseFloat(speed || 0) * 1000,
+          );
         }
       },
       { immediate: true },

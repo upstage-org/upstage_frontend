@@ -24,11 +24,7 @@
       </button>
     </div>
     <div class="dropdown-menu" id="dropdown-menu" role="menu">
-      <div
-        class="dropdown-content"
-        ref="el"
-        :style="{ position: fixed ? 'fixed' : 'unset' }"
-      >
+      <div class="dropdown-content" ref="el" :style="{ position: fixed ? 'fixed' : 'unset' }">
         <template v-if="data && data.length">
           <a
             v-for="item in data"
@@ -90,8 +86,7 @@ export default {
       isActive.value = false;
     };
     const el = ref();
-    const scrollIntoView = () =>
-      el.value.querySelector(".is-active")?.scrollIntoView();
+    const scrollIntoView = () => el.value.querySelector(".is-active")?.scrollIntoView();
     onMounted(scrollIntoView);
     return { select, selectedItem, isActive, el };
   },

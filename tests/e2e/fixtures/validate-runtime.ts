@@ -92,10 +92,9 @@ export async function validateRuntimeStateForReuse(
   if (accessRaw == null || (typeof accessRaw === "string" && accessRaw.length === 0)) {
     return {
       ok: false,
-      reason:
-        `stage ${state.stageId} has no playerAccess set (got ${
-          accessRaw === null ? "null" : "empty string"
-        }); backend resolve_permission falls through to "audience" for every persona`,
+      reason: `stage ${state.stageId} has no playerAccess set (got ${
+        accessRaw === null ? "null" : "empty string"
+      }); backend resolve_permission falls through to "audience" for every persona`,
     };
   }
   if (typeof accessRaw !== "string") {
@@ -113,10 +112,9 @@ export async function validateRuntimeStateForReuse(
   if (!Array.isArray(parsed) || parsed.length !== 2) {
     return {
       ok: false,
-      reason:
-        `playerAccess is not a 2-element list (got length ${
-          Array.isArray(parsed) ? parsed.length : "non-array"
-        }); backend resolve_permission falls through to "audience"`,
+      reason: `playerAccess is not a 2-element list (got length ${
+        Array.isArray(parsed) ? parsed.length : "non-array"
+      }); backend resolve_permission falls through to "audience"`,
     };
   }
   const [playerBucket, editorBucket] = parsed as [unknown, unknown];
@@ -129,8 +127,7 @@ export async function validateRuntimeStateForReuse(
   if (playerBucket.length === 0 && editorBucket.length === 0) {
     return {
       ok: false,
-      reason:
-        `playerAccess has both buckets empty; nobody is granted player or editor — every persona resolves to "audience"`,
+      reason: `playerAccess has both buckets empty; nobody is granted player or editor — every persona resolves to "audience"`,
     };
   }
 

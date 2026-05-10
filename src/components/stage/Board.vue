@@ -1,20 +1,36 @@
 <template>
-  <section id="live-stage" class="hero bg-cover is-fullheight" :style="{ 'background-color': backdropColor }">
-    <div id="board" data-testid="board" @dragenter.prevent @dragover.prevent @drop.prevent="drop" :style="{
-      width: stageSize.width + 'px',
-      height: stageSize.height + 'px',
-      transform:
-        'translateX(' +
-        stageSize.left +
-        'px) translateY(' +
-        stageSize.top +
-        'px)',
-    }">
+  <section
+    id="live-stage"
+    class="hero bg-cover is-fullheight"
+    :style="{ 'background-color': backdropColor }"
+  >
+    <div
+      id="board"
+      data-testid="board"
+      @dragenter.prevent
+      @dragover.prevent
+      @drop.prevent="drop"
+      :style="{
+        width: stageSize.width + 'px',
+        height: stageSize.height + 'px',
+        transform: 'translateX(' + stageSize.left + 'px) translateY(' + stageSize.top + 'px)',
+      }"
+    >
       <Backdrop />
       <transition-group name="stage-avatars" :css="false" @enter="avatarEnter" @leave="avatarLeave">
-        <component v-for="object in objects" :id="object.id" :key="object.id"
-          :is="object.drawingId ? 'drawing' : object.type == 'video' ? 'avatar' : object.type ?? 'avatar'"
-          :object="object" />
+        <component
+          v-for="object in objects"
+          :id="object.id"
+          :key="object.id"
+          :is="
+            object.drawingId
+              ? 'drawing'
+              : object.type == 'video'
+                ? 'avatar'
+                : (object.type ?? 'avatar')
+          "
+          :object="object"
+        />
       </transition-group>
     </div>
   </section>
@@ -57,13 +73,9 @@ export default {
     const config = computed(() => store.getters["stage/config"]);
     const objects = computed(() => store.getters["stage/objects"]);
     const drop = (e) => {
-      const { object, isReal, nodrop } = JSON.parse(
-        e.dataTransfer.getData("text"),
-      );
+      const { object, isReal, nodrop } = JSON.parse(e.dataTransfer.getData("text"));
       if (isReal) {
-        if (
-          confirm("Are you sure you want to take this object off the stage?")
-        ) {
+        if (confirm("Are you sure you want to take this object off the stage?")) {
           store.dispatch("stage/deleteObject", object);
         }
       } else {

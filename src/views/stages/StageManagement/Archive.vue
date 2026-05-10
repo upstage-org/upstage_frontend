@@ -15,9 +15,7 @@
       <div v-if="item.name">
         <b>{{ item.name }}</b>
       </div>
-      <small v-if="item.description" class="has-text-dark">{{
-        item.description
-        }}</small>
+      <small v-if="item.description" class="has-text-dark">{{ item.description }}</small>
       <small v-else class="has-text-dark">
         <span v-if="item.recording">{{ $t("recorded") }}</span>
         <span v-else>{{ $t("auto_recorded") }}</span>
@@ -29,7 +27,7 @@
       <Modal>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="chat.svg" style="width: 16px; height: 16px;" />
+            <Icon src="chat.svg" style="width: 16px; height: 16px" />
           </button>
         </template>
         <template #header>
@@ -41,14 +39,14 @@
         </template>
       </Modal>
       <button class="button is-light" @click="downloadChatLog('public', item)">
-        <Icon src="download.svg" style="width: 16px; height: 16px;" />
+        <Icon src="download.svg" style="width: 16px; height: 16px" />
       </button>
     </template>
     <template #private-chat="{ item }">
       <Modal>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="chat.svg" style="width: 16px; height: 16px;" />
+            <Icon src="chat.svg" style="width: 16px; height: 16px" />
           </button>
         </template>
         <template #header>
@@ -60,17 +58,23 @@
         </template>
       </Modal>
       <button class="button is-light" @click="downloadChatLog('private', item)">
-        <Icon src="download.svg" style="width: 16px; height: 16px;" />
+        <Icon src="download.svg" style="width: 16px; height: 16px" />
       </button>
     </template>
     <template #replay="{ item }">
-      <router-link :to="`/replay/${stage.fileLocation}/${item.id}`"
-        :class="`button ${item.recording ? 'is-primary' : 'is-dark'}`">
+      <router-link
+        :to="`/replay/${stage.fileLocation}/${item.id}`"
+        :class="`button ${item.recording ? 'is-primary' : 'is-dark'}`"
+      >
         <i class="fas fa-video"></i>
       </router-link>
     </template>
     <template #actions="{ item }">
-      <CustomConfirm @confirm="(complete) => updatePerformance(item, complete)" :loading="updating" :only-yes="true">
+      <CustomConfirm
+        @confirm="(complete) => updatePerformance(item, complete)"
+        :loading="updating"
+        :only-yes="true"
+      >
         <Field v-model="item.name" label="Performance Name" required />
         <Field label="Description">
           <textarea class="textarea" v-model="item.description" rows="3"></textarea>
@@ -80,21 +84,20 @@
         </template>
         <template #trigger>
           <button class="button is-light">
-            <Icon src="edit.svg" style="width: 16px; height: 16px;" />
+            <Icon src="edit.svg" style="width: 16px; height: 16px" />
           </button>
         </template>
       </CustomConfirm>
       <CustomConfirm @confirm="(complete) => deletePerformance(item, complete)" :loading="deleting">
         <template #trigger>
           <button class="button is-light is-danger">
-            <Icon src="delete.svg" style="width: 16px; height: 16px;" />
+            <Icon src="delete.svg" style="width: 16px; height: 16px" />
           </button>
         </template>
         <div class="has-text-centered">
           Deleting this performance will also delete
-          <span class="has-text-danger">{{
-            $t("all_of_its_replay_and_chat")
-            }}</span>. This cannot be undone!
+          <span class="has-text-danger">{{ $t("all_of_its_replay_and_chat") }}</span
+          >. This cannot be undone!
           <strong>Are you sure you want to continue?</strong>
         </div>
       </CustomConfirm>
@@ -180,9 +183,7 @@ export default {
       if (stage.value) {
         const { performances, chats } = stage.value;
         (performances || []).forEach((p) => {
-          p.messages = chats
-            .filter((c) => c.performanceId === p.id)
-            .map((c) => c.payload);
+          p.messages = chats.filter((c) => c.performanceId === p.id).map((c) => c.payload);
           res.push(p);
         });
       }
@@ -190,17 +191,15 @@ export default {
       res.forEach((session) => {
         const messages = session.messages.filter((m) => !m.clear);
         if (messages.length) {
-          session.begin = null
+          session.begin = null;
           for (const m of messages) {
             if (m.at) {
               if (!session.begin) {
-                session.begin = m.at
+                session.begin = m.at;
               }
-              session.end = m.at
+              session.end = m.at;
               session.duration = m.at - session.begin;
             }
-
-
           }
         } else {
           session.chatless = true;
@@ -208,12 +207,8 @@ export default {
         }
       });
       res.forEach((session) => {
-        session.privateMessages = session.messages.filter(
-          (m) => m.isPrivate || m.clearPlayerChat,
-        );
-        session.publicMessages = session.messages.filter(
-          (m) => !m.isPrivate && !m.clearPlayerChat,
-        );
+        session.privateMessages = session.messages.filter((m) => m.isPrivate || m.clearPlayerChat);
+        session.publicMessages = session.messages.filter((m) => !m.isPrivate && !m.clearPlayerChat);
       });
       return res;
     });
@@ -241,9 +236,8 @@ export default {
         if (session) {
           link.setAttribute(
             "download",
-            `${stage.value.name}-Audience-chat-${session.end
-              ? timeStamp(session.end)
-              : timeStamp(session.createdOn)
+            `${stage.value.name}-Audience-chat-${
+              session.end ? timeStamp(session.end) : timeStamp(session.createdOn)
             }.txt`,
           );
           content = session.publicMessages.map((item) => {
@@ -256,10 +250,7 @@ export default {
             return `${line}\r\n`;
           });
         } else {
-          link.setAttribute(
-            "download",
-            `${stage.value.name}-Audience-chat.txt`,
-          );
+          link.setAttribute("download", `${stage.value.name}-Audience-chat.txt`);
           sessions.value.forEach((session) => {
             content = content.concat(
               session.publicMessages.map((item) => {
@@ -276,9 +267,8 @@ export default {
         if (session) {
           link.setAttribute(
             "download",
-            `${stage.value.name}-Player-chat-${session.end
-              ? timeStamp(session.end)
-              : timeStamp(session.createdOn)
+            `${stage.value.name}-Player-chat-${
+              session.end ? timeStamp(session.end) : timeStamp(session.createdOn)
             }.txt`,
           );
           content = session.privateMessages.map((item) => {
@@ -322,15 +312,11 @@ export default {
 
     const formatDate = (date) => {
       return (
-        [padTo2Digits(date.getHours()), padTo2Digits(date.getMinutes())].join(
-          "",
-        ) +
+        [padTo2Digits(date.getHours()), padTo2Digits(date.getMinutes())].join("") +
         "-" +
-        [
-          padTo2Digits(date.getDate()),
-          padTo2Digits(date.getMonth() + 1),
-          date.getFullYear(),
-        ].join("")
+        [padTo2Digits(date.getDate()), padTo2Digits(date.getMonth() + 1), date.getFullYear()].join(
+          "",
+        )
       );
     };
 
@@ -339,9 +325,7 @@ export default {
       return formatDate(date);
     };
 
-    const { loading: updating, save: updateMutation } = useMutation(
-      stageGraph.updatePerformance,
-    );
+    const { loading: updating, save: updateMutation } = useMutation(stageGraph.updatePerformance);
     const updatePerformance = async (item, complete) => {
       await updateMutation(
         "Performance updated successfully!",
@@ -352,9 +336,7 @@ export default {
       complete();
     };
 
-    const { loading: deleting, save: deleteMutation } = useMutation(
-      stageGraph.deletePerformance,
-    );
+    const { loading: deleting, save: deleteMutation } = useMutation(stageGraph.deletePerformance);
     const deletePerformance = async (item, complete) => {
       await deleteMutation("Performance deleted successfully!", item.id);
       complete();
@@ -379,7 +361,7 @@ export default {
 </script>
 
 <style scoped>
-.button.is-light>img {
+.button.is-light > img {
   max-width: unset;
 }
 </style>

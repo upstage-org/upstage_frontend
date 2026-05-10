@@ -76,7 +76,6 @@ export default {
 </script>
 
 <style lang="scss">
-
 #topbar {
   display: flex;
   flex: 1;
@@ -111,7 +110,7 @@ export default {
       position: relative;
       width: 100px;
       height: 88px;
-      background: #F5F5F5;
+      background: #f5f5f5;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -138,8 +137,8 @@ export default {
         filter: brightness(1.2);
         background-color: lightgray;
         img {
-          -webkit-filter: drop-shadow(5px 5px 5px #F5F5F5);
-          filter: drop-shadow(5px 5px 5px #F5F5F5);
+          -webkit-filter: drop-shadow(5px 5px 5px #f5f5f5);
+          filter: drop-shadow(5px 5px 5px #f5f5f5);
         }
         .tag {
           background-color: transparent;

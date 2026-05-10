@@ -116,7 +116,7 @@ export const useRequest = (service, ...params) => {
     refresh,
     pushNode,
     popNode,
-    refetch
+    refetch,
   };
 };
 
@@ -139,7 +139,7 @@ export const useMutation = (...params) => {
       return response;
     } catch (error) {
       if (prm === configGraph.sendEmail) {
-        message.error(error);// notification.emailError(error);
+        message.error(error); // notification.emailError(error);
       } else {
         message.error(error);
       }
@@ -156,16 +156,12 @@ export const useQuery = (...params) => {
 };
 
 export const useFirst = (nodes) => {
-  return computed(
-    () => (nodes.value && nodes.value.length && nodes.value[0]) ?? {},
-  );
+  return computed(() => (nodes.value && nodes.value.length && nodes.value[0]) ?? {});
 };
 
 export function useAttribute(node, attributeName, isJson?: boolean) {
   return computed(() => {
-    let value = node.value?.attributes?.find(
-      (a) => a.name === attributeName,
-    )?.description;
+    let value = node.value?.attributes?.find((a) => a.name === attributeName)?.description;
     if (isJson && value) {
       value = JSON.parse(value);
     }

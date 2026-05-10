@@ -51,7 +51,7 @@ export default {
     AudioPlayer,
     ConnectionStatus,
     MasqueradingStatus,
-    Shell
+    Shell,
   },
   setup: () => {
     const store = useStore();

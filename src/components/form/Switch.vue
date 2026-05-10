@@ -1,17 +1,9 @@
 <template>
   <div class="field is-inline-block is-relative">
-    <span
-      class="on-switch-label"
-      v-if="!!checkedLabel && modelValue"
-      style="left: 10px"
-    >
+    <span class="on-switch-label" v-if="!!checkedLabel && modelValue" style="left: 10px">
       {{ checkedLabel }}
     </span>
-    <span
-      class="on-switch-label"
-      v-if="!!uncheckedLabel && !modelValue"
-      style="left: 25px"
-    >
+    <span class="on-switch-label" v-if="!!uncheckedLabel && !modelValue" style="left: 25px">
       {{ uncheckedLabel }}
     </span>
     <input
@@ -39,14 +31,7 @@ import Icon from "components/Icon.vue";
 import Loading from "components/Loading.vue";
 
 export default {
-  props: [
-    "className",
-    "modelValue",
-    "label",
-    "checkedLabel",
-    "uncheckedLabel",
-    "loading",
-  ],
+  props: ["className", "modelValue", "label", "checkedLabel", "uncheckedLabel", "loading"],
   emits: ["update:modelValue"],
   components: { Icon, Loading },
   setup: () => {

@@ -2,13 +2,18 @@
   <Object :object="object">
     <template #render>
       <div v-if="!videoTrack && !audioTrack" class="loading">
-        <Loading width="auto" height="22px" src="img/videoloading.gif"/>
+        <Loading width="auto" height="22px" src="img/videoloading.gif" />
       </div>
       <template v-else>
-        <video autoplay ref="videoEl" :style="{
-          'border-radius': object.shape === 'circle' ? '100%' : '12px',
-        }" @timeupdate="timeupdate"
-        @loadeddata="loadeddata">
+        <video
+          autoplay
+          ref="videoEl"
+          :style="{
+            'border-radius': object.shape === 'circle' ? '100%' : '12px',
+          }"
+          @timeupdate="timeupdate"
+          @loadeddata="loadeddata"
+        >
           Please click on Refresh Stream button.
         </video>
         <audio autoplay ref="audioEl" :muted="localMuted" v-bind:id="'video' + object.id"></audio>
@@ -76,14 +81,14 @@ export default {
 
     const reloadStreams = computed(() => store.getters["stage/reloadStreams"]);
     const videoTrack = computed(() => {
-      const vTracks = tracks.value.filter((t) => t.type === "video")
-      if (vTracks.find(t => t.stream.active)) return vTracks.find(t => t.stream.active)
-      return vTracks[0]
+      const vTracks = tracks.value.filter((t) => t.type === "video");
+      if (vTracks.find((t) => t.stream.active)) return vTracks.find((t) => t.stream.active);
+      return vTracks[0];
     });
     const audioTrack = computed(() => {
-      const aTracks = tracks.value.filter((t) => t.type === "audio")
-      if (aTracks.find(t => t.stream.active)) return aTracks.find(t => t.stream.active)
-      return aTracks[0]
+      const aTracks = tracks.value.filter((t) => t.type === "audio");
+      if (aTracks.find((t) => t.stream.active)) return aTracks.find((t) => t.stream.active);
+      return aTracks[0];
     });
     const loadTrack = () => {
       if (tracks.value.length) {
@@ -158,7 +163,7 @@ export default {
 
     const timeupdate = (e) => {
       interval && clearInterval(interval);
-    }
+    };
 
     const openVolumePopup = (slotProps) => {
       store
@@ -166,11 +171,11 @@ export default {
           type: "VolumeParameters",
         })
         .then(slotProps.closeMenu);
-    }
+    };
 
     const loadeddata = () => {
-      loading.value=false;
-    }
+      loading.value = false;
+    };
 
     return {
       videoTrack,
@@ -186,7 +191,7 @@ export default {
       loadTrack,
       openVolumePopup,
       loadeddata,
-      loading
+      loading,
     };
   },
 };

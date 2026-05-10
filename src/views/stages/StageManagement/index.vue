@@ -25,24 +25,27 @@
           <aside class="menu box has-background-light mx-4">
             <ul class="menu-list">
               <li>
-                <router-link :to="id
-      ? `/stages/stage-management/${id}/`
-      : '/stages/new-stage'
-      " exact-active-class="is-active">{{ $t("general_information") }}</router-link>
+                <router-link
+                  :to="id ? `/stages/stage-management/${id}/` : '/stages/new-stage'"
+                  exact-active-class="is-active"
+                  >{{ $t("general_information") }}</router-link
+                >
               </li>
               <template v-if="id">
                 <li>
-                  <router-link to="customisation" exact-active-class="is-active">{{ $t("customisation") }}</router-link>
+                  <router-link to="customisation" exact-active-class="is-active">{{
+                    $t("customisation")
+                  }}</router-link>
                 </li>
                 <li id="media-menu">
                   <router-link to="media" exact-active-class="is-active">{{
-      $t("media")
-    }}</router-link>
+                    $t("media")
+                  }}</router-link>
                 </li>
                 <li>
                   <router-link to="archive" exact-active-class="is-active">{{
-        $t("archive")
-                    }}</router-link>
+                    $t("archive")
+                  }}</router-link>
                 </li>
               </template>
             </ul>
@@ -70,9 +73,7 @@ export default {
   props: ["id"],
   components: { Loading },
   setup: (props) => {
-    const { nodes, loading, refetch, data, refresh, clearCache } = useRequest(
-      stageGraph.getStage,
-    );
+    const { nodes, loading, refetch, data, refresh, clearCache } = useRequest(stageGraph.getStage);
     const stage = useFirst(nodes);
     provide("stage", stage);
     provide("refresh", refresh);

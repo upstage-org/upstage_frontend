@@ -101,10 +101,7 @@
           <Skeleton :data="drawing" />
         </template>
         <template #context>
-          <a
-            class="panel-block has-text-danger"
-            @click="deleteDrawingPermanently(drawing)"
-          >
+          <a class="panel-block has-text-danger" @click="deleteDrawingPermanently(drawing)">
             <span class="panel-icon">
               <Icon src="remove.svg" />
             </span>

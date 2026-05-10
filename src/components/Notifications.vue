@@ -5,10 +5,7 @@ import { absolutePath } from "utils/common";
 import { useConfirmPermission } from "components/media/MediaForm/composable";
 import { inquiryVar } from "apollo";
 import { Media } from "models/studio";
-import {
-  computed,
-  watch,
-} from "vue";
+import { computed, watch } from "vue";
 
 const { result, loading, refetch } = useQuery(gql`
   query Notifications {
@@ -44,8 +41,7 @@ const { result: editingMediaResult } = useQuery<{ editingMedia: Media }>(gql`
 watch(editingMediaResult, () => {
   if (editingMediaResult.value) {
     const { editingMedia } = editingMediaResult.value;
-    if (editingMedia && editingMedia.permissions)
-      refetch();
+    if (editingMedia && editingMedia.permissions) refetch();
   }
 });
 
@@ -55,9 +51,9 @@ const refresh = () => {
   refetch();
   inquiryVar({
     ...inquiryVar(),
-    refresh: new Date()
+    refresh: new Date(),
   });
-}
+};
 </script>
 
 <template>
@@ -68,7 +64,10 @@ const refresh = () => {
           <template v-if="notification.type === 1">
             <a-list-item-meta>
               <template #avatar>
-                <a-avatar class="my-2" :src="absolutePath(notification.mediaUsage.asset.fileLocation)" />
+                <a-avatar
+                  class="my-2"
+                  :src="absolutePath(notification.mediaUsage.asset.fileLocation)"
+                />
               </template>
               <template #title>
                 <div class="text-sm whitespace-pre-wrap mb-2">
@@ -82,18 +81,28 @@ const refresh = () => {
                   <br />
                 </div>
                 <a-space>
-                  <smart-button type="primary" :action="() =>
-                    confirmPermission({
-                      approved: true,
-                      id: notification.mediaUsage.id,
-                    }).then(refresh)
-                    ">{{ $t("approve") }}</smart-button>
-                  <smart-button type="danger" :action="() =>
-                    confirmPermission({
-                      approved: false,
-                      id: notification.mediaUsage.id,
-                    }).then(refresh)
-                    ">{{ $t("reject") }}</smart-button>
+                  <smart-button
+                    type="primary"
+                    :action="
+                      () =>
+                        confirmPermission({
+                          approved: true,
+                          id: notification.mediaUsage.id,
+                        }).then(refresh)
+                    "
+                    >{{ $t("approve") }}</smart-button
+                  >
+                  <smart-button
+                    type="danger"
+                    :action="
+                      () =>
+                        confirmPermission({
+                          approved: false,
+                          id: notification.mediaUsage.id,
+                        }).then(refresh)
+                    "
+                    >{{ $t("reject") }}</smart-button
+                  >
                 </a-space>
               </template>
               <template #description>
