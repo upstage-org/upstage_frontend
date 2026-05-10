@@ -440,13 +440,33 @@ async function setStageStatus(
 
 /**
  * Open a brand-new browser context with no auth state, navigate to the live
- * stage URL, dismiss the LoginPrompt as audience, and wait for MQTT to come
- * up. Returns a seat-shaped object so existing `LiveStagePage` helpers
- * (speech bubble lookup, etc.) work the same way as for cast seats.
+ * stage URL, dismiss the LoginPrompt modal (audience entry), and wait for
+ * MQTT to come up. Returns a seat-shaped object so existing
+ * `LiveStagePage` helpers (speech bubble lookup, etc.) work the same way
+ * as for cast seats.
  *
  * NOTE: this requires the stage to be in "live" status. In rehearsal the
  * SPA shows "not currently open to the public" and `LiveStagePage.goto`
  * throws — that's intentional and matches real audience UX.
+ *
+ * Two non-obvious things:
+ * 1. `joinStage` is dispatched AUTOMATICALLY on the `mqtt.client.connect`
+ *    event (see stage/index.ts `connect` action). So the audience is
+ *    subscribed to the stage's MQTT topics as soon as `state.status` flips
+ *    to "LIVE", *without* the human ever clicking the modal. Functionally
+ *    we don't need to call `saveNickname` from the test.
+ * 2. BUT the LoginPrompt modal's `.modal-background` is an opaque overlay
+ *    (rgba(10,10,10,0.86)) covering the board. If we don't dismiss it,
+ *    the human watching headed Chromium sees nothing happen on the
+ *    audience seat. So we still have to click `.modal-background` to fire
+ *    `enterAsAudience` → `close()` and reveal the board.
+ *
+ * The previous `.modal .modal-background` selector + plain `.click()` was
+ * brittle: animejs runs a 1s rotate animation on `.modal-content` right
+ * after mount, and Playwright's stability check can refuse the click. We
+ * use `.modal.is-active` to target the visible LoginPrompt specifically,
+ * `force: true` to skip stability, and a JS-level `.click()` event as a
+ * fallback if Playwright's click somehow misses.
  */
 async function openAudienceSeat({
   browser,
@@ -460,18 +480,7 @@ async function openAudienceSeat({
   const live = new LiveStagePage(page);
   await live.goto(runtime.stageSlug);
 
-  // The LoginPrompt modal sits on top of the board for any unauthenticated
-  // visitor. Clicking `.modal-background` triggers `enterAsAudience` which
-  // dispatches `user/saveNickname` (which in turn dispatches `joinStage`)
-  // and closes the modal.
-  const modalBg = page.locator(".modal .modal-background").first();
-  await modalBg.waitFor({ state: "visible", timeout: 10_000 });
-  await modalBg.click();
-
-  // Wait for MQTT to flip the runtime status to LIVE on this client. Without
-  // this, the next SPEAK arriving here would be silently mute-gated by
-  // SET_OBJECT_SPEAK (`state.status === "LIVE"` is the gate that controls
-  // whether avatarSpeak / meSpeak fires).
+  console.log("[perform] audience: waiting for MQTT status=LIVE…");
   await page.waitForFunction(
     () => {
       const store = (
@@ -481,6 +490,65 @@ async function openAudienceSeat({
     },
     { timeout: 30_000 },
   );
+  console.log("[perform] audience: MQTT LIVE ✓ (joinStage fired automatically)");
+
+  // Wait for the LoginPrompt to actually mount and become active. It lives
+  // inside `<template v-if="ready">` in Layout.vue, so it appears the same
+  // tick `stage/ready` flips. We narrow to `.modal.is-active` so the
+  // selector unambiguously points at LoginPrompt (the only `.modal` that's
+  // is-active for an unauthenticated, just-arrived visitor).
+  const loginModal = page.locator(".modal.is-active").first();
+  try {
+    await loginModal.waitFor({ state: "visible", timeout: 15_000 });
+  } catch {
+    console.warn(
+      "[perform] audience: LoginPrompt modal never showed — already dismissed by an earlier auto-join? Continuing.",
+    );
+    return { context, page, live };
+  }
+  console.log("[perform] audience: LoginPrompt visible — dismissing…");
+
+  // Strategy 1: Playwright click with force:true to bypass the animejs
+  // rotation animation on .modal-content (which can fail Playwright's
+  // actionability check on the sibling .modal-background).
+  await loginModal
+    .locator(".modal-background")
+    .first()
+    .click({ force: true, timeout: 5_000 })
+    .catch((err) => {
+      console.warn(
+        `[perform] audience: Playwright click on .modal-background failed (${
+          err instanceof Error ? err.message : String(err)
+        }); falling back to JS dispatch.`,
+      );
+    });
+
+  // Strategy 2: if the modal is still active after the click, fire a
+  // synthetic click event on the same element from inside the page. This
+  // bypasses every Playwright actionability concern because we're inside
+  // the page's JS context invoking the DOM click() directly — Vue's bound
+  // @click handler runs the same way it would for a real user click.
+  const stillActive = await page
+    .locator(".modal.is-active")
+    .count()
+    .catch(() => 0);
+  if (stillActive > 0) {
+    console.log("[perform] audience: modal still active — using JS-level dispatch fallback");
+    await page.evaluate(() => {
+      const bg = document.querySelector<HTMLElement>(".modal.is-active .modal-background");
+      bg?.click();
+    });
+  }
+
+  // Confirm the modal actually closed. If even the JS-level dispatch
+  // didn't dismiss it, that's a real LoginPrompt regression we want to
+  // surface — fail loudly rather than let pass 2 run with the audience
+  // staring at an opaque overlay.
+  await page.waitForFunction(
+    () => document.querySelectorAll(".modal.is-active").length === 0,
+    { timeout: 10_000 },
+  );
+  console.log("[perform] audience: LoginPrompt dismissed ✓ — board visible");
 
   return { context, page, live };
 }
@@ -521,19 +589,32 @@ async function reloadCastSeats({
 // ---------------------------------------------------------------------------
 
 /**
- * Sweep pass 2's events into a Performance row, reload the audience seat with
- * that recordId so its Vuex picks up `state.model.events` and
- * `state.replay.timestamp.{begin,end}`, then dispatch `stage/replayRecording`
- * and wait for the SPA to flip `state.replay.isReplaying` back to false.
+ * Sweep pass 2's events into a Performance row, navigate the audience seat
+ * to the SPA's actual replay route (/replay/:url/:id), pin speed to 1x,
+ * dispatch `stage/replayRecording`, and wait for it to self-pause when the
+ * recording reaches its end.
  *
- * Speed is pinned to 1x: scheduled future events are dispatched via
- * `replayEvent` (NOT `replicateEvent`), so they are NOT muted, so meSpeak
- * fires for every speech beat. Faster speeds chop or stack TTS audibly.
+ * Why navigate instead of reusing `loadStage` via the dev hook:
  *
- * If sweepStage reports there were no events to archive (which can only
- * happen if pass 2 emitted nothing — usually a real bug we want surfaced —
- * but also the case in a smoke run where one of the cast races MQTT), we
- * log a warning and skip the replay rather than failing the whole test.
+ *   `Topping.vue::shouldShowBubble` has an explicit
+ *   `window.location.pathname.includes('/replay/')` short-circuit that is
+ *   the ONLY thing keeping replayed bubbles on screen — without it, every
+ *   bubble's `(now - speak.at) < 5s` check fails because `speak.at` is the
+ *   original (now-stale) MQTT timestamp. Reusing the live URL with a
+ *   dev-hook loadStage looks like it works (avatars place and move), but
+ *   every speech bubble gets filtered out and the replay looks "silent".
+ *
+ *   Mounting the actual `views/replay/Layout.vue` also gives us the
+ *   `provide("replaying", true)` injection some downstream components rely
+ *   on, and skips the LoginPrompt modal entirely.
+ *
+ * Speed is pinned to 1x: scheduled future events go through `replayEvent`
+ * (NOT `replicateEvent`), so they are NOT muted, so meSpeak fires for every
+ * speech beat. Faster speeds chop or stack TTS audibly. (The on-screen
+ * Controls bar lets a human override mid-replay if desired.)
+ *
+ * If sweepStage reports there were no events to archive, we log a warning
+ * and skip the replay rather than failing the whole test.
  */
 async function runReplay({
   audience,
@@ -555,44 +636,59 @@ async function runReplay({
     );
     return;
   }
-  console.log(`[perform] PASS 3: replay performance #${performanceId} on audience seat`);
+  console.log(
+    `[perform] PASS 3: replay performance #${performanceId} on audience seat ` +
+      `via /replay/${stageSlug}/${performanceId}`,
+  );
 
-  // Reload the audience SPA against the new performanceId so `loadStage`
-  // pulls just THIS performance's events. We hit `stage/loadStage` directly
-  // through the dev-store hook (same path as `Live.vue`'s preloader) so we
-  // don't have to construct a /record/<id>/<slug> URL by hand.
-  const eventCount = await audience.page.evaluate(
-    async ({ url, recordId }) => {
+  // Navigate the audience context to the proper replay URL. The SPA route
+  // `/replay/:url/:id` mounts views/replay/Layout.vue which auto-dispatches
+  // `stage/loadStage({url, recordId})` on setup.
+  await audience.page.goto(`/replay/${stageSlug}/${performanceId}`);
+  await audience.page.waitForLoadState("domcontentloaded");
+
+  // The replay layout still uses the Preloader (with `replaying` class).
+  // Once the model and assets have loaded the hero shows
+  // "click anywhere to continue" — dismiss it the same way LiveStagePage.goto
+  // does for the live route.
+  const hero = audience.page.locator("section.hero.is-fullheight").first();
+  await hero.waitFor({ state: "visible", timeout: 60_000 });
+  const continueText = audience.page.getByText(/click anywhere to continue/i).first();
+  if (await continueText.isVisible().catch(() => false)) {
+    await hero.click();
+  }
+  await audience.page
+    .locator('#board, [data-testid="board"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 });
+
+  // Wait until loadStage has finished filling state.replay.timestamp from
+  // the recording's events (the dev hook is exposed by main.ts under
+  // VITE_E2E, same as on the live route).
+  await audience.page.waitForFunction(
+    () => {
       type DevStore = {
-        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
-        state: { stage: { model: { events?: unknown[] } } };
+        state: { stage: { replay: { timestamp: { begin: number; end: number } }; model: { events?: unknown[] } } };
       };
       const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
-      await store.dispatch("stage/loadStage", { url, recordId });
-      return store.state.stage.model.events?.length ?? 0;
+      const ts = store?.state?.stage?.replay?.timestamp;
+      const events = store?.state?.stage?.model?.events;
+      return Boolean(ts && Number(ts.end) > Number(ts.begin) && events && events.length > 0);
     },
-    { url: stageSlug, recordId: performanceId },
+    { timeout: 30_000 },
   );
-  if (eventCount === 0) {
-    throw new Error(
-      `[perform] PASS 3: loadStage returned 0 events for performance ${performanceId} — ` +
-        "the recording is empty. Check that event_archive_dev was running during pass 2.",
-    );
-  }
 
-  // Pin speed=1 BEFORE starting playback. SET_REPLAY merges into state.replay
-  // and replayRecording reads `state.replay.speed` at the top of the action.
-  // Snapshot the begin/end window in the same evaluate so the wait loop has
-  // a sane wall-clock bound.
-  const { durationMs } = await audience.page.evaluate(() => {
+  // Pin speed=1 and snapshot the begin/end window so the wait loop has a
+  // sane wall-clock bound. SET_REPLAY merges into state.replay and
+  // replayRecording reads `state.replay.speed` at the top of the action.
+  const { durationMs, eventCount } = await audience.page.evaluate(() => {
     type ReplayState = {
       timestamp: { begin: number; end: number };
       speed: number;
     };
     type DevStore = {
       commit: (type: string, payload?: unknown) => void;
-      state: { stage: { replay: ReplayState } };
+      state: { stage: { replay: ReplayState; model: { events?: unknown[] } } };
     };
     const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
     if (!store) throw new Error("Vuex store not exposed.");
@@ -601,7 +697,10 @@ async function runReplay({
     // mqttTimestamp is POSIX seconds (event_archive subscriber writes
     // time.time()), so wall-clock duration at speed=1 is (end-begin)*1000.
     const seconds = Math.max(0, Number(ts.end) - Number(ts.begin));
-    return { durationMs: Math.round(seconds * 1000) };
+    return {
+      durationMs: Math.round(seconds * 1000),
+      eventCount: store.state.stage.model.events?.length ?? 0,
+    };
   });
   console.log(
     `[perform] PASS 3: replay duration ≈ ${(durationMs / 1000).toFixed(1)}s @ 1x ` +
@@ -622,10 +721,10 @@ async function runReplay({
     fullPage: true,
   });
 
-  // The action installs a 1Hz interval that increments `current` and fires
-  // `pauseReplay` when current passes end, which sets isReplaying=false.
+  // replayRecording installs a 1Hz interval that increments `current` and
+  // fires `pauseReplay` (→ isReplaying=false) when current passes end.
   // Allow durationMs + a generous buffer for the last setTimeout to fire
-  // and meSpeak's tail to drain. tailWait shape mirrored from pass 2.
+  // and meSpeak's tail to drain.
   const tailMs = pace === "fast" ? 5_000 : pace === "normal" ? 15_000 : 30_000;
   const timeoutMs = durationMs + tailMs;
   await audience.page.waitForFunction(
@@ -668,11 +767,28 @@ async function runBeat({
   const tag = `[${label}] beat[${i}] ${beat.kind}${beat.speaker ? ` <${beat.speaker}>` : ""}`;
 
   if (beat.kind === "backdrop") {
-    // Admin owns backdrop changes. We reach into the SPA's GraphQL directly
-    // because the live UI for backdrop swap is buried in a context menu we
-    // don't drive with Playwright clicks.
+    // Admin owns backdrop changes. We do TWO things in lock-step:
+    //
+    //   1. GraphQL `updateStage(cover)` — persists the chosen backdrop as
+    //      the stage's default. Anyone reloading later starts on this
+    //      cover. This is what we used to do, alone — the bug was that
+    //      it doesn't show up on already-connected clients in real time
+    //      (cover only seeds `state.model.cover`, which Board.vue does
+    //      not render; the live board image comes from `state.background`)
+    //      AND it isn't broadcast over MQTT, so the event_archive worker
+    //      never sees it and the recording can't replay it.
+    //
+    //   2. MQTT `stage/setBackground` — broadcasts a CHANGE_BACKGROUND
+    //      event over TOPICS.BACKGROUND. Every connected client commits
+    //      `SET_BACKGROUND`, which sets `state.background`, which is what
+    //      `Backdrop.vue` actually renders. The event is also captured by
+    //      event_archive_dev → swept into the Performance row → replayed
+    //      by `replayRecording` → fires `SET_BACKGROUND` again on the
+    //      audience seat in pass 3.
     const ref = beat.backdrop ? runtime.backdrops[beat.backdrop] : undefined;
     if (!ref) throw new Error(`${tag}: unknown backdrop key ${beat.backdrop}`);
+
+    // 1. Persist via GraphQL.
     await adminLive["page"].evaluate(async ({ stageId, mediaId }) => {
       const raw = window.localStorage.getItem("vuex");
       const token = raw ? (JSON.parse(raw)?.auth?.token ?? null) : null;
@@ -722,6 +838,54 @@ async function runBeat({
       const result = await resp.json();
       if (result.errors) throw new Error(JSON.stringify(result.errors));
     }, { stageId: runtime.stageId, mediaId: ref.id });
+
+    // 2. Broadcast over MQTT from the admin's seat. We pull the backdrop
+    //    object straight out of `state.stage.tools.backdrops` because that
+    //    is exactly what the real toolbox UI passes to setBackground —
+    //    same `id`, `src` (already absolutized by SET_MODEL), and any
+    //    multi-frame metadata. SET_BACKGROUND does change-detection on
+    //    `id` and `at`, so a synthetic minimal object would risk being
+    //    dropped on observers that already saw a same-id no-op.
+    await adminLive["page"].evaluate(async ({ mediaId }) => {
+      type Backdrop = Record<string, unknown> & { id: string | number };
+      type DevStore = {
+        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
+        state: { stage: { tools: { backdrops?: Backdrop[] }; status: string } };
+      };
+      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+      if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
+
+      const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+      // Toolbox is populated by SET_MODEL after `loadStage` resolves; on a
+      // freshly reloaded admin page it may not be there yet. Poll briefly.
+      let backdrop: Backdrop | undefined;
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const list = store.state.stage.tools.backdrops ?? [];
+        backdrop = list.find((b) => String(b.id) === String(mediaId));
+        if (backdrop) break;
+        await sleep(250);
+      }
+      if (!backdrop) {
+        const ids = (store.state.stage.tools.backdrops ?? [])
+          .map((b) => String(b.id))
+          .join(", ");
+        throw new Error(
+          `setBackground: backdrop ${mediaId} not in admin tools.backdrops; available: [${ids}]`,
+        );
+      }
+
+      // setBackground stamps `at = +new Date()` itself before publishing,
+      // so we don't need to set it. MQTT must be LIVE on the admin page
+      // (it always is — admin has been on the stage since the start), but
+      // assert just in case so a regression here surfaces clearly.
+      if (store.state.stage.status !== "LIVE") {
+        throw new Error(
+          `setBackground: admin MQTT status=${store.state.stage.status}, expected LIVE`,
+        );
+      }
+      await store.dispatch("stage/setBackground", backdrop);
+    }, { mediaId: ref.id });
     return;
   }
 

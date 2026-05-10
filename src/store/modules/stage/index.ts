@@ -1286,13 +1286,28 @@ export default {
       }
     },
     replayEvent({ dispatch }, { topic, payload }) {
+      // Deep-clone before dispatching. The event payload sitting in
+      // `state.model.events[i].payload` is a SHARED reference that survives
+      // the entire replay session. Downstream mutations (notably
+      // `deserializeObject`, called by PUSH_OBJECT and UPDATE_OBJECT)
+      // rewrite x/y/w/h IN PLACE — converting `relative → absolute` on
+      // first replay (480 = 0.4 * stageSize.width), then `absolute →
+      // multiplied-absolute` on every subsequent replay/seek (480 * 1200
+      // = 576000). After two passes the avatar lands far off-screen and
+      // the stage looks blank even though the replay timer keeps
+      // ticking. Cloning here scopes that mutation to one playback only.
+      const clone = JSON.parse(JSON.stringify(payload));
       dispatch("handleMessage", {
         topic: unnamespaceTopic(topic),
-        message: payload,
+        message: clone,
       });
     },
     replicateEvent({ dispatch }, { topic, payload }) {
-      const message = payload;
+      // Same shared-reference hazard as `replayEvent` — see comment there.
+      // `replicateEvent` is hit for past events on seek and for catch-up
+      // via `reloadMissingEvents`, both of which can run on the same
+      // event multiple times.
+      const message = JSON.parse(JSON.stringify(payload));
       message.mute = true;
       dispatch("handleMessage", {
         topic: unnamespaceTopic(topic),
@@ -1306,7 +1321,17 @@ export default {
         ? Number(timestamp)
         : state.replay.timestamp.begin;
       state.replay.timestamp.current = current;
+      // Preserve persistent stage-config values across CLEAN_STAGE. Backdrop
+      // color and config live on stage attributes (not in the MQTT event
+      // stream), so CLEAN_STAGE wiping them to "gray" / defaults produces a
+      // visible flash that doesn't correspond to anything in the original
+      // performance — and they're never re-set by replayed events, so the
+      // wrong color persists for the entire replay.
+      const preservedBackdropColor = state.backdropColor;
+      const preservedConfig = state.config;
       commit("CLEAN_STAGE");
+      state.backdropColor = preservedBackdropColor;
+      state.config = preservedConfig;
       state.replay.isReplaying = true;
       const events = state.model.events;
       const speed = state.replay.speed;
