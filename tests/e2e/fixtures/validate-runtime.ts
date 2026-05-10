@@ -35,6 +35,7 @@ export async function validateRuntimeStateForReuse(
       id
       fileLocation
       status
+      playerAccess
       assets { id }
     }
   }`;
@@ -44,6 +45,7 @@ export async function validateRuntimeStateForReuse(
       id: string | number;
       fileLocation: string;
       status: string | null;
+      playerAccess: string | null;
       assets: Array<{ id: string | number }>;
     } | null;
   }>(query, { id: String(state.stageId) }, adminToken);
@@ -73,6 +75,33 @@ export async function validateRuntimeStateForReuse(
   for (const id of expected) {
     if (!onStage.has(id)) {
       return { ok: false, reason: `media id ${id} not on stage assets` };
+    }
+  }
+
+  // The backend `stage_operation_service.resolve_permission` only honors a
+  // 2-element `playerAccess` JSON list (`[playerIds, editorIds]`). Any other
+  // shape — including the legacy 3-element `[audience, player, playerEdit]`
+  // some older test runs persisted — falls through to "audience" for every
+  // user, which makes `getters.canPlay` false in the SPA and silently drops
+  // the SPEAK MQTT side-channel that drives `Topping.vue` speech bubbles.
+  // Treat a malformed payload as a re-authoring trigger so a stale stage gets
+  // rewritten with the correct shape on the next setup run.
+  const accessRaw = stage.playerAccess;
+  if (typeof accessRaw === "string" && accessRaw.length > 0) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(accessRaw);
+    } catch {
+      return { ok: false, reason: `playerAccess is not valid JSON: ${accessRaw}` };
+    }
+    if (!Array.isArray(parsed) || parsed.length !== 2) {
+      return {
+        ok: false,
+        reason:
+          `playerAccess is not a 2-element list (got length ${
+            Array.isArray(parsed) ? parsed.length : "non-array"
+          }); backend resolve_permission falls through to "audience"`,
+      };
     }
   }
 

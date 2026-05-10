@@ -12,7 +12,11 @@ import type { JQueryStatic } from "jquery";
  */
 declare global {
   interface Window {
-    /** Dev-only hook for Playwright E2E (`pnpm dev`). Do not rely on in production. */
+    /**
+     * Hook for Playwright `e2e:perform`: present whenever `import.meta.env.DEV`
+     * is true (i.e. `pnpm dev`) OR the bundle was built with `VITE_E2E=1`.
+     * Don't rely on it in feature code — it may be stripped from real prod bundles.
+     */
     __UPSTAGE_STORE__?: import("vuex").Store<unknown>;
     $: JQueryStatic;
     jQuery: JQueryStatic;

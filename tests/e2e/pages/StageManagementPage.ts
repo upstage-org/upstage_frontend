@@ -104,12 +104,21 @@ export class StageManagementPage {
   }
 
   /**
-   * Grants Player + edit access to all the named usernames in a single mutation.
-   * Reuses the SPA's `updateStage` mutation exposed via the auth token.
+   * Grants Player + edit access to the named user ids in a single `updateStage`
+   * mutation, matching the on-disk format the SPA writes from
+   * `MultiTransferAccessColumn` and that `stage_operation_service.resolve_permission`
+   * reads on the backend.
+   *
+   * Wire format: a JSON-stringified **2-element** list — `[playerIds, editorIds]`.
+   * Audience is implicit (any user not in either bucket). The backend checks
+   * `len(accesses) == 2` before honoring the lists; a 3-element list (audience
+   * + player + editor) falls through to `"audience"` for everyone, which makes
+   * `getters.canPlay` false in the SPA and silently disables the SPEAK MQTT
+   * side-channel that drives `Topping.vue` speech bubbles.
    */
   async grantPlayerAccess(
     stageId: string,
-    userIdsByLevel: { audience: string[]; player: string[]; playerEdit: string[] },
+    userIdsByLevel: { player: string[]; playerEdit: string[] },
   ): Promise<void> {
     await this.page.evaluate(
       async ({ stageId, userIdsByLevel }) => {
@@ -118,7 +127,6 @@ export class StageManagementPage {
         if (!token) throw new Error("[e2e] no auth token in localStorage");
         const endpoint = new URL("studio_graphql", `${window.location.origin}/api/`).toString();
         const playerAccess = JSON.stringify([
-          userIdsByLevel.audience,
           userIdsByLevel.player,
           userIdsByLevel.playerEdit,
         ]);

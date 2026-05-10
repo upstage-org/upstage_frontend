@@ -35,6 +35,12 @@ Running **`pnpm exec playwright test`** directly bypasses preflight entirely.
 
 2. **Frontend** already serving the SPA at **`E2E_BASE_URL`**, or leave it unset to target **`http://127.0.0.1:3000`** (typical `pnpm dev`). Playwright **never** starts the dev server—bring the bundle up yourself first.
 
+   The bundle must expose `window.__UPSTAGE_STORE__` so `perform.spec.ts` can dispatch `stage/placeObjectOnStage` on each player's seat. Two ways to satisfy this:
+   - `pnpm dev` — automatic via `import.meta.env.DEV` (see `src/main.ts`).
+   - `vite build` (e.g. via `run_front_end_dev.sh` / `run_front_end_prod.sh` Docker compose) — the build must see `VITE_E2E=1`. The scripts seed it through two paths: (a) `cp env_backup_${SITE} ./.env` before `docker compose up --build`, so the `vite build` inside the builder container reads it via `loadEnv` (this also brings in `VITE_MQTT_ENDPOINT`, `VITE_GRAPHQL_ENDPOINT`, `VITE_STATIC_ASSETS_ENDPOINT`, etc. — without them MQTT silently no-ops and asset URLs 404); (b) compose `build.args` + Dockerfile `ENV VITE_E2E` as a fallback override. `env.template`, `dotenv_template`, `.env.example`, `.env`, `env_backup_dev`, and `env_backup_prod` all carry `VITE_E2E=1` for parity.
+
+   **Heads-up:** `.dockerignore` deliberately includes `.env` in the build context (see comment in that file). If you re-add `.env` to `.dockerignore` you'll break `vite build` for **all** `VITE_*` vars, not just `VITE_E2E`.
+
 3. **Mosquitto** for perform tests. The SPA connects over **WebSockets** (see
    `VITE_MQTT_ENDPOINT`, typically `ws://localhost:9001` on the host). Plain
    **MQTT TCP 1883** is usually mapped only **inside** Docker. `global-setup.ts`

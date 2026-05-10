@@ -195,31 +195,108 @@ async function runBeat({
   if (beat.kind === "move") {
     const mediaRef = runtime.mediaByPersona[beat.speaker];
     if (!mediaRef) return;
-    await seat.live.moveObjectByName(mediaRef.name, beat.to ?? { x: 500, y: 300 });
+    // We dispatch `stage/shapeObject` directly rather than driving a pointer
+    // drag through the DOM. With liveAction: true on an already-published
+    // object this emits BOARD_ACTIONS.MOVE_TO over MQTT for every observer —
+    // exactly what a real drag does on dragEnd. Avoids the fragility of
+    // pointer-timing and works regardless of viewport/zoom. (The DOM path is
+    // available via LiveStagePage.moveObjectByName for tests that specifically
+    // want to exercise the pointer/drag code.)
+    await moveAvatar({
+      seat,
+      mediaName: mediaRef.name,
+      to: beat.to ?? { x: 500, y: 300 },
+    });
     return;
   }
 
   if (beat.kind === "speak" || beat.kind === "shout" || beat.kind === "think") {
     if (!beat.line) throw new Error(`${tag}: missing line`);
-    await seat.live.sendChat(beat.line, beat.kind);
+    // Players speak in-world: their line is the avatar's voice (TTS via
+    // meSpeak) and a transient bubble over the avatar (Topping.vue), and is
+    // *not* an OOC chat-panel message. We dispatch `stage/speakAsAvatar`
+    // (TOPICS.BOARD/SPEAK only — no TOPICS.CHAT) instead of typing into the
+    // chat input. The chat panel stays reserved for audience text and the
+    // `-` prefix in `stage/sendChat`.
+    await speakAsAvatar({ seat, message: beat.line, behavior: beat.kind });
 
     const mediaRef = runtime.mediaByPersona[beat.speaker];
     if (mediaRef) {
-      // We assert on the *admin's* view (the easiest 3rd-party observer). MQTT
-      // round-trip lag means we poll here.
-      await expect
-        .poll(
-          async () => {
-            const bubble = adminLive.speechBubbleFor(mediaRef.name);
-            if (!(await bubble.count())) return "";
-            return (await bubble.innerText()).trim();
-          },
-          { timeout: 12_000, intervals: [200, 400, 800, 1600] },
-        )
-        .toContain(beat.line.split(/\s+/).slice(0, 4).join(" "));
+      // The bubble being visible on the *admin's* page proves the SPEAK MQTT
+      // message round-tripped — and SET_OBJECT_SPEAK calls avatarSpeak() on
+      // every observing client (including the speaker), so the bubble is also
+      // implicit proof that TTS was fired. The bubble is ephemeral: it
+      // auto-clears after 1s + 1s/word (SET_OBJECT_SPEAK timer), and Topping's
+      // BUBBLE_TIMEOUT is 5s — so don't dawdle between dispatch and assert.
+      await expect(
+        adminLive.speechBubbleFor(mediaRef.name),
+      ).toBeVisible({ timeout: 8_000 });
+
+      // Negative assertion: player speech must NOT pollute the public chat
+      // log. We sample the first few words of the line; for shouts, sendChat
+      // would have uppercased — `speakAsAvatar` does the same for `behavior`
+      // semantics, so we check both forms to be safe.
+      const expectedPrefix = beat.line.split(/\s+/).slice(0, 4).join(" ");
+      const needles = beat.kind === "shout"
+        ? [expectedPrefix, expectedPrefix.toUpperCase()]
+        : [expectedPrefix];
+      for (const needle of needles) {
+        await expect(
+          adminLive.chatLogEntryFor(mediaRef.name, needle),
+        ).toHaveCount(0, { timeout: 1_000 });
+      }
     }
     return;
   }
+}
+
+/**
+ * Drive in-world avatar speech (bubble + meSpeak TTS) from the speaker's seat
+ * by dispatching `stage/speakAsAvatar` directly via the dev-store hook. This
+ * intentionally skips the chat input / `stage/sendChat` path so the line does
+ * NOT appear in the public chat log — matching how player speech behaves in
+ * the real app (in-world performance, not OOC chat).
+ *
+ * Throws if the seat has no held avatar or `canPlay` is false (rather than
+ * silently no-opping like the underlying action) so test failures point at the
+ * real cause: the speaker isn't actually on stage / hasn't been granted
+ * player permissions.
+ */
+async function speakAsAvatar({
+  seat,
+  message,
+  behavior,
+}: {
+  seat: CastSeat;
+  message: string;
+  behavior: "speak" | "shout" | "think";
+}): Promise<void> {
+  await seat.page.evaluate(
+    async ({ message, behavior }) => {
+      type DevStore = {
+        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
+        getters: Record<string, unknown>;
+      };
+      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+      if (!store) {
+        throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
+      }
+      const avatar = store.getters["stage/currentAvatar"];
+      if (!avatar) {
+        throw new Error(
+          "speakAsAvatar: no currentAvatar held — the speaker hasn't entered or `enter` did not publish.",
+        );
+      }
+      const canPlay = store.getters["stage/canPlay"];
+      if (!canPlay) {
+        throw new Error(
+          "speakAsAvatar: canPlay=false on this seat — backend permission resolution did not grant `player`.",
+        );
+      }
+      await store.dispatch("stage/speakAsAvatar", { message, behavior });
+    },
+    { message, behavior },
+  );
 }
 
 async function placeAvatar({
@@ -301,5 +378,63 @@ async function placeAvatar({
       });
     },
     { mediaId, mediaName, to },
+  );
+}
+
+async function moveAvatar({
+  seat,
+  mediaName,
+  to,
+}: {
+  seat: CastSeat;
+  mediaName: string;
+  to: { x: number; y: number };
+}): Promise<void> {
+  await seat.page.evaluate(
+    async ({ mediaName, to }) => {
+      type StageSlice = {
+        board: { objects: Array<Record<string, unknown> & { id: string; name?: string; published?: boolean }> };
+      };
+      type DevStore = {
+        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
+        state: { stage: StageSlice };
+      };
+
+      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+      if (!store) {
+        throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
+      }
+
+      const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+      // Object placement is async (MQTT round-trip via shapeObject in placeAvatar);
+      // a follow-up move beat may run before the seat's local board state has
+      // settled. Poll briefly so we don't race the placement.
+      let target: (Record<string, unknown> & { id: string; published?: boolean }) | undefined;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        target = store.state.stage.board.objects.find(
+          (o) => o.name === mediaName,
+        );
+        if (target) break;
+        await sleep(150);
+      }
+      if (!target) {
+        throw new Error(
+          `move: object name=${mediaName} not in board.objects on this seat`,
+        );
+      }
+
+      // shapeObject with liveAction: true emits BOARD_ACTIONS.MOVE_TO when the
+      // object is already published (placeAvatar publishes on enter), or
+      // PLACE_OBJECT_ON_STAGE if not — either way observers see the new x/y.
+      await store.dispatch("stage/shapeObject", {
+        ...target,
+        x: to.x,
+        y: to.y,
+        liveAction: true,
+        published: target.published ?? true,
+      });
+    },
+    { mediaName, to },
   );
 }

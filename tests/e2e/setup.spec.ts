@@ -237,7 +237,6 @@ test.describe("setup: author the Romeo & Juliet stage", () => {
       personas.map((p) => p.persona.username),
     );
     await stageMgmt.grantPlayerAccess(stageId, {
-      audience: [],
       player: [],
       playerEdit: Object.values(playerIds),
     });

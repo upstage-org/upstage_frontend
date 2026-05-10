@@ -831,6 +831,44 @@ export default {
         });
       }
     },
+    /**
+     * Make the held avatar speak (bubble + TTS) WITHOUT writing to the public
+     * chat log. Mirrors the SPEAK side of `sendChat` — same payload shape, same
+     * topic — but skips `TOPICS.CHAT` entirely.
+     *
+     * Use when the speech act is the avatar performing in-world (the spoken
+     * line is captured by the bubble + voice synthesis), and routing it through
+     * the chat panel would be noise rather than a signal. The chat panel
+     * remains the place for OOC text and audience messages (`-` prefix in
+     * `sendChat`).
+     *
+     * No-op when there is no held avatar, the user is not a player, or the
+     * message is empty — same silent-precondition pattern as `sendChat`.
+     */
+    speakAsAvatar({ state, rootGetters, getters }, { message, behavior }) {
+      if (!message) return;
+      const avatar = getters["currentAvatar"];
+      if (!avatar) return;
+      const isPlayer = getters["canPlay"];
+      if (!isPlayer) return;
+      const finalBehavior = behavior === "shout" || behavior === "think" ? behavior : "speak";
+      const finalMessage = finalBehavior === "shout" ? String(message).toUpperCase() : message;
+      const speak = {
+        user: rootGetters["user/chatname"],
+        message: finalMessage,
+        behavior: finalBehavior,
+        isPlayer: true,
+        isPrivate: false,
+        session: state.session,
+        at: +new Date(),
+        id: uuidv4(),
+      };
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.SPEAK,
+        avatar,
+        speak,
+      });
+    },
     handleChatMessage({ commit, state, rootGetters, dispatch }, { message }) {
       if (message.clear) {
         commit("CLEAR_CHAT");

@@ -89,9 +89,15 @@ export class LiveStagePage {
 
   /**
    * Drag an object's wrapper (Object.vue) from its current screen position to
-   * a target client-coordinate inside the board. The Moveable wrapper handles
-   * pointerdown/move/up but a plain mouse drag works for our simple "walk to
-   * (x,y)" beats.
+   * a target client-coordinate inside the board.
+   *
+   * `[data-testid="object-${name}"]` now lives on the sized `.object` div
+   * inside Moveable's slot, so it has a real bounding box and is visible to
+   * Playwright. This pointer-drag path is therefore usable, but for perform
+   * `move` beats we still prefer `moveAvatar()` in `perform.spec.ts`
+   * (dispatches `stage/shapeObject` directly via the dev store hook), which is
+   * what the SPA itself does after a real drag finishes — no fragile pointer
+   * timing, and it works even when the board is not in the viewport.
    */
   async moveObjectByName(objectName: string, to: { x: number; y: number }): Promise<void> {
     const target = this.objectByName(objectName);
@@ -121,15 +127,43 @@ export class LiveStagePage {
   }
 
   chatInput(): Locator {
-    return this.page.locator('[data-testid="chat-input"] textarea, [data-testid="chat-input"] input').first();
+    // ChatInput.vue renders a single <textarea class="textarea"> via ElasticInput.
+    // The wrapper also embeds <emoji-picker> (a custom element) whose Shadow DOM
+    // contains <input id="search"> for emoji search; Playwright pierces shadow DOM
+    // by default, so a comma selector that includes `input` resolved to the hidden
+    // emoji-search field on `.first()` and `waitFor({ visible })` timed out.
+    // Stick to `textarea` — the emoji picker has none, so this is unambiguous.
+    return this.page.locator('[data-testid="chat-input"] textarea').first();
   }
 
   /**
-   * Speech bubbles live in `Topping.vue`, teleported to `document.body`, so they
-   * are not under `[data-testid="object-*"]`. The topping wrapper uses
-   * `data-testid="speech-topping-${object.name}"`.
+   * Speech bubbles live in `Topping.vue`, teleported to `document.body`, so
+   * they are not under `[data-testid="object-*"]`. The topping wrapper uses
+   * `data-testid="speech-topping-${object.name}"` and the `.bubble` is
+   * conditionally rendered while `object.speak` is set.
+   *
+   * This is the canonical assertion for **player speech** (in-world
+   * bubble + TTS, dispatched via `stage/speakAsAvatar` → `TOPICS.BOARD/SPEAK`,
+   * intentionally not in the chat log). The bubble is ephemeral: Topping's
+   * `BUBBLE_TIMEOUT` is 5s and `SET_OBJECT_SPEAK` clears `object.speak` after
+   * 1s + 1s/word — assert promptly after the dispatch.
    */
   speechBubbleFor(name: string): Locator {
     return this.page.getByTestId(`speech-topping-${name}`).locator(".bubble").first();
+  }
+
+  /**
+   * Public chat log entry (Chat/index.vue → Messages.vue). Each `<p>` in
+   * `#chatbox` is one message: `<small><b>{user}:</b></small>` + `<span
+   * class="tag message">…{message}…</span>`. We narrow by both the speaker
+   * label and a substring of the line so repeats from the same persona stay
+   * unambiguous. Used for OOC chat assertions (and as a *negative* assertion
+   * to prove player speech did NOT leak into the chat log).
+   */
+  chatLogEntryFor(speakerLabel: string, lineSubstring: string): Locator {
+    return this.page
+      .locator("#chatbox p")
+      .filter({ hasText: `${speakerLabel}:` })
+      .filter({ hasText: lineSubstring });
   }
 }

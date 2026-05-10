@@ -23,6 +23,14 @@ x-common-build: &common_build |
   COPY . .
 
   ARG SITE
+  # VITE_E2E is consumed by `vite build` (Vite's loadEnv merges process.env on
+  # top of `.env`) so the bundle exposes window.__UPSTAGE_STORE__ for the
+  # Playwright e2e:perform suite. We pass it through here (not via `.env`) to
+  # keep the dev/prod toggle out of the persisted env files.
+  # All other VITE_* vars (MQTT endpoint/credentials, GraphQL, static assets,
+  # …) come from `.env` in the build context — `.dockerignore` MUST allow it.
+  ARG VITE_E2E
+  ENV VITE_E2E=$$VITE_E2E
   RUN if [ "$$SITE" = "dev" ]; then \
         pnpm run build:dev; \
       else \
@@ -55,6 +63,7 @@ services:
       dockerfile_inline: *common_build
       args:
         SITE: "${SITE}"
+        VITE_E2E: "${VITE_E2E:-}"
     image: upstage/frontend:local
     container_name: upstage_frontend_${SITE}
     user: "${HOST_UID}:${HOST_GID}"

@@ -21,7 +21,7 @@ const app = createApp(App)
   .use(i18n)
   .directive("click-outside", ClickOutside);
 
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV || import.meta.env.VITE_E2E) {
   window.__UPSTAGE_STORE__ = store;
 }
 
