@@ -130,9 +130,10 @@ export class StageManagementPage {
           userIdsByLevel.player,
           userIdsByLevel.playerEdit,
         ]);
+        const headers = { "content-type": "application/json", authorization: `Bearer ${token}` };
         const resp = await fetch(endpoint, {
           method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          headers,
           body: JSON.stringify({
             query: `mutation UpdateStage($input: StageInput!) {
               updateStage(input: $input) { id }
@@ -152,6 +153,43 @@ export class StageManagementPage {
         const result = JSON.parse(body) as { errors?: unknown };
         if (result.errors) {
           throw new Error(`updateStage failed: ${JSON.stringify(result.errors)}`);
+        }
+
+        // Read-back. The mutation returns 200/no errors even when the backend
+        // silently ignores `playerAccess` (input shape mismatch, missing
+        // mapper field, etc.). Without this check, a misconfigured stage
+        // gets persisted, validate-runtime accepts it, and the perform suite
+        // explodes much later with `canPlay=false` from speakAsAvatar — which
+        // is hard to trace back to the missing write at setup.
+        const verifyResp = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            query: `query VerifyPlayerAccess($id: ID!) {
+              stage(id: $id) { id playerAccess }
+            }`,
+            variables: { id: String(stageId) },
+          }),
+        });
+        const verifyBody = await verifyResp.text();
+        const verifyResult = JSON.parse(verifyBody) as {
+          data?: { stage?: { playerAccess?: string | null } | null };
+          errors?: unknown;
+        };
+        if (verifyResult.errors) {
+          throw new Error(
+            `[e2e] grantPlayerAccess read-back failed: ${JSON.stringify(verifyResult.errors)}`,
+          );
+        }
+        const persisted = verifyResult.data?.stage?.playerAccess ?? null;
+        if (persisted !== playerAccess) {
+          throw new Error(
+            `[e2e] grantPlayerAccess did not persist on stage ${stageId}: ` +
+              `wrote ${playerAccess} but the backend returned ${
+                persisted === null ? "null" : JSON.stringify(persisted)
+              }. ` +
+              `Check the StageInput GraphQL schema for a missing/renamed playerAccess field.`,
+          );
         }
       },
       { stageId, userIdsByLevel },
