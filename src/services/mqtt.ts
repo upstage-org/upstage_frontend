@@ -1,7 +1,13 @@
 // @ts-nocheck
 import config from "config";
 import { v4 as uuidv4 } from "uuid";
-import * as mqtt from "mqtt";
+// mqtt v5's browser ESM bundle (./dist/mqtt.esm.js) ships ONLY a default
+// export ("export default XT()"). A namespace import like
+// `import * as mqtt from "mqtt"` therefore yields { __esModule, default }
+// and `mqtt.connect` is undefined — the audience client crashes silently
+// inside buildClient(), no WS is opened, and mosquitto stats stay at 0.
+// Pull the default and read connect off it.
+import mqtt from "mqtt";
 const { connect } = mqtt;
 import { namespaceTopic, unnamespaceTopic } from "store/modules/stage/reusable";
 import { isJson } from "utils/common";
