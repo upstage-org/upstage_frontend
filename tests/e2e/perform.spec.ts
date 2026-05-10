@@ -73,15 +73,47 @@ function pauseAfterBeatMs(beat: Beat, pace: PaceKind): number {
   }
 }
 
+/**
+ * Should pass 3 (audience replay of the recorded live performance) run?
+ * Default: yes when headed (a human is watching and wants the replay), no
+ * when headless (CI shouldn't pay an extra ~live-performance-length wall
+ * clock just to re-watch the same events). Override with E2E_REPLAY=1|0.
+ */
+function shouldRunReplay(): boolean {
+  const explicit = process.env.E2E_REPLAY?.trim().toLowerCase();
+  if (explicit === "1" || explicit === "true") return true;
+  if (explicit === "0" || explicit === "false") return false;
+  return !loadE2eConfig().headless;
+}
+
+/**
+ * The event_archive_dev worker drains MQTT into Postgres asynchronously
+ * (queue + per-event INSERT). After pass 2's last beat the in-flight tail
+ * may not be on disk yet; sweepStage would then bundle a truncated set of
+ * events into the Performance row and the replay would be missing the last
+ * line or two. This buffer is short and only paid in headed runs.
+ */
+function eventArchiveSettleWaitMs(pace: PaceKind): number {
+  if (pace === "fast") return 1500;
+  if (pace === "normal") return 2500;
+  return 4000;
+}
+
 test.describe("perform: re-enact Romeo & Juliet A1S1", () => {
   test.describe.configure({ mode: "serial" });
-  test.setTimeout(30 * 60_000);
+  // Three-phase test: rehearsal, live-with-audience, then optional audience
+  // replay. At pace=slow with full BEATS each phase can run several minutes;
+  // 60min keeps headroom even when E2E_REPLAY=1 doubles the active wall clock.
+  test.setTimeout(60 * 60_000);
 
-  test("rehearsal pass + audience pass with audible TTS @full", async ({ browser }) => {
+  test("rehearsal + live-w-audience + audience replay @full", async ({ browser }) => {
     const runtime = readRuntime();
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     const pace = resolvePace();
-    console.log(`[perform] pace=${pace} (headless=${loadE2eConfig().headless})`);
+    const runReplayPhase = shouldRunReplay();
+    console.log(
+      `[perform] pace=${pace} headless=${loadE2eConfig().headless} replay=${runReplayPhase}`,
+    );
 
     // ---------- 0. Spin up admin browser FIRST --------------------------
     // The backend deletes prior UserSessionModel rows on each login (single-
@@ -196,7 +228,7 @@ test.describe("perform: re-enact Romeo & Juliet A1S1", () => {
     });
     await tailWait(audience.page, pace);
 
-    // ---------- 6. Final screenshots + teardown -------------------------
+    // ---------- 6. Live-end screenshots ---------------------------------
     for (const seat of seats) {
       await seat.page.screenshot({
         path: path.join(SCREENSHOT_DIR, `live-${seat.persona.username}.png`),
@@ -212,8 +244,32 @@ test.describe("perform: re-enact Romeo & Juliet A1S1", () => {
       fullPage: true,
     });
 
-    await audience.context.close();
+    // Cast contexts have nothing more to do — pass 3 only exercises the
+    // audience seat (replay loads the recorded performance there). Closing
+    // them now frees ~12 Chromium contexts before the long replay wait.
     for (const seat of seats) await seat.context.close();
+
+    // ---------- 7. PASS 3 — audience replay (optional) -----------------
+    if (runReplayPhase) {
+      // Let the event_archive worker drain the tail of pass 2 into the DB
+      // before we sweep, otherwise the Performance row would be missing the
+      // last few events and the replay would cut short.
+      await audience.page.waitForTimeout(eventArchiveSettleWaitMs(pace));
+      // JWT may have aged out across two long passes; refresh from the
+      // admin browser, which holds the only live admin session.
+      adminToken = await getAdminToken();
+      await runReplay({
+        audience,
+        stageId: runtime.stageId,
+        stageSlug: runtime.stageSlug,
+        adminToken,
+        pace,
+      });
+    } else {
+      console.log("[perform] PASS 3 skipped (E2E_REPLAY=0 or headless run).");
+    }
+
+    await audience.context.close();
     await adminCtx.close();
 
     // We finished pass 2 in live mode, so status is already "live". Skip
@@ -290,11 +346,16 @@ async function tailWait(page: Page, pace: PaceKind): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Archive any unbound events on the stage into a fresh PerformanceModel.
- * The backend raises `"The stage is already sweeped!"` when there are no
- * orphan events; we treat that as success so re-runs are idempotent.
+ * Archive any unbound events on the stage into a fresh PerformanceModel and
+ * return the new performance id. Returns `null` when the backend reports
+ * `"The stage is already sweeped!"` (no orphan events to archive) — callers
+ * that only care about idempotent cleanup ignore the return value, callers
+ * that need the id (replay) treat null as "skip the next step".
  */
-async function sweepStageIfNeeded(stageId: string, adminToken: string): Promise<void> {
+async function sweepStageReturningId(
+  stageId: string,
+  adminToken: string,
+): Promise<number | null> {
   const result = await gql<{
     sweepStage: { success: boolean; performanceId: number | string };
   }>(
@@ -307,14 +368,29 @@ async function sweepStageIfNeeded(stageId: string, adminToken: string): Promise<
   if (result.errors?.length) {
     const messages = result.errors.map((e) => String(e.message)).join("; ");
     if (/already sweeped/i.test(messages)) {
-      // Idempotent: no orphan events to archive. Treated as success.
-      return;
+      return null;
     }
     throw new Error(`[perform] sweepStage failed: ${messages}`);
   }
   if (!result.data?.sweepStage?.success) {
     throw new Error(`[perform] sweepStage returned non-success: ${JSON.stringify(result.data)}`);
   }
+  const id = result.data.sweepStage.performanceId;
+  if (id == null) {
+    throw new Error(
+      `[perform] sweepStage success but performanceId missing: ${JSON.stringify(result.data)}`,
+    );
+  }
+  return Number(id);
+}
+
+/**
+ * Idempotent variant: archive orphan events if any, ignore "already sweeped".
+ * Used between passes where we just want to ensure no leftover events leak
+ * into the next performance's recording.
+ */
+async function sweepStageIfNeeded(stageId: string, adminToken: string): Promise<void> {
+  await sweepStageReturningId(stageId, adminToken);
 }
 
 /**
@@ -438,6 +514,134 @@ async function reloadCastSeats({
   }
   await adminPage.reload();
   await admin.goto(runtime.stageSlug);
+}
+
+// ---------------------------------------------------------------------------
+// REPLAY (PASS 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sweep pass 2's events into a Performance row, reload the audience seat with
+ * that recordId so its Vuex picks up `state.model.events` and
+ * `state.replay.timestamp.{begin,end}`, then dispatch `stage/replayRecording`
+ * and wait for the SPA to flip `state.replay.isReplaying` back to false.
+ *
+ * Speed is pinned to 1x: scheduled future events are dispatched via
+ * `replayEvent` (NOT `replicateEvent`), so they are NOT muted, so meSpeak
+ * fires for every speech beat. Faster speeds chop or stack TTS audibly.
+ *
+ * If sweepStage reports there were no events to archive (which can only
+ * happen if pass 2 emitted nothing — usually a real bug we want surfaced —
+ * but also the case in a smoke run where one of the cast races MQTT), we
+ * log a warning and skip the replay rather than failing the whole test.
+ */
+async function runReplay({
+  audience,
+  stageId,
+  stageSlug,
+  adminToken,
+  pace,
+}: {
+  audience: AudienceSeat;
+  stageId: string;
+  stageSlug: string;
+  adminToken: string;
+  pace: PaceKind;
+}): Promise<void> {
+  const performanceId = await sweepStageReturningId(stageId, adminToken);
+  if (performanceId == null) {
+    console.warn(
+      "[perform] PASS 3: sweepStage reports no events to archive — skipping replay.",
+    );
+    return;
+  }
+  console.log(`[perform] PASS 3: replay performance #${performanceId} on audience seat`);
+
+  // Reload the audience SPA against the new performanceId so `loadStage`
+  // pulls just THIS performance's events. We hit `stage/loadStage` directly
+  // through the dev-store hook (same path as `Live.vue`'s preloader) so we
+  // don't have to construct a /record/<id>/<slug> URL by hand.
+  const eventCount = await audience.page.evaluate(
+    async ({ url, recordId }) => {
+      type DevStore = {
+        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
+        state: { stage: { model: { events?: unknown[] } } };
+      };
+      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+      if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
+      await store.dispatch("stage/loadStage", { url, recordId });
+      return store.state.stage.model.events?.length ?? 0;
+    },
+    { url: stageSlug, recordId: performanceId },
+  );
+  if (eventCount === 0) {
+    throw new Error(
+      `[perform] PASS 3: loadStage returned 0 events for performance ${performanceId} — ` +
+        "the recording is empty. Check that event_archive_dev was running during pass 2.",
+    );
+  }
+
+  // Pin speed=1 BEFORE starting playback. SET_REPLAY merges into state.replay
+  // and replayRecording reads `state.replay.speed` at the top of the action.
+  // Snapshot the begin/end window in the same evaluate so the wait loop has
+  // a sane wall-clock bound.
+  const { durationMs } = await audience.page.evaluate(() => {
+    type ReplayState = {
+      timestamp: { begin: number; end: number };
+      speed: number;
+    };
+    type DevStore = {
+      commit: (type: string, payload?: unknown) => void;
+      state: { stage: { replay: ReplayState } };
+    };
+    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+    if (!store) throw new Error("Vuex store not exposed.");
+    store.commit("stage/SET_REPLAY", { speed: 1 });
+    const ts = store.state.stage.replay.timestamp;
+    // mqttTimestamp is POSIX seconds (event_archive subscriber writes
+    // time.time()), so wall-clock duration at speed=1 is (end-begin)*1000.
+    const seconds = Math.max(0, Number(ts.end) - Number(ts.begin));
+    return { durationMs: Math.round(seconds * 1000) };
+  });
+  console.log(
+    `[perform] PASS 3: replay duration ≈ ${(durationMs / 1000).toFixed(1)}s @ 1x ` +
+      `(${eventCount} events)`,
+  );
+
+  await audience.page.evaluate(async () => {
+    type DevStore = {
+      dispatch: (type: string, payload?: unknown) => Promise<unknown>;
+    };
+    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+    if (!store) throw new Error("Vuex store not exposed.");
+    await store.dispatch("stage/replayRecording");
+  });
+
+  await audience.page.screenshot({
+    path: path.join(SCREENSHOT_DIR, "replay-start.png"),
+    fullPage: true,
+  });
+
+  // The action installs a 1Hz interval that increments `current` and fires
+  // `pauseReplay` when current passes end, which sets isReplaying=false.
+  // Allow durationMs + a generous buffer for the last setTimeout to fire
+  // and meSpeak's tail to drain. tailWait shape mirrored from pass 2.
+  const tailMs = pace === "fast" ? 5_000 : pace === "normal" ? 15_000 : 30_000;
+  const timeoutMs = durationMs + tailMs;
+  await audience.page.waitForFunction(
+    () => {
+      type DevStore = { state: { stage: { replay: { isReplaying: boolean } } } };
+      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+      return store?.state?.stage?.replay?.isReplaying === false;
+    },
+    { timeout: timeoutMs, polling: 500 },
+  );
+  await tailWait(audience.page, pace);
+
+  await audience.page.screenshot({
+    path: path.join(SCREENSHOT_DIR, "replay-end.png"),
+    fullPage: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
