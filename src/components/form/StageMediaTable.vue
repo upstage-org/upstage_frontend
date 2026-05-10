@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, inject, Ref, defineProps, defineEmits } from "vue";
+import { computed, inject, Ref } from "vue";
 import { editingMediaVar, inquiryVar } from "apollo";
 import configs from "config";
 import { Media, MediaAttributes, UploadFile } from "models/studio";

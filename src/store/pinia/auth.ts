@@ -55,7 +55,7 @@ export const useAuthStore = defineStore(
   {
     persist: {
       key: "upstage-auth",
-      paths: ["username", "token", "refresh_token"],
+      pick: ["username", "token", "refresh_token"],
     },
   },
 );

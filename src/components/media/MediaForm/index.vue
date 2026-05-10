@@ -8,7 +8,6 @@ import {
   inject,
   Ref,
   createVNode,
-  defineModel,
   watch,
   reactive,
   ComputedRef,

@@ -25,7 +25,7 @@ import { useStore } from "vuex";
 import Loading from "components/Loading.vue";
 import { absolutePath } from "utils/common";
 import Entry from "components/stage/Entry.vue";
-import MasonryWall from "@yeger/vue-masonry-wall";
+import { MasonryWall } from "@yeger/vue-masonry-wall";
 import { stageGraph } from "services/graphql";
 import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";

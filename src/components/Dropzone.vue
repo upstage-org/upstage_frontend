@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, provide, watch, Ref, defineModel } from "vue";
+import { ref, provide, watch, Ref } from "vue";
 import configs from "config";
 import { message } from "ant-design-vue";
 import { useLazyQuery } from "@vue/apollo-composable";
