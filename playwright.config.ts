@@ -32,9 +32,17 @@ export default defineConfig({
     video: "retain-on-failure",
     headless: HEADLESS,
     launchOptions: {
-      // Headless Chromium is muted so a headed local run doesn't blast 70 lines
-      // of TTS at the operator. (Browser TTS is already a no-op in headless.)
-      args: ["--mute-audio"],
+      // Audio policy is mode-dependent:
+      //   • headless (CI / fast runs): mute audio. meSpeak still gets called
+      //     (the test asserts on the bubble, which is the side-effect proof
+      //     that SPEAK round-tripped) but no sound leaves the container.
+      //   • headed (operator watching the play): un-mute, AND disable
+      //     Chromium's autoplay-needs-user-gesture policy so meSpeak's
+      //     audio element can `.play()` from an MQTT callback rather than a
+      //     real click. Without this flag headed runs are still silent.
+      args: HEADLESS
+        ? ["--mute-audio"]
+        : ["--autoplay-policy=no-user-gesture-required"],
     },
   },
   projects: [

@@ -20,3 +20,10 @@ To generate the necessary environment scripts and start up the application using
 
 1. The application should now be running. You can access it by navigating to `https://{YOUR_DOMAIN}` in your web browser.
 
+Testing:
+
+ PWHEADLESS=0 pnpm e2e:perform                   # watch + hear, default slow pace
+
+  PWHEADLESS=0 E2E_PACE=normal pnpm e2e:perform   # watch + hear, half pace
+
+  pnpm e2e:perform      
