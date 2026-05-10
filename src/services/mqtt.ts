@@ -1,7 +1,8 @@
 // @ts-nocheck
 import config from "config";
 import { v4 as uuidv4 } from "uuid";
-import { connect } from "mqtt/dist/mqtt";
+import * as mqtt from "mqtt";
+const { connect } = mqtt;
 import { namespaceTopic, unnamespaceTopic } from "store/modules/stage/reusable";
 import { isJson } from "utils/common";
 
