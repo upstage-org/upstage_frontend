@@ -213,6 +213,18 @@ test.describe("perform: re-enact Romeo & Juliet A1S1", () => {
     try {
       // ---------- 1. Cast logins (only if a phase needs them) ---------
       if (needsCast) {
+        // Flip the stage to "rehearsal" BEFORE the cast logs in if pass 1
+        // will run. Each cast SPA caches `state.stage.model.status` on
+        // stage load and there's no MQTT/poll path that pushes a later
+        // status change to existing clients. Setting it after login
+        // makes the headed run look identical to a live performance:
+        // ConnectionStatus.vue keeps showing the red LIVE badge instead
+        // of the blue REHEARSAL one. The teardown's needsStatusRestore
+        // path will pin status back to "live" on exit.
+        if (phases.has("rehearsal")) {
+          await setStageStatus(runtime.stageId, "rehearsal", adminToken);
+          needsStatusRestore = true;
+        }
         console.log(`[perform] logging in ${PERSONAS.length} cast members…`);
         for (const persona of PERSONAS) {
           const ctx = await browser.newContext();
@@ -229,9 +241,8 @@ test.describe("perform: re-enact Romeo & Juliet A1S1", () => {
 
       // ---------- 2. PASS 1 — rehearsal walkthrough ------------------
       if (phases.has("rehearsal")) {
-        await setStageStatus(runtime.stageId, "rehearsal", adminToken);
-        needsStatusRestore = true;
-
+        // Status was already flipped to "rehearsal" in the pre-login
+        // block above so the cast SPAs picked it up at load time.
         console.log("[perform] PASS 1: rehearsal mode (cast + admin observer)");
         await runPass({
           label: "rehearsal",
