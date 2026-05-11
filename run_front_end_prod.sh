@@ -9,7 +9,7 @@ FRONTEND_PORT=3002
 HOST_UID=1000
 HOST_GID=1000
 ENV_BACKUP=./env_backup_${SITE}
-# Exposes window.__UPSTAGE_STORE__ for Playwright e2e:perform avatar placement.
+# Exposes window.__UPSTAGE_PINIA__ for the Playwright e2e suites.
 # Belt-and-suspenders alongside env_backup_prod so a wiped backup still builds e2e-ready.
 VITE_E2E=1
 

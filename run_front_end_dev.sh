@@ -9,8 +9,9 @@ FRONTEND_PORT=3001
 HOST_UID=1000
 HOST_GID=1000
 ENV_BACKUP=./env_backup_${SITE}
-# Exposes window.__UPSTAGE_STORE__ for Playwright e2e:perform avatar placement.
-# Belt-and-suspenders alongside env_backup_dev so a wiped backup still builds e2e-ready.
+# Exposes window.__UPSTAGE_PINIA__ for the Playwright e2e suites (perform +
+# features). Belt-and-suspenders alongside env_backup_dev so a wiped backup
+# still builds e2e-ready.
 VITE_E2E=1
 
 # static-api-server in container: serves dist/ and proxies /api → studio API on shared Docker network :3000.

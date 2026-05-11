@@ -269,7 +269,6 @@
     "useStepper": true,
     "useStorage": true,
     "useStorageAsync": true,
-    "useStore": true,
     "useStyleTag": true,
     "useSupported": true,
     "useSwipe": true,

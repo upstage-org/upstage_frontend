@@ -46,7 +46,6 @@ export default defineConfig(({ mode }) => {
           "pinia",
           "@vueuse/core",
           { "vue-i18n": ["useI18n"] },
-          { vuex: ["useStore"] },
         ],
         dts: "src/auto-imports.d.ts",
         eslintrc: { enabled: true },

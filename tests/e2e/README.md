@@ -39,12 +39,14 @@ Running **`pnpm exec playwright test`** directly bypasses preflight entirely.
    - `pnpm dev` — automatic via `import.meta.env.DEV` (see `src/main.ts`).
    - `vite build` (e.g. via `run_front_end_dev.sh` / `run_front_end_prod.sh` Docker compose) — the build must see `VITE_E2E=1`. The scripts seed it through two paths: (a) `cp env_backup_${SITE} ./.env` before `docker compose up --build`, so the `vite build` inside the builder container reads it via `loadEnv` (this also brings in `VITE_MQTT_ENDPOINT`, `VITE_GRAPHQL_ENDPOINT`, `VITE_STATIC_ASSETS_ENDPOINT`, etc. — without them MQTT silently no-ops and asset URLs 404); (b) compose `build.args` + Dockerfile `ENV VITE_E2E` as a fallback override. `env.template`, `dotenv_template`, `.env.example`, `.env`, `env_backup_dev`, and `env_backup_prod` all carry `VITE_E2E=1` for parity.
 
-   Earlier builds also installed `window.__UPSTAGE_STORE__` (the Vuex
-   stage facade). It still exists as a thin Pinia-backed Proxy but has no
-   first-party consumers in `src/` or `tests/`; the next pass of the Pinia
-   migration (Wave F2) removes it along with the `vuex` dependency. All
-   stores (`auth`, `cache`, `config`, `user`, `stage`) are exposed via
-   `__UPSTAGE_PINIA__`.
+   Earlier builds installed `window.__UPSTAGE_STORE__` (a Vuex stage
+   facade). That hook and the `vuex` dependency itself were removed in
+   Phase 5.3 Wave F. If you're rebasing a branch onto a tree that still
+   uses `__UPSTAGE_STORE__` the rewrite is mechanical: `store.dispatch
+   ("stage/X", p)` → `__UPSTAGE_PINIA__.stage.X(p)`, `store.state.stage.X`
+   → `__UPSTAGE_PINIA__.stage.X`, `store.getters["stage/X"]` →
+   `__UPSTAGE_PINIA__.stage.X`. All stores (`auth`, `cache`, `config`,
+   `user`, `stage`) are exposed via `__UPSTAGE_PINIA__`.
 
    **Heads-up:** `.dockerignore` deliberately includes `.env` in the build context (see comment in that file). If you re-add `.env` to `.dockerignore` you'll break `vite build` for **all** `VITE_*` vars, not just `VITE_E2E`.
 

@@ -20,10 +20,11 @@ interface ImportMetaEnv {
   readonly VITE_RELEASE_VERSION?: string;
   readonly VITE_ALIAS_RELEASE_VERSION?: string;
   /**
-   * When truthy at build time, expose the Vuex store on `window.__UPSTAGE_STORE__`
-   * so Playwright `e2e:perform` can dispatch `stage/placeObjectOnStage` etc.
-   * `import.meta.env.DEV` already covers `pnpm dev`; this flag is for served
-   * `vite build` bundles used by run_front_end_*.sh.
+   * When truthy at build time, expose every Pinia store on
+   * `window.__UPSTAGE_PINIA__` so Playwright `e2e:perform` /
+   * `e2e:features` can drive `stage.placeObjectOnStage(...)` etc.
+   * directly. `import.meta.env.DEV` already covers `pnpm dev`; this
+   * flag is for served `vite build` bundles used by run_front_end_*.sh.
    */
   readonly VITE_E2E?: string;
 }

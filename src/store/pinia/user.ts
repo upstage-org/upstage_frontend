@@ -4,8 +4,8 @@ import { message } from "ant-design-vue";
 import { displayName, logout as logoutHelper } from "@utils/auth";
 import { ROLES } from "@utils/constants";
 import { userGraph } from "@services/graphql";
-import vuexStore from "@stores/index";
 import { useAuthStore } from "@stores/pinia/auth";
+import { useStageStore } from "@stores/pinia/stage";
 
 interface UserData {
   id?: string | number;
@@ -44,15 +44,15 @@ const handleAuthFailure = (errorMsg: string | undefined): void => {
 };
 
 /**
- * User profile store + actions. Mirrors the Vuex `user` module API.
+ * User profile store + actions. Mirrors the legacy Vuex `user` module
+ * API; consumers call `useUserStore()` instead of `store.state.user.X`
+ * / `store.dispatch("user/...")`.
  *
- * **Cross-store coupling (transitional)**: `saveNickname` and
- * `setAvatarId` need to dispatch into the stage module, and the `avatar`
- * getter reads `state.stage.board.objects`. While the stage module is
- * still on Vuex (Phase 5.3 will move it), we reach across via the
- * imported `vuexStore`. These three references are the ONLY remaining
- * Pinia → Vuex bridge in this store and disappear once Phase 5.3 lands
- * the Pinia stage facade.
+ * **Cross-store coupling**: `saveNickname` and `setAvatarId` reach into
+ * the stage store, and the `avatar` getter reads `stage.board.objects`.
+ * After Phase 5.3 Wave F these go via the Pinia stage store
+ * (`useStageStore()`); the lazy in-function call dodges the
+ * `user → stage → user` import cycle the route guards already rely on.
  */
 export const useUserStore = defineStore("user", () => {
   const user = ref<UserData | null>(null);
@@ -81,14 +81,12 @@ export const useUserStore = defineStore("user", () => {
 
   /**
    * Currently held avatar object on the live stage, or `undefined` if
-   * the user hasn't claimed one. Reads from the (still-Vuex) stage
-   * module's `board.objects`. Replaced by a Pinia stage-store import
-   * in Phase 5.3.
+   * the user hasn't claimed one. Reads from the Pinia stage store's
+   * `board.objects` via a lazy `useStageStore()` call.
    */
   const avatar = computed<BoardObject | undefined>(() => {
     if (!avatarId.value) return undefined;
-    const objects = (vuexStore.state as { stage?: { board?: { objects?: BoardObject[] } } })?.stage
-      ?.board?.objects;
+    const objects = useStageStore().board?.objects as BoardObject[] | undefined;
     return objects?.find((o) => o.id === avatarId.value);
   });
 
@@ -146,31 +144,28 @@ export const useUserStore = defineStore("user", () => {
   /**
    * Set the user's display nickname. If they're already holding an
    * avatar, the avatar's `name` is updated instead (and the avatar
-   * change broadcasts via stage/shapeObject). Otherwise the local
+   * change broadcasts via `stage.shapeObject`). Otherwise the local
    * nickname ref is updated and the user (re-)joins the stage.
-   *
-   * The stage dispatches use the still-Vuex stage module; replaced by
-   * Pinia stage-store calls in Phase 5.3.
    */
   const saveNickname = async ({ nickname: name }: { nickname: string }): Promise<string> => {
     const av = avatar.value;
+    const stage = useStageStore();
     if (av) {
-      void vuexStore.dispatch("stage/shapeObject", { ...av, name });
+      void Promise.resolve(stage.shapeObject({ ...av, name }));
     } else {
       nicknameOverride.value = name;
-      void vuexStore.dispatch("stage/joinStage");
+      void Promise.resolve(stage.joinStage());
     }
     return name;
   };
 
   /**
    * Claim the given board object as the user's avatar and (re-)join
-   * the stage so other clients see the new ownership. Stage dispatch
-   * is a transitional bridge to Vuex; Phase 5.3 will replace it.
+   * the stage so other clients see the new ownership.
    */
   const setAvatarId = (id: string | number | null): void => {
     avatarId.value = id;
-    void vuexStore.dispatch("stage/joinStage");
+    void Promise.resolve(useStageStore().joinStage());
   };
 
   const checkIsAdmin = async (): Promise<boolean | undefined> => {
