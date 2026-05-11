@@ -36,22 +36,37 @@ if (import.meta.env.DEV || import.meta.env.VITE_E2E) {
     import("./store/pinia/cache"),
     import("./store/pinia/config"),
     import("./store/pinia/user"),
-  ]).then(([{ useAuthStore }, { useCacheStore }, { useConfigStore }, { useUserStore }]) => {
-    window.__UPSTAGE_PINIA__ = {
-      get auth() {
-        return useAuthStore();
-      },
-      get cache() {
-        return useCacheStore();
-      },
-      get config() {
-        return useConfigStore();
-      },
-      get user() {
-        return useUserStore();
-      },
-    };
-  });
+    import("./store/pinia/stage"),
+  ]).then(
+    ([
+      { useAuthStore },
+      { useCacheStore },
+      { useConfigStore },
+      { useUserStore },
+      { useStageStore },
+    ]) => {
+      window.__UPSTAGE_PINIA__ = {
+        get auth() {
+          return useAuthStore();
+        },
+        get cache() {
+          return useCacheStore();
+        },
+        get config() {
+          return useConfigStore();
+        },
+        get user() {
+          return useUserStore();
+        },
+        // Wave C scaffold: Pinia `stage` store is exposed for probes but
+        // no app code consumes it yet (Wave D will start migrating
+        // consumers off `store.state.stage` / `store.dispatch("stage/…")`).
+        get stage() {
+          return useStageStore();
+        },
+      };
+    },
+  );
 }
 
 if ("serviceWorker" in navigator) {

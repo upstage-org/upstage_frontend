@@ -29,6 +29,7 @@ declare global {
       readonly cache: ReturnType<typeof import("@stores/pinia/cache").useCacheStore>;
       readonly config: ReturnType<typeof import("@stores/pinia/config").useConfigStore>;
       readonly user: ReturnType<typeof import("@stores/pinia/user").useUserStore>;
+      readonly stage: ReturnType<typeof import("@stores/pinia/stage").useStageStore>;
     };
     $: JQueryStatic;
     jQuery: JQueryStatic;
