@@ -29,6 +29,10 @@ const draw = (ctx, { fromX, fromY, x, y, size, color }) => {
 
 const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
 
+// Delay between line segments when replaying a saved drawing for the audience.
+// Tuned so a typical stroke reads as a live pen rather than an instant flicker.
+const STROKE_SEGMENT_DELAY_MS = 25;
+
 const execute = async (ctx, command, animate) => {
   const { type, size, color, lines } = command;
   if (lines && lines.length) {
@@ -44,7 +48,7 @@ const execute = async (ctx, command, animate) => {
           color,
         });
         if (animate) {
-          await wait(10);
+          await wait(STROKE_SEGMENT_DELAY_MS);
         }
       }
     } else {
@@ -282,7 +286,7 @@ export const useDrawing = (drawing) => {
           shouldAnimate = false;
         }
       }
-      execute(ctx, command, shouldAnimate);
+      await execute(ctx, command, shouldAnimate);
     }
     return ctx;
   };
