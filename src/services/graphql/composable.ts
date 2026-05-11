@@ -74,7 +74,6 @@ export const useRequest = (service, ...params) => {
     try {
       const payload = newParams.length ? newParams : params;
       const cacheKey = hash({ service, payload });
-      const cached = store.state.cache.graphql[cacheKey];
       loading.value = true;
       data.value = await service(...payload);
       if (data.value) {

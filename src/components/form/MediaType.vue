@@ -1,13 +1,3 @@
-<template>
-  <Dropdown
-    title="Type"
-    v-model="mediaType"
-    :data="data ?? ['avatar', 'prop', 'backdrop', 'audio', 'video', 'curtain']"
-    :render-label="titleCase"
-    :is-up="isUp"
-  />
-</template>
-
 <script>
 import { ref } from "vue";
 import { watchEffect } from "vue";
@@ -15,9 +5,13 @@ import Dropdown from "./Dropdown.vue";
 import { titleCase } from "utils/common";
 
 export default {
-  props: ["modelValue", "isUp", "data"],
-  emits: ["update:modelValue"],
   components: { Dropdown },
+  props: {
+    modelValue: String,
+    isUp: Boolean,
+    data: Array,
+  },
+  emits: ["update:modelValue"],
   setup: (props, { emit }) => {
     const mediaType = ref(props.modelValue);
     watchEffect(() => {
@@ -36,5 +30,15 @@ export default {
   methods: { titleCase },
 };
 </script>
+
+<template>
+  <Dropdown
+    v-model="mediaType"
+    title="Type"
+    :data="data ?? ['avatar', 'prop', 'backdrop', 'audio', 'video', 'curtain']"
+    :render-label="titleCase"
+    :is-up="isUp"
+  />
+</template>
 
 <style></style>

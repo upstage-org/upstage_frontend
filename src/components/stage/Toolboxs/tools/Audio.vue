@@ -1,3 +1,78 @@
+<script>
+import { useStore } from "vuex";
+import Icon from "components/Icon.vue";
+import { computed, ref } from "vue";
+import { useShortcut } from "../../composable";
+import { displayTimestamp } from "utils/common";
+import { animate } from "animejs";
+
+export default {
+  components: { Icon },
+  setup: () => {
+    const store = useStore();
+    const audios = ref(store.getters["stage/audios"] || []);
+    const audioPlayers = computed(() => store.state.stage.audioPlayers);
+
+    const togglePlaying = (audio, currentTime) => {
+      audio.isPlaying = !audio.isPlaying;
+      audio.currentTime = currentTime;
+      audio.saken = true;
+      store.dispatch("stage/updateAudioStatus", audio);
+    };
+    const stopAudio = (audio) => {
+      audio.currentTime = 0;
+      audio.saken = true;
+      audio.isPlaying = false;
+      store.dispatch("stage/updateAudioStatus", audio);
+    };
+    const toggleLoop = (audio, currentTime) => {
+      audio.loop = !audio.loop;
+      audio.currentTime = currentTime;
+      store.dispatch("stage/updateAudioStatus", audio);
+    };
+    const seek = (audio, e) => {
+      audio.currentTime = e.target.value;
+      audio.saken = true;
+      store.dispatch("stage/updateAudioStatus", audio);
+    };
+    const setVolume = (audio, _e) => {
+      //audio.volume = e.target.value;
+      store.dispatch("stage/updateAudioStatus", audio);
+    };
+
+    useShortcut((e) => {
+      if (isFinite(e.key)) {
+        const i = e.key - 1;
+        if (audios.value.length > i && i >= 0) {
+          togglePlaying(audios.value[i]);
+        }
+      }
+    });
+    const scrollToEnd = () => {
+      const topbar = document.querySelector("#topbar");
+      if (topbar) {
+        animate(topbar, {
+          scrollLeft: topbar.scrollWidth,
+          ease: "inOutQuad",
+        });
+      }
+    };
+
+    return {
+      audios,
+      togglePlaying,
+      stopAudio,
+      toggleLoop,
+      setVolume,
+      audioPlayers,
+      seek,
+      displayTimestamp,
+      scrollToEnd,
+    };
+  },
+};
+</script>
+
 <template>
   <div
     v-for="(audio, i) in audios"
@@ -39,13 +114,13 @@
             <Icon size="24" src="voice-setting.svg" />
           </div>
           <input
+            v-model="audio.volume"
             class="slider is-fullwidth is-dark my-0"
             step="0.01"
             min="0"
             max="1"
-            v-model="audio.volume"
-            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)"
             type="range"
+            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)"
           />
         </div>
         <input
@@ -53,8 +128,8 @@
           min="0"
           :max="audioPlayers[i]?.duration"
           :value="audioPlayers[i]?.currentTime ?? 0"
-          @change="seek(audio, $event)"
           type="range"
+          @change="seek(audio, $event)"
         />
         <div class="addon">
           <span v-if="audio.isPlaying">{{
@@ -66,81 +141,6 @@
     </div>
   </div>
 </template>
-
-<script>
-import { useStore } from "vuex";
-import Icon from "components/Icon.vue";
-import { computed, ref, onMounted } from "vue";
-import { useShortcut } from "../../composable";
-import { displayTimestamp } from "utils/common";
-import { animate } from "animejs";
-
-export default {
-  components: { Icon },
-  setup: () => {
-    const store = useStore();
-    const audios = ref(store.getters["stage/audios"] || []);
-    const audioPlayers = computed(() => store.state.stage.audioPlayers);
-
-    const togglePlaying = (audio, currentTime) => {
-      audio.isPlaying = !audio.isPlaying;
-      audio.currentTime = currentTime;
-      audio.saken = true;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-    const stopAudio = (audio) => {
-      audio.currentTime = 0;
-      audio.saken = true;
-      audio.isPlaying = false;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-    const toggleLoop = (audio, currentTime) => {
-      audio.loop = !audio.loop;
-      audio.currentTime = currentTime;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-    const seek = (audio, e) => {
-      audio.currentTime = e.target.value;
-      audio.saken = true;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-    const setVolume = (audio, e) => {
-      //audio.volume = e.target.value;
-      store.dispatch("stage/updateAudioStatus", audio);
-    };
-
-    useShortcut((e) => {
-      if (isFinite(e.key)) {
-        const i = e.key - 1;
-        if (audios.value.length > i && i >= 0) {
-          togglePlaying(audios.value[i]);
-        }
-      }
-    });
-    const scrollToEnd = () => {
-      const topbar = document.querySelector("#topbar");
-      if (topbar) {
-        animate(topbar, {
-          scrollLeft: topbar.scrollWidth,
-          ease: "inOutQuad",
-        });
-      }
-    };
-
-    return {
-      audios,
-      togglePlaying,
-      stopAudio,
-      toggleLoop,
-      setVolume,
-      audioPlayers,
-      seek,
-      displayTimestamp,
-      scrollToEnd,
-    };
-  },
-};
-</script>
 
 <style scoped lang="scss">
 .audio-name {

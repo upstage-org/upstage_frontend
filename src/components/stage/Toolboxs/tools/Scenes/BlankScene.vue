@@ -1,12 +1,3 @@
-<template>
-  <div @click="createScene" class="is-pulled-left">
-    <div class="icon is-large">
-      <Icon src="new.svg" size="36" />
-    </div>
-    <span class="tag is-light is-block">{{ $t("blank_scene") }}</span>
-  </div>
-</template>
-
 <script>
 import Icon from "components/Icon.vue";
 import { useStore } from "vuex";
@@ -40,5 +31,14 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="is-pulled-left" @click="createScene">
+    <div class="icon is-large">
+      <Icon src="new.svg" size="36" />
+    </div>
+    <span class="tag is-light is-block">{{ $t("blank_scene") }}</span>
+  </div>
+</template>
 
 <style></style>

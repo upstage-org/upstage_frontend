@@ -1,24 +1,3 @@
-<template>
-  <div class="card-header">
-    <span class="card-header-title">{{ $t("new_stream") }}</span>
-  </div>
-  <div class="card-content voice-parameters">
-    <form @submit.prevent="createRoom">
-      <HorizontalField title="Name">
-        <Field
-          v-model="form.name"
-          required
-          required-message="Stream name is required"
-          pattern="^[^?&:&quot;'%#]+$"
-          title="Meeting name should not contain any of these characters: ?, &, :, ', &quot;, %, #."
-        >
-        </Field>
-      </HorizontalField>
-      <SaveButton :disabled="!form.name.trim()">{{ $t("new_stream") }}</SaveButton>
-    </form>
-  </div>
-</template>
-
 <script>
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
@@ -49,5 +28,26 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="card-header">
+    <span class="card-header-title">{{ $t("new_stream") }}</span>
+  </div>
+  <div class="card-content voice-parameters">
+    <form @submit.prevent="createRoom">
+      <HorizontalField title="Name">
+        <Field
+          v-model="form.name"
+          required
+          required-message="Stream name is required"
+          pattern="^[^?&:&quot;'%#]+$"
+          title="Meeting name should not contain any of these characters: ?, &, :, ', &quot;, %, #."
+        >
+        </Field>
+      </HorizontalField>
+      <SaveButton :disabled="!form.name.trim()">{{ $t("new_stream") }}</SaveButton>
+    </form>
+  </div>
+</template>
 
 <style></style>

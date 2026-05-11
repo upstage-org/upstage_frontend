@@ -1,70 +1,13 @@
-<template>
-  <div
-    class="is-flex is-align-items-center is-justify-content-center skeleton"
-    :class="{ dropzone }"
-    draggable="true"
-    @dragstart="dragstart"
-    @dragend="dragend"
-    @dragenter.prevent
-    @dragover.prevent="dropzone = true"
-    @dragleave.prevent="dropzone = false"
-    @drop.prevent="drop"
-    @touchmove="touchmove"
-    @touchend="touchend"
-    @dblclick="hold"
-    @mouseenter="showMovable"
-    :style="{
-      position: position.isDragging ? 'fixed' : 'static',
-      width: position.isDragging ? '100px' : '100%',
-      height: position.isDragging ? '100px' : '100%',
-      top: position.y - topbarPosition.top + 'px',
-      left: position.x - topbarPosition.left + 'px',
-    }"
-    :title="data.name"
-  >
-    <slot v-if="$slots.default" />
-    <SavedDrawing v-else-if="data.drawingId" :drawing="data" />
-    <p
-      v-else-if="data.type === 'text'"
-      :style="{
-        ...data,
-        transform: `scale(${76 / data.w})`,
-        'transform-origin': 0,
-        'max-width': '100%',
-      }"
-      v-html="data.content"
-    ></p>
-    <div :title="`Stream key: ${data.name}`" class="is-fullwidth" v-else-if="data.type === 'video'">
-      <Icon src="stream.svg" size="36" />
-      <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7)">{{
-        data.name
-      }}</span>
-    </div>
-    <div v-else-if="data.type === 'meeting'" class="is-flex-grow-1 pt-2">
-      <Icon src="meeting.svg" size="48" />
-      <span class="tag is-light is-block stream-key">{{ data.name }}</span>
-    </div>
-    <a-tooltip v-else-if="!data.src" :title="data.displayName">
-      <Icon src="meeting.svg" size="36" />
-    </a-tooltip>
-    <Image v-else :src="data.src" />
-    <Icon
-      v-if="data.multi"
-      class="is-multi"
-      title="This is a multiframe avatar"
-      src="multi-frame.svg"
-    />
-  </div>
-</template>
-
 <script>
 import { useStore } from "vuex";
 import { computed, reactive, ref } from "vue";
-import Image from "components/Image.vue";
+// Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppImage from "components/Image.vue";
 import Icon from "components/Icon.vue";
 import SavedDrawing from "./tools/Draw/SavedDrawing.vue";
 
 export default {
+  components: { AppImage, Icon, SavedDrawing },
   props: {
     data: {
       type: Object,
@@ -84,7 +27,6 @@ export default {
     },
   },
   emits: ["dragstart"],
-  components: { Image, Icon, SavedDrawing },
   setup: (props, { emit }) => {
     const store = useStore();
     const position = reactive({
@@ -184,6 +126,65 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div
+    class="is-flex is-align-items-center is-justify-content-center skeleton"
+    :class="{ dropzone }"
+    :style="{
+      position: position.isDragging ? 'fixed' : 'static',
+      width: position.isDragging ? '100px' : '100%',
+      height: position.isDragging ? '100px' : '100%',
+      top: position.y - topbarPosition.top + 'px',
+      left: position.x - topbarPosition.left + 'px',
+    }"
+    :title="data.name"
+    draggable="true"
+    @dragstart="dragstart"
+    @dragend="dragend"
+    @dragenter.prevent
+    @dragover.prevent="dropzone = true"
+    @dragleave.prevent="dropzone = false"
+    @drop.prevent="drop"
+    @touchmove="touchmove"
+    @touchend="touchend"
+    @dblclick="hold"
+    @mouseenter="showMovable"
+  >
+    <slot v-if="$slots.default" />
+    <SavedDrawing v-else-if="data.drawingId" :drawing="data" />
+    <p
+      v-else-if="data.type === 'text'"
+      :style="{
+        ...data,
+        transform: `scale(${76 / data.w})`,
+        'transform-origin': 0,
+        'max-width': '100%',
+      }"
+      v-html="data.content"
+    ></p>
+    <div v-else-if="data.type === 'video'" :title="`Stream key: ${data.name}`" class="is-fullwidth">
+      <Icon src="stream.svg" size="36" />
+      <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7)">{{
+        data.name
+      }}</span>
+    </div>
+    <div v-else-if="data.type === 'meeting'" class="is-flex-grow-1 pt-2">
+      <Icon src="meeting.svg" size="48" />
+      <span class="tag is-light is-block stream-key">{{ data.name }}</span>
+    </div>
+    <a-tooltip v-else-if="!data.src" :title="data.displayName">
+      <Icon src="meeting.svg" size="36" />
+    </a-tooltip>
+    <AppImage v-else :src="data.src" />
+    <Icon
+      v-if="data.multi"
+      class="is-multi"
+      title="This is a multiframe avatar"
+      src="multi-frame.svg"
+    />
+  </div>
+</template>
 
 <style scoped lang="scss">
 .stream-key {

@@ -1,3 +1,53 @@
+<script>
+import { computed, ref } from "vue";
+import { loggedIn, logout } from "utils/auth";
+import { useStore } from "vuex";
+import Logo from "./Logo.vue";
+import LanguageSelector from "./LanguageSelector.vue";
+import configs from "config";
+
+export default {
+  components: { Logo, LanguageSelector },
+  setup() {
+    const store = useStore();
+    const expanded = ref(false);
+    const toggleExpanded = () => (expanded.value = !expanded.value);
+
+    const navigations = computed(() => store.getters["config/navigations"]);
+    const showRegistration = computed(
+      () => store.getters["config/foyer"]?.showRegistration?.value ?? false,
+    );
+    const isAdmin = computed(() => store.getters["user/isAdmin"]);
+    const isGuest = computed(() => store.getters["user/isGuest"]);
+
+    const isShow = (seeByAdmin) => {
+      if (isAdmin.value) {
+        return true;
+      }
+
+      return !seeByAdmin;
+    };
+
+    return {
+      expanded,
+      toggleExpanded,
+      loggedIn,
+      logout,
+      showRegistration,
+      isShow,
+      navigations,
+      isAdmin,
+      isGuest,
+    };
+  },
+  computed: {
+    configs() {
+      return configs;
+    },
+  },
+};
+</script>
+
 <template>
   <nav class="navbar" role="navigation" aria-label="main navigation">
     <div class="navbar-brand">
@@ -64,7 +114,7 @@
           <RouterLink v-if="!isGuest" to="/stages" class="button is-primary m-2">
             <strong>{{ $t("studio") }}</strong>
           </RouterLink>
-          <button @click="logout" class="button m-2 mr-6">
+          <button class="button m-2 mr-6" @click="logout">
             <strong>{{ $t("logout") }}</strong>
           </button>
         </template>
@@ -80,56 +130,6 @@
     </div>
   </nav>
 </template>
-
-<script>
-import { computed, ref } from "vue";
-import { loggedIn, logout } from "utils/auth";
-import { useStore } from "vuex";
-import Logo from "./Logo.vue";
-import LanguageSelector from "./LanguageSelector.vue";
-import configs from "config";
-
-export default {
-  computed: {
-    configs() {
-      return configs;
-    },
-  },
-  components: { Logo, LanguageSelector },
-  setup() {
-    const store = useStore();
-    const expanded = ref(false);
-    const toggleExpanded = () => (expanded.value = !expanded.value);
-
-    const navigations = computed(() => store.getters["config/navigations"]);
-    const showRegistration = computed(
-      () => store.getters["config/foyer"]?.showRegistration?.value ?? false,
-    );
-    const isAdmin = computed(() => store.getters["user/isAdmin"]);
-    const isGuest = computed(() => store.getters["user/isGuest"]);
-
-    const isShow = (seeByAdmin) => {
-      if (isAdmin.value) {
-        return true;
-      }
-
-      return !seeByAdmin;
-    };
-
-    return {
-      expanded,
-      toggleExpanded,
-      loggedIn,
-      logout,
-      showRegistration,
-      isShow,
-      navigations,
-      isAdmin,
-      isGuest,
-    };
-  },
-};
-</script>
 
 <style lang="scss">
 @media screen and (max-width: 1023px) {

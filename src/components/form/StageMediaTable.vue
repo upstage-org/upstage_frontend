@@ -1,9 +1,8 @@
 <script lang="ts" setup>
-import { computed, inject, Ref } from "vue";
-import { editingMediaVar, inquiryVar } from "apollo";
+import { computed } from "vue";
+import { inquiryVar } from "apollo";
 import configs from "config";
-import { Media, MediaAttributes, UploadFile } from "models/studio";
-import { absolutePath } from "utils/common";
+import { Media } from "models/studio";
 import { ColumnType, TablePaginationConfig } from "ant-design-vue/lib/table";
 import { SorterResult } from "ant-design-vue/lib/table/interface";
 import { useI18n } from "vue-i18n";
@@ -41,7 +40,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const files = inject<Ref<UploadFile[]>>("files");
 
 const columns = computed<ColumnType<Media>[]>(() => [
   {
@@ -130,34 +128,6 @@ const paginationConfig = computed<Pagination>(() => ({
   showSizeChanger: props.pagination?.showSizeChanger ?? true,
 }));
 
-const editMedia = (media: Media) => {
-  editingMediaVar(media);
-};
-
-const composingMode = inject<Ref<boolean>>("composingMode");
-
-const addFrameToEditingMedia = (media: Media) => {
-  if (files && composingMode) {
-    let frames = [media.fileLocation];
-    const attribute = JSON.parse(media.description || "{}") as MediaAttributes;
-    if (attribute.multi) {
-      frames = attribute.frames;
-    }
-    files.value = files.value.concat(
-      frames.map<UploadFile>((frame, i) => ({
-        id: files.value.length + i,
-        preview: absolutePath(frame),
-        url: frame,
-        status: "uploaded",
-        file: {
-          name: frame,
-        } as File,
-      })),
-    );
-    composingMode.value = false;
-  }
-};
-
 const filterTag = (tag: string) => {
   inquiryVar({
     ...inquiryVar(),
@@ -172,10 +142,10 @@ const filterTag = (tag: string) => {
       class="w-full overflow-auto"
       :columns="columns as ColumnType<Media>[]"
       :data-source="dataSource"
-      rowKey="id"
+      row-key="id"
       :loading="loading"
-      @change="handleTableChange"
       :pagination="paginationConfig"
+      @change="handleTableChange"
     >
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'preview'">
@@ -212,8 +182,8 @@ const filterTag = (tag: string) => {
             v-for="(tag, i) in text"
             :key="i"
             :color="tag"
-            @click="filterTag(tag)"
             class="cursor-pointer"
+            @click="filterTag(tag)"
             >{{ tag }}
           </a-tag>
         </template>

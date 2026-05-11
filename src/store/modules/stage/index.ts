@@ -665,7 +665,7 @@ export default {
     RELOAD_STREAMS(state) {
       state.reloadStreams = new Date();
     },
-    OPEN_RECEIPT_POPUP(state, { amount, date }) {
+    OPEN_RECEIPT_POPUP(state, _payload) {
       state.receiptPopup.isActive = true;
     },
     CLOSE_RECEIPT_POPUP(state) {
@@ -894,7 +894,9 @@ export default {
         try {
           const description = JSON.parse(data.description);
           if (description.w && description.h) object.h = (description.h * 100) / description.w;
-        } catch (e) {}
+        } catch {
+          // description is optional / may not be JSON; fall back to defaults.
+        }
       }
       commit("PUSH_OBJECT", serializeObject(object));
       if (object.type === "avatar") {

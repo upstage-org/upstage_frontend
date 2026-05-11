@@ -1,139 +1,3 @@
-<template>
-  <div v-show="!collapsed" id="replay-controls" class="card is-light">
-    <div class="card-body">
-      <div class="is-fullwidth my-2 has-text-centered controls-row">
-        <button
-          class="button is-primary is-outlined is-rounded reaction is-small m-1"
-          @click="seekBackward"
-          title="Skip back 10s"
-        >
-          <i class="fas fa-fast-backward"></i>
-        </button>
-        <button
-          v-if="isPlaying"
-          class="button is-primary is-outlined is-rounded reaction mx-1"
-          @click="pause"
-          title="Pause"
-        >
-          <i class="fas fa-pause"></i>
-        </button>
-        <button
-          v-else
-          class="button is-primary is-rounded reaction mx-1"
-          @click="play"
-          title="Play"
-        >
-          <i class="fas fa-play"></i>
-        </button>
-        <button
-          class="button is-primary is-outlined is-rounded reaction is-small m-1"
-          @click="seekForward"
-          title="Skip forward 10s"
-        >
-          <i class="fas fa-fast-forward"></i>
-        </button>
-
-        <!-- Inline speed control. Replaces the prior teleported Dropdown
-             (which was floated absolutely off the controls card and easy
-             to miss). Step buttons walk the discrete `speeds` array; the
-             native <select> exposes the same values for one-click jumps.
-             Speed changes restart playback at the current timestamp via
-             changeSpeed → play, so the new rate takes effect immediately. -->
-        <span class="speed-control mx-2" :title="`Replay speed: ${speed}x`">
-          <button
-            class="button is-light is-small"
-            :disabled="speedIndex <= 0"
-            @click="stepSpeed(-1)"
-            title="Slower"
-          >
-            <i class="fas fa-minus"></i>
-          </button>
-          <select class="speed-select mx-1" :value="speed" @change="onSpeedSelect">
-            <option v-for="s in speeds" :key="s" :value="s">{{ s }}x</option>
-          </select>
-          <button
-            class="button is-light is-small"
-            :disabled="speedIndex >= speeds.length - 1"
-            @click="stepSpeed(1)"
-            title="Faster"
-          >
-            <i class="fas fa-plus"></i>
-          </button>
-        </span>
-
-        <Modal width="500px">
-          <template #trigger>
-            <button
-              class="button minimise is-rounded is-light is-small"
-              @click="collapsed = true"
-              title="Hide controls (Esc)"
-            >
-              <span class="icon">
-                <Icon src="minimise.svg" size="24" class="mt-4" />
-              </span>
-            </button>
-          </template>
-          <template #header>{{ $t("tips") }}</template>
-          <template #content>
-            <p>
-              Replay controls are hidden! You can toggle the
-              <code>{{ $t("esc") }}</code> key to quickly hide the replay controls or bring it back.
-            </p>
-          </template>
-        </Modal>
-      </div>
-    </div>
-    <footer class="card-footer">
-      <div class="card-footer-item" style="width: 60px">
-        {{ displayTimestamp(timestamp.current - timestamp.begin) }}
-      </div>
-      <div class="card-footer-item">
-        <input
-          type="range"
-          class="slider is-fullwidth my-2"
-          style="width: 250px"
-          :min="timestamp.begin"
-          :max="timestamp.end"
-          :value="timestamp.current"
-          @change="seek"
-        />
-        <EventIndicator />
-      </div>
-      <div class="card-footer-item" style="width: 60px">
-        {{ displayTimestamp(timestamp.end - timestamp.begin) }}
-      </div>
-    </footer>
-  </div>
-
-  <!-- Speed warning modal. Opened programmatically when the user picks a
-       playback rate at which TTS / audio cannot keep up. Replaces the
-       prior pattern of opening the warning Modal as a side-effect of the
-       speed Dropdown's render slot. -->
-  <teleport to="body">
-    <div v-if="showSpeedWarning" class="modal is-active">
-      <div class="modal-background" @click="showSpeedWarning = false"></div>
-      <div class="modal-content">
-        <div class="card">
-          <header class="card-header">
-            <p class="card-header-title">{{ $t("warning") }}</p>
-          </header>
-          <div class="card-content">
-            <div class="content">
-              <p>
-                Audio and avatar speeches won't be able to play in 16x speed or more. You should
-                only use these playback rates for seeking purposes.
-              </p>
-            </div>
-          </div>
-          <footer class="card-footer">
-            <a class="card-footer-item" @click="showSpeedWarning = false"> OK </a>
-          </footer>
-        </div>
-      </div>
-    </div>
-  </teleport>
-</template>
-
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
@@ -220,6 +84,142 @@ useShortcut((e: KeyboardEvent) => {
   }
 });
 </script>
+
+<template>
+  <div v-show="!collapsed" id="replay-controls" class="card is-light">
+    <div class="card-body">
+      <div class="is-fullwidth my-2 has-text-centered controls-row">
+        <button
+          class="button is-primary is-outlined is-rounded reaction is-small m-1"
+          title="Skip back 10s"
+          @click="seekBackward"
+        >
+          <i class="fas fa-fast-backward"></i>
+        </button>
+        <button
+          v-if="isPlaying"
+          class="button is-primary is-outlined is-rounded reaction mx-1"
+          title="Pause"
+          @click="pause"
+        >
+          <i class="fas fa-pause"></i>
+        </button>
+        <button
+          v-else
+          class="button is-primary is-rounded reaction mx-1"
+          title="Play"
+          @click="play"
+        >
+          <i class="fas fa-play"></i>
+        </button>
+        <button
+          class="button is-primary is-outlined is-rounded reaction is-small m-1"
+          title="Skip forward 10s"
+          @click="seekForward"
+        >
+          <i class="fas fa-fast-forward"></i>
+        </button>
+
+        <!-- Inline speed control. Replaces the prior teleported Dropdown
+             (which was floated absolutely off the controls card and easy
+             to miss). Step buttons walk the discrete `speeds` array; the
+             native <select> exposes the same values for one-click jumps.
+             Speed changes restart playback at the current timestamp via
+             changeSpeed → play, so the new rate takes effect immediately. -->
+        <span class="speed-control mx-2" :title="`Replay speed: ${speed}x`">
+          <button
+            class="button is-light is-small"
+            :disabled="speedIndex <= 0"
+            title="Slower"
+            @click="stepSpeed(-1)"
+          >
+            <i class="fas fa-minus"></i>
+          </button>
+          <select class="speed-select mx-1" :value="speed" @change="onSpeedSelect">
+            <option v-for="s in speeds" :key="s" :value="s">{{ s }}x</option>
+          </select>
+          <button
+            class="button is-light is-small"
+            :disabled="speedIndex >= speeds.length - 1"
+            title="Faster"
+            @click="stepSpeed(1)"
+          >
+            <i class="fas fa-plus"></i>
+          </button>
+        </span>
+
+        <Modal width="500px">
+          <template #trigger>
+            <button
+              class="button minimise is-rounded is-light is-small"
+              title="Hide controls (Esc)"
+              @click="collapsed = true"
+            >
+              <span class="icon">
+                <Icon src="minimise.svg" size="24" class="mt-4" />
+              </span>
+            </button>
+          </template>
+          <template #header>{{ $t("tips") }}</template>
+          <template #content>
+            <p>
+              Replay controls are hidden! You can toggle the
+              <code>{{ $t("esc") }}</code> key to quickly hide the replay controls or bring it back.
+            </p>
+          </template>
+        </Modal>
+      </div>
+    </div>
+    <footer class="card-footer">
+      <div class="card-footer-item" style="width: 60px">
+        {{ displayTimestamp(timestamp.current - timestamp.begin) }}
+      </div>
+      <div class="card-footer-item">
+        <input
+          type="range"
+          class="slider is-fullwidth my-2"
+          style="width: 250px"
+          :min="timestamp.begin"
+          :max="timestamp.end"
+          :value="timestamp.current"
+          @change="seek"
+        />
+        <EventIndicator />
+      </div>
+      <div class="card-footer-item" style="width: 60px">
+        {{ displayTimestamp(timestamp.end - timestamp.begin) }}
+      </div>
+    </footer>
+  </div>
+
+  <!-- Speed warning modal. Opened programmatically when the user picks a
+       playback rate at which TTS / audio cannot keep up. Replaces the
+       prior pattern of opening the warning Modal as a side-effect of the
+       speed Dropdown's render slot. -->
+  <teleport to="body">
+    <div v-if="showSpeedWarning" class="modal is-active">
+      <div class="modal-background" @click="showSpeedWarning = false"></div>
+      <div class="modal-content">
+        <div class="card">
+          <header class="card-header">
+            <p class="card-header-title">{{ $t("warning") }}</p>
+          </header>
+          <div class="card-content">
+            <div class="content">
+              <p>
+                Audio and avatar speeches won't be able to play in 16x speed or more. You should
+                only use these playback rates for seeking purposes.
+              </p>
+            </div>
+          </div>
+          <footer class="card-footer">
+            <a class="card-footer-item" @click="showSpeedWarning = false"> OK </a>
+          </footer>
+        </div>
+      </div>
+    </div>
+  </teleport>
+</template>
 
 <style lang="scss">
 #replay-controls {

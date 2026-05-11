@@ -1,110 +1,3 @@
-<template>
-  <div class="has-text-right is-fullwidth pb-3">
-    <button class="button ml-2 is-light" @click="downloadChatLog('public')">
-      <span>{{ $t("download_all_audience_chat") }}</span>
-    </button>
-    <button class="button ml-2 is-light" @click="downloadChatLog('player')">
-      <span>{{ $t("download_all_player_chat") }}</span>
-    </button>
-    <ClearChat />
-    <SweepStage :archive="true">{{ $t("archive_performance") }}</SweepStage>
-  </div>
-
-  <DataTable :data="sessions" :headers="headers">
-    <template #name="{ item }">
-      <div v-if="item.name">
-        <b>{{ item.name }}</b>
-      </div>
-      <small v-if="item.description" class="has-text-dark">{{ item.description }}</small>
-      <small v-else class="has-text-dark">
-        <span v-if="item.recording">{{ $t("recorded") }}</span>
-        <span v-else>{{ $t("auto_recorded") }}</span>
-        <span v-if="item.chatless"> on {{ date(item.createdOn) }}</span>
-        <span v-else> from {{ date(item.begin) }} to {{ date(item.end) }}</span>
-      </small>
-    </template>
-    <template #public-chat="{ item }">
-      <Modal>
-        <template #trigger>
-          <button class="button is-light">
-            <Icon src="chat.svg" style="width: 16px; height: 16px" />
-          </button>
-        </template>
-        <template #header>
-          Audience chats from {{ date(item.begin) }}
-          <span v-if="item.begin !== item.end">to {{ date(item.end) }}</span>
-        </template>
-        <template #content>
-          <Messages :messages="item.publicMessages" from="archive" />
-        </template>
-      </Modal>
-      <button class="button is-light" @click="downloadChatLog('public', item)">
-        <Icon src="download.svg" style="width: 16px; height: 16px" />
-      </button>
-    </template>
-    <template #private-chat="{ item }">
-      <Modal>
-        <template #trigger>
-          <button class="button is-light">
-            <Icon src="chat.svg" style="width: 16px; height: 16px" />
-          </button>
-        </template>
-        <template #header>
-          Player chats from {{ date(item.begin) }}
-          <span v-if="item.begin !== item.end">to {{ date(item.end) }}</span>
-        </template>
-        <template #content>
-          <Messages :messages="item.privateMessages" from="archive" />
-        </template>
-      </Modal>
-      <button class="button is-light" @click="downloadChatLog('private', item)">
-        <Icon src="download.svg" style="width: 16px; height: 16px" />
-      </button>
-    </template>
-    <template #replay="{ item }">
-      <router-link
-        :to="`/replay/${stage.fileLocation}/${item.id}`"
-        :class="`button ${item.recording ? 'is-primary' : 'is-dark'}`"
-      >
-        <i class="fas fa-video"></i>
-      </router-link>
-    </template>
-    <template #actions="{ item }">
-      <CustomConfirm
-        @confirm="(complete) => updatePerformance(item, complete)"
-        :loading="updating"
-        :only-yes="true"
-      >
-        <Field v-model="item.name" label="Performance Name" required />
-        <Field label="Description">
-          <textarea class="textarea" v-model="item.description" rows="3"></textarea>
-        </Field>
-        <template #yes>
-          <span>{{ $t("save") }}</span>
-        </template>
-        <template #trigger>
-          <button class="button is-light">
-            <Icon src="edit.svg" style="width: 16px; height: 16px" />
-          </button>
-        </template>
-      </CustomConfirm>
-      <CustomConfirm @confirm="(complete) => deletePerformance(item, complete)" :loading="deleting">
-        <template #trigger>
-          <button class="button is-light is-danger">
-            <Icon src="delete.svg" style="width: 16px; height: 16px" />
-          </button>
-        </template>
-        <div class="has-text-centered">
-          Deleting this performance will also delete
-          <span class="has-text-danger">{{ $t("all_of_its_replay_and_chat") }}</span
-          >. This cannot be undone!
-          <strong>Are you sure you want to continue?</strong>
-        </div>
-      </CustomConfirm>
-    </template>
-  </DataTable>
-</template>
-
 <script>
 import Messages from "components/stage/Chat/Messages.vue";
 import DataTable from "components/DataTable/index.vue";
@@ -359,6 +252,113 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="has-text-right is-fullwidth pb-3">
+    <button class="button ml-2 is-light" @click="downloadChatLog('public')">
+      <span>{{ $t("download_all_audience_chat") }}</span>
+    </button>
+    <button class="button ml-2 is-light" @click="downloadChatLog('player')">
+      <span>{{ $t("download_all_player_chat") }}</span>
+    </button>
+    <ClearChat />
+    <SweepStage :archive="true">{{ $t("archive_performance") }}</SweepStage>
+  </div>
+
+  <DataTable :data="sessions" :headers="headers">
+    <template #name="{ item }">
+      <div v-if="item.name">
+        <b>{{ item.name }}</b>
+      </div>
+      <small v-if="item.description" class="has-text-dark">{{ item.description }}</small>
+      <small v-else class="has-text-dark">
+        <span v-if="item.recording">{{ $t("recorded") }}</span>
+        <span v-else>{{ $t("auto_recorded") }}</span>
+        <span v-if="item.chatless"> on {{ date(item.createdOn) }}</span>
+        <span v-else> from {{ date(item.begin) }} to {{ date(item.end) }}</span>
+      </small>
+    </template>
+    <template #public-chat="{ item }">
+      <Modal>
+        <template #trigger>
+          <button class="button is-light">
+            <Icon src="chat.svg" style="width: 16px; height: 16px" />
+          </button>
+        </template>
+        <template #header>
+          Audience chats from {{ date(item.begin) }}
+          <span v-if="item.begin !== item.end">to {{ date(item.end) }}</span>
+        </template>
+        <template #content>
+          <Messages :messages="item.publicMessages" from="archive" />
+        </template>
+      </Modal>
+      <button class="button is-light" @click="downloadChatLog('public', item)">
+        <Icon src="download.svg" style="width: 16px; height: 16px" />
+      </button>
+    </template>
+    <template #private-chat="{ item }">
+      <Modal>
+        <template #trigger>
+          <button class="button is-light">
+            <Icon src="chat.svg" style="width: 16px; height: 16px" />
+          </button>
+        </template>
+        <template #header>
+          Player chats from {{ date(item.begin) }}
+          <span v-if="item.begin !== item.end">to {{ date(item.end) }}</span>
+        </template>
+        <template #content>
+          <Messages :messages="item.privateMessages" from="archive" />
+        </template>
+      </Modal>
+      <button class="button is-light" @click="downloadChatLog('private', item)">
+        <Icon src="download.svg" style="width: 16px; height: 16px" />
+      </button>
+    </template>
+    <template #replay="{ item }">
+      <router-link
+        :to="`/replay/${stage.fileLocation}/${item.id}`"
+        :class="`button ${item.recording ? 'is-primary' : 'is-dark'}`"
+      >
+        <i class="fas fa-video"></i>
+      </router-link>
+    </template>
+    <template #actions="{ item }">
+      <CustomConfirm
+        :loading="updating"
+        :only-yes="true"
+        @confirm="(complete) => updatePerformance(item, complete)"
+      >
+        <Field v-model="item.name" label="Performance Name" required />
+        <Field label="Description">
+          <textarea v-model="item.description" class="textarea" rows="3"></textarea>
+        </Field>
+        <template #yes>
+          <span>{{ $t("save") }}</span>
+        </template>
+        <template #trigger>
+          <button class="button is-light">
+            <Icon src="edit.svg" style="width: 16px; height: 16px" />
+          </button>
+        </template>
+      </CustomConfirm>
+      <CustomConfirm :loading="deleting" @confirm="(complete) => deletePerformance(item, complete)">
+        <template #trigger>
+          <button class="button is-light is-danger">
+            <Icon src="delete.svg" style="width: 16px; height: 16px" />
+          </button>
+        </template>
+        <div class="has-text-centered">
+          Deleting this performance will also delete
+          <span class="has-text-danger">{{ $t("all_of_its_replay_and_chat") }}</span
+          >. This cannot be undone!
+          <strong>Are you sure you want to continue?</strong>
+        </div>
+      </CustomConfirm>
+    </template>
+  </DataTable>
+</template>
 
 <style scoped>
 .button.is-light > img {

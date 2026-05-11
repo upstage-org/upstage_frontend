@@ -1,113 +1,8 @@
-<template>
-  <section class="modal-card-body p-0">
-    <button class="delete close-modal" aria-label="close" @click="closeModal"></button>
-    <div class="container-fluid">
-      <footer class="modal-card-foot">
-        <div class="columns is-fullwidth">
-          <div class="column is-narrow">
-            <SaveButton
-              @click="save"
-              :loading="loading"
-              :disabled="!form.name || !form.assetType"
-            />
-          </div>
-          <div class="column is-narrow">
-            <Field horizontal label="Media Type">
-              <MediaType v-model="form.assetType" :data="availableTypes" />
-            </Field>
-          </div>
-          <div class="column">
-            <Field horizontal v-model="form.name" label="Media Name" />
-          </div>
-        </div>
-      </footer>
-      <Tabs :items="tabs">
-        <template #extras>
-          <Upload v-model="form.base64" :type="fileType" :preview="false">
-            <span class="icon">
-              <i class="fas fa-retweet"></i>
-            </span>
-            <span>{{ $t("replace") }}</span>
-          </Upload>
-        </template>
-        <template #preview>
-          <div class="preview">
-            <Asset :asset="media" @detect-size="updateMediaSize" />
-          </div>
-        </template>
-        <template #copyright>
-          <HorizontalField title="Copyright Level">
-            <Dropdown
-              v-model="form.copyrightLevel"
-              :data="copyrightLevels"
-              :render-label="(item) => item.name"
-              :render-value="(item) => item.value"
-              :render-description="(item) => item.description"
-            />
-          </HorizontalField>
-          <HorizontalField v-show="[2].includes(form.copyrightLevel)">
-            <div style="margin-right: 32px">
-              <MultiTransferColumn
-                :columns="['No access', 'Readonly access', 'Editor access']"
-                :data="users"
-                :renderLabel="displayName"
-                :renderValue="(item) => item.id"
-                :renderKeywords="
-                  (item) =>
-                    `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
-                "
-                v-model="playerAccess"
-              />
-            </div>
-          </HorizontalField>
-        </template>
-        <template #stages>
-          <MultiSelectList
-            :loading="loadingAllStages"
-            :data="availableStages"
-            v-model="form.assignedStages"
-            :columnClass="() => 'is-12 p-0'"
-          >
-            <template #render="{ item }">
-              <div class="box m-0 p-2">
-                <div class="content">
-                  <strong>{{ item.name }}</strong>
-                  <span style="float: right">
-                    Created by
-                    <span class="has-text-primary">{{ displayName(item.owner) }}</span>
-                  </span>
-                </div>
-              </div>
-            </template>
-          </MultiSelectList>
-        </template>
-        <template #voice>
-          <VoiceParameters v-model="form.voice" />
-        </template>
-        <template #link>
-          <HorizontalField title="URL">
-            <Field
-              placeholder="The destination when audience click on the link"
-              v-model="form.link.url"
-            />
-          </HorizontalField>
-          <HorizontalField title="Open in new tab">
-            <Switch v-model="form.link.blank" />
-          </HorizontalField>
-        </template>
-        <template #multiframe>
-          <Multiframe :media="media" :form="form" />
-        </template>
-      </Tabs>
-    </div>
-  </section>
-</template>
-
 <script>
 import { reactive, ref } from "vue";
 import { useMutation, useQuery } from "services/graphql/composable";
 import { stageGraph, userGraph } from "services/graphql";
-import { computed, inject, watch } from "@vue/runtime-core";
+import { computed, inject, watch } from "vue";
 import { message } from "ant-design-vue";
 import HorizontalField from "components/form/HorizontalField.vue";
 import Field from "components/form/Field.vue";
@@ -123,7 +18,8 @@ import VoiceParameters from "components/stage/SettingPopup/settings/VoiceParamet
 import { displayName } from "utils/auth";
 import { MEDIA_COPYRIGHT_LEVELS } from "utils/constants";
 import Multiframe from "./Multiframe.vue";
-import Switch from "components/form/Switch.vue";
+// Aliased: "Switch" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppSwitch from "components/form/Switch.vue";
 
 export default {
   components: {
@@ -139,7 +35,7 @@ export default {
     MultiTransferColumn,
     Dropdown,
     Multiframe,
-    Switch,
+    AppSwitch,
   },
   props: {
     media: Object,
@@ -224,12 +120,14 @@ export default {
       if (["video"].includes(form.assetType)) {
         return "video";
       }
+      return null;
     });
     const availableTypes = computed(() => {
       const type = form.fileType ?? fileType.value;
       if (type === "image") return ["avatar", "prop", "backdrop", "curtain"];
       if (type === "audio") return ["audio"];
       if (type === "video") return ["video"];
+      return [];
     });
 
     const tabs = computed(() => {
@@ -313,6 +211,111 @@ export default {
   },
 };
 </script>
+
+<template>
+  <section class="modal-card-body p-0">
+    <button class="delete close-modal" aria-label="close" @click="closeModal"></button>
+    <div class="container-fluid">
+      <footer class="modal-card-foot">
+        <div class="columns is-fullwidth">
+          <div class="column is-narrow">
+            <SaveButton
+              :loading="loading"
+              :disabled="!form.name || !form.assetType"
+              @click="save"
+            />
+          </div>
+          <div class="column is-narrow">
+            <Field horizontal label="Media Type">
+              <MediaType v-model="form.assetType" :data="availableTypes" />
+            </Field>
+          </div>
+          <div class="column">
+            <Field v-model="form.name" horizontal label="Media Name" />
+          </div>
+        </div>
+      </footer>
+      <Tabs :items="tabs">
+        <template #extras>
+          <Upload v-model="form.base64" :type="fileType" :preview="false">
+            <span class="icon">
+              <i class="fas fa-retweet"></i>
+            </span>
+            <span>{{ $t("replace") }}</span>
+          </Upload>
+        </template>
+        <template #preview>
+          <div class="preview">
+            <Asset :asset="media" @detect-size="updateMediaSize" />
+          </div>
+        </template>
+        <template #copyright>
+          <HorizontalField title="Copyright Level">
+            <Dropdown
+              v-model="form.copyrightLevel"
+              :data="copyrightLevels"
+              :render-label="(item) => item.name"
+              :render-value="(item) => item.value"
+              :render-description="(item) => item.description"
+            />
+          </HorizontalField>
+          <HorizontalField v-show="[2].includes(form.copyrightLevel)">
+            <div style="margin-right: 32px">
+              <MultiTransferColumn
+                v-model="playerAccess"
+                :columns="['No access', 'Readonly access', 'Editor access']"
+                :data="users"
+                :render-label="displayName"
+                :render-value="(item) => item.id"
+                :render-keywords="
+                  (item) =>
+                    `${item.firstName} ${item.lastName} ${item.username} ${item.email} ${item.displayName}`
+                "
+              />
+            </div>
+          </HorizontalField>
+        </template>
+        <template #stages>
+          <MultiSelectList
+            v-model="form.assignedStages"
+            :loading="loadingAllStages"
+            :data="availableStages"
+            :column-class="() => 'is-12 p-0'"
+          >
+            <template #render="{ item }">
+              <div class="box m-0 p-2">
+                <div class="content">
+                  <strong>{{ item.name }}</strong>
+                  <span style="float: right">
+                    Created by
+                    <span class="has-text-primary">{{ displayName(item.owner) }}</span>
+                  </span>
+                </div>
+              </div>
+            </template>
+          </MultiSelectList>
+        </template>
+        <template #voice>
+          <VoiceParameters v-model="form.voice" />
+        </template>
+        <template #link>
+          <HorizontalField title="URL">
+            <Field
+              v-model="form.link.url"
+              placeholder="The destination when audience click on the link"
+            />
+          </HorizontalField>
+          <HorizontalField title="Open in new tab">
+            <AppSwitch v-model="form.link.blank" />
+          </HorizontalField>
+        </template>
+        <template #multiframe>
+          <Multiframe :media="media" :form="form" />
+        </template>
+      </Tabs>
+    </div>
+  </section>
+</template>
 
 <style lang="scss" scoped>
 :deep(.field-label) {

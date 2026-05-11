@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import { CloseCircleFilled, MailOutlined } from "@ant-design/icons-vue";
-import { useAsyncState } from "@vueuse/core";
 import { Layout, message, Space } from "ant-design-vue";
 import { TransferItem } from "ant-design-vue/lib/transfer";
 import RichTextEditor from "components/editor/RichTextEditor.vue";
 import configs from "config";
 import { useLoading } from "hooks/mutations";
 import { displayName, titleCase } from "utils/common";
-import { reactive } from "vue";
 import { computed } from "vue";
-import { watch } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Header from "components/Header.vue";
-import { userGraph, configGraph } from "services/graphql";
-import { ROLES } from "utils/constants";
+import { configGraph } from "services/graphql";
 import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
 import store from "store";
@@ -165,7 +161,7 @@ const { proceed, loading } = useLoading(
       class="bg-white shadow rounded-tl rounded-tr p-2 px-4 sticky top-0 z-50 mb-6 flex justify-between items-center"
     >
       <a-tag color="#007011"> <MailOutlined /> Email Notification </a-tag>
-      <a-button type="primary" @click="proceed" :loading="loading">
+      <a-button type="primary" :loading="loading" @click="proceed">
         <send-outlined />
         Send
       </a-button>
@@ -185,6 +181,7 @@ const { proceed, loading } = useLoading(
           <a-space direction="vertical">
             {{ t("to") }}
             <a-select
+              v-model:value="filterRole"
               allow-clear
               placeholder="Filter by role"
               :options="
@@ -193,7 +190,6 @@ const { proceed, loading } = useLoading(
                   label: titleCase(key),
                 }))
               "
-              v-model:value="filterRole"
             />
             <a-button type="dashed" @click="addCustomRecipient">
               <plus-circle-outlined />
@@ -203,6 +199,7 @@ const { proceed, loading } = useLoading(
         </template>
         <a-spin :spinning="isReady">
           <a-transfer
+            v-model:target-keys="receiverEmails"
             :locale="{
               itemUnit: 'recipient',
               itemsUnit: 'recipients',
@@ -214,7 +211,6 @@ const { proceed, loading } = useLoading(
               height: '300px',
             }"
             :titles="[' available', ' selected']"
-            v-model:target-keys="receiverEmails"
             :data-source="dataSource"
             show-search
             :filter-option="filterOption"

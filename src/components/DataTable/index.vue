@@ -1,83 +1,3 @@
-<template>
-  <Loading v-if="loading" />
-  <div :class="{ 'table-wrapper': wrapper }" v-else>
-    <table class="table">
-      <thead>
-        <tr>
-          <th align="right" v-if="numbered">#</th>
-          <th
-            v-for="header in headers"
-            :key="header"
-            align="left"
-            :style="{ 'text-align': header.align }"
-            class="clickable"
-            @click="sort(header)"
-          >
-            <a-tooltip :title="header.description">
-              <abbr class="has-tooltip-bottom">
-                {{ header.title }}
-              </abbr>
-            </a-tooltip>
-            &nbsp;
-            <template v-if="sortBy?.title === header.title">
-              <i
-                v-if="header.type === 'date'"
-                :class="`fas ${sortOrder ? 'fa-sort-amount-down' : 'fa-sort-amount-down-alt'}`"
-              />
-              <i
-                v-else
-                :class="`fas ${sortOrder ? 'fa-sort-alpha-down' : 'fa-sort-alpha-down-alt'}`"
-              />
-            </template>
-            <template v-else-if="header.sortable">
-              <i class="fas fa-sort" />
-            </template>
-          </th>
-        </tr>
-      </thead>
-      <tfoot v-if="!nodes.length">
-        <tr>
-          <td class="has-text-centered has-text-dark" :colspan="headers.length + numbered">
-            <i class="fas fa-frown fa-4x"></i>
-            <div>No replay recordings have been saved for this stage yet.</div>
-          </td>
-        </tr>
-      </tfoot>
-      <tbody>
-        <transition-group :css="false">
-          <tr v-for="(item, index) in rows" :key="item">
-            <td align="right" v-if="numbered">{{ offset + index + 1 }}</td>
-            <td
-              v-for="header in headers"
-              :key="header"
-              :style="{ 'text-align': header.align }"
-              :class="header.slot"
-            >
-              <slot
-                :name="header.slot"
-                :item="item"
-                :header="header"
-                :refresh="refresh ?? (() => {})"
-              >
-                <template v-if="header.render">
-                  {{ header.render(item) }}
-                </template>
-                <template v-else-if="header.type === 'date'">
-                  <span :title="dayjs(item[header.key]).toString()">
-                    {{ handleFormatDate(item[header.key]) }}
-                  </span>
-                </template>
-                <template v-else>{{ item[header.key] }}</template>
-              </slot>
-            </td>
-          </tr>
-        </transition-group>
-      </tbody>
-    </table>
-    <Pagination v-model="current" v-model:limit="limit" :total="totalCount" />
-  </div>
-</template>
-
 <script>
 import { useQuery } from "services/graphql/composable";
 import Loading from "components/Loading.vue";
@@ -86,6 +6,7 @@ import dayjs from "@utils/dayjs";
 import Pagination from "./Pagination.vue";
 
 export default {
+  components: { Loading, Pagination },
   props: {
     query: {
       type: Function,
@@ -106,7 +27,6 @@ export default {
       default: true,
     },
   },
-  components: { Loading, Pagination },
   setup: (props) => {
     if (props.data) {
       return {
@@ -126,39 +46,6 @@ export default {
       sortOrder: true,
       now: new Date(),
     };
-  },
-  mounted() {
-    const header = this.headers.find((h) => h.defaultSortOrder !== undefined);
-    if (header) {
-      this.sortBy = header;
-      this.sortOrder = header.defaultSortOrder;
-    }
-  },
-  methods: {
-    dayjs,
-    fromNow(date) {
-      return dayjs(date).fromNow();
-    },
-    sort(header) {
-      if (header.sortable) {
-        if (this.sortBy?.title === header.title) {
-          this.sortOrder = !this.sortOrder;
-        }
-        this.sortBy = header;
-      }
-    },
-
-    handleFormatDate(date) {
-      if (date == null) {
-        return null;
-      }
-
-      if (dayjs(this.now).diff(date, "weeks") > 1) {
-        return dayjs(date).format("DD/MM/yyyy");
-      }
-
-      return this.fromNow(date);
-    },
   },
   computed: {
     offset() {
@@ -204,8 +91,121 @@ export default {
       return rows.slice(start, end);
     },
   },
+  mounted() {
+    const header = this.headers.find((h) => h.defaultSortOrder !== undefined);
+    if (header) {
+      this.sortBy = header;
+      this.sortOrder = header.defaultSortOrder;
+    }
+  },
+  methods: {
+    dayjs,
+    fromNow(date) {
+      return dayjs(date).fromNow();
+    },
+    sort(header) {
+      if (header.sortable) {
+        if (this.sortBy?.title === header.title) {
+          this.sortOrder = !this.sortOrder;
+        }
+        this.sortBy = header;
+      }
+    },
+
+    handleFormatDate(date) {
+      if (date == null) {
+        return null;
+      }
+
+      if (dayjs(this.now).diff(date, "weeks") > 1) {
+        return dayjs(date).format("DD/MM/yyyy");
+      }
+
+      return this.fromNow(date);
+    },
+  },
 };
 </script>
+
+<template>
+  <Loading v-if="loading" />
+  <div v-else :class="{ 'table-wrapper': wrapper }">
+    <table class="table">
+      <thead>
+        <tr>
+          <th v-if="numbered" align="right">#</th>
+          <th
+            v-for="header in headers"
+            :key="header"
+            align="left"
+            :style="{ 'text-align': header.align }"
+            class="clickable"
+            @click="sort(header)"
+          >
+            <a-tooltip :title="header.description">
+              <abbr class="has-tooltip-bottom">
+                {{ header.title }}
+              </abbr>
+            </a-tooltip>
+            &nbsp;
+            <template v-if="sortBy?.title === header.title">
+              <i
+                v-if="header.type === 'date'"
+                :class="`fas ${sortOrder ? 'fa-sort-amount-down' : 'fa-sort-amount-down-alt'}`"
+              />
+              <i
+                v-else
+                :class="`fas ${sortOrder ? 'fa-sort-alpha-down' : 'fa-sort-alpha-down-alt'}`"
+              />
+            </template>
+            <template v-else-if="header.sortable">
+              <i class="fas fa-sort" />
+            </template>
+          </th>
+        </tr>
+      </thead>
+      <tfoot v-if="!nodes.length">
+        <tr>
+          <td class="has-text-centered has-text-dark" :colspan="headers.length + numbered">
+            <i class="fas fa-frown fa-4x"></i>
+            <div>No replay recordings have been saved for this stage yet.</div>
+          </td>
+        </tr>
+      </tfoot>
+      <tbody>
+        <transition-group :css="false">
+          <tr v-for="(item, index) in rows" :key="item">
+            <td v-if="numbered" align="right">{{ offset + index + 1 }}</td>
+            <td
+              v-for="header in headers"
+              :key="header"
+              :style="{ 'text-align': header.align }"
+              :class="header.slot"
+            >
+              <slot
+                :name="header.slot"
+                :item="item"
+                :header="header"
+                :refresh="refresh ?? (() => {})"
+              >
+                <template v-if="header.render">
+                  {{ header.render(item) }}
+                </template>
+                <template v-else-if="header.type === 'date'">
+                  <span :title="dayjs(item[header.key]).toString()">
+                    {{ handleFormatDate(item[header.key]) }}
+                  </span>
+                </template>
+                <template v-else>{{ item[header.key] }}</template>
+              </slot>
+            </td>
+          </tr>
+        </transition-group>
+      </tbody>
+    </table>
+    <Pagination v-model="current" v-model:limit="limit" :total="totalCount" />
+  </div>
+</template>
 
 <style scoped>
 i.fas {

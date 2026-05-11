@@ -1,125 +1,3 @@
-<template>
-  <transition name="fade">
-    <div class="modal" :class="{ 'is-active': isActive }">
-      <div class="modal-background" @click="close"></div>
-      <div class="modal-content">
-        <div class="card">
-          <a href="#" class="card-header-icon" @click="close">
-            <span class="icon">
-              <Icon src="close.svg" />
-            </span>
-          </a>
-          <div class="card-header">
-            <span class="card-header-title">{{ title }}</span>
-          </div>
-          <div class="card-content">
-            <form v-if="isActive" @submit.prevent="donateToUpstage">
-              <StripeElements
-                :stripe-key="stripeKey"
-                :instance-options="stripeOptions"
-                :elements-options="elementsOptions"
-                ref="elementsComponent"
-              >
-                <StripeElement
-                  type="payment"
-                  :options="paymentElementOptions"
-                  ref="paymentComponent"
-                />
-              </StripeElements>
-              <br />
-              <div class="button-purchase">
-                <button
-                  class="button is-primary"
-                  type="submit"
-                  :class="{ 'is-loading': loading }"
-                  :disabled="loading"
-                >
-                  <span>Donate USD$ {{ amount }}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </transition>
-  <transition name="fade">
-    <div class="modal" :class="{ 'is-active': isReceiptPopupActive }" v-if="isReceiptPopupActive">
-      <div class="modal-background" @click="closeReceiptPopup"></div>
-      <div class="modal-content">
-        <div class="card">
-          <div class="card-header">
-            <span class="card-header-title">Would you like a receipt?</span>
-          </div>
-          <div class="card-content">
-            <div class="buttons">
-              <button class="button is-primary" @click="openReceiptForm">Yes</button>
-              <button class="button" @click="closeReceiptPopup">No</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </transition>
-
-  <transition name="fade">
-    <div class="modal" :class="{ 'is-active': isReceiptFormActive }" v-if="isReceiptFormActive">
-      <div class="modal-background" @click="closeReceiptForm"></div>
-      <div class="modal-content">
-        <div class="card">
-          <a href="#" class="card-header-icon" @click="closeReceiptForm">
-            <span class="icon">
-              <Icon src="close.svg" />
-            </span>
-          </a>
-          <div class="card-header">
-            <span class="card-header-title">Donation Receipt</span>
-          </div>
-          <div class="card-content">
-            <form @submit.prevent="generateReceipt">
-              <div class="field">
-                <label class="label">Received from</label>
-                <div class="control">
-                  <input class="input" type="text" v-model="donorName" required />
-                </div>
-              </div>
-              <div class="field">
-                <label class="label">Amount</label>
-                <div class="control">
-                  <input class="input" type="text" :value="`$${donationDetails.amount}`" disabled />
-                </div>
-              </div>
-              <div class="field">
-                <label class="label">Date</label>
-                <div class="control">
-                  <input class="input" type="text" :value="donationDetails.date" disabled />
-                </div>
-              </div>
-              <div class="field">
-                <label class="label">Description</label>
-                <div class="control">
-                  <input class="input" type="text" value="Donation" disabled />
-                </div>
-              </div>
-              <div class="buttons">
-                <button
-                  class="button is-primary"
-                  type="submit"
-                  :class="{ 'is-loading': generating }"
-                  :disabled="generating"
-                >
-                  Download PDF
-                </button>
-                <button class="button" @click="closeReceiptForm">Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </transition>
-</template>
-
 <script>
 import { computed, ref, watch, onBeforeMount } from "vue";
 import { useStore } from "vuex";
@@ -215,7 +93,7 @@ export default {
             message.error(res.error.message);
             return;
           }
-          const { paymentIntent, error } = await stripeInstance.confirmPayment({
+          const { error } = await stripeInstance.confirmPayment({
             elements,
             clientSecret: clientSecret.value,
             confirmParams: { return_url: window.location.href },
@@ -307,6 +185,128 @@ export default {
   },
 };
 </script>
+
+<template>
+  <transition name="fade">
+    <div v-show="isActive" class="modal" :class="{ 'is-active': isActive }">
+      <div class="modal-background" @click="close"></div>
+      <div class="modal-content">
+        <div class="card">
+          <a href="#" class="card-header-icon" @click="close">
+            <span class="icon">
+              <Icon src="close.svg" />
+            </span>
+          </a>
+          <div class="card-header">
+            <span class="card-header-title">{{ title }}</span>
+          </div>
+          <div class="card-content">
+            <form v-if="isActive" @submit.prevent="donateToUpstage">
+              <StripeElements
+                ref="elementsComponent"
+                :stripe-key="stripeKey"
+                :instance-options="stripeOptions"
+                :elements-options="elementsOptions"
+              >
+                <StripeElement
+                  ref="paymentComponent"
+                  type="payment"
+                  :options="paymentElementOptions"
+                />
+              </StripeElements>
+              <br />
+              <div class="button-purchase">
+                <button
+                  class="button is-primary"
+                  type="submit"
+                  :class="{ 'is-loading': loading }"
+                  :disabled="loading"
+                >
+                  <span>Donate USD$ {{ amount }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </transition>
+  <transition name="fade">
+    <div v-if="isReceiptPopupActive" class="modal" :class="{ 'is-active': isReceiptPopupActive }">
+      <div class="modal-background" @click="closeReceiptPopup"></div>
+      <div class="modal-content">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-header-title">Would you like a receipt?</span>
+          </div>
+          <div class="card-content">
+            <div class="buttons">
+              <button class="button is-primary" @click="openReceiptForm">Yes</button>
+              <button class="button" @click="closeReceiptPopup">No</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div v-if="isReceiptFormActive" class="modal" :class="{ 'is-active': isReceiptFormActive }">
+      <div class="modal-background" @click="closeReceiptForm"></div>
+      <div class="modal-content">
+        <div class="card">
+          <a href="#" class="card-header-icon" @click="closeReceiptForm">
+            <span class="icon">
+              <Icon src="close.svg" />
+            </span>
+          </a>
+          <div class="card-header">
+            <span class="card-header-title">Donation Receipt</span>
+          </div>
+          <div class="card-content">
+            <form @submit.prevent="generateReceipt">
+              <div class="field">
+                <label class="label">Received from</label>
+                <div class="control">
+                  <input v-model="donorName" class="input" type="text" required />
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Amount</label>
+                <div class="control">
+                  <input class="input" type="text" :value="`$${donationDetails.amount}`" disabled />
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Date</label>
+                <div class="control">
+                  <input class="input" type="text" :value="donationDetails.date" disabled />
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Description</label>
+                <div class="control">
+                  <input class="input" type="text" value="Donation" disabled />
+                </div>
+              </div>
+              <div class="buttons">
+                <button
+                  class="button is-primary"
+                  type="submit"
+                  :class="{ 'is-loading': generating }"
+                  :disabled="generating"
+                >
+                  Download PDF
+                </button>
+                <button class="button" @click="closeReceiptForm">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </transition>
+</template>
 
 <style scoped lang="scss">
 .card-icon {

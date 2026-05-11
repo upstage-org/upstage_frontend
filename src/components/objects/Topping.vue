@@ -1,39 +1,3 @@
-<template>
-  <teleport to="body">
-    <div
-      class="avatar-topping"
-      :data-testid="object?.name ? `speech-topping-${object.name}` : undefined"
-      :style="{
-        left: stageSize.left + object.x + object.w / 2 + 'px',
-        top: stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',
-      }"
-      @click="openChatBox"
-    >
-      <a-tooltip
-        :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname}`"
-      >
-        <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
-          <Icon src="my-avatar.svg" style="width: 16px; height: 16px" />
-        </span>
-      </a-tooltip>
-      <transition @enter="enter" @leave="leave" :css="false" appear>
-        <blockquote
-          v-if="shouldShowBubble"
-          class="bubble"
-          tabindex="-1"
-          :key="object.speak"
-          :class="object.speak.behavior ?? 'speak'"
-          :style="bubbleStyle"
-        >
-          <div class="py-2 px-4">
-            <Linkify>{{ object.speak.message }}</Linkify>
-          </div>
-        </blockquote>
-      </transition>
-    </div>
-  </teleport>
-</template>
-
 <script>
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
@@ -43,8 +7,11 @@ import Linkify from "components/Linkify.vue";
 import { outOfViewportPosition } from "utils/common";
 
 export default {
-  props: ["object", "active"],
   components: { Icon, Linkify },
+  props: {
+    object: Object,
+    active: Boolean,
+  },
   setup: (props) => {
     const store = useStore();
     const isHolding = computed(() => props.object.id === store.state.user.avatarId);
@@ -204,6 +171,42 @@ export default {
   },
 };
 </script>
+
+<template>
+  <teleport to="body">
+    <div
+      class="avatar-topping"
+      :data-testid="object?.name ? `speech-topping-${object.name}` : undefined"
+      :style="{
+        left: stageSize.left + object.x + object.w / 2 + 'px',
+        top: stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',
+      }"
+      @click="openChatBox"
+    >
+      <a-tooltip
+        :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname}`"
+      >
+        <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
+          <Icon src="my-avatar.svg" style="width: 16px; height: 16px" />
+        </span>
+      </a-tooltip>
+      <transition :css="false" appear @enter="enter" @leave="leave">
+        <blockquote
+          v-if="shouldShowBubble"
+          :key="object.speak"
+          class="bubble"
+          tabindex="-1"
+          :class="object.speak.behavior ?? 'speak'"
+          :style="bubbleStyle"
+        >
+          <div class="py-2 px-4">
+            <Linkify>{{ object.speak.message }}</Linkify>
+          </div>
+        </blockquote>
+      </transition>
+    </div>
+  </teleport>
+</template>
 
 <style scoped lang="scss">
 .avatar-topping {

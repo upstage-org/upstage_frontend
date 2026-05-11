@@ -1,3 +1,7 @@
+<script>
+export default {};
+</script>
+
 <template>
   <div class="divider">
     <hr class="zig" />
@@ -7,10 +11,6 @@
     </span>
   </div>
 </template>
-
-<script>
-export default {};
-</script>
 
 <style scoped>
 .divider {

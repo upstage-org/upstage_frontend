@@ -1,24 +1,14 @@
-<template>
-  <Object :object="object">
-    <template #menu="slotProps">
-      <MenuContent :object="object" :closeMenu="slotProps.closeMenu" v-model:active="active" />
-    </template>
-    <template #render>
-      <canvas ref="el"></canvas>
-    </template>
-  </Object>
-</template>
-
 <script>
-import Object from "./Object.vue";
+// Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppObject from "./Object.vue";
 import MenuContent from "./Avatar/ContextMenuAvatar.vue";
 import { useStore } from "vuex";
 import { useDrawing } from "components/stage/Toolboxs/tools/Draw/composable";
 import { computed } from "vue";
 
 export default {
-  props: ["object"],
-  components: { Object, MenuContent },
+  components: { AppObject, MenuContent },
+  props: { object: Object },
   setup: (props) => {
     const store = useStore();
 
@@ -29,5 +19,16 @@ export default {
   },
 };
 </script>
+
+<template>
+  <AppObject :object="object">
+    <template #menu="slotProps">
+      <MenuContent v-model:active="active" :object="object" :close-menu="slotProps.closeMenu" />
+    </template>
+    <template #render>
+      <canvas ref="el"></canvas>
+    </template>
+  </AppObject>
+</template>
 
 <style></style>

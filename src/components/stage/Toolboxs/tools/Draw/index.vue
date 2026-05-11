@@ -1,118 +1,3 @@
-<template>
-  <canvas
-    ref="el"
-    v-show="isDrawing"
-    class="drawing"
-    :width="stageSize.width"
-    :height="stageSize.height"
-    :style="{
-      cursor,
-      top: stageSize.top + 'px',
-      left: stageSize.left + 'px',
-    }"
-  >
-    Your browser does not support the HTML5 canvas tag.
-  </canvas>
-  <template v-if="isDrawing">
-    <div class="drawing-tool">
-      <div class="icon is-large">
-        <ColorPicker v-model="color" />
-      </div>
-      <span class="tag is-light is-block">{{ $t("colour") }}</span>
-    </div>
-    <div class="drawing-tool" style="width: 200px">
-      <div class="size-preview">
-        <div
-          class="dot"
-          :style="{
-            width: size + 'px',
-            height: size + 'px',
-            'background-color': color,
-          }"
-          @click="mode = 'draw'"
-        />
-      </div>
-      <input
-        class="slider is-fullwidth m-0 is-dark"
-        step="1"
-        min="1"
-        max="200"
-        type="range"
-        v-model="size"
-      />
-    </div>
-    <div
-      class="drawing-tool"
-      @click="toggleErase"
-      :class="{
-        active: mode === 'erase',
-      }"
-    >
-      <div class="icon is-large">
-        <Icon size="36" src="erase.svg" />
-      </div>
-      <span class="tag is-light is-block">{{ $t("erase") }}</span>
-    </div>
-    <div class="drawing-tool" @click="undo">
-      <div class="icon is-large">
-        <Icon size="36" src="undo.svg" />
-      </div>
-      <span class="tag is-light is-block">{{ $t("undo") }}</span>
-    </div>
-    <div class="drawing-tool" @click="clearCanvas(true)">
-      <div class="icon is-large">
-        <Icon size="36" src="clear.svg" />
-      </div>
-      <span class="tag is-light is-block">{{ $t("clear") }}</span>
-    </div>
-    <div class="drawing-tool" @click="save('avatar')">
-      <div class="icon is-large">
-        <Icon size="24" src="check.svg" />
-        &nbsp;
-        <Icon size="24" src="avatar.svg" />
-      </div>
-      <span class="tag is-light is-block">{{ $t("save_as_avatar") }}</span>
-    </div>
-    <div class="drawing-tool" @click="save('prop')">
-      <div class="icon is-large">
-        <Icon size="24" src="check.svg" />
-        &nbsp;
-        <Icon size="24" src="prop.svg" />
-      </div>
-      <span class="tag is-light is-block">{{ $t("save_as_prop") }}</span>
-    </div>
-    <div class="drawing-tool" @click="cancel">
-      <div class="icon is-large">
-        <Icon size="36" src="cancel.svg" />
-      </div>
-      <span class="tag is-light is-block">{{ $t("cancel") }}</span>
-    </div>
-  </template>
-  <template v-else>
-    <div @click="create" class="is-pulled-left">
-      <div class="icon is-large">
-        <Icon src="new.svg" size="36" />
-      </div>
-      <span class="tag is-light is-block">{{ $t("new_drawing") }}</span>
-    </div>
-    <div v-for="drawing in drawings" :key="drawing">
-      <ContextMenu>
-        <template #trigger>
-          <Skeleton :data="drawing" />
-        </template>
-        <template #context>
-          <a class="panel-block has-text-danger" @click="deleteDrawingPermanently(drawing)">
-            <span class="panel-icon">
-              <Icon src="remove.svg" />
-            </span>
-            <span>{{ $t("delete_permanently") }}</span>
-          </a>
-        </template>
-      </ContextMenu>
-    </div>
-  </template>
-</template>
-
 <script>
 import { computed } from "vue";
 import { useStore } from "vuex";
@@ -196,6 +81,121 @@ export default {
   },
 };
 </script>
+
+<template>
+  <canvas
+    v-show="isDrawing"
+    ref="el"
+    class="drawing"
+    :width="stageSize.width"
+    :height="stageSize.height"
+    :style="{
+      cursor,
+      top: stageSize.top + 'px',
+      left: stageSize.left + 'px',
+    }"
+  >
+    Your browser does not support the HTML5 canvas tag.
+  </canvas>
+  <template v-if="isDrawing">
+    <div class="drawing-tool">
+      <div class="icon is-large">
+        <ColorPicker v-model="color" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("colour") }}</span>
+    </div>
+    <div class="drawing-tool" style="width: 200px">
+      <div class="size-preview">
+        <div
+          class="dot"
+          :style="{
+            width: size + 'px',
+            height: size + 'px',
+            'background-color': color,
+          }"
+          @click="mode = 'draw'"
+        />
+      </div>
+      <input
+        v-model="size"
+        class="slider is-fullwidth m-0 is-dark"
+        step="1"
+        min="1"
+        max="200"
+        type="range"
+      />
+    </div>
+    <div
+      class="drawing-tool"
+      :class="{
+        active: mode === 'erase',
+      }"
+      @click="toggleErase"
+    >
+      <div class="icon is-large">
+        <Icon size="36" src="erase.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("erase") }}</span>
+    </div>
+    <div class="drawing-tool" @click="undo">
+      <div class="icon is-large">
+        <Icon size="36" src="undo.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("undo") }}</span>
+    </div>
+    <div class="drawing-tool" @click="clearCanvas(true)">
+      <div class="icon is-large">
+        <Icon size="36" src="clear.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("clear") }}</span>
+    </div>
+    <div class="drawing-tool" @click="save('avatar')">
+      <div class="icon is-large">
+        <Icon size="24" src="check.svg" />
+        &nbsp;
+        <Icon size="24" src="avatar.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("save_as_avatar") }}</span>
+    </div>
+    <div class="drawing-tool" @click="save('prop')">
+      <div class="icon is-large">
+        <Icon size="24" src="check.svg" />
+        &nbsp;
+        <Icon size="24" src="prop.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("save_as_prop") }}</span>
+    </div>
+    <div class="drawing-tool" @click="cancel">
+      <div class="icon is-large">
+        <Icon size="36" src="cancel.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("cancel") }}</span>
+    </div>
+  </template>
+  <template v-else>
+    <div class="is-pulled-left" @click="create">
+      <div class="icon is-large">
+        <Icon src="new.svg" size="36" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("new_drawing") }}</span>
+    </div>
+    <div v-for="drawing in drawings" :key="drawing">
+      <ContextMenu>
+        <template #trigger>
+          <Skeleton :data="drawing" />
+        </template>
+        <template #context>
+          <a class="panel-block has-text-danger" @click="deleteDrawingPermanently(drawing)">
+            <span class="panel-icon">
+              <Icon src="remove.svg" />
+            </span>
+            <span>{{ $t("delete_permanently") }}</span>
+          </a>
+        </template>
+      </ContextMenu>
+    </div>
+  </template>
+</template>
 
 <style lang="scss" scoped>
 .drawing {

@@ -109,9 +109,10 @@ Passwords are not stored in `runtime.json`; they stay in code and env.
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm e2e` | Full suite (`run-e2e` preflight → Playwright lists all projects: smoke + setup + perform). |
+| `pnpm e2e` | Full suite (`run-e2e` preflight → Playwright lists all projects: smoke + setup + perform + features). |
 | `pnpm e2e:setup` | Setup project only (`run-e2e` preflight → `playwright test --project=setup`). |
 | `pnpm e2e:perform` | Perform project (`run-e2e` preflight → `playwright --project=perform`; setup runs first via dependencies). |
+| `pnpm e2e:features` | Features project (drawing, drawing-as-avatar, opacity, depth; setup runs first via dependencies). |
 | `pnpm e2e:smoke` | Short perform slice via `E2E_BEATS=smoke` + `run-e2e` preflight. |
 | `pnpm e2e:smoke:stub` | Mock smoke specs only + `run-e2e` preflight. |
 
@@ -137,6 +138,7 @@ Passwords are not stored in `runtime.json`; they stay in code and env.
 | `smoke` | `auth.spec.ts`, `media.spec.ts`, `stage.spec.ts` |
 | `setup` | `setup.spec.ts` |
 | `perform` | `perform.spec.ts` (runs after `setup` in one invocation) |
+| `features` | `features.spec.ts` — drawing, drawing-as-avatar, opacity, depth (runs after `setup`) |
 
 `workers: 1` and `fullyParallel: false` keep ordering predictable for setup and MQTT.
 
@@ -164,6 +166,7 @@ tests/e2e/
 ├── auth.spec.ts
 ├── media.spec.ts
 ├── stage.spec.ts
+├── features.spec.ts          drawing / drawing-as-avatar / opacity / depth
 └── runtime.json               emitted by setup; gitignored
 ```
 

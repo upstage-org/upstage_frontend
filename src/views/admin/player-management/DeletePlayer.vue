@@ -21,7 +21,7 @@ export default {
   setup(props) {
     const { t } = useI18n();
 
-    const { mutate: deleteUser, loading: deleting } = useMutation<
+    const { mutate: deleteUser } = useMutation<
       {
         deleteUser: { success: boolean };
       },

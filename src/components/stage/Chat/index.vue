@@ -1,96 +1,3 @@
-<template>
-  <transition :css="false" @enter="enter" @leave="leave">
-    <div
-      id="chatbox"
-      :key="chatPosition"
-      v-show="chatVisibility"
-      class="card is-light"
-      :class="{ collapsed, dark: chatDarkMode }"
-      :style="{
-        opacity,
-        fontSize,
-        width: `calc(20% + 3*${fontSize}`,
-        height: `calc(100vh - ${stageSize.height}px - 64px)`,
-        left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
-      }"
-    >
-      <transition @enter="bounceUnread">
-        <a-tooltip :title="`${unreadMessages} new message${unreadMessages > 1 ? 's' : ''}`">
-          <span
-            v-if="collapsed && unreadMessages"
-            :key="unreadMessages"
-            class="unread clickable tag is-danger is-small"
-            @click="collapsed = false"
-            style="position: absolute; left: 12px; top: 6px; background-color: #f14668 !important"
-            >{{ unreadMessages }}</span
-          >
-        </a-tooltip>
-      </transition>
-      <div class="actions">
-        <Reaction v-if="collapsed" />
-        <a-tooltip :title="collapsed ? 'Maximise' : 'Minimise'">
-          <button
-            class="chat-setting button is-rounded is-outlined"
-            @click="collapsed = !collapsed"
-            :key="collapsed"
-          >
-            <span class="icon">
-              <Icon v-if="collapsed" src="maximise.svg" size="20" />
-              <Icon v-else src="minimise.svg" size="24" class="mt-4" />
-            </span>
-          </button>
-        </a-tooltip>
-        <a-tooltip title="Settings">
-          <button class="chat-setting button is-rounded is-outlined" @click="openChatSetting">
-            <span class="icon">
-              <Icon src="setting.svg" size="32" />
-            </span>
-          </button>
-        </a-tooltip>
-        <ClearChat option="public-chat" />
-      </div>
-      <div class="card-content" ref="theContent">
-        <Messages :messages="messages" :style="{ fontSize }" />
-      </div>
-      <footer class="card-footer">
-        <div class="card-footer-item">
-          <div v-if="!collapsed" class="is-fullwidth my-1 reaction-bar">
-            <Reaction :custom-emoji="true" />
-            <div class="font-size-controls">
-              <a-tooltip title="Increase font size">
-                <button
-                  class="button is-small is-rounded mx-1"
-                  @click="increateFontSize()"
-                  style="width: 24px; height: 24px; padding: 0px; padding-top: 4px"
-                >
-                  ➕
-                </button>
-              </a-tooltip>
-              <a-tooltip title="Decrease font size">
-                <button
-                  class="button is-small is-rounded mx-1"
-                  @click="decreaseFontSize()"
-                  style="width: 24px; height: 24px; padding: 0px; padding-top: 4px"
-                >
-                  ➖
-                </button>
-              </a-tooltip>
-            </div>
-          </div>
-          <div class="control has-icons-right is-fullwidth">
-            <ChatInput
-              v-model="message"
-              placeholder="Type message"
-              :loading="loadingUser"
-              @submit="sendChat"
-            />
-          </div>
-        </div>
-      </footer>
-    </div>
-  </transition>
-</template>
-
 <script>
 import { computed, onMounted, ref, watch, watchEffect } from "vue";
 import { animate } from "animejs";
@@ -229,6 +136,99 @@ export default {
   },
 };
 </script>
+
+<template>
+  <transition :css="false" @enter="enter" @leave="leave">
+    <div
+      v-show="chatVisibility"
+      id="chatbox"
+      :key="chatPosition"
+      class="card is-light"
+      :class="{ collapsed, dark: chatDarkMode }"
+      :style="{
+        opacity,
+        fontSize,
+        width: `calc(20% + 3*${fontSize}`,
+        height: `calc(100vh - ${stageSize.height}px - 64px)`,
+        left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
+      }"
+    >
+      <transition @enter="bounceUnread">
+        <a-tooltip :title="`${unreadMessages} new message${unreadMessages > 1 ? 's' : ''}`">
+          <span
+            v-if="collapsed && unreadMessages"
+            :key="unreadMessages"
+            class="unread clickable tag is-danger is-small"
+            style="position: absolute; left: 12px; top: 6px; background-color: #f14668 !important"
+            @click="collapsed = false"
+            >{{ unreadMessages }}</span
+          >
+        </a-tooltip>
+      </transition>
+      <div class="actions">
+        <Reaction v-if="collapsed" />
+        <a-tooltip :title="collapsed ? 'Maximise' : 'Minimise'">
+          <button
+            :key="collapsed"
+            class="chat-setting button is-rounded is-outlined"
+            @click="collapsed = !collapsed"
+          >
+            <span class="icon">
+              <Icon v-if="collapsed" src="maximise.svg" size="20" />
+              <Icon v-else src="minimise.svg" size="24" class="mt-4" />
+            </span>
+          </button>
+        </a-tooltip>
+        <a-tooltip title="Settings">
+          <button class="chat-setting button is-rounded is-outlined" @click="openChatSetting">
+            <span class="icon">
+              <Icon src="setting.svg" size="32" />
+            </span>
+          </button>
+        </a-tooltip>
+        <ClearChat option="public-chat" />
+      </div>
+      <div ref="theContent" class="card-content">
+        <Messages :messages="messages" :style="{ fontSize }" />
+      </div>
+      <footer class="card-footer">
+        <div class="card-footer-item">
+          <div v-if="!collapsed" class="is-fullwidth my-1 reaction-bar">
+            <Reaction :custom-emoji="true" />
+            <div class="font-size-controls">
+              <a-tooltip title="Increase font size">
+                <button
+                  class="button is-small is-rounded mx-1"
+                  style="width: 24px; height: 24px; padding: 0px; padding-top: 4px"
+                  @click="increateFontSize()"
+                >
+                  ➕
+                </button>
+              </a-tooltip>
+              <a-tooltip title="Decrease font size">
+                <button
+                  class="button is-small is-rounded mx-1"
+                  style="width: 24px; height: 24px; padding: 0px; padding-top: 4px"
+                  @click="decreaseFontSize()"
+                >
+                  ➖
+                </button>
+              </a-tooltip>
+            </div>
+          </div>
+          <div class="control has-icons-right is-fullwidth">
+            <ChatInput
+              v-model="message"
+              placeholder="Type message"
+              :loading="loadingUser"
+              @submit="sendChat"
+            />
+          </div>
+        </div>
+      </footer>
+    </div>
+  </transition>
+</template>
 
 <style lang="scss" scoped>
 #chatbox {

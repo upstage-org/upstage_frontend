@@ -54,6 +54,16 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
     },
+    {
+      // Stage features that perform.spec.ts deliberately doesn't exercise:
+      // drawing, drawing-as-avatar, opacity, depth. Same `setup` dep so
+      // runtime.json is guaranteed; runs after setup but in parallel-eligible
+      // order with perform (we keep workers=1 globally for MQTT safety).
+      name: "features",
+      testMatch: /features\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
   ],
   webServer: e2eCfg.webServerStartsVite
     ? {

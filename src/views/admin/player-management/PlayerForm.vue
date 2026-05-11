@@ -351,7 +351,6 @@ export default {
                   icon: () => h(EditOutlined),
                 },
               ),
-              ,
             ],
           ),
     ];

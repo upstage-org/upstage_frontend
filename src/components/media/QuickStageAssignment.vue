@@ -2,8 +2,8 @@
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 import { gql } from "@apollo/client/core";
-import { computed, inject, PropType, ref } from "vue";
-import { Media, Stage, AssignedStage } from "models/studio";
+import { computed, inject, PropType, ref, watch } from "vue";
+import { Media, AssignedStage } from "models/studio";
 import store from "store";
 import MediaPreview from "./MediaPreview.vue";
 import { uniq } from "lodash";
@@ -21,7 +21,7 @@ const note = computed(() => {
   try {
     const description = JSON.parse(props.media.description);
     return description?.note || "";
-  } catch (err) {
+  } catch {
     return "";
   }
 });
@@ -50,17 +50,24 @@ const { result, loading } = useQuery(
 );
 
 const dataSource = computed(() => {
-  if (result.value) {
-    const options = result.value.stages.edges.filter((el: any) => {
-      return isAdmin.value ? true : el.permission == "editor" || el.permission == "owner";
-    });
+  if (!result.value) return [];
+  return result.value.stages.edges.filter((el: any) => {
+    return isAdmin.value ? true : el.permission == "editor" || el.permission == "owner";
+  });
+});
+
+// Side-effect previously lived inside `dataSource`'s computed function, which
+// triggered vue/no-side-effects-in-computed-properties. Move it to a watcher
+// so `dataSource` stays pure while `stages` still mirrors the assigned ones.
+watch(
+  dataSource,
+  (options) => {
     stages.value = props.media.stages
       .filter((el) => options.find((item: AssignedStage) => item.id == el.id))
       .map((el: AssignedStage) => el.id);
-    return options;
-  }
-  return [];
-});
+  },
+  { immediate: true },
+);
 const handleFilterStageName = (keyword: string, option: any) => {
   return option.label.toLowerCase().includes(keyword.toLowerCase());
 };
@@ -118,14 +125,14 @@ const handleOk = async () => {
     <h3 style="color: black; margin-top: 20px">{{ media.copyrightLevel == 1 ? note : "" }}</h3>
     <div class="flex">
       <a-select
-        allowClear
-        showArrow
-        :filterOption="handleFilterStageName"
+        v-model:value="stages"
+        allow-clear
+        show-arrow
+        :filter-option="handleFilterStageName"
         mode="tags"
         style="width: 100%"
         placeholder="Stage name"
         :loading="loading"
-        v-model:value="stages"
         :options="
           dataSource
             ? dataSource.map((e: any) => ({

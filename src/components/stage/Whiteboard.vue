@@ -1,11 +1,3 @@
-<template>
-  <canvas
-    class="whiteboard"
-    ref="el"
-    :style="{ top: stageSize.top + 'px', left: stageSize.left + 'px' }"
-  />
-</template>
-
 <script>
 import { computed } from "vue";
 import { useDrawing } from "./Toolboxs/tools/Draw/composable";
@@ -31,6 +23,14 @@ export default {
   },
 };
 </script>
+
+<template>
+  <canvas
+    ref="el"
+    class="whiteboard"
+    :style="{ top: stageSize.top + 'px', left: stageSize.left + 'px' }"
+  />
+</template>
 
 <style scoped>
 .whiteboard {

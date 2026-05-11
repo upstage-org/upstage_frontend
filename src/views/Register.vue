@@ -1,95 +1,3 @@
-<template>
-  <div class="columns is-mobile is-centered is-vcentered foyer-background">
-    <div
-      class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen"
-    >
-      <form @submit.prevent="submit">
-        <div class="card">
-          <header class="card-header">
-            <p class="card-header-title">
-              {{ $t("create_a_account_with_upstage") }}
-            </p>
-          </header>
-          <div class="card-content">
-            <div class="content">
-              <Field
-                v-model="form.username"
-                left="fas fa-user"
-                placeholder="Username"
-                required
-                requiredMessage="Username is required"
-                :touched="touched"
-              />
-              <Password
-                v-model="form.password"
-                left="fas fa-lock"
-                placeholder="Password"
-                required
-                requiredMessage="Password is required"
-                :touched="touched"
-              />
-              <Password
-                v-model="form.confirmPassword"
-                left="fas fa-lock"
-                placeholder="Confirm Password"
-                :error="confirmPasswordError"
-              />
-              <div class="columns">
-                <div class="column pr-0 pb-0">
-                  <Field v-model="form.firstName" left="fas fa-user" placeholder="First Name" />
-                </div>
-                <div class="column pb-0">
-                  <Field v-model="form.lastName" placeholder="Last Name" />
-                </div>
-              </div>
-              <Field
-                v-model="form.email"
-                left="fas fa-envelope"
-                placeholder="Email"
-                type="email"
-                required
-                requiredMessage="Email is required"
-                :touched="touched"
-              />
-              <Field
-                v-model="form.intro"
-                placeholder="Please say briefly who you are and why you would like an UpStage account."
-                type="textarea"
-                required
-                requiredMessage="Introduction is required"
-                :touched="touched"
-              />
-              <label class="checkbox">
-                <input type="checkbox" v-model="agreed" />
-                {{ $t("tos.register") }}
-                <TermsOfService />.
-              </label>
-              <turnstile
-                v-if="isProduction"
-                ref="captcha"
-                :site-key="siteKey"
-                v-model="form.token"
-              />
-            </div>
-          </div>
-          <footer class="card-footer">
-            <button
-              class="card-footer-item is-white button has-text-primary"
-              :class="{ 'is-loading': loading }"
-              type="submit"
-            >
-              <span>{{ $t("register") }}</span>
-              <span class="icon is-medium">
-                <i class="fas fa-check"></i>
-              </span>
-            </button>
-          </footer>
-        </div>
-      </form>
-    </div>
-  </div>
-</template>
-
 <script>
 import Field from "components/form/Field.vue";
 import Password from "components/form/Password.vue";
@@ -139,7 +47,7 @@ export default {
         return;
       }
       try {
-        const response = await mutation();
+        await mutation();
         message.success(
           "Thank you for registering. Your account needs to be approved by an Admin - please check your email.",
         );
@@ -174,6 +82,98 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="columns is-mobile is-centered is-vcentered foyer-background">
+    <div
+      class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen"
+    >
+      <form @submit.prevent="submit">
+        <div class="card">
+          <header class="card-header">
+            <p class="card-header-title">
+              {{ $t("create_a_account_with_upstage") }}
+            </p>
+          </header>
+          <div class="card-content">
+            <div class="content">
+              <Field
+                v-model="form.username"
+                left="fas fa-user"
+                placeholder="Username"
+                required
+                required-message="Username is required"
+                :touched="touched"
+              />
+              <Password
+                v-model="form.password"
+                left="fas fa-lock"
+                placeholder="Password"
+                required
+                required-message="Password is required"
+                :touched="touched"
+              />
+              <Password
+                v-model="form.confirmPassword"
+                left="fas fa-lock"
+                placeholder="Confirm Password"
+                :error="confirmPasswordError"
+              />
+              <div class="columns">
+                <div class="column pr-0 pb-0">
+                  <Field v-model="form.firstName" left="fas fa-user" placeholder="First Name" />
+                </div>
+                <div class="column pb-0">
+                  <Field v-model="form.lastName" placeholder="Last Name" />
+                </div>
+              </div>
+              <Field
+                v-model="form.email"
+                left="fas fa-envelope"
+                placeholder="Email"
+                type="email"
+                required
+                required-message="Email is required"
+                :touched="touched"
+              />
+              <Field
+                v-model="form.intro"
+                placeholder="Please say briefly who you are and why you would like an UpStage account."
+                type="textarea"
+                required
+                required-message="Introduction is required"
+                :touched="touched"
+              />
+              <label class="checkbox">
+                <input v-model="agreed" type="checkbox" />
+                {{ $t("tos.register") }}
+                <TermsOfService />.
+              </label>
+              <Turnstile
+                v-if="isProduction"
+                ref="captcha"
+                v-model="form.token"
+                :site-key="siteKey"
+              />
+            </div>
+          </div>
+          <footer class="card-footer">
+            <button
+              class="card-footer-item is-white button has-text-primary"
+              :class="{ 'is-loading': loading }"
+              type="submit"
+            >
+              <span>{{ $t("register") }}</span>
+              <span class="icon is-medium">
+                <i class="fas fa-check"></i>
+              </span>
+            </button>
+          </footer>
+        </div>
+      </form>
+    </div>
+  </div>
+</template>
 
 <style>
 .clickable {

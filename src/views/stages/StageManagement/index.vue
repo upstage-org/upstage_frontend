@@ -1,9 +1,42 @@
+<script>
+import { provide, watch } from "vue";
+import { useFirst, useRequest } from "services/graphql/composable";
+import { stageGraph } from "services/graphql";
+import Loading from "components/Loading.vue";
+// Aliased: "Header" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppHeader from "components/Header.vue";
+
+export default {
+  components: { Loading, AppHeader },
+  props: { id: [String, Number] },
+  setup: (props) => {
+    const { nodes, loading, refetch, data, refresh, clearCache } = useRequest(stageGraph.getStage);
+    const stage = useFirst(nodes);
+    provide("stage", stage);
+    provide("refresh", refresh);
+    provide("clearCache", clearCache);
+    watch(
+      () => props.id,
+      () => {
+        if (props.id) {
+          refetch(props.id);
+        } else {
+          data.value = null;
+        }
+      },
+      { immediate: true },
+    );
+    return { stage, loading };
+  },
+};
+</script>
+
 <template>
-  <Header>
+  <AppHeader>
     <template v-if="id">
       <a-space class="flex-wrap">
         <div class="mr-4">
-          <h3 class="stage_title mb-0" v-if="stage.name">
+          <h3 v-if="stage.name" class="stage_title mb-0">
             {{ stage.name }}
           </h3>
           <p class="mb-0">{{ $t("stage_management") }}</p>
@@ -17,7 +50,7 @@
       </a-space>
     </template>
     <h3 v-else class="stage_title mb-0">{{ $t("create_new_stage") }}</h3>
-  </Header>
+  </AppHeader>
   <a-layout class="w-full shadow rounded-xl bg-white stage_container">
     <div class="container-fluid">
       <div class="columns">
@@ -61,38 +94,6 @@
     </div>
   </a-layout>
 </template>
-
-<script>
-import { provide, watch } from "vue";
-import { useFirst, useRequest } from "services/graphql/composable";
-import { stageGraph } from "services/graphql";
-import Loading from "components/Loading.vue";
-import Header from "components/Header.vue";
-
-export default {
-  props: ["id"],
-  components: { Loading },
-  setup: (props) => {
-    const { nodes, loading, refetch, data, refresh, clearCache } = useRequest(stageGraph.getStage);
-    const stage = useFirst(nodes);
-    provide("stage", stage);
-    provide("refresh", refresh);
-    provide("clearCache", clearCache);
-    watch(
-      () => props.id,
-      () => {
-        if (props.id) {
-          refetch(props.id);
-        } else {
-          data.value = null;
-        }
-      },
-      { immediate: true },
-    );
-    return { stage, loading };
-  },
-};
-</script>
 
 <style scoped>
 .stage_container {

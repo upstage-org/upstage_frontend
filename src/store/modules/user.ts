@@ -55,7 +55,7 @@ export default {
         const { updateUser } = await userGraph.updateUser(payload);
         commit("SET_USER_DATA", updateUser);
         return updateUser;
-      } catch (error) {
+      } catch {
         message.warning("Failed update!");
       } finally {
         commit("SET_LOADING_USER", false);

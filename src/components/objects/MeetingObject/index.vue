@@ -1,31 +1,14 @@
-<template>
-  <div>
-    <Object :object="meeting">
-      <template #render>
-        <div
-          id="meeting-room"
-          class="frame"
-          :style="{ width: object.w + 'px', height: object.h + 'px' }"
-          :class="activeMovable ? 'disable-pointer' : ''"
-        >
-          <Loading v-if="loading" height="100%" />
-          <div class="room" ref="room"></div>
-        </div>
-      </template>
-    </Object>
-  </div>
-</template>
-
 <script>
-import Object from "../Object.vue";
+// Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppObject from "../Object.vue";
 import Loading from "components/Loading.vue";
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useJitsiDomain } from "./composable";
 
 export default {
-  components: { Object, Loading },
-  props: ["object"],
+  components: { AppObject, Loading },
+  props: { object: Object },
   setup: (props) => {
     const store = useStore();
     const room = ref();
@@ -61,6 +44,24 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div>
+    <AppObject :object="meeting">
+      <template #render>
+        <div
+          id="meeting-room"
+          class="frame"
+          :style="{ width: object.w + 'px', height: object.h + 'px' }"
+          :class="activeMovable ? 'disable-pointer' : ''"
+        >
+          <Loading v-if="loading" height="100%" />
+          <div ref="room" class="room"></div>
+        </div>
+      </template>
+    </AppObject>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .frame {

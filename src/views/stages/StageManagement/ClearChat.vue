@@ -1,9 +1,3 @@
-<template>
-  <button class="button ml-2 is-warning" @click="clearChat" :class="{ 'is-loading': clearing }">
-    Clear Chat
-  </button>
-</template>
-
 <script>
 import { inject, ref } from "vue";
 import { message } from "ant-design-vue";
@@ -37,5 +31,11 @@ export default {
   },
 };
 </script>
+
+<template>
+  <button class="button ml-2 is-warning" :class="{ 'is-loading': clearing }" @click="clearChat">
+    Clear Chat
+  </button>
+</template>
 
 <style></style>

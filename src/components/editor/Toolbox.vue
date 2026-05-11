@@ -3,7 +3,7 @@
 import { defineComponent } from "vue";
 import { PropType } from "vue";
 import { Editor } from "@tiptap/vue-3";
-import { Button, ButtonGroup, Modal, Space, message } from "ant-design-vue";
+import { Button, ButtonGroup, Modal, Space } from "ant-design-vue";
 import { h } from "vue";
 import {
   BoldOutlined,

@@ -1,13 +1,3 @@
-<template>
-  <div v-if="hasJitsi" id="reload-stream">
-    <a-tooltip title="Refresh streams">
-      <button class="button is-small refresh-icon clickable" @mousedown="onReload">
-        <i class="fas fa-sync"></i>
-      </button>
-    </a-tooltip>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
@@ -17,6 +7,16 @@ const objects = computed<{ type?: string }[]>(() => store.getters["stage/objects
 const hasJitsi = computed(() => objects.value.some((el) => el.type === "jitsi"));
 const onReload = () => store.dispatch("stage/reloadStreams");
 </script>
+
+<template>
+  <div v-if="hasJitsi" id="reload-stream">
+    <a-tooltip title="Refresh streams">
+      <button class="button is-small refresh-icon clickable" @mousedown="onReload">
+        <i class="fas fa-sync"></i>
+      </button>
+    </a-tooltip>
+  </div>
+</template>
 
 <style scoped lang="scss">
 #reload-stream {

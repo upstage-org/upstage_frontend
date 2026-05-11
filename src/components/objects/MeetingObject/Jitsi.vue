@@ -1,71 +1,17 @@
-<template>
-  <Object :object="object">
-    <template #render>
-      <div v-if="!videoTrack && !audioTrack" class="loading">
-        <Loading width="auto" height="22px" src="img/videoloading.gif" />
-      </div>
-      <template v-else>
-        <video
-          autoplay
-          ref="videoEl"
-          :style="{
-            'border-radius': object.shape === 'circle' ? '100%' : '12px',
-          }"
-          @timeupdate="timeupdate"
-          @loadeddata="loadeddata"
-        >
-          Please click on Refresh Stream button.
-        </video>
-        <audio autoplay ref="audioEl" :muted="localMuted" v-bind:id="'video' + object.id"></audio>
-        <img v-if="loading" class="overlay" src="/img/videoloading.gif" />
-      </template>
-    </template>
-    <template #menu="slotProps">
-      <div class="field has-addons shape-group">
-        <p class="control menu-group-item">Shape</p>
-        <p class="control menu-group-item">
-          <button class="button is-light" @click="clip(null)">
-            <div class="icon">
-              <i class="fas fa-square"></i>
-            </div>
-          </button>
-        </p>
-        <p class="control menu-group-item" @click="clip('circle')">
-          <button class="button is-light">
-            <div class="icon">
-              <i class="fas fa-circle"></i>
-            </div>
-          </button>
-        </p>
-      </div>
-      <a class="panel-block" @click="toggleMuted">
-        <span class="panel-icon">
-          <i v-if="localMuted" class="fas fa-volume-mute has-text-danger"></i>
-          <i v-else class="fas fa-volume-up has-text-primary"></i>
-        </span>
-        <span>{{ localMuted ? "UnMute locally" : "Mute locally" }}</span>
-      </a>
-      <a class="panel-block" @click="openVolumePopup(slotProps)">
-        <span class="panel-icon">
-          <Icon src="voice-setting.svg" />
-        </span>
-        <span>{{ $t("volumn_setting") }}</span>
-      </a>
-      <AvatarContextMenu :object="object" v-bind="slotProps" />
-    </template>
-  </Object>
-</template>
-
 <script>
-import Object from "../Object.vue";
+// Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppObject from "../Object.vue";
 import Loading from "components/Loading.vue";
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
 
 export default {
-  components: { Object, Loading, AvatarContextMenu },
-  props: ["object", "closeMenu"],
+  components: { AppObject, Loading, AvatarContextMenu },
+  props: {
+    object: Object,
+    closeMenu: Function,
+  },
   setup: (props) => {
     const store = useStore();
     const videoEl = ref();
@@ -161,7 +107,7 @@ export default {
 
     const isPlayer = computed(() => store.getters["stage/canPlay"]);
 
-    const timeupdate = (e) => {
+    const timeupdate = () => {
       interval && clearInterval(interval);
     };
 
@@ -196,6 +142,64 @@ export default {
   },
 };
 </script>
+
+<template>
+  <AppObject :object="object">
+    <template #render>
+      <div v-if="!videoTrack && !audioTrack" class="loading">
+        <Loading width="auto" height="22px" src="img/videoloading.gif" />
+      </div>
+      <template v-else>
+        <video
+          ref="videoEl"
+          autoplay
+          :style="{
+            'border-radius': object.shape === 'circle' ? '100%' : '12px',
+          }"
+          @timeupdate="timeupdate"
+          @loadeddata="loadeddata"
+        >
+          Please click on Refresh Stream button.
+        </video>
+        <audio :id="'video' + object.id" ref="audioEl" autoplay :muted="localMuted"></audio>
+        <img v-if="loading" class="overlay" src="/img/videoloading.gif" />
+      </template>
+    </template>
+    <template #menu="slotProps">
+      <div class="field has-addons shape-group">
+        <p class="control menu-group-item">Shape</p>
+        <p class="control menu-group-item">
+          <button class="button is-light" @click="clip(null)">
+            <div class="icon">
+              <i class="fas fa-square"></i>
+            </div>
+          </button>
+        </p>
+        <p class="control menu-group-item" @click="clip('circle')">
+          <button class="button is-light">
+            <div class="icon">
+              <i class="fas fa-circle"></i>
+            </div>
+          </button>
+        </p>
+      </div>
+      <a class="panel-block" @click="toggleMuted">
+        <span class="panel-icon">
+          <i v-if="localMuted" class="fas fa-volume-mute has-text-danger"></i>
+          <i v-else class="fas fa-volume-up has-text-primary"></i>
+        </span>
+        <span>{{ localMuted ? "UnMute locally" : "Mute locally" }}</span>
+      </a>
+      <a class="panel-block" @click="openVolumePopup(slotProps)">
+        <span class="panel-icon">
+          <Icon src="voice-setting.svg" />
+        </span>
+        <span>{{ $t("volumn_setting") }}</span>
+      </a>
+      <AvatarContextMenu :object="object" v-bind="slotProps" />
+    </template>
+  </AppObject>
+</template>
 
 <style lang="scss" scoped>
 video {

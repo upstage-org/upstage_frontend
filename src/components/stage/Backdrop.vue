@@ -1,25 +1,12 @@
-<template>
-  <Image
-    v-if="src"
-    class="background-image"
-    :src="src"
-    :style="{
-      opacity: backgroundOpacity,
-    }"
-    :transition="transitionDuration"
-    :no-fallback="true"
-    fit="cover"
-  />
-</template>
-
 <script>
 import { computed, reactive } from "vue";
 import { watch } from "vue";
 import { useStore } from "vuex";
-import Image from "../Image.vue";
+// Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppImage from "../Image.vue";
 
 export default {
-  components: { Image },
+  components: { AppImage },
   setup: () => {
     const store = useStore();
     const background = computed(() => store.state.stage.background);
@@ -70,6 +57,20 @@ export default {
   },
 };
 </script>
+
+<template>
+  <AppImage
+    v-if="src"
+    class="background-image"
+    :src="src"
+    :style="{
+      opacity: backgroundOpacity,
+    }"
+    :transition="transitionDuration"
+    :no-fallback="true"
+    fit="cover"
+  />
+</template>
 
 <style scoped>
 .background-image {

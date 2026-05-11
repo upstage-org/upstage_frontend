@@ -1,13 +1,3 @@
-<template>
-  <NavBar />
-  <div id="main-layout">
-    <router-view />
-    <OneTimePurchase v-if="enableDonate" />
-    <PurchasePopup v-if="enableDonate" />
-  </div>
-  <Footer />
-</template>
-
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
@@ -19,6 +9,16 @@ import PurchasePopup from "components/payment/PurchasePopup.vue";
 const store = useStore();
 const enableDonate = computed<boolean>(() => store.getters["config/enableDonate"]);
 </script>
+
+<template>
+  <NavBar />
+  <div id="main-layout">
+    <router-view />
+    <OneTimePurchase v-if="enableDonate" />
+    <PurchasePopup v-if="enableDonate" />
+  </div>
+  <Footer />
+</template>
 
 <style>
 #main-layout {

@@ -10,7 +10,7 @@ import { humanFileSize } from "utils/common";
 import { Media, StudioGraph, UploadFile } from "models/studio";
 import { useQuery } from "@vue/apollo-composable";
 
-const model = defineModel();
+const model = defineModel<boolean>();
 const { load, refetch } = useLazyQuery<StudioGraph>(
   gql`
     query WhoAmI {
@@ -45,14 +45,14 @@ const toSrc = ({ file }: { file: File }) => {
   return URL.createObjectURL(file);
 };
 
-watch(visible as Ref, (val) => {
+watch(visible as Ref, () => {
   reload();
 });
 
 const handleUpload = async (file: UploadFile) => {
   let fileType = file.file.type;
   const profile = (await (load as any)()) || (await refetch());
-  const uploadLimit = (profile?.data || profile?.whoami).uploadLimit ?? uploadDefault;
+  const uploadLimit = (profile?.data || profile?.whoami)?.uploadLimit ?? uploadDefault;
 
   if (!fileType.includes("video")) {
     const canUpload = file.file.size <= uploadLimit;
@@ -71,7 +71,7 @@ const handleUpload = async (file: UploadFile) => {
     }
   }
   if (editingMediaResult.value?.editingMedia?.id) {
-    const { assetType } = editingMediaResult.value?.editingMedia;
+    const { assetType } = editingMediaResult.value.editingMedia;
     if (
       (["video", "audio"].includes(assetType?.name) && !fileType.includes(assetType?.name)) ||
       ((fileType.includes("video") || fileType.includes("audio")) &&
@@ -112,11 +112,11 @@ const uploadFile = async (file: any) => {
   <a-modal
     :footer="null"
     :visible="visible"
-    @cancel="visible = false"
     width="100%"
-    wrapClassName="fullscreen-dragzone"
+    wrap-class-name="fullscreen-dragzone"
     class="h-full top-0 p-0"
     data-testid="dropzone"
+    @cancel="visible = false"
   >
     <a-upload-dragger
       data-testid="dropzone-input"

@@ -1,22 +1,3 @@
-<template>
-  <transition name="fade">
-    <div v-if="type" class="modal" :class="{ 'is-active': isActive }">
-      <div class="modal-background" @click="close"></div>
-      <component v-if="simple" :is="type" @close="close" />
-      <div v-else ref="modal" class="modal-content">
-        <div class="card">
-          <a href="#" class="card-header-icon" @click="close">
-            <span class="icon">
-              <Icon src="close.svg" />
-            </span>
-          </a>
-          <component :is="type" @close="close" />
-        </div>
-      </div>
-    </div>
-  </transition>
-</template>
-
 <script>
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
@@ -53,6 +34,25 @@ export default {
   },
 };
 </script>
+
+<template>
+  <transition name="fade">
+    <div v-if="type" class="modal" :class="{ 'is-active': isActive }">
+      <div class="modal-background" @click="close"></div>
+      <component :is="type" v-if="simple" @close="close" />
+      <div v-else ref="modal" class="modal-content">
+        <div class="card">
+          <a href="#" class="card-header-icon" @click="close">
+            <span class="icon">
+              <Icon src="close.svg" />
+            </span>
+          </a>
+          <component :is="type" @close="close" />
+        </div>
+      </div>
+    </div>
+  </transition>
+</template>
 <style scoped lang="scss">
 .fade-enter-active,
 .fade-leave-active {

@@ -1,50 +1,40 @@
-<template>
-  <div id="topbar" class="card is-light" v-if="tool">
-    <div
-      ref="bar"
-      class="card-content"
-      :class="{ 'is-compact': compact }"
-      :id="tool + 'tool'"
-      @wheel="horizontalScroll"
-    >
-      <component :is="tool" />
-    </div>
-  </div>
-</template>
-
 <script>
 import { onUnmounted, ref } from "vue";
 import Avatars from "./tools/Avatars.vue";
 import Backdrops from "./tools/Backdrops.vue";
 import Props from "./tools/Props.vue";
-import Audio from "./tools/Audio.vue";
+// Aliased: "Audio" and "Text" are reserved HTML element names
+// (vue/no-reserved-component-names). The companion <PanelItem name="..."> in
+// stage/Toolboxs/index.vue is updated to "AudioTool"/"TextTool" so the
+// dynamic <component :is="tool"> lookup still resolves.
+import AudioTool from "./tools/Audio.vue";
 import Draw from "./tools/Draw/index.vue";
 import Whiteboard from "./tools/WhiteboardTools.vue";
 import Streams from "./tools/Streams/index.vue";
 import Meeting from "./tools/Meeting/index.vue";
-import Text from "./tools/TextTool.vue";
+import TextTool from "./tools/TextTool.vue";
 import Settings from "./tools/Settings.vue";
 import Depth from "./tools/Depth.vue";
 import Curtain from "./tools/CurtainTool.vue";
 import Scenes from "./tools/Scenes/index.vue";
 
 export default {
-  props: ["tool"],
   components: {
     Avatars,
     Backdrops,
     Props,
-    Audio,
+    AudioTool,
     Draw,
     Streams,
     Meeting,
-    Text,
+    TextTool,
     Settings,
     Depth,
     Curtain,
     Scenes,
     Whiteboard,
   },
+  props: { tool: String },
   setup: () => {
     const bar = ref();
     const horizontalScroll = (e) => {
@@ -74,6 +64,20 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div v-if="tool" id="topbar" class="card is-light">
+    <div
+      :id="tool + 'tool'"
+      ref="bar"
+      class="card-content"
+      :class="{ 'is-compact': compact }"
+      @wheel="horizontalScroll"
+    >
+      <component :is="tool" />
+    </div>
+  </div>
+</template>
 
 <style lang="scss">
 #topbar {

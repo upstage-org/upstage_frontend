@@ -1,41 +1,3 @@
-<template>
-  <div class="file">
-    <a-tooltip :title="tooltip">
-      <label class="file-label has-tooltip-right">
-        <input
-          :id="id"
-          class="file-input"
-          type="file"
-          name="resume"
-          :accept="accept"
-          @input="handleInputFile"
-        />
-        <span class="file-cta">
-          <slot>
-            <span class="file-icon">
-              <i class="fas fa-file"></i>
-            </span>
-            <span class="file-label">Choose a file…</span>
-          </slot>
-        </span>
-        <div v-if="!valid" class="mt-2 mx-2 has-text-danger">
-          <span>Maximum file size: {{ humanFileSize(mediaLimit) }}&nbsp;</span>
-          <i class="fas fa-times"></i>
-          (current size: {{ humanFileSize(file.size) }})
-        </div>
-      </label>
-    </a-tooltip>
-  </div>
-
-  <template v-if="preview && file">
-    <img v-if="isImage" :src="modelValue" alt="Preview" />
-    <div v-else class="box has-text-centered">
-      <i class="fas fa-file"></i>
-      <b>{{ file.name }} ({{ humanFileSize(file.size) }})</b>
-    </div>
-  </template>
-</template>
-
 <script>
 import { ref } from "vue";
 import { computed, watch } from "vue";
@@ -151,5 +113,43 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="file">
+    <a-tooltip :title="tooltip">
+      <label class="file-label has-tooltip-right">
+        <input
+          :id="id"
+          class="file-input"
+          type="file"
+          name="resume"
+          :accept="accept"
+          @input="handleInputFile"
+        />
+        <span class="file-cta">
+          <slot>
+            <span class="file-icon">
+              <i class="fas fa-file"></i>
+            </span>
+            <span class="file-label">Choose a file…</span>
+          </slot>
+        </span>
+        <div v-if="!valid" class="mt-2 mx-2 has-text-danger">
+          <span>Maximum file size: {{ humanFileSize(mediaLimit) }}&nbsp;</span>
+          <i class="fas fa-times"></i>
+          (current size: {{ humanFileSize(file.size) }})
+        </div>
+      </label>
+    </a-tooltip>
+  </div>
+
+  <template v-if="preview && file">
+    <img v-if="isImage" :src="modelValue" alt="Preview" />
+    <div v-else class="box has-text-centered">
+      <i class="fas fa-file"></i>
+      <b>{{ file.name }} ({{ humanFileSize(file.size) }})</b>
+    </div>
+  </template>
+</template>
 
 <style></style>

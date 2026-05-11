@@ -1,25 +1,3 @@
-<template>
-  <CustomConfirm @confirm="(complete) => duplicateStage(complete)" :loading="loading">
-    <Field v-model="name" label="Enter new stage name" :placeholder="defaultName" />
-    <template #trigger>
-      <slot></slot>
-    </template>
-
-    <template #no>
-      <span class="icon">
-        <i class="fas fa-times"></i>
-      </span>
-      <span>{{ $t("cancel") }}</span>
-    </template>
-    <template #yes>
-      <span class="icon">
-        <i class="fas fa-clone"></i>
-      </span>
-      <span>{{ $t("duplicate") }}</span>
-    </template>
-  </CustomConfirm>
-</template>
-
 <script setup>
 import { defineProps, computed, inject, ref } from "vue";
 import CustomConfirm from "components/CustomConfirm.vue";
@@ -51,5 +29,27 @@ const duplicateStage = async (complete) => {
   console.log(result);
 };
 </script>
+
+<template>
+  <CustomConfirm :loading="loading" @confirm="(complete) => duplicateStage(complete)">
+    <Field v-model="name" label="Enter new stage name" :placeholder="defaultName" />
+    <template #trigger>
+      <slot></slot>
+    </template>
+
+    <template #no>
+      <span class="icon">
+        <i class="fas fa-times"></i>
+      </span>
+      <span>{{ $t("cancel") }}</span>
+    </template>
+    <template #yes>
+      <span class="icon">
+        <i class="fas fa-clone"></i>
+      </span>
+      <span>{{ $t("duplicate") }}</span>
+    </template>
+  </CustomConfirm>
+</template>
 
 <style></style>

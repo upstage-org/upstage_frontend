@@ -1,19 +1,3 @@
-<template>
-  <div :title="'Joined ' + joinedAt.fromNow()" @click="tagPlayer">
-    <span class="icon">
-      <i
-        class="fas"
-        :class="{
-          'fa-user': session.isPlayer,
-          'fa-desktop': !session.isPlayer,
-          'has-text-success': isOnline,
-        }"
-      ></i>
-    </span>
-    {{ session.nickname }}
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed } from "vue";
 import dayjs from "@utils/dayjs";
@@ -38,6 +22,22 @@ const tagPlayer = () => {
   }
 };
 </script>
+
+<template>
+  <div :title="'Joined ' + joinedAt.fromNow()" @click="tagPlayer">
+    <span class="icon">
+      <i
+        class="fas"
+        :class="{
+          'fa-user': session.isPlayer,
+          'fa-desktop': !session.isPlayer,
+          'has-text-success': isOnline,
+        }"
+      ></i>
+    </span>
+    {{ session.nickname }}
+  </div>
+</template>
 
 <style scoped>
 div {

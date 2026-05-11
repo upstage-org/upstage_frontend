@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { PropType, computed, ref } from "vue";
+import { PropType, computed } from "vue";
 import { Media, MediaAttributes } from "models/studio";
 import { absolutePath } from "utils/common";
 
@@ -13,8 +13,6 @@ const props = defineProps({
 const attributes = computed<MediaAttributes>(() => {
   return JSON.parse(props.media.description || "{}");
 });
-
-const showStreamInstruction = ref(false);
 </script>
 
 <template>

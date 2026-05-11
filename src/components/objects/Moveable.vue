@@ -1,34 +1,3 @@
-<template>
-  <div
-    ref="el"
-    :style="{
-      position: 'absolute',
-      opacity: object.opacity * (isDragging ? 0.5 : 1),
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
-      'transform-origin': transformOrigin,
-    }"
-    @mousedown="clickInside"
-    v-click-outside="clickOutside"
-  >
-    <slot />
-  </div>
-  <div
-    v-if="isDragging"
-    :style="{
-      position: 'absolute',
-      left: object.x + 'px',
-      top: object.y + 'px',
-      width: object.w + 'px',
-      height: object.h + 'px',
-      transform: `rotate(${object.rotate}deg)`,
-      opacity: object.opacity,
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
-    }"
-  >
-    <slot />
-  </div>
-</template>
-
 <script>
 import { ref } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
@@ -37,7 +6,11 @@ import { useStore } from "vuex";
 import { animate } from "animejs";
 
 export default {
-  props: ["object", "controlable", "active"],
+  props: {
+    object: Object,
+    controlable: Boolean,
+    active: Boolean,
+  },
   emits: ["update:active"],
   setup: (props, { emit }) => {
     const el = ref();
@@ -223,7 +196,7 @@ export default {
           onUpdate: () => {
             try {
               moveable.updateRect();
-            } catch (error) {
+            } catch {
               // pass
             }
           },
@@ -260,5 +233,36 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div
+    ref="el"
+    v-click-outside="clickOutside"
+    :style="{
+      position: 'absolute',
+      opacity: object.opacity * (isDragging ? 0.5 : 1),
+      filter: `grayscale(${object.liveAction ? 0 : 1})`,
+      'transform-origin': transformOrigin,
+    }"
+    @mousedown="clickInside"
+  >
+    <slot />
+  </div>
+  <div
+    v-if="isDragging"
+    :style="{
+      position: 'absolute',
+      left: object.x + 'px',
+      top: object.y + 'px',
+      width: object.w + 'px',
+      height: object.h + 'px',
+      transform: `rotate(${object.rotate}deg)`,
+      opacity: object.opacity,
+      filter: `grayscale(${object.liveAction ? 0 : 1})`,
+    }"
+  >
+    <slot />
+  </div>
+</template>
 
 <style></style>

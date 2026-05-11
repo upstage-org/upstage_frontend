@@ -25,6 +25,8 @@ To generate the necessary environment scripts and start up the application using
 
 Testing:
 
+pnpm e2e:features
+
 # Default (today's behavior): all three phases headed, no replay headless.
 
 PWHEADLESS=0 pnpm e2e:perform

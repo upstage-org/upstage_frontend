@@ -1,7 +1,3 @@
-<template>
-  <img :src="src" :style="{ width, height }" />
-</template>
-
 <script>
 export default {
   props: {
@@ -20,3 +16,7 @@ export default {
   },
 };
 </script>
+
+<template>
+  <img :src="src" :style="{ width, height }" />
+</template>

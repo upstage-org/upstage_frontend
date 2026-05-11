@@ -1,16 +1,3 @@
-<template>
-  <button
-    v-if="clearChatVisibility"
-    class="chat-setting button is-rounded is-outlined"
-    @click="clearChat"
-    :class="{ 'is-loading': clearing }"
-  >
-    <span class="icon">
-      <Icon src="clear.svg" size="20" />
-    </span>
-  </button>
-</template>
-
 <script>
 import { ref } from "vue";
 import { message } from "ant-design-vue";
@@ -57,5 +44,18 @@ export default {
   },
 };
 </script>
+
+<template>
+  <button
+    v-if="clearChatVisibility"
+    class="chat-setting button is-rounded is-outlined"
+    :class="{ 'is-loading': clearing }"
+    @click="clearChat"
+  >
+    <span class="icon">
+      <Icon src="clear.svg" size="20" />
+    </span>
+  </button>
+</template>
 
 <style></style>

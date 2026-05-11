@@ -1,3 +1,22 @@
+<script>
+import { ref } from "vue";
+import Modal from "components/Modal.vue";
+import SaveButton from "components/form/SaveButton.vue";
+export default {
+  components: { Modal, SaveButton },
+  props: {
+    loading: Boolean,
+    onlyYes: Boolean,
+  },
+  emits: ["confirm"],
+  setup: () => {
+    const active = ref(false);
+
+    return { active };
+  },
+};
+</script>
+
 <template>
   <slot name="render" :confirm="() => (active = true)" />
   <Modal v-model="active" width="500px">
@@ -16,7 +35,7 @@
           <span>{{ $t("no") }}</span>
         </slot>
       </button>
-      <SaveButton class="is-dark" @click="$emit('confirm', closeModal)" :loading="loading">
+      <SaveButton class="is-dark" :loading="loading" @click="$emit('confirm', closeModal)">
         <slot name="yes">
           <span class="icon">
             <i class="fas fa-check"></i>
@@ -27,21 +46,5 @@
     </template>
   </Modal>
 </template>
-
-<script>
-import { ref } from "vue";
-import Modal from "components/Modal.vue";
-import SaveButton from "components/form/SaveButton.vue";
-export default {
-  props: ["loading", "onlyYes"],
-  emits: ["confirm"],
-  components: { Modal, SaveButton },
-  setup: () => {
-    const active = ref(false);
-
-    return { active };
-  },
-};
-</script>
 
 <style></style>

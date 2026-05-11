@@ -20,7 +20,7 @@ const deleteStage = async (complete) => {
 </script>
 
 <template>
-  <CustomConfirm @confirm="(complete) => deleteStage(complete)" :loading="loading">
+  <CustomConfirm :loading="loading" @confirm="(complete) => deleteStage(complete)">
     <p>
       Deleting
       <b>{{ stage.name }}</b> will also remove all records and chat that ever happened on this

@@ -31,6 +31,12 @@ export default [
         ecmaVersion: "latest",
         sourceType: "module",
         extraFileExtensions: [".vue"],
+        // A handful of legacy components use `<script lang="jsx">` (e.g.
+        // src/components/objects/MeetingObject/Track.vue) for inline render
+        // functions. Without `ecmaFeatures.jsx`, the TS parser bails on the
+        // first JSX `<` and reports `Parsing error: '>' expected.`, which
+        // also masks every other rule on that file.
+        ecmaFeatures: { jsx: true },
       },
       globals: {
         window: "readonly",
@@ -72,7 +78,10 @@ export default [
       "vue/no-mutating-props": "warn",
       "vue/require-default-prop": "off",
       "vue/component-name-in-template-casing": ["warn", "PascalCase"],
-      "vue/component-tags-order": ["warn", { order: ["script", "template", "style"] }],
+      // `vue/component-tags-order` was renamed to `vue/block-order` in
+      // eslint-plugin-vue v9. Keeping the same `script, template, style`
+      // ordering preference.
+      "vue/block-order": ["warn", { order: ["script", "template", "style"] }],
     },
   },
   {

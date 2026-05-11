@@ -1,20 +1,3 @@
-<template>
-  <transition name="fade">
-    <img v-if="fallback && !noFallback" src="assets/notfound.svg" />
-    <img
-      v-else
-      v-bind="$props"
-      :key="src"
-      :style="{
-        'object-fit': fit,
-        opacity,
-        transform: `rotate(${rotate}deg)`,
-      }"
-      @error="fallback = true"
-    />
-  </transition>
-</template>
-
 <script>
 import { computed, ref } from "vue";
 import { watch } from "vue";
@@ -56,6 +39,23 @@ export default {
   },
 };
 </script>
+
+<template>
+  <transition name="fade">
+    <img v-if="fallback && !noFallback" src="assets/notfound.svg" />
+    <img
+      v-else
+      v-bind="$props"
+      :key="src"
+      :style="{
+        'object-fit': fit,
+        opacity,
+        transform: `rotate(${rotate}deg)`,
+      }"
+      @error="fallback = true"
+    />
+  </transition>
+</template>
 
 <style scoped>
 img {

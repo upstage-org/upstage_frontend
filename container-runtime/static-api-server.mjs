@@ -24,14 +24,10 @@ function parsePort(name, raw) {
   return n;
 }
 
-const listenPort = parsePort(
-  "STATIC_API_LISTEN_PORT",
-  process.env.STATIC_API_LISTEN_PORT,
-);
+const listenPort = parsePort("STATIC_API_LISTEN_PORT", process.env.STATIC_API_LISTEN_PORT);
 const publishedHostPort = parsePort("FRONTEND_PORT", process.env.FRONTEND_PORT);
 
-const apiTarget =
-  process.env.VITE_STUDIO_API_PROXY || "http://127.0.0.1:3001";
+const apiTarget = process.env.VITE_STUDIO_API_PROXY || "http://127.0.0.1:3001";
 
 const staticHandler = sirv("dist", {
   etag: true,

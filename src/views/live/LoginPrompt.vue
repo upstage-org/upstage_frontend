@@ -1,45 +1,3 @@
-<template>
-  <div class="modal" :class="{ 'is-active': showing }">
-    <div class="modal-background" @click="enterAsAudience"></div>
-    <div ref="modal" class="modal-content">
-      <LoginForm v-if="showLoginForm" @success="onLoginSuccess" />
-      <div v-else class="card">
-        <header class="card-header">
-          <p class="card-header-title">
-            {{ $t("click_anywhere_to_enter_the_stage") }}
-          </p>
-        </header>
-        <div class="card-content">
-          <div class="content">
-            <label class="label" style="font-weight: normal">
-              Choose a nickname if you want one:
-            </label>
-            <InputButtonPostfix
-              v-model="nickname"
-              placeholder="Guest"
-              icon="fas fa-sign-in-alt"
-              title="Choose a nickname"
-              @ok="enterAsAudience"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-    <button
-      v-if="showLoginForm"
-      class="button is-light is-outlined mt-4"
-      @click="showLoginForm = false"
-    >
-      <span class="icon"><i class="fas fa-chevron-left"></i></span>
-      <span>{{ $t("enter_as_audience") }}</span>
-    </button>
-    <button v-else class="button is-light is-outlined mt-4" @click="showLoginForm = true">
-      <span>{{ $t("player_login") }}</span>
-      <span class="icon"><i class="fas fa-chevron-right"></i></span>
-    </button>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
@@ -91,6 +49,48 @@ const onLoginSuccess = () => {
   store.dispatch("stage/reloadPermission");
 };
 </script>
+
+<template>
+  <div class="modal" :class="{ 'is-active': showing }">
+    <div class="modal-background" @click="enterAsAudience"></div>
+    <div ref="modal" class="modal-content">
+      <LoginForm v-if="showLoginForm" @success="onLoginSuccess" />
+      <div v-else class="card">
+        <header class="card-header">
+          <p class="card-header-title">
+            {{ $t("click_anywhere_to_enter_the_stage") }}
+          </p>
+        </header>
+        <div class="card-content">
+          <div class="content">
+            <label class="label" style="font-weight: normal">
+              Choose a nickname if you want one:
+            </label>
+            <InputButtonPostfix
+              v-model="nickname"
+              placeholder="Guest"
+              icon="fas fa-sign-in-alt"
+              title="Choose a nickname"
+              @ok="enterAsAudience"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+    <button
+      v-if="showLoginForm"
+      class="button is-light is-outlined mt-4"
+      @click="showLoginForm = false"
+    >
+      <span class="icon"><i class="fas fa-chevron-left"></i></span>
+      <span>{{ $t("enter_as_audience") }}</span>
+    </button>
+    <button v-else class="button is-light is-outlined mt-4" @click="showLoginForm = true">
+      <span>{{ $t("player_login") }}</span>
+      <span class="icon"><i class="fas fa-chevron-right"></i></span>
+    </button>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .modal-close {

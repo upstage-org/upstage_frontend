@@ -1,5 +1,3 @@
-import { Static } from "vue";
-
 export interface Connection<T> {
   pageInfo: PageInfo;
   edges: Edge<T>[];

@@ -1,32 +1,7 @@
-<template>
-  <div @click="switchScene">
-    <ContextMenu style="width: 100%; height: 100%; padding: 0" prevent-clicking>
-      <template #trigger>
-        <Skeleton :data="scene" nodrop>
-          <div
-            class="p-2 is-fullwidth is-flex is-flex-direction-column is-justify-content-space-between"
-            :title="scene.name"
-          >
-            <Image :src="scene.scenePreview" style="height: auto; border-radius: 4px" />
-            <span class="tag mt-1 is-block">{{ scene.name }}</span>
-          </div>
-        </Skeleton>
-      </template>
-      <template #context>
-        <a class="panel-block has-text-danger" @click="deleteScene">
-          <span class="panel-icon">
-            <Icon src="remove.svg" />
-          </span>
-          <span>{{ $t("delete_scene") }}</span>
-        </a>
-      </template>
-    </ContextMenu>
-  </div>
-</template>
-
 <script>
 import Icon from "components/Icon.vue";
-import Image from "components/Image.vue";
+// Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
 import { useStore } from "vuex";
 import { useMutation } from "services/graphql/composable";
@@ -35,8 +10,8 @@ import { message } from "ant-design-vue";
 import Skeleton from "../../Skeleton.vue";
 
 export default {
-  components: { Icon, Image, ContextMenu, Skeleton },
-  props: ["scene"],
+  components: { Icon, AppImage, ContextMenu, Skeleton },
+  props: { scene: Object },
   setup: (props) => {
     const store = useStore();
     const switchScene = () => {
@@ -69,6 +44,32 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div @click="switchScene">
+    <ContextMenu style="width: 100%; height: 100%; padding: 0" prevent-clicking>
+      <template #trigger>
+        <Skeleton :data="scene" nodrop>
+          <div
+            class="p-2 is-fullwidth is-flex is-flex-direction-column is-justify-content-space-between"
+            :title="scene.name"
+          >
+            <AppImage :src="scene.scenePreview" style="height: auto; border-radius: 4px" />
+            <span class="tag mt-1 is-block">{{ scene.name }}</span>
+          </div>
+        </Skeleton>
+      </template>
+      <template #context>
+        <a class="panel-block has-text-danger" @click="deleteScene">
+          <span class="panel-icon">
+            <Icon src="remove.svg" />
+          </span>
+          <span>{{ $t("delete_scene") }}</span>
+        </a>
+      </template>
+    </ContextMenu>
+  </div>
+</template>
 
 <style scoped>
 .tag {

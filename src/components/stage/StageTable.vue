@@ -2,7 +2,7 @@
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
 import { computed, reactive, watch, provide, onMounted, ComputedRef } from "vue";
-import type { Media, Stage, StudioGraph } from "models/studio";
+import type { Media, Stage } from "models/studio";
 import { absolutePath } from "utils/common";
 import { ColumnType, TablePaginationConfig } from "ant-design-vue/lib/table";
 import { SorterResult } from "ant-design-vue/lib/table/interface";
@@ -34,7 +34,7 @@ const params = computed(() => ({
   ...inquiryResult.value.inquiry,
 }));
 
-const { result, loading, fetchMore, refetch } = useQuery(
+const { result, loading, refetch } = useQuery(
   gql`
     query StageTable(
       $page: Int
@@ -176,13 +176,6 @@ interface Pagination {
   total: number;
 }
 
-interface Sorter {
-  column: any;
-  columnKey: string;
-  field: string;
-  order: "ascend" | "descend";
-}
-
 const handleTableChange = (
   { current = 1, pageSize = 10 }: TablePaginationConfig,
   _: any,
@@ -261,9 +254,8 @@ onVisibilityUpdated(handleUpdate);
       class="w-full shadow overflow-auto"
       :columns="columns as ColumnType<Stage>[]"
       :data-source="dataSource"
-      rowKey="id"
+      row-key="id"
       :loading="loading"
-      @change="handleTableChange"
       :pagination="
         {
           showQuickJumper: true,
@@ -271,6 +263,7 @@ onVisibilityUpdated(handleUpdate);
           total: result ? result.stages.totalCount : 0,
         } as Pagination
       "
+      @change="handleTableChange"
     >
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'cover'">

@@ -1,9 +1,3 @@
-<template>
-  <div style="width: 500px">
-    <ChatInput v-model="message" placeholder="Type message" @keyup.enter="sendChat" />
-  </div>
-</template>
-
 <script>
 import ChatInput from "components/form/ChatInput.vue";
 import { ref } from "vue";
@@ -27,5 +21,11 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div style="width: 500px">
+    <ChatInput v-model="message" placeholder="Type message" @keyup.enter="sendChat" />
+  </div>
+</template>
 
 <style></style>

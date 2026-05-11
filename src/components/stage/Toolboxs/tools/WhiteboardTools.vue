@@ -1,71 +1,3 @@
-<template>
-  <canvas
-    ref="el"
-    class="drawing"
-    :width="stageSize.width"
-    :height="stageSize.height"
-    :style="{
-      cursor,
-      top: stageSize.top + 'px',
-      left: stageSize.left + 'px',
-      'pointer-events': none,
-    }"
-  >
-    Your browser does not support the HTML5 canvas tag.
-  </canvas>
-  <div class="drawing-tool">
-    <div class="icon is-large">
-      <ColorPicker v-model="color" />
-    </div>
-    <span class="tag is-light is-block">{{ $t("colour") }}</span>
-  </div>
-  <div class="drawing-tool" style="width: 200px">
-    <div class="size-preview">
-      <div
-        class="dot"
-        :style="{
-          width: size + 'px',
-          height: size + 'px',
-          'background-color': color,
-        }"
-        @click="mode = 'draw'"
-      />
-    </div>
-    <input
-      class="slider is-fullwidth m-0 is-dark"
-      step="1"
-      min="1"
-      max="200"
-      type="range"
-      v-model="size"
-    />
-  </div>
-  <div
-    class="drawing-tool"
-    @click="toggleErase"
-    :class="{
-      active: mode === 'erase',
-    }"
-  >
-    <div class="icon is-large">
-      <Icon size="36" src="erase.svg" />
-    </div>
-    <span class="tag is-light is-block">{{ $t("erase") }}</span>
-  </div>
-  <div class="drawing-tool" @click="undo">
-    <div class="icon is-large">
-      <Icon size="36" src="undo.svg" />
-    </div>
-    <span class="tag is-light is-block">{{ $t("undo") }}</span>
-  </div>
-  <div class="drawing-tool" @click="clear">
-    <div class="icon is-large">
-      <Icon size="36" src="clear.svg" />
-    </div>
-    <span class="tag is-light is-block">{{ $t("clear") }}</span>
-  </div>
-</template>
-
 <script>
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
@@ -137,6 +69,74 @@ export default {
   },
 };
 </script>
+
+<template>
+  <canvas
+    ref="el"
+    class="drawing"
+    :width="stageSize.width"
+    :height="stageSize.height"
+    :style="{
+      cursor,
+      top: stageSize.top + 'px',
+      left: stageSize.left + 'px',
+      'pointer-events': none,
+    }"
+  >
+    Your browser does not support the HTML5 canvas tag.
+  </canvas>
+  <div class="drawing-tool">
+    <div class="icon is-large">
+      <ColorPicker v-model="color" />
+    </div>
+    <span class="tag is-light is-block">{{ $t("colour") }}</span>
+  </div>
+  <div class="drawing-tool" style="width: 200px">
+    <div class="size-preview">
+      <div
+        class="dot"
+        :style="{
+          width: size + 'px',
+          height: size + 'px',
+          'background-color': color,
+        }"
+        @click="mode = 'draw'"
+      />
+    </div>
+    <input
+      v-model="size"
+      class="slider is-fullwidth m-0 is-dark"
+      step="1"
+      min="1"
+      max="200"
+      type="range"
+    />
+  </div>
+  <div
+    class="drawing-tool"
+    :class="{
+      active: mode === 'erase',
+    }"
+    @click="toggleErase"
+  >
+    <div class="icon is-large">
+      <Icon size="36" src="erase.svg" />
+    </div>
+    <span class="tag is-light is-block">{{ $t("erase") }}</span>
+  </div>
+  <div class="drawing-tool" @click="undo">
+    <div class="icon is-large">
+      <Icon size="36" src="undo.svg" />
+    </div>
+    <span class="tag is-light is-block">{{ $t("undo") }}</span>
+  </div>
+  <div class="drawing-tool" @click="clear">
+    <div class="icon is-large">
+      <Icon size="36" src="clear.svg" />
+    </div>
+    <span class="tag is-light is-block">{{ $t("clear") }}</span>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .drawing {

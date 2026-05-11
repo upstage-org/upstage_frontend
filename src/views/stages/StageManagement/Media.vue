@@ -1,33 +1,9 @@
-<template>
-  <div class="columns">
-    <div class="column">
-      <b><span>Media assigned to this Stage</span></b>
-    </div>
-  </div>
-
-  <Reorder v-model="selectedMedia" />
-</template>
-
 <script>
-import MultiSelectList from "components/MultiSelectList.vue";
-import Asset from "components/Asset.vue";
-import SaveButton from "components/form/SaveButton.vue";
-import Dropdown from "components/form/Dropdown.vue";
-import Field from "components/form/Field.vue";
-import Icon from "components/Icon.vue";
 import { inject } from "vue";
-import MultiframePreview from "./MultiframePreview.vue";
 import Reorder from "./Reorder.vue";
 
 export default {
   components: {
-    MultiSelectList,
-    Asset,
-    SaveButton,
-    Dropdown,
-    Icon,
-    Field,
-    MultiframePreview,
     Reorder,
   },
   setup: () => {
@@ -37,6 +13,16 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="columns">
+    <div class="column">
+      <b><span>Media assigned to this Stage</span></b>
+    </div>
+  </div>
+
+  <Reorder v-model="selectedMedia" />
+</template>
 
 <style scoped lang="scss">
 .media-preview {

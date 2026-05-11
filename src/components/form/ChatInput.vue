@@ -1,61 +1,6 @@
-<template>
-  <a-tooltip :title="dynamicTooltip">
-    <div
-      style="position: relative"
-      class="has-tooltip-left"
-      data-testid="chat-input"
-      :data-chat-mode="behavior"
-    >
-      <ElasticInput
-        v-if="!pickerOnly"
-        v-bind="$attrs"
-        :model-value="modelValue"
-        @update:model-value="$emit('update:modelValue', $event)"
-        @ref="(el) => (input = el)"
-        @submit="$emit('submit')"
-        :style="{
-          'border-top-right-radius': '20px',
-          'border-bottom-right-radius': '20px',
-          'padding-right': '40px',
-        }"
-        :class="dynamicClass"
-      />
-      <div v-click-outside="() => (isPicking = false)" class="emoji-picker-wrapper">
-        <button
-          type="button"
-          class="button is-right clickable is-rounded"
-          :class="{
-            'is-loading': loading,
-            'is-primary': !className,
-            [className]: true,
-            'picker-only': pickerOnly,
-          }"
-          :disabled="loading"
-          :style="style"
-          @click="isPicking = !isPicking"
-        >
-          <slot name="icon">
-            <span class="icon" v-if="!loading">
-              <Icon size="48" src="emoji.svg" />
-            </span>
-          </slot>
-        </button>
-        <transition :css="false" @enter="pickerEnter" @leave="pickerLeave">
-          <emoji-picker
-            v-show="isPicking"
-            :class="{ dark: chatDarkMode, light: !chatDarkMode }"
-            :style="emojiPickerStyle"
-            ref="emojiPicker"
-          />
-        </transition>
-      </div>
-    </div>
-  </a-tooltip>
-</template>
-
 <script>
 import "emoji-picker-element";
-import { computed, ref, onMounted, nextTick } from "vue";
+import { computed, ref, nextTick } from "vue";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import ElasticInput from "components/form/ElasticInput.vue";
@@ -63,9 +8,15 @@ import { useStore } from "vuex";
 import { useHoldingShift } from "../stage/composable";
 
 export default {
-  props: ["loading", "modelValue", "pickerOnly", "style", "className"],
-  emits: ["update:modelValue"],
   components: { Icon, ElasticInput },
+  props: {
+    loading: Boolean,
+    modelValue: String,
+    pickerOnly: Boolean,
+    style: [String, Object],
+    className: String,
+  },
+  emits: ["update:modelValue", "submit"],
   setup: (props, { emit }) => {
     const input = ref();
     const isPicking = ref(false);
@@ -246,6 +197,61 @@ export default {
   },
 };
 </script>
+
+<template>
+  <a-tooltip :title="dynamicTooltip">
+    <div
+      style="position: relative"
+      class="has-tooltip-left"
+      data-testid="chat-input"
+      :data-chat-mode="behavior"
+    >
+      <ElasticInput
+        v-if="!pickerOnly"
+        v-bind="$attrs"
+        :model-value="modelValue"
+        :style="{
+          'border-top-right-radius': '20px',
+          'border-bottom-right-radius': '20px',
+          'padding-right': '40px',
+        }"
+        :class="dynamicClass"
+        @update:model-value="$emit('update:modelValue', $event)"
+        @ref="(el) => (input = el)"
+        @submit="$emit('submit')"
+      />
+      <div v-click-outside="() => (isPicking = false)" class="emoji-picker-wrapper">
+        <button
+          type="button"
+          class="button is-right clickable is-rounded"
+          :class="{
+            'is-loading': loading,
+            'is-primary': !className,
+            [className]: true,
+            'picker-only': pickerOnly,
+          }"
+          :disabled="loading"
+          :style="style"
+          @click="isPicking = !isPicking"
+        >
+          <slot name="icon">
+            <span v-if="!loading" class="icon">
+              <Icon size="48" src="emoji.svg" />
+            </span>
+          </slot>
+        </button>
+        <transition :css="false" @enter="pickerEnter" @leave="pickerLeave">
+          <emoji-picker
+            v-show="isPicking"
+            ref="emojiPicker"
+            :class="{ dark: chatDarkMode, light: !chatDarkMode }"
+            :style="emojiPickerStyle"
+          />
+        </transition>
+      </div>
+    </div>
+  </a-tooltip>
+</template>
 
 <style scoped lang="scss">
 emoji-picker {

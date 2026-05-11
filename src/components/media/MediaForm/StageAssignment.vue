@@ -2,7 +2,6 @@
 import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
 import { ref, computed, watchEffect, PropType } from "vue";
-import { StudioGraph } from "models/studio";
 import { TransferItem } from "ant-design-vue/lib/transfer";
 import store from "store";
 
@@ -16,7 +15,7 @@ const props = defineProps({
 const emits = defineEmits(["update:modelValue"]);
 const isAdmin = computed(() => store.getters["user/isAdmin"]);
 
-const { result, loading } = useQuery(
+const { result } = useQuery(
   gql`
     {
       getAllStages {
@@ -58,6 +57,7 @@ const renderItem = (item: TransferItem) => item.name;
 
 <template>
   <a-transfer
+    v-model:target-keys="targetKeys"
     :locale="{
       itemUnit: 'stage',
       itemsUnit: 'stages',
@@ -69,7 +69,6 @@ const renderItem = (item: TransferItem) => item.name;
       height: '300px',
     }"
     :titles="[' available', ' assigned']"
-    v-model:target-keys="targetKeys"
     :data-source="stages as any"
     show-search
     :filter-option="filterOption"

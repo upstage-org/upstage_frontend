@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 let version;
 try {
   version = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
-} catch (error) {
+} catch {
   version = `unknown-${Date.now()}`;
   console.warn("Git commit hash unavailable, using fallback version:", version);
 }

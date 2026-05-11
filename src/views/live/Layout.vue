@@ -1,26 +1,4 @@
-<template>
-  <div id="live-logo">
-    <Logo v-if="loggedIn" :link="studioEndpoint" />
-    <Logo v-else to="/" />
-  </div>
-  <Shell id="main-content">
-    <Preloader />
-    <template v-if="ready">
-      <Board />
-      <ConnectionStatus />
-      <MasqueradingStatus />
-      <StageToolbox v-if="canPlay" />
-      <Chat />
-      <PlayerChat v-if="canPlay" />
-      <AudioPlayer />
-      <LoginPrompt />
-      <SettingPopup />
-    </template>
-  </Shell>
-</template>
-
 <script>
-import configs from "config";
 import Logo from "components/Logo.vue";
 import SettingPopup from "components/stage/SettingPopup/index.vue";
 import Chat from "components/stage/Chat/index.vue";
@@ -81,6 +59,27 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div id="live-logo">
+    <Logo v-if="loggedIn" :link="studioEndpoint" />
+    <Logo v-else to="/" />
+  </div>
+  <Shell id="main-content">
+    <Preloader />
+    <template v-if="ready">
+      <Board />
+      <ConnectionStatus />
+      <MasqueradingStatus />
+      <StageToolbox v-if="canPlay" />
+      <Chat />
+      <PlayerChat v-if="canPlay" />
+      <AudioPlayer />
+      <LoginPrompt />
+      <SettingPopup />
+    </template>
+  </Shell>
+</template>
 
 <style lang="scss">
 #main-content {

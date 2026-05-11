@@ -14,12 +14,10 @@ import DeletePlayer from "./DeletePlayer.vue";
 import type { DefaultOptionType } from "ant-design-vue/lib/select";
 import Confirm from "components/Confirm.vue";
 import { useUpdateUser } from "hooks/mutations";
-import { useAsyncState } from "@vueuse/core";
 import { computed, ComputedRef } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
 import configs from "config";
-import { useRouter } from "vue-router";
 
 interface Pagination {
   current: number;
@@ -32,7 +30,6 @@ interface Pagination {
 export default {
   setup() {
     const { t } = useI18n();
-    const router = useRouter();
 
     const tableParams = reactive({
       page: 1,
@@ -49,7 +46,7 @@ export default {
       ...inquiryResult.value.inquiry,
     }));
 
-    const { result, loading, fetchMore, refetch } = useQuery(
+    const { result, loading, refetch } = useQuery(
       gql`
         query adminPlayersTable(
           $page: Int

@@ -1,3 +1,17 @@
+<script>
+import { ref } from "vue";
+export default {
+  props: {
+    items: Array,
+    centered: Boolean,
+  },
+  setup: (props) => {
+    const tab = ref(props.items[0].key);
+    return { tab };
+  },
+};
+</script>
+
 <template>
   <div class="tabs is-boxed" :class="{ 'is-centered': centered }">
     <ul>
@@ -18,24 +32,13 @@
     </ul>
   </div>
   <div class="tab-content">
-    <div :class="`tab-${item.key}`" v-for="item in items" :key="item.key">
+    <div v-for="item in items" :key="item.key" :class="`tab-${item.key}`">
       <template v-if="tab === item.key">
         <slot :name="item.key"></slot>
       </template>
     </div>
   </div>
 </template>
-
-<script>
-import { ref } from "vue";
-export default {
-  props: ["items", "centered"],
-  setup: (props) => {
-    const tab = ref(props.items[0].key);
-    return { tab };
-  },
-};
-</script>
 
 <style>
 .tabs {

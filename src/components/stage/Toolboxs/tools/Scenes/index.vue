@@ -1,17 +1,3 @@
-<template>
-  <BlankScene />
-  <Scene v-for="scene in scenes" :key="scene.id" :scene="scene" />
-  <div v-if="saving">
-    <Loading height="64px" />
-  </div>
-  <div v-else @click="saveScene" class="is-pulled-left">
-    <div class="icon is-large">
-      <Icon src="save.svg" size="36" />
-    </div>
-    <span class="tag is-light is-block">{{ $t("save_scene") }}</span>
-  </div>
-</template>
-
 <script>
 import { useStore } from "vuex";
 import Icon from "components/Icon.vue";
@@ -38,6 +24,20 @@ export default {
   },
 };
 </script>
+
+<template>
+  <BlankScene />
+  <Scene v-for="scene in scenes" :key="scene.id" :scene="scene" />
+  <div v-if="saving">
+    <Loading height="64px" />
+  </div>
+  <div v-else class="is-pulled-left" @click="saveScene">
+    <div class="icon is-large">
+      <Icon src="save.svg" size="36" />
+    </div>
+    <span class="tag is-light is-block">{{ $t("save_scene") }}</span>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 @mixin gradientText($from, $to) {

@@ -1,26 +1,11 @@
-<template>
-  <div v-for="video in videos" :key="video">
-    <img class="overlay" src="/img/videoloading.gif" />
-    <div style="z-index: 1">
-      <Skeleton :data="video">
-        <video :src="video.url"></video>
-      </Skeleton>
-    </div>
-  </div>
-</template>
-
 <script>
-import { computed, onMounted } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
 import Skeleton from "../../Skeleton.vue";
-import Icon from "components/Icon.vue";
-import Loading from "components/Loading.vue";
 
 export default {
   components: {
     Skeleton,
-    Icon,
-    Loading,
   },
   setup: () => {
     const store = useStore();
@@ -34,6 +19,17 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div v-for="video in videos" :key="video">
+    <img class="overlay" src="/img/videoloading.gif" />
+    <div style="z-index: 1">
+      <Skeleton :data="video">
+        <video :src="video.url"></video>
+      </Skeleton>
+    </div>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 @mixin gradientText($from, $to) {

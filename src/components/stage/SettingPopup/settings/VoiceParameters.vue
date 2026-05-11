@@ -1,40 +1,3 @@
-<template>
-  <div v-if="!modelValue" class="card-header">
-    <span class="card-header-title">{{ $t("voice_setting") }}</span>
-  </div>
-  <div class="card-content voice-parameters">
-    <a-form-item label="Voice" :labelCol="{ span: 4 }" class="mb-2">
-      <a-select v-model:value="parameters.voice" placeholder="No voice" :options="voices" />
-    </a-form-item>
-
-    <template v-if="parameters.voice">
-      <a-form-item label="Variant" :labelCol="{ span: 4 }" class="mb-2">
-        <a-select v-model:value="parameters.variant" :options="variants" />
-      </a-form-item>
-
-      <a-form-item label="Pitch" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.pitch" :max="50" />
-      </a-form-item>
-
-      <a-form-item label="Rate" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.speed" :max="175" />
-      </a-form-item>
-      <a-form-item label="Volume" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.amplitude" />
-      </a-form-item>
-
-      <a-form-item label="Test voice" :labelCol="{ span: 4 }" class="mb-2">
-        <a-input-search :placeholder="defaultTestMessage" v-model:value="test" @search="testVoice">
-          <template #enterButton>
-            <sound-outlined />
-          </template>
-        </a-input-search>
-      </a-form-item>
-    </template>
-    <SaveButton v-if="!modelValue" @click="save" />
-  </div>
-</template>
-
 <script>
 import { computed, reactive, ref } from "vue";
 import SaveButton from "components/form/SaveButton.vue";
@@ -46,7 +9,7 @@ export default {
   components: {
     SaveButton,
   },
-  props: ["modelValue"],
+  props: { modelValue: Object },
   emits: ["close", "update:modelValue"],
   setup: (props, { emit }) => {
     const store = useStore();
@@ -75,6 +38,43 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div v-if="!modelValue" class="card-header">
+    <span class="card-header-title">{{ $t("voice_setting") }}</span>
+  </div>
+  <div class="card-content voice-parameters">
+    <a-form-item label="Voice" :label-col="{ span: 4 }" class="mb-2">
+      <a-select v-model:value="parameters.voice" placeholder="No voice" :options="voices" />
+    </a-form-item>
+
+    <template v-if="parameters.voice">
+      <a-form-item label="Variant" :label-col="{ span: 4 }" class="mb-2">
+        <a-select v-model:value="parameters.variant" :options="variants" />
+      </a-form-item>
+
+      <a-form-item label="Pitch" :label-col="{ span: 4 }" class="mb-2">
+        <a-slider v-model:value="parameters.pitch" :max="50" />
+      </a-form-item>
+
+      <a-form-item label="Rate" :label-col="{ span: 4 }" class="mb-2">
+        <a-slider v-model:value="parameters.speed" :max="175" />
+      </a-form-item>
+      <a-form-item label="Volume" :label-col="{ span: 4 }" class="mb-2">
+        <a-slider v-model:value="parameters.amplitude" />
+      </a-form-item>
+
+      <a-form-item label="Test voice" :label-col="{ span: 4 }" class="mb-2">
+        <a-input-search v-model:value="test" :placeholder="defaultTestMessage" @search="testVoice">
+          <template #enterButton>
+            <sound-outlined />
+          </template>
+        </a-input-search>
+      </a-form-item>
+    </template>
+    <SaveButton v-if="!modelValue" @click="save" />
+  </div>
+</template>
 
 <style lang="scss">
 .card-footer-item {

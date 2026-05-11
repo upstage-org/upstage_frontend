@@ -21,7 +21,7 @@ const handleClick = async (e: any): Promise<void> => {
 </script>
 
 <template>
-  <a-button v-bind="$attrs" @click="handleClick" :loading="loading">
+  <a-button v-bind="$attrs" :loading="loading" @click="handleClick">
     <slot />
   </a-button>
 </template>

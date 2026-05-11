@@ -1,9 +1,3 @@
-<template>
-  <div v-for="prop in props" :key="prop">
-    <Skeleton :data="prop" />
-  </div>
-</template>
-
 <script>
 import Skeleton from "../Skeleton.vue";
 import { useStore } from "vuex";
@@ -17,5 +11,11 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div v-for="prop in props" :key="prop">
+    <Skeleton :data="prop" />
+  </div>
+</template>
 
 <style scoped lang="scss"></style>

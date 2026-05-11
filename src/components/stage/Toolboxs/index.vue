@@ -1,30 +1,5 @@
-<template>
-  <TopBar :tool="tool" />
-  <nav id="toolbox" class="panel">
-    <div class="panel-body">
-      <PanelItem name="Audio" icon="audio.svg" />
-      <hr />
-      <PanelItem name="Backdrops" icon="backdrop.svg" />
-      <PanelItem name="Avatars" icon="avatar.svg" />
-      <PanelItem name="Props" icon="prop.svg" />
-      <PanelItem name="Streams" label="Video" icon="stream.svg" />
-      <PanelItem v-if="enabledLiveStreaming" name="Meeting" label="Streams" icon="meeting.svg" />
-      <PanelItem name="Whiteboard" icon="whiteboard.svg" label="Live drawing" />
-      <PanelItem name="Draw" icon="object-drawing.svg" label="Object drawing" />
-      <PanelItem name="Text" icon="text.svg" />
-      <hr />
-      <PanelItem name="Depth" icon="depth.svg" />
-      <PanelItem name="Curtain" icon="curtain.svg" />
-      <PanelItem name="Scenes" icon="animation-slider.svg" />
-      <hr />
-      <PanelItem name="Settings" icon="configurations.svg" />
-      <PlayerChatTool />
-    </div>
-  </nav>
-</template>
-
 <script>
-import { computed, provide, ref, watch } from "vue";
+import { computed, provide, ref } from "vue";
 import TopBar from "./TopBar.vue";
 import PanelItem from "./PanelItem.vue";
 import PlayerChatTool from "./PlayerChatTool.vue";
@@ -58,6 +33,31 @@ export default {
   },
 };
 </script>
+
+<template>
+  <TopBar :tool="tool" />
+  <nav id="toolbox" class="panel">
+    <div class="panel-body">
+      <PanelItem name="AudioTool" icon="audio.svg" label="Audio" />
+      <hr />
+      <PanelItem name="Backdrops" icon="backdrop.svg" />
+      <PanelItem name="Avatars" icon="avatar.svg" />
+      <PanelItem name="Props" icon="prop.svg" />
+      <PanelItem name="Streams" label="Video" icon="stream.svg" />
+      <PanelItem v-if="enabledLiveStreaming" name="Meeting" label="Streams" icon="meeting.svg" />
+      <PanelItem name="Whiteboard" icon="whiteboard.svg" label="Live drawing" />
+      <PanelItem name="Draw" icon="object-drawing.svg" label="Object drawing" />
+      <PanelItem name="TextTool" icon="text.svg" label="Text" />
+      <hr />
+      <PanelItem name="Depth" icon="depth.svg" />
+      <PanelItem name="Curtain" icon="curtain.svg" />
+      <PanelItem name="Scenes" icon="animation-slider.svg" />
+      <hr />
+      <PanelItem name="Settings" icon="configurations.svg" />
+      <PlayerChatTool />
+    </div>
+  </nav>
+</template>
 
 <style lang="scss">
 #toolbox {

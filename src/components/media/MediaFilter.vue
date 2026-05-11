@@ -3,9 +3,7 @@ import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
 import { gql } from "@apollo/client/core";
-import { StudioGraph, UploadFile } from "models/studio";
 import { editingMediaVar, inquiryVar } from "apollo";
-import configs from "config";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
 import dayjs, { type Dayjs } from "@utils/dayjs";
@@ -117,7 +115,7 @@ watch(
   }, 500),
 );
 
-const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) => {
+const onRangeChange = (_dates: null | (Dayjs | null)[], _dateStrings: string[]) => {
   updateInquiry({
     createdBetween: _dates
       ? [_dates[0]?.format("YYYY-MM-DD"), _dates[1]?.format("YYYY-MM-DD")]
@@ -180,8 +178,8 @@ const onVisibleDropzone = () => {
           Back to editing
         </a-button>
         <a-button
-          type="primary"
           v-else
+          type="primary"
           @click="
             visibleDropzone = true;
             onVisibleDropzone();
@@ -189,16 +187,16 @@ const onVisibleDropzone = () => {
         >
           <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
         </a-button>
-        <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="name" />
+        <a-input-search v-model:value="name" allow-clear class="w-48" placeholder="Search media" />
         <a-select
-          allowClear
-          showArrow
-          :filterOption="handleFilterOwnerName"
+          v-model:value="owners"
+          allow-clear
+          show-arrow
+          :filter-option="handleFilterOwnerName"
           mode="tags"
           style="min-width: 124px"
           placeholder="Owners"
           :loading="loading"
-          v-model:value="owners"
           :options="
             result
               ? result.users.map((e: any) => ({
@@ -209,7 +207,7 @@ const onVisibleDropzone = () => {
           "
         >
           <template #dropdownRender="{ menuNode: menu }">
-            <v-nodes :vnodes="menu" />
+            <VNodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
             <div
               class="w-full cursor-pointer text-center"
@@ -221,14 +219,14 @@ const onVisibleDropzone = () => {
           </template>
         </a-select>
         <a-select
-          allowClear
-          showArrow
-          filterOption
+          v-model:value="types"
+          allow-clear
+          show-arrow
+          filter-option
           mode="tags"
           style="min-width: 128px"
           placeholder="Media types"
           :loading="loading"
-          v-model:value="types"
           :options="
             result
               ? result.mediaTypes
@@ -242,14 +240,14 @@ const onVisibleDropzone = () => {
         >
         </a-select>
         <a-select
-          allowClear
-          showArrow
-          :filterOption="handleFilterStageName"
+          v-model:value="stages"
+          allow-clear
+          show-arrow
+          :filter-option="handleFilterStageName"
           mode="tags"
           style="min-width: 160px"
           placeholder="Stages assigned"
           :loading="loading"
-          v-model:value="stages"
           :options="
             result
               ? result.getAllStages.map((e: any) => ({
@@ -261,13 +259,13 @@ const onVisibleDropzone = () => {
         >
         </a-select>
         <a-select
-          allowClear
-          showArrow
+          v-model:value="tags"
+          allow-clear
+          show-arrow
           mode="tags"
           style="min-width: 160px"
           placeholder="Tags"
           :loading="loading"
-          v-model:value="tags"
           :options="
             result
               ? result.tags.map((e: any) => ({
@@ -278,10 +276,10 @@ const onVisibleDropzone = () => {
           "
         ></a-select>
         <a-range-picker
+          v-model:value="dates as any"
           :placeholder="['Created from', 'to date']"
           :presets="ranges as any"
-          :onChange="onRangeChange as any"
-          v-model:value="dates as any"
+          :on-change="onRangeChange as any"
         />
         <a-space v-if="isAdmin">
           <span> Dormant: </span>

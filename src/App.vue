@@ -1,24 +1,3 @@
-<template>
-  <a-config-provider
-    :theme="{
-      token: {
-        colorPrimary: '#007011',
-        borderRadius: 4,
-        fontSize: 16,
-        fontFamily: 'Josefin Sans, sans-serif',
-        colorPrimaryBg: '#ffffff',
-      },
-      components: {},
-    }"
-  >
-    <router-view />
-    <div v-if="hasShowPrompt" class="reload-prompt">
-      <p>A new version ({{ latestVersion }}) is available!</p>
-      <button @click="reloadPage">Reload Now</button>
-    </div>
-  </a-config-provider>
-</template>
-
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from "vue";
 import { useStore } from "vuex";
@@ -122,6 +101,27 @@ onMounted(() => {
   });
 });
 </script>
+
+<template>
+  <a-config-provider
+    :theme="{
+      token: {
+        colorPrimary: '#007011',
+        borderRadius: 4,
+        fontSize: 16,
+        fontFamily: 'Josefin Sans, sans-serif',
+        colorPrimaryBg: '#ffffff',
+      },
+      components: {},
+    }"
+  >
+    <router-view />
+    <div v-if="hasShowPrompt" class="reload-prompt">
+      <p>A new version ({{ latestVersion }}) is available!</p>
+      <button @click="reloadPage">Reload Now</button>
+    </div>
+  </a-config-provider>
+</template>
 
 <style lang="scss">
 html {

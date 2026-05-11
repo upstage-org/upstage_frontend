@@ -1,14 +1,12 @@
 <script lang="ts" setup>
 import Notifications from "components/Notifications.vue";
 import LanguageSelector from "components/LanguageSelector.vue";
-import configs from "config";
 import logo from "assets/upstage.png";
 import StudioVersion from "./StudioVersion.vue";
 import PlayerForm from "views/admin/player-management/PlayerForm.vue";
 import { useStore } from "vuex";
-import { userGraph } from "services/graphql";
 import { computed } from "vue";
-import { loggedIn, logout } from "utils/auth";
+import { logout } from "utils/auth";
 
 const store = useStore();
 const whoami = computed(() => store.getters["user/whoami"]);
@@ -26,8 +24,6 @@ const roleName = computed(() => {
   }
   return "";
 });
-const to = (path: string) => `${configs.UPSTAGE_URL}/${path}`;
-
 const onSave = (payload: any) => {
   store.dispatch("user/updateUserProfile", payload);
 };
@@ -37,12 +33,12 @@ const onSave = (payload: any) => {
   <a-space>
     <PlayerForm
       v-if="whoami"
-      :player="whoami"
-      :onSave="onSave"
-      :saving="loading"
-      noUploadLimit
-      noStatusToggle
       v-slot="{ onClick }"
+      :player="whoami"
+      :on-save="onSave"
+      :saving="loading"
+      no-upload-limit
+      no-status-toggle
     >
       <div :onClick="onClick" class="cursor-pointer">
         <span class="text-gray-500 cursor-pointer">{{ roleName }}</span>

@@ -41,7 +41,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div class="qr-code" ref="el"></div>
+  <div ref="el" class="qr-code"></div>
 </template>
 
 <style scoped>

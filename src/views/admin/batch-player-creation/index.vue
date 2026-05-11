@@ -19,7 +19,7 @@ export default {
       default: () => {},
     },
   },
-  setup(props, ctx) {
+  setup(props) {
     const { t } = useI18n();
     const players = reactive<{ username: string; email: string; password: string }[]>([
       {
@@ -63,7 +63,7 @@ export default {
       });
     });
 
-    const watchInquiryVar = (vars: any) => {
+    const watchInquiryVar = (_vars: any) => {
       inquiryVar.onNextChange(watchInquiryVar);
     };
     inquiryVar.onNextChange(watchInquiryVar);

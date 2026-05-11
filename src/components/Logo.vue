@@ -1,12 +1,3 @@
-<template>
-  <a v-if="link" class="navbar-item" :href="link" :target="target || '_self'">
-    <img :src="logoSrc" />
-  </a>
-  <router-link v-else class="navbar-item" :to="to ?? '/'">
-    <img :src="logoSrc" />
-  </router-link>
-</template>
-
 <script>
 // Import the asset through Vite's resolver so the rendered <img> uses an
 // absolute, content-hashed URL instead of the literal string "assets/…".
@@ -19,9 +10,22 @@
 import logoSrc from "assets/upstage.png";
 
 export default {
-  props: ["link", "to", "target"],
+  props: {
+    link: String,
+    to: String,
+    target: String,
+  },
   data() {
     return { logoSrc };
   },
 };
 </script>
+
+<template>
+  <a v-if="link" class="navbar-item" :href="link" :target="target || '_self'">
+    <img :src="logoSrc" />
+  </a>
+  <router-link v-else class="navbar-item" :to="to ?? '/'">
+    <img :src="logoSrc" />
+  </router-link>
+</template>

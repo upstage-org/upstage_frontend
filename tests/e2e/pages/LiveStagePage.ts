@@ -164,4 +164,80 @@ export class LiveStagePage {
       .filter({ hasText: `${speakerLabel}:` })
       .filter({ hasText: lineSubstring });
   }
+
+  // ---------------------------------------------------------------------
+  // Vuex dev-hook helpers
+  // ---------------------------------------------------------------------
+  // Builds (`pnpm dev` and `vite build` with VITE_E2E=1) expose the live
+  // Vuex store under `window.__UPSTAGE_STORE__` (see src/main.ts). These
+  // helpers wrap the boilerplate so individual specs don't have to repeat
+  // the cast + null-check + dispatch dance for every action.
+
+  /**
+   * Read a slice of stage state on the page. Useful for cross-client
+   * assertions where the spec needs to wait for an MQTT-delivered mutation
+   * to land in the audience's local Vuex (see e.g. `pollUntilStateMatches`
+   * in features.spec.ts).
+   *
+   * Returns `null` if the dev hook isn't installed (production build
+   * without VITE_E2E) so callers can emit a clearer error than
+   * "evaluate failed".
+   */
+  async getStageState<T = unknown>(selectorPath: string): Promise<T | null> {
+    return this.page.evaluate((path: string): T | null => {
+      type DevStore = { state: { stage: Record<string, unknown> } };
+      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+      if (!store) return null;
+      // Walk dot-path against state.stage. Returning `null` for any missing
+      // segment keeps callers from having to special-case partial paths.
+      const segments = path.split(".").filter(Boolean);
+      let cursor: unknown = store.state.stage;
+      for (const seg of segments) {
+        if (cursor == null || typeof cursor !== "object") return null;
+        cursor = (cursor as Record<string, unknown>)[seg];
+      }
+      return (cursor ?? null) as T | null;
+    }, selectorPath);
+  }
+
+  /**
+   * Dispatch a Vuex action on the page. Awaits the action's resolved value
+   * (so callers chaining on async actions like `placeObjectOnStage` can
+   * read back the new object id).
+   *
+   * Throws via the dev hook if the store isn't exposed — that's a
+   * configuration regression and we want it loud.
+   */
+  async dispatchAction<TPayload = unknown, TResult = unknown>(
+    type: string,
+    payload?: TPayload,
+  ): Promise<TResult> {
+    return this.page.evaluate(
+      async ({ actionType, actionPayload }: { actionType: string; actionPayload: unknown }) => {
+        type DevStore = { dispatch: (t: string, p?: unknown) => Promise<unknown> };
+        const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+        if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__ missing).");
+        return (await store.dispatch(actionType, actionPayload)) as unknown;
+      },
+      { actionType: type, actionPayload: payload ?? null },
+    ) as Promise<TResult>;
+  }
+
+  /**
+   * Commit a Vuex mutation on the page. Used for the rare cases where a
+   * spec needs to bypass an action wrapper (e.g. `SET_REPLAY` for replay
+   * speed). Prefer `dispatchAction` whenever an action is available, since
+   * actions handle MQTT broadcasts.
+   */
+  async commitMutation<TPayload = unknown>(type: string, payload?: TPayload): Promise<void> {
+    await this.page.evaluate(
+      ({ mutationType, mutationPayload }: { mutationType: string; mutationPayload: unknown }) => {
+        type DevStore = { commit: (t: string, p?: unknown) => void };
+        const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
+        if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__ missing).");
+        store.commit(mutationType, mutationPayload);
+      },
+      { mutationType: type, mutationPayload: payload ?? null },
+    );
+  }
 }

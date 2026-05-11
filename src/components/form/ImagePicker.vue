@@ -1,158 +1,3 @@
-<template>
-  <modal :styles="{ zIndex: `999 !important` }">
-    <template #trigger>
-      <Asset
-        class="clickable"
-        v-if="modelValue"
-        :asset="{
-          src: modelValue,
-        }"
-      />
-      <button v-else class="button">{{ $t("choose_an_image") }}</button>
-    </template>
-    <template #header
-      ><span>{{ $t("choose_an_existing_image_or_upload_new") }}</span></template
-    >
-    <template #content="{ closeModal }">
-      <Loading v-if="loadingMedia" />
-      <div v-else class="columns is-multiline">
-        <div class="column is-12">
-          <div class="columns">
-            <a-space class="shadow rounded-xl px-4 py-2 bg-white flex justify-between">
-              <a-space class="flex-wrap">
-                <a-button
-                  type="primary"
-                  @click="
-                    visibleDropzone = true;
-                    onVisibleDropzone();
-                  "
-                >
-                  <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
-                </a-button>
-                <a-input-search
-                  allowClear
-                  class="w-48"
-                  placeholder="Search media"
-                  v-model:value="searchInput"
-                />
-                <a-select
-                  allowClear
-                  showArrow
-                  :filterOption="handleFilterOwnerName"
-                  mode="tags"
-                  style="min-width: 124px"
-                  placeholder="Owners"
-                  :loading="loading"
-                  v-model:value="formData.owners"
-                  :options="
-                    result
-                      ? result.users.map((e) => {
-                          return {
-                            value: e.username,
-                            label: e.displayName || e.username,
-                          };
-                        })
-                      : []
-                  "
-                >
-                  <template #dropdownRender="{ menuNode: menu }">
-                    <v-nodes :vnodes="menu" />
-                    <a-divider style="margin: 4px 0" />
-                    <div
-                      class="w-full cursor-pointer text-center"
-                      @mousedown.prevent
-                      @click.stop.prevent="formData.owners = []"
-                    >
-                      <team-outlined />&nbsp;All players
-                    </div>
-                  </template>
-                </a-select>
-                <a-select
-                  allowClear
-                  showArrow
-                  filterOption
-                  mode="tags"
-                  style="min-width: 128px"
-                  placeholder="Media types"
-                  :loading="loading"
-                  v-model:value="formData.types"
-                  :options="
-                    result
-                      ? result.mediaTypes
-                          .filter((e) => !['shape', 'media'].includes(e.name.toLowerCase()))
-                          .map((e) => ({
-                            value: e.name,
-                            label: capitalize(e.name),
-                          }))
-                      : []
-                  "
-                >
-                </a-select>
-                <a-select
-                  allowClear
-                  showArrow
-                  :filterOption="handleFilterStageName"
-                  mode="tags"
-                  style="min-width: 160px"
-                  placeholder="Stages assigned"
-                  :loading="loading"
-                  v-model:value="formData.stages"
-                  :options="
-                    result
-                      ? result.getAllStages.map((e) => ({
-                          value: e.id,
-                          label: e.name,
-                        }))
-                      : []
-                  "
-                >
-                </a-select>
-                <a-select
-                  allowClear
-                  showArrow
-                  mode="tags"
-                  style="min-width: 160px"
-                  placeholder="Tags"
-                  :loading="loading"
-                  v-model:value="formData.tags"
-                  :options="
-                    result
-                      ? result.tags.map((e) => ({
-                          value: e.name,
-                          label: e.name,
-                        }))
-                      : []
-                  "
-                ></a-select>
-                <a-range-picker
-                  :placeholder="['Created from', 'to date']"
-                  :presets="ranges"
-                  v-model:value="formData.dates"
-                  :popupStyle="{ zIndex: 5000 }"
-                />
-                <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
-                  <ClearOutlined />Clear Filters
-                </a-button>
-              </a-space>
-            </a-space>
-          </div>
-        </div>
-
-        <StageMediaTable
-          :data="availableImages"
-          :loading="loadingMedia"
-          :pagination="paginationConfig"
-          :totalCount="totalCount"
-          view-detail-action="select"
-          @viewDetail="(item) => select(item, closeModal)"
-          @change="handleTableChange"
-        />
-      </div>
-    </template>
-  </modal>
-  <MediaForm />
-</template>
-
 <script>
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
@@ -163,10 +8,8 @@ import Loading from "components/Loading.vue";
 import Asset from "components/Asset.vue";
 import { computed, provide, reactive, inject, watch, ref } from "vue";
 import { capitalize } from "utils/common";
-import Dropdown from "./Dropdown.vue";
 import { stageGraph } from "services/graphql";
 import { useQuery } from "services/graphql/composable";
-import MediaUpload from "./Media/MediaUpload.vue";
 import MediaForm from "components/media/MediaForm/index.vue";
 import VNodes from "./VNodes";
 import StageMediaTable from "./StageMediaTable.vue";
@@ -177,9 +20,9 @@ import { permissionFragment } from "models/fragment";
 dayjs.extend(isBetween);
 
 export default {
-  props: ["modelValue"],
+  components: { Modal, Loading, Asset, VNodes, MediaForm, StageMediaTable },
+  props: { modelValue: [String, Object] },
   emits: ["update:modelValue"],
-  components: { Modal, Loading, Asset, Dropdown, MediaUpload, VNodes, MediaForm, StageMediaTable },
   setup: (props, { emit }) => {
     const { data, loading } = useQuery(stageGraph.getSearchOption);
     provide("whoami", null);
@@ -237,7 +80,6 @@ export default {
     const {
       result: mediaResult,
       loading: loadingMedia,
-      fetchMore,
       refetch,
     } = useApolloQuery(
       gql`
@@ -468,6 +310,161 @@ export default {
   },
 };
 </script>
+
+<template>
+  <Modal :styles="{ zIndex: `999 !important` }">
+    <template #trigger>
+      <Asset
+        v-if="modelValue"
+        class="clickable"
+        :asset="{
+          src: modelValue,
+        }"
+      />
+      <button v-else class="button">{{ $t("choose_an_image") }}</button>
+    </template>
+    <template #header
+      ><span>{{ $t("choose_an_existing_image_or_upload_new") }}</span></template
+    >
+    <template #content="{ closeModal }">
+      <Loading v-if="loadingMedia" />
+      <div v-else class="columns is-multiline">
+        <div class="column is-12">
+          <div class="columns">
+            <a-space class="shadow rounded-xl px-4 py-2 bg-white flex justify-between">
+              <a-space class="flex-wrap">
+                <a-button
+                  type="primary"
+                  @click="
+                    visibleDropzone = true;
+                    onVisibleDropzone();
+                  "
+                >
+                  <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
+                </a-button>
+                <a-input-search
+                  v-model:value="searchInput"
+                  allow-clear
+                  class="w-48"
+                  placeholder="Search media"
+                />
+                <a-select
+                  v-model:value="formData.owners"
+                  allow-clear
+                  show-arrow
+                  :filter-option="handleFilterOwnerName"
+                  mode="tags"
+                  style="min-width: 124px"
+                  placeholder="Owners"
+                  :loading="loading"
+                  :options="
+                    result
+                      ? result.users.map((e) => {
+                          return {
+                            value: e.username,
+                            label: e.displayName || e.username,
+                          };
+                        })
+                      : []
+                  "
+                >
+                  <template #dropdownRender="{ menuNode: menu }">
+                    <VNodes :vnodes="menu" />
+                    <a-divider style="margin: 4px 0" />
+                    <div
+                      class="w-full cursor-pointer text-center"
+                      @mousedown.prevent
+                      @click.stop.prevent="formData.owners = []"
+                    >
+                      <team-outlined />&nbsp;All players
+                    </div>
+                  </template>
+                </a-select>
+                <a-select
+                  v-model:value="formData.types"
+                  allow-clear
+                  show-arrow
+                  filter-option
+                  mode="tags"
+                  style="min-width: 128px"
+                  placeholder="Media types"
+                  :loading="loading"
+                  :options="
+                    result
+                      ? result.mediaTypes
+                          .filter((e) => !['shape', 'media'].includes(e.name.toLowerCase()))
+                          .map((e) => ({
+                            value: e.name,
+                            label: capitalize(e.name),
+                          }))
+                      : []
+                  "
+                >
+                </a-select>
+                <a-select
+                  v-model:value="formData.stages"
+                  allow-clear
+                  show-arrow
+                  :filter-option="handleFilterStageName"
+                  mode="tags"
+                  style="min-width: 160px"
+                  placeholder="Stages assigned"
+                  :loading="loading"
+                  :options="
+                    result
+                      ? result.getAllStages.map((e) => ({
+                          value: e.id,
+                          label: e.name,
+                        }))
+                      : []
+                  "
+                >
+                </a-select>
+                <a-select
+                  v-model:value="formData.tags"
+                  allow-clear
+                  show-arrow
+                  mode="tags"
+                  style="min-width: 160px"
+                  placeholder="Tags"
+                  :loading="loading"
+                  :options="
+                    result
+                      ? result.tags.map((e) => ({
+                          value: e.name,
+                          label: e.name,
+                        }))
+                      : []
+                  "
+                ></a-select>
+                <a-range-picker
+                  v-model:value="formData.dates"
+                  :placeholder="['Created from', 'to date']"
+                  :presets="ranges"
+                  :popup-style="{ zIndex: 5000 }"
+                />
+                <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
+                  <ClearOutlined />Clear Filters
+                </a-button>
+              </a-space>
+            </a-space>
+          </div>
+        </div>
+
+        <StageMediaTable
+          :data="availableImages"
+          :loading="loadingMedia"
+          :pagination="paginationConfig"
+          :total-count="totalCount"
+          view-detail-action="select"
+          @view-detail="(item) => select(item, closeModal)"
+          @change="handleTableChange"
+        />
+      </div>
+    </template>
+  </Modal>
+  <MediaForm />
+</template>
 
 <style>
 .modal-card-title {

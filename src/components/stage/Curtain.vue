@@ -1,26 +1,3 @@
-<template>
-  <div :style="{ opacity: canPlay ? 0.5 : 1 }">
-    <transition @enter="curtainEnter" @leave="curtainLeave">
-      <img
-        v-if="curtain"
-        :key="curtain"
-        :src="curtain"
-        class="curtain"
-        :class="{ 'dual-left': dualCurtain }"
-      />
-    </transition>
-    <transition @enter="dualCurtainEnter" @leave="dualCurtainLeave">
-      <img
-        v-if="dualCurtain && curtain"
-        :key="curtain"
-        :src="curtain"
-        class="curtain"
-        :class="{ 'dual-right': dualCurtain }"
-      />
-    </transition>
-  </div>
-</template>
-
 <script>
 import { computed } from "vue";
 import { animate } from "animejs";
@@ -120,6 +97,29 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div :style="{ opacity: canPlay ? 0.5 : 1 }">
+    <transition @enter="curtainEnter" @leave="curtainLeave">
+      <img
+        v-if="curtain"
+        :key="curtain"
+        :src="curtain"
+        class="curtain"
+        :class="{ 'dual-left': dualCurtain }"
+      />
+    </transition>
+    <transition @enter="dualCurtainEnter" @leave="dualCurtainLeave">
+      <img
+        v-if="dualCurtain && curtain"
+        :key="curtain"
+        :src="curtain"
+        class="curtain"
+        :class="{ 'dual-right': dualCurtain }"
+      />
+    </transition>
+  </div>
+</template>
 
 <style scoped>
 .curtain {

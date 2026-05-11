@@ -12,7 +12,7 @@ const props = defineProps({
 });
 
 const refresh = inject("refresh", () => {});
-const { mutate, loading } = useRequestPermission();
+const { mutate } = useRequestPermission();
 const sendAcknowledge = async () => {
   const response = await mutate({
     assetId: props.media.id,

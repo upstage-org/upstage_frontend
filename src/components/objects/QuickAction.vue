@@ -1,36 +1,11 @@
-<template>
-  <div
-    class="quick-action"
-    v-show="showQuickActions"
-    @mousedown.stop="keepActive"
-    @mouseup.stop="keepActive"
-  >
-    <button
-      class="button is-rounded is-small"
-      :class="{ 'is-primary': object.liveAction }"
-      @click="toggleLiveAction"
-    >
-      <i class="fas fa-lightbulb"></i>
-    </button>
-    <button
-      v-if="object.type === 'text'"
-      :class="{ 'is-primary': object.editing }"
-      class="button is-rounded is-small"
-      @click="editText"
-    >
-      <i class="fas fa-pen"></i>
-    </button>
-    <button class="button is-rounded is-small" @click="deleteObject">
-      <i class="fas fa-times"></i>
-    </button>
-  </div>
-</template>
-
 <script>
 import { computed } from "vue";
 import { useStore } from "vuex";
 export default {
-  props: ["object", "active"],
+  props: {
+    object: Object,
+    active: Boolean,
+  },
   emits: ["update:active"],
   setup: (props, { emit }) => {
     const store = useStore();
@@ -75,6 +50,34 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div
+    v-show="showQuickActions"
+    class="quick-action"
+    @mousedown.stop="keepActive"
+    @mouseup.stop="keepActive"
+  >
+    <button
+      class="button is-rounded is-small"
+      :class="{ 'is-primary': object.liveAction }"
+      @click="toggleLiveAction"
+    >
+      <i class="fas fa-lightbulb"></i>
+    </button>
+    <button
+      v-if="object.type === 'text'"
+      :class="{ 'is-primary': object.editing }"
+      class="button is-rounded is-small"
+      @click="editText"
+    >
+      <i class="fas fa-pen"></i>
+    </button>
+    <button class="button is-rounded is-small" @click="deleteObject">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .quick-action {

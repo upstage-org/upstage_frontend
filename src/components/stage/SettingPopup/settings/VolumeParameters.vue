@@ -1,17 +1,3 @@
-<template>
-  <div class="card-header">
-    <span class="card-header-title">{{ $t("volumne_setting") }}</span>
-  </div>
-  <div class="card-content voice-parameters">
-    <div class="content">
-      <HorizontalField title="Volume">
-        <a-slider v-model:value="parameters.volume" :min="0" :max="100" />
-      </HorizontalField>
-      <SaveButton @click="saveVolume" :loading="loading" />
-    </div>
-  </div>
-</template>
-
 <script>
 import { reactive, computed } from "vue";
 import { useStore } from "vuex";
@@ -23,7 +9,7 @@ export default {
     HorizontalField,
     SaveButton,
   },
-  props: ["modelValue"],
+  props: { modelValue: [Number, String] },
   emits: ["close", "update:modelValue"],
   setup: (props, { emit }) => {
     const store = useStore();
@@ -49,5 +35,19 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="card-header">
+    <span class="card-header-title">{{ $t("volumne_setting") }}</span>
+  </div>
+  <div class="card-content voice-parameters">
+    <div class="content">
+      <HorizontalField title="Volume">
+        <a-slider v-model:value="parameters.volume" :min="0" :max="100" />
+      </HorizontalField>
+      <SaveButton :loading="loading" @click="saveVolume" />
+    </div>
+  </div>
+</template>
 
 <style lang="scss"></style>

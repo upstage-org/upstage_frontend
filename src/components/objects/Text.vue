@@ -1,33 +1,13 @@
-<template>
-  <Object :object="object">
-    <template #menu="slotProps">
-      <MenuContent :object="object" v-bind="slotProps" v-model:active="active" />
-    </template>
-    <template #render>
-      <p
-        ref="el"
-        :style="object"
-        class="has-text-centered"
-        :contenteditable="object.editing"
-        @keyup.delete.prevent.stop
-        @keyup="liveTyping"
-        @focus="isFocus = true"
-        @blur="isFocus = false"
-        @mousedown="mousedown"
-      ></p>
-    </template>
-  </Object>
-</template>
-
 <script>
-import Object from "./Object.vue";
+// Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppObject from "./Object.vue";
 import MenuContent from "./Avatar/ContextMenuAvatar.vue"; // Text should inherit all of avatar behavior
 import { useStore } from "vuex";
 import { computed, onMounted, ref, watch } from "vue";
 
 export default {
-  props: ["object"],
-  components: { Object, MenuContent },
+  components: { AppObject, MenuContent },
+  props: { object: Object },
   setup: (props) => {
     const el = ref();
     const store = useStore();
@@ -65,6 +45,27 @@ export default {
   },
 };
 </script>
+
+<template>
+  <AppObject :object="object">
+    <template #menu="slotProps">
+      <MenuContent v-bind="slotProps" v-model:active="active" :object="object" />
+    </template>
+    <template #render>
+      <p
+        ref="el"
+        :style="object"
+        class="has-text-centered"
+        :contenteditable="object.editing"
+        @keyup.delete.prevent.stop
+        @keyup="liveTyping"
+        @focus="isFocus = true"
+        @blur="isFocus = false"
+        @mousedown="mousedown"
+      ></p>
+    </template>
+  </AppObject>
+</template>
 
 <style>
 p[contenteditable="true"] {

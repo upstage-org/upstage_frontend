@@ -1,15 +1,3 @@
-<template>
-  <div @mouseenter="show" @mouseleave="hide" v-click-outside="hide" class="popover">
-    <slot name="trigger" />
-
-    <transition @enter="enter">
-      <div v-if="position" class="card">
-        <slot />
-      </div>
-    </transition>
-  </div>
-</template>
-
 <script>
 import { ref } from "vue";
 import { animate } from "animejs";
@@ -37,6 +25,18 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div v-click-outside="hide" class="popover" @mouseenter="show" @mouseleave="hide">
+    <slot name="trigger" />
+
+    <transition @enter="enter">
+      <div v-if="position" class="card">
+        <slot />
+      </div>
+    </transition>
+  </div>
+</template>
 
 <style scoped>
 .popover {

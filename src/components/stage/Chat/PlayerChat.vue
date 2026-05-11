@@ -1,74 +1,3 @@
-<template>
-  <transition :css="false" @enter="enter" @leave="leave">
-    <div
-      id="player-chatbox"
-      ref="theChatbox"
-      v-show="playerChatVisibility"
-      class="card is-light"
-      :class="{ collapsed, 'is-movingable': isMovingable }"
-      :style="{
-        opacity,
-        fontSize,
-      }"
-    >
-      <div class="actions">
-        <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
-          <span class="icon">
-            <Icon v-if="collapsed" src="maximise.svg" size="20" />
-            <Icon v-else src="minimise.svg" size="24" class="mt-4" />
-          </span>
-        </button>
-        <button
-          class="chat-setting button is-rounded is-outlined"
-          :class="{ 'has-background-primary-light': isMovingable }"
-          @click="toggleMoveable"
-        >
-          <span class="icon">
-            <Icon src="prop.svg" size="20" />
-          </span>
-        </button>
-        <button
-          class="chat-setting button is-rounded is-outlined drag-icon-button"
-          @mousedown.prevent="startDrag"
-        >
-          <span class="icon">
-            <Icon src="movement-slider.svg" size="20" />
-          </span>
-        </button>
-        <ClearChat option="player-chat" />
-      </div>
-      <div class="card-content" ref="theContent">
-        <Messages :messages="messages" :style="{ fontSize }" />
-      </div>
-      <footer class="card-footer">
-        <div class="card-footer-item">
-          <div class="is-fullwidth my-1 reaction-bar">
-            <div class="font-size-controls">
-              <a-tooltip title="Increase font size">
-                <button class="button is-small is-rounded mx-1" @click="increateFontSize()">
-                  ➕
-                </button>
-              </a-tooltip>
-              <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded" @click="decreaseFontSize()">➖</button>
-              </a-tooltip>
-            </div>
-          </div>
-          <div class="control has-icons-right is-fullwidth">
-            <ChatInput
-              v-model="chat.privateMessage"
-              placeholder="Type message"
-              :loading="loadingUser"
-              :disabled="isMovingable"
-              @submit="sendChat"
-            />
-          </div>
-        </div>
-      </footer>
-    </div>
-  </transition>
-</template>
-
 <script>
 import { computed, onMounted, ref, watch } from "vue";
 import { animate } from "animejs";
@@ -159,23 +88,12 @@ export default {
 
     const collapsed = ref(false);
     const isMovingable = ref(false);
-    const canDrag = ref(false);
 
     const toggleMoveable = () => {
       moveable.setState({
         target: isMovingable.value ? null : theChatbox.value,
       });
       isMovingable.value = !isMovingable.value;
-    };
-
-    const toggleDragMode = () => {
-      canDrag.value = !canDrag.value;
-
-      // Disable moveable mode when enabling drag mode
-      if (canDrag.value && isMovingable.value) {
-        isMovingable.value = false;
-        moveable.setState({ target: null });
-      }
     };
 
     const playerChatVisibility = computed(() => store.state.stage.showPlayerChat);
@@ -264,6 +182,77 @@ export default {
   },
 };
 </script>
+
+<template>
+  <transition :css="false" @enter="enter" @leave="leave">
+    <div
+      v-show="playerChatVisibility"
+      id="player-chatbox"
+      ref="theChatbox"
+      class="card is-light"
+      :class="{ collapsed, 'is-movingable': isMovingable }"
+      :style="{
+        opacity,
+        fontSize,
+      }"
+    >
+      <div class="actions">
+        <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
+          <span class="icon">
+            <Icon v-if="collapsed" src="maximise.svg" size="20" />
+            <Icon v-else src="minimise.svg" size="24" class="mt-4" />
+          </span>
+        </button>
+        <button
+          class="chat-setting button is-rounded is-outlined"
+          :class="{ 'has-background-primary-light': isMovingable }"
+          @click="toggleMoveable"
+        >
+          <span class="icon">
+            <Icon src="prop.svg" size="20" />
+          </span>
+        </button>
+        <button
+          class="chat-setting button is-rounded is-outlined drag-icon-button"
+          @mousedown.prevent="startDrag"
+        >
+          <span class="icon">
+            <Icon src="movement-slider.svg" size="20" />
+          </span>
+        </button>
+        <ClearChat option="player-chat" />
+      </div>
+      <div ref="theContent" class="card-content">
+        <Messages :messages="messages" :style="{ fontSize }" />
+      </div>
+      <footer class="card-footer">
+        <div class="card-footer-item">
+          <div class="is-fullwidth my-1 reaction-bar">
+            <div class="font-size-controls">
+              <a-tooltip title="Increase font size">
+                <button class="button is-small is-rounded mx-1" @click="increateFontSize()">
+                  ➕
+                </button>
+              </a-tooltip>
+              <a-tooltip title="Decrease font size">
+                <button class="button is-small is-rounded" @click="decreaseFontSize()">➖</button>
+              </a-tooltip>
+            </div>
+          </div>
+          <div class="control has-icons-right is-fullwidth">
+            <ChatInput
+              v-model="chat.privateMessage"
+              placeholder="Type message"
+              :loading="loadingUser"
+              :disabled="isMovingable"
+              @submit="sendChat"
+            />
+          </div>
+        </div>
+      </footer>
+    </div>
+  </transition>
+</template>
 
 <style lang="scss" scoped>
 #player-chatbox {

@@ -31,11 +31,11 @@ import { editingMediaVar, inquiryVar } from "apollo";
 import MediaPermissions from "./MediaPermissions.vue";
 import AvatarVoice from "./AvatarVoice.vue";
 import PropLink from "./PropLink.vue";
-import { getDefaultAvatarVoice, getDefaultVariant } from "services/speech/voice";
+import { getDefaultAvatarVoice } from "services/speech/voice";
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 
-const model = defineModel();
+const model = defineModel<boolean>();
 const files = inject<Ref<UploadFile[]>>("files");
 
 const { result: editingMediaResult, refetch } = useQuery<{
@@ -215,7 +215,7 @@ const handleClose = () => {
 
 const clearMode = ref(false);
 
-const { result, loading } = useQuery<StudioGraph>(
+const { result } = useQuery<StudioGraph>(
   gql`
     {
       mediaTypes {
@@ -268,7 +268,7 @@ const { progress, saveMedia, saving } = useSaveMedia(
       },
     };
   },
-  (id) => {
+  (_id) => {
     if (files && refresh) {
       editingMediaVar(undefined);
       editingMediaResult.value = undefined;
@@ -437,14 +437,14 @@ const getUserDisplayName = (user: User) => {
       <a-space>
         <a-input-group compact>
           <a-select
+            v-model:value="type"
             data-testid="media-form-type"
             :options="mediaTypes"
-            v-model:value="type"
             style="min-width: 110px"
           ></a-select>
           <a-input
-            data-testid="media-form-name"
             v-model:value="name"
+            data-testid="media-form-name"
             :placeholder="mediaName"
           ></a-input>
         </a-input-group>
@@ -548,10 +548,10 @@ const getUserDisplayName = (user: User) => {
             title="Are you sure you want to delete this media?"
             ok-text="Yes"
             cancel-text="No"
-            @confirm="onDelete()"
             placement="bottom"
             :ok-button-props="{ danger: true }"
             loading="deleting"
+            @confirm="onDelete()"
           >
             <a-button
               type="primary"
@@ -568,7 +568,7 @@ const getUserDisplayName = (user: User) => {
     <a-row :gutter="12">
       <a-col :span="6">
         <div class="bg-gray-200 flex items-center justify-center h-full" style="max-height: 600px">
-          <audio v-if="type === 'audio'" controls class="w-48" :key="files?.[0]?.preview">
+          <audio v-if="type === 'audio'" :key="files?.[0]?.preview" controls class="w-48">
             <source v-if="files && files.length" :src="files[0].preview" />
             Your browser does not support the audio element.
           </audio>
@@ -580,9 +580,9 @@ const getUserDisplayName = (user: User) => {
             ></div>
             <video
               v-else
+              :key="files?.[0]?.preview"
               controls
               class="w-48"
-              :key="files?.[0]?.preview"
               @loadedmetadata="handleVideoLoad"
             >
               <source v-if="files && files.length" :src="files[0].preview" />
@@ -591,8 +591,8 @@ const getUserDisplayName = (user: User) => {
           </template>
           <SlickList
             v-else
-            axis="y"
             v-model:list="files"
+            axis="y"
             class="cursor-move w-full max-h-96 overflow-auto"
             :class="{ 'cursor-not-allowed': clearMode }"
             @sort-start="handleFrameClick"
@@ -646,14 +646,12 @@ const getUserDisplayName = (user: User) => {
               <div class="p-4">
                 <a-form-item label="New Owner">
                   <a-select
-                    data-testid="media-form-owner"
                     v-model:value="owner"
+                    data-testid="media-form-owner"
                     placeholder="Select new owner"
                     :loading="!users.length"
                     show-search
                     :filter-option="false"
-                    @search="handleSearch"
-                    @dropdown-visible-change="handleDropdownVisibleChange"
                     :options="
                       filteredUsers.map((user) => ({
                         value: user.username,
@@ -661,6 +659,8 @@ const getUserDisplayName = (user: User) => {
                         key: user.id,
                       }))
                     "
+                    @search="handleSearch"
+                    @dropdown-visible-change="handleDropdownVisibleChange"
                   />
                 </a-form-item>
               </div>
@@ -685,9 +685,9 @@ const getUserDisplayName = (user: User) => {
     <template #footer>
       <a-space>
         <a-select
+          v-model:value="tags"
           class="text-left"
           style="min-width: 200px"
-          v-model:value="tags"
           mode="tags"
           placeholder="Tags"
           :options="
@@ -701,8 +701,8 @@ const getUserDisplayName = (user: User) => {
         >
         </a-select>
         <a-button
-          data-testid="media-form-save"
           key="submit"
+          data-testid="media-form-save"
           type="primary"
           :loading="saving"
           @click="saveMedia"

@@ -17,7 +17,7 @@ const props = defineProps({
   },
   users: {
     type: Array as PropType<string[]>,
-    default: [],
+    default: () => [],
   },
   media: Object as PropType<Media>,
   note: {
@@ -41,7 +41,7 @@ watchEffect(() => {
   emits("update:users", targetKeys.value);
 });
 
-const { result, loading } = useQuery<StudioGraph>(
+const { result } = useQuery<StudioGraph>(
   gql`
     {
       users(active: true) {
@@ -106,7 +106,7 @@ watch(isAdmin, console.log);
         @change="handleOwnerChange"
       />
     </div>
-    <a-select class="w-80" placeholder="Media copyright level" v-model:value="copyrightLevel">
+    <a-select v-model:value="copyrightLevel" class="w-80" placeholder="Media copyright level">
       <a-select-option
         v-for="level in configs.MEDIA_COPYRIGHT_LEVELS"
         :key="level.value"
@@ -129,7 +129,7 @@ watch(isAdmin, console.log);
       ></a-textarea>
     </a-tooltip>
     <template v-if="copyrightLevel === 1">
-      <a-alert show-icon v-for="request in media?.permissions" :key="request.id" class="bg-white">
+      <a-alert v-for="request in media?.permissions" :key="request.id" show-icon class="bg-white">
         <template #icon>✅</template>
         <template #message>
           <b>
@@ -144,10 +144,10 @@ watch(isAdmin, console.log);
     </template>
     <template v-else-if="copyrightLevel === 2">
       <a-alert
-        type="warning"
-        show-icon
         v-for="request in media?.permissions.filter((p) => !p.approved)"
         :key="request.id"
+        type="warning"
+        show-icon
       >
         <template #icon>🔑</template>
         <template #message>
@@ -171,6 +171,7 @@ watch(isAdmin, console.log);
         </template>
       </a-alert>
       <a-transfer
+        v-model:target-keys="targetKeys"
         :locale="{
           itemUnit: 'player',
           itemsUnit: 'players',
@@ -182,7 +183,6 @@ watch(isAdmin, console.log);
           height: '300px',
         }"
         :titles="[' available', ' granted']"
-        v-model:target-keys="targetKeys"
         :data-source="
           result
             ? (result.users.map((e: any) => ({

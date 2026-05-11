@@ -11,7 +11,7 @@ const emits = defineEmits(["change"]);
 
 const visible = ref<boolean>(false);
 
-const afterVisibleChange = (bool: boolean) => {
+const afterVisibleChange = (_bool: boolean) => {
   refetch();
 };
 
@@ -40,7 +40,7 @@ const { result, loading, refetch } = useQuery<StudioGraph>(gql`
   }
 `);
 
-const voiceDescription = ({ voice, avatar }: VoiceGraph) => {
+const voiceDescription = ({ voice }: VoiceGraph) => {
   return `${voices[voice.voice!]} - ${variants[voice.variant]}`;
 };
 const keyword = ref("");
@@ -88,11 +88,11 @@ const select = ({ __typename, ...voice }: any) => {
   >
     <div class="flex">
       <a-input-search
+        v-model:value="keyword"
         class="mr-2"
         placeholder="Search for avatar"
-        v-model:value="keyword"
       ></a-input-search>
-      <a-input placeholder="Test voice" v-model:value="test"></a-input>
+      <a-input v-model:value="test" placeholder="Test voice"></a-input>
     </div>
     <a-list
       class="demo-loadmore-list"

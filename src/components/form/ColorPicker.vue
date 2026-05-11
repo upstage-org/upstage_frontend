@@ -1,3 +1,10 @@
+<script>
+export default {
+  props: { modelValue: String },
+  emits: ["update:modelValue"],
+};
+</script>
+
 <template>
   <input
     type="color"
@@ -5,13 +12,6 @@
     @input="$emit('update:modelValue', $event.target.value)"
   />
 </template>
-
-<script>
-export default {
-  props: ["modelValue"],
-  emits: ["update:modelValue"],
-};
-</script>
 
 <style>
 input[type="color"] {

@@ -1,8 +1,16 @@
+<!--
+  Parent (MediaModal.vue) passes `form` as a shared reactive object so this
+  child can directly bind v-model into `form.multi`, `form.frames`, and
+  `form.uploadedFrames`. That is the intentional contract; refactoring to
+  emit-based v-models would require parallel changes in MediaModal and is
+  out of scope for this lint pass. The vue/no-mutating-props warnings on
+  these mutations are silenced at the file level.
+-->
+<!-- eslint-disable vue/no-mutating-props -->
 <script setup>
 import { stageGraph } from "services/graphql";
 import { useQuery } from "services/graphql/composable";
-import { defineProps, watch } from "@vue/runtime-core";
-import { reactive } from "vue";
+import { reactive, watch } from "vue";
 import Switch from "components/form/Switch.vue";
 import HorizontalField from "components/form/HorizontalField.vue";
 import MultiSelectList from "components/MultiSelectList.vue";
@@ -41,19 +49,20 @@ watch(uploadedFrames, (val) => {
 </script>
 
 <template>
+  <!-- eslint-disable vue/no-mutating-props -->
   <HorizontalField title="Multiframe">
     <Switch v-model="form.multi" class="is-rounded is-success" />
   </HorizontalField>
   <HorizontalField v-if="form.multi">
     <MultiSelectList
+      v-model="form.frames"
       :loading="loadingAllMedia"
       :data="
         allMedia
           ?.filter((item) => !['audio', 'video'].includes(item.assetType.name))
           .map((media) => media.src)
       "
-      v-model="form.frames"
-      :columnClass="() => 'is-4'"
+      :column-class="() => 'is-4'"
     >
       <template #render="{ item: src }">
         <Asset :asset="{ src }" />

@@ -1,3 +1,34 @@
+<script setup lang="ts">
+import { computed, onUnmounted, ref } from "vue";
+import { useStore } from "vuex";
+import { animate } from "animejs";
+import Icon from "components/Icon.vue";
+import Modal from "components/Modal.vue";
+import Copy from "components/Copy.vue";
+
+const publicPath = "/";
+const store = useStore();
+const isFirefox = navigator.userAgent.indexOf("Firefox") != -1;
+const status = computed<string>(() => store.state.stage.status);
+const visible = computed<boolean>(
+  () => isFirefox && (status.value === "CONNECTING" || status.value === "OFFLINE"),
+);
+const open = ref(true);
+
+const icon = ref<HTMLElement>();
+const interval = setInterval(() => {
+  if (icon.value) {
+    animate(icon.value, {
+      scale: [1, 1.5, 1],
+      rotate: [45, -45, 45, -45, 0],
+      ease: "inOutQuad",
+    });
+  }
+}, 3000);
+
+onUnmounted(() => clearInterval(interval));
+</script>
+
 <template>
   <Modal v-if="visible" v-model="open">
     <template #trigger>
@@ -52,36 +83,5 @@
     </template>
   </Modal>
 </template>
-
-<script setup lang="ts">
-import { computed, onUnmounted, ref } from "vue";
-import { useStore } from "vuex";
-import { animate } from "animejs";
-import Icon from "components/Icon.vue";
-import Modal from "components/Modal.vue";
-import Copy from "components/Copy.vue";
-
-const publicPath = "/";
-const store = useStore();
-const isFirefox = navigator.userAgent.indexOf("Firefox") != -1;
-const status = computed<string>(() => store.state.stage.status);
-const visible = computed<boolean>(
-  () => isFirefox && (status.value === "CONNECTING" || status.value === "OFFLINE"),
-);
-const open = ref(true);
-
-const icon = ref<HTMLElement>();
-const interval = setInterval(() => {
-  if (icon.value) {
-    animate(icon.value, {
-      scale: [1, 1.5, 1],
-      rotate: [45, -45, 45, -45, 0],
-      ease: "inOutQuad",
-    });
-  }
-}, 3000);
-
-onUnmounted(() => clearInterval(interval));
-</script>
 
 <style></style>

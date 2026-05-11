@@ -1,31 +1,3 @@
-<template>
-  <span @click="openModal">
-    <slot name="trigger" />
-  </span>
-  <slot name="render" :open="openModal" />
-  <teleport to="body">
-    <div v-if="isActive" class="modal is-active" :id="id" :style="{ ...styles }">
-      <div class="modal-background" @click="closeModal"></div>
-      <div class="modal-card" :style="{ width, height }">
-        <slot>
-          <header v-if="$slots.header" class="modal-card-head">
-            <p class="modal-card-title">
-              <slot name="header" />
-            </p>
-            <button class="delete" aria-label="close" @click="closeModal"></button>
-          </header>
-          <section v-if="$slots.content" class="modal-card-body">
-            <slot name="content" :close-modal="closeModal" />
-          </section>
-          <footer v-if="$slots.footer" class="modal-card-foot">
-            <slot name="footer" :close-modal="closeModal" />
-          </footer>
-        </slot>
-      </div>
-    </div>
-  </teleport>
-</template>
-
 <script>
 import { provide, ref, watchEffect } from "vue";
 export default {
@@ -64,6 +36,34 @@ export default {
   },
 };
 </script>
+
+<template>
+  <span @click="openModal">
+    <slot name="trigger" />
+  </span>
+  <slot name="render" :open="openModal" />
+  <teleport to="body">
+    <div v-if="isActive" :id="id" class="modal is-active" :style="{ ...styles }">
+      <div class="modal-background" @click="closeModal"></div>
+      <div class="modal-card" :style="{ width, height }">
+        <slot>
+          <header v-if="$slots.header" class="modal-card-head">
+            <p class="modal-card-title">
+              <slot name="header" />
+            </p>
+            <button class="delete" aria-label="close" @click="closeModal"></button>
+          </header>
+          <section v-if="$slots.content" class="modal-card-body">
+            <slot name="content" :close-modal="closeModal" />
+          </section>
+          <footer v-if="$slots.footer" class="modal-card-foot">
+            <slot name="footer" :close-modal="closeModal" />
+          </footer>
+        </slot>
+      </div>
+    </div>
+  </teleport>
+</template>
 
 <style>
 .modal {

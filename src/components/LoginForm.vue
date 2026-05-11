@@ -1,194 +1,3 @@
-<template>
-  <form v-if="!resetMode" @submit.prevent="submit">
-    <div class="card">
-      <header class="card-header">
-        <p class="card-header-title">
-          {{ $t("enter_username_and_password_to_login") }}
-        </p>
-      </header>
-      <div class="card-content">
-        <div class="content">
-          <div class="field">
-            <p class="control has-icons-left">
-              <input
-                name="username"
-                class="input"
-                v-model="username"
-                placeholder="Username"
-                required
-              />
-              <span class="icon is-small is-left">
-                <i class="fas fa-user"></i>
-              </span>
-            </p>
-          </div>
-          <div class="field">
-            <p class="control has-icons-left has-icons-right">
-              <input
-                name="password"
-                class="input"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="Password"
-                v-model="password"
-                required
-              />
-              <span class="icon is-small is-left">
-                <i class="fas fa-lock"></i>
-              </span>
-              <a
-                class="icon is-small is-right"
-                style="pointer-events: all"
-                @click="toggleShowPassword"
-              >
-                <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
-              </a>
-              <a class="help has-text-right" @click="resetMode = true">Forgot password?</a>
-            </p>
-            <turnstile v-if="isProduction" ref="captcha" :site-key="siteKey" v-model="token" />
-            <p>
-              {{ $t("tos.login") }}
-              <TermsOfService />
-            </p>
-          </div>
-        </div>
-      </div>
-      <footer class="card-footer">
-        <button
-          type="submit"
-          class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }"
-          :disabled="!!siteKey && !token && isProduction"
-        >
-          <span>{{ $t("login") }}</span>
-          <span class="icon is-medium">
-            <i class="fas fa-chevron-right"></i>
-          </span>
-        </button>
-      </footer>
-    </div>
-  </form>
-  <form v-else @submit.prevent="resetPassword">
-    <div class="card">
-      <header class="card-header">
-        <p class="card-header-title">{{ $t("reset_your_password") }}</p>
-      </header>
-      <div v-if="resetStep === 1" class="card-content">
-        <div class="content">
-          <p>
-            Please provide us your username or email so that we can send you a verification code:
-          </p>
-          <div class="field">
-            <p class="control has-icons-left">
-              <input class="input" v-model="username" placeholder="Username or email" required />
-              <span class="icon is-small is-left">
-                <i class="fas fa-user"></i>
-              </span>
-            </p>
-          </div>
-        </div>
-      </div>
-      <div v-if="resetStep === 2" class="card-content">
-        <div class="content">
-          <p>Please enter the OTP code that we've sent to your email:</p>
-          <div class="field">
-            <p class="control has-icons-left">
-              <input
-                name="otp"
-                autocomplete="one-time-code"
-                class="input"
-                v-model="otp"
-                placeholder="XXXXXX"
-                required
-                maxlength="6"
-              />
-              <span class="icon is-small is-left">
-                <i class="fas fa-key"></i>
-              </span>
-            </p>
-          </div>
-        </div>
-      </div>
-      <div v-if="resetStep === 3" class="card-content">
-        <div class="content">
-          <p>Please enter your new password:</p>
-          <div class="field">
-            <p class="control has-icons-left has-icons-right">
-              <input
-                class="input"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="Password"
-                v-model="password"
-                required
-              />
-              <span class="icon is-small is-left">
-                <i class="fas fa-lock"></i>
-              </span>
-              <a
-                class="icon is-small is-right"
-                style="pointer-events: all"
-                @click="toggleShowPassword"
-              >
-                <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
-              </a>
-            </p>
-          </div>
-          <div class="field">
-            <p class="control has-icons-left has-icons-right">
-              <input
-                class="input"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="Confirm Password"
-                v-model="passwordConfirm"
-                required
-              />
-              <span class="icon is-small is-left">
-                <i class="fas fa-lock"></i>
-              </span>
-              <a
-                class="icon is-small is-right"
-                style="pointer-events: all"
-                @click="toggleShowPassword"
-              >
-                <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
-              </a>
-              <span
-                class="help is-danger"
-                v-if="password && passwordConfirm && password !== passwordConfirm"
-                >Confirm password mismatch!</span
-              >
-            </p>
-          </div>
-        </div>
-      </div>
-      <footer class="card-footer">
-        <button
-          v-if="resetStep < 3"
-          type="submit"
-          class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }"
-        >
-          <span>{{ $t("next") }}</span>
-          <span class="icon is-medium">
-            <i class="fas fa-chevron-right"></i>
-          </span>
-        </button>
-        <button
-          v-else
-          type="submit"
-          class="card-footer-item is-white button has-text-primary"
-          :class="{ 'is-loading': loading }"
-          :disabled="!password || !passwordConfirm || password !== passwordConfirm"
-        >
-          <span>{{ $t("finish") }}</span>
-          <span class="icon is-medium">
-            <i class="fas fa-chevron-right"></i>
-          </span>
-        </button>
-      </footer>
-    </div>
-  </form>
-</template>
-
 <script setup>
 import { message } from "ant-design-vue";
 import TermsOfService from "components/TermsOfService.vue";
@@ -297,5 +106,196 @@ const resetPassword = () => {
   }
 };
 </script>
+
+<template>
+  <form v-if="!resetMode" @submit.prevent="submit">
+    <div class="card">
+      <header class="card-header">
+        <p class="card-header-title">
+          {{ $t("enter_username_and_password_to_login") }}
+        </p>
+      </header>
+      <div class="card-content">
+        <div class="content">
+          <div class="field">
+            <p class="control has-icons-left">
+              <input
+                v-model="username"
+                name="username"
+                class="input"
+                placeholder="Username"
+                required
+              />
+              <span class="icon is-small is-left">
+                <i class="fas fa-user"></i>
+              </span>
+            </p>
+          </div>
+          <div class="field">
+            <p class="control has-icons-left has-icons-right">
+              <input
+                v-model="password"
+                name="password"
+                class="input"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="Password"
+                required
+              />
+              <span class="icon is-small is-left">
+                <i class="fas fa-lock"></i>
+              </span>
+              <a
+                class="icon is-small is-right"
+                style="pointer-events: all"
+                @click="toggleShowPassword"
+              >
+                <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
+              </a>
+              <a class="help has-text-right" @click="resetMode = true">Forgot password?</a>
+            </p>
+            <Turnstile v-if="isProduction" ref="captcha" v-model="token" :site-key="siteKey" />
+            <p>
+              {{ $t("tos.login") }}
+              <TermsOfService />
+            </p>
+          </div>
+        </div>
+      </div>
+      <footer class="card-footer">
+        <button
+          type="submit"
+          class="card-footer-item is-white button has-text-primary"
+          :class="{ 'is-loading': loading }"
+          :disabled="!!siteKey && !token && isProduction"
+        >
+          <span>{{ $t("login") }}</span>
+          <span class="icon is-medium">
+            <i class="fas fa-chevron-right"></i>
+          </span>
+        </button>
+      </footer>
+    </div>
+  </form>
+  <form v-else @submit.prevent="resetPassword">
+    <div class="card">
+      <header class="card-header">
+        <p class="card-header-title">{{ $t("reset_your_password") }}</p>
+      </header>
+      <div v-if="resetStep === 1" class="card-content">
+        <div class="content">
+          <p>
+            Please provide us your username or email so that we can send you a verification code:
+          </p>
+          <div class="field">
+            <p class="control has-icons-left">
+              <input v-model="username" class="input" placeholder="Username or email" required />
+              <span class="icon is-small is-left">
+                <i class="fas fa-user"></i>
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+      <div v-if="resetStep === 2" class="card-content">
+        <div class="content">
+          <p>Please enter the OTP code that we've sent to your email:</p>
+          <div class="field">
+            <p class="control has-icons-left">
+              <input
+                v-model="otp"
+                name="otp"
+                autocomplete="one-time-code"
+                class="input"
+                placeholder="XXXXXX"
+                required
+                maxlength="6"
+              />
+              <span class="icon is-small is-left">
+                <i class="fas fa-key"></i>
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+      <div v-if="resetStep === 3" class="card-content">
+        <div class="content">
+          <p>Please enter your new password:</p>
+          <div class="field">
+            <p class="control has-icons-left has-icons-right">
+              <input
+                v-model="password"
+                class="input"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="Password"
+                required
+              />
+              <span class="icon is-small is-left">
+                <i class="fas fa-lock"></i>
+              </span>
+              <a
+                class="icon is-small is-right"
+                style="pointer-events: all"
+                @click="toggleShowPassword"
+              >
+                <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
+              </a>
+            </p>
+          </div>
+          <div class="field">
+            <p class="control has-icons-left has-icons-right">
+              <input
+                v-model="passwordConfirm"
+                class="input"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="Confirm Password"
+                required
+              />
+              <span class="icon is-small is-left">
+                <i class="fas fa-lock"></i>
+              </span>
+              <a
+                class="icon is-small is-right"
+                style="pointer-events: all"
+                @click="toggleShowPassword"
+              >
+                <i :class="`fas fa-${showPassword ? 'eye-slash' : 'eye'}`"></i>
+              </a>
+              <span
+                v-if="password && passwordConfirm && password !== passwordConfirm"
+                class="help is-danger"
+                >Confirm password mismatch!</span
+              >
+            </p>
+          </div>
+        </div>
+      </div>
+      <footer class="card-footer">
+        <button
+          v-if="resetStep < 3"
+          type="submit"
+          class="card-footer-item is-white button has-text-primary"
+          :class="{ 'is-loading': loading }"
+        >
+          <span>{{ $t("next") }}</span>
+          <span class="icon is-medium">
+            <i class="fas fa-chevron-right"></i>
+          </span>
+        </button>
+        <button
+          v-else
+          type="submit"
+          class="card-footer-item is-white button has-text-primary"
+          :class="{ 'is-loading': loading }"
+          :disabled="!password || !passwordConfirm || password !== passwordConfirm"
+        >
+          <span>{{ $t("finish") }}</span>
+          <span class="icon is-medium">
+            <i class="fas fa-chevron-right"></i>
+          </span>
+        </button>
+      </footer>
+    </div>
+  </form>
+</template>
 
 <style></style>

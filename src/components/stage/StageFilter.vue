@@ -5,11 +5,9 @@ import { useDebounceFn } from "@vueuse/core";
 import { gql } from "@apollo/client/core";
 import { StudioGraph } from "models/studio";
 import { inquiryVar } from "apollo";
-import configs from "config";
 import Navbar from "../Navbar.vue";
 import dayjs, { type Dayjs } from "@utils/dayjs";
 
-const to = (path: string) => `${configs.UPSTAGE_URL}/${path}`;
 const { result, loading } = useQuery<StudioGraph>(gql`
   query StageFilter {
     whoami {
@@ -121,7 +119,7 @@ watch(
   }, 500),
 );
 
-const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) => {
+const onRangeChange = (_dates: null | (Dayjs | null)[], _dateStrings: string[]) => {
   updateInquiry({
     createdBetween: _dates
       ? [_dates[0]?.format("YYYY-MM-DD"), _dates[1]?.format("YYYY-MM-DD")]
@@ -167,16 +165,16 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
         <RouterLink to="/stages/new-stage">
           <a-button type="primary"> <PlusOutlined /> {{ $t("new") }} {{ $t("stage") }} </a-button>
         </RouterLink>
-        <a-input-search allowClear class="w-48" placeholder="Search stage" v-model:value="name" />
+        <a-input-search v-model:value="name" allow-clear class="w-48" placeholder="Search stage" />
         <a-select
-          allowClear
-          showArrow
-          :filterOption="handleFilterOwnerName"
+          v-model:value="owners"
+          allow-clear
+          show-arrow
+          :filter-option="handleFilterOwnerName"
           mode="tags"
           style="min-width: 124px"
           placeholder="Owners"
           :loading="loading"
-          v-model:value="owners"
           :options="
             result
               ? result.users.map((e) => ({
@@ -187,7 +185,7 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           "
         >
           <template #dropdownRender="{ menuNode: menu }">
-            <v-nodes :vnodes="menu" />
+            <VNodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
             <div
               class="w-full cursor-pointer text-center"
@@ -199,15 +197,15 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           </template>
         </a-select>
         <a-select
-          allowClear
+          v-model:value="access"
+          allow-clear
           mode="multiple"
           style="min-width: 124px"
           placeholder="Access Level"
-          v-model:value="access"
           :options="accessOptions"
         >
           <template #dropdownRender="{ menuNode: menu }">
-            <v-nodes :vnodes="menu" />
+            <VNodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
             <div
               class="w-full cursor-pointer text-center"
@@ -219,8 +217,8 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           </template>
         </a-select>
         <a-range-picker
-          :placeholder="['Created from', 'to date']"
           v-model:value="dates as any"
+          :placeholder="['Created from', 'to date']"
           :presets="ranges as any"
           @change="onRangeChange as any"
         />

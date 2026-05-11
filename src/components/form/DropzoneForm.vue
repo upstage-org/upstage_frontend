@@ -35,13 +35,13 @@ const drop = (event) => {
 <template>
   <div @dragover="dragover" @dragleave="dragleave" @drop="drop">
     <input
+      id="dropzone"
       ref="el"
       type="file"
       multiple
-      id="dropzone"
-      @change="onChange"
       :accept="imageExtensions"
       style="display: none"
+      @change="onChange"
     />
     <label for="dropzone">
       <slot>

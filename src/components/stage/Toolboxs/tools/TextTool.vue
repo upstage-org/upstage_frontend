@@ -1,102 +1,3 @@
-<template>
-  <section
-    v-show="isWriting"
-    class="writing"
-    @click="onClickWriting"
-    :style="{
-      width: stageSize.width + 'px',
-      height: stageSize.height + 'px',
-      top: stageSize.top + 'px',
-      left: stageSize.left + 'px',
-    }"
-  >
-    <p ref="el" :style="options" contenteditable="true">
-      Write or paste
-      <br />your text here
-    </p>
-  </section>
-  <template v-if="!isWriting">
-    <div @click="createText" class="text-tool">
-      <div class="icon is-large">
-        <Icon size="36" src="new.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("new_text") }}</span>
-    </div>
-    <div v-for="text in savedTexts" :key="text" class="is-pulled-left saved-text">
-      <ContextMenu>
-        <template #trigger>
-          <Skeleton :data="text" />
-        </template>
-        <template #context>
-          <a class="panel-block has-text-danger" @click="deleteTextPermanently(text)">
-            <span class="panel-icon">
-              <Icon src="remove.svg" />
-            </span>
-            <span>{{ $t("delete_permanently") }}</span>
-          </a>
-        </template>
-      </ContextMenu>
-    </div>
-  </template>
-  <template v-else>
-    <div class="text-tool" style="width: 200px; z-index: 1005">
-      <span class="tag muted is-block">{{ $t("font") }}</span>
-      <Dropdown
-        class="font-dropdown"
-        v-model="options.fontFamily"
-        :data="fontFamilies"
-        @open="fontDropdownOpen"
-      >
-        <template #option="{ label }">
-          <span :style="{ 'font-family': label }">{{ label }}</span>
-        </template>
-      </Dropdown>
-    </div>
-    <div class="text-tool" style="z-index: 1004">
-      <span class="tag muted is-block">Size (px)</span>
-      <Field
-        :modelValue="options.fontSize.slice(0, -2)"
-        @update:modelValue="changeFontSize"
-        type="number"
-      />
-    </div>
-    <div class="text-tool" style="z-index: 1003">
-      <span class="tag muted is-block">{{ $t("colour") }}</span>
-      <ColorPicker v-model="options.color" />
-    </div>
-    <div class="text-tool" :class="{ active: options.fontWeight }" @click="toggleBold">
-      <div class="icon is-large">
-        <Icon size="36" src="bold.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("bold") }}</span>
-    </div>
-    <div class="text-tool" :class="{ active: options.fontStyle }" @click="toggleItalic">
-      <div class="icon is-large">
-        <Icon size="36" src="italic.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("italic") }}</span>
-    </div>
-    <div class="text-tool" :class="{ active: options.textDecoration }" @click="toggleUnderline">
-      <div class="icon is-large">
-        <Icon size="36" src="underline.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("underline") }}</span>
-    </div>
-    <div class="text-tool has-tooltip-bottom" @click="saveText">
-      <div class="icon is-large">
-        <Icon size="40" src="check.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("save") }}</span>
-    </div>
-    <div class="text-tool" @click="cancelWriting">
-      <div class="icon is-large">
-        <Icon size="32" src="cancel.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("cancel") }}</span>
-    </div>
-  </template>
-</template>
-
 <script>
 import Dropdown from "components/form/Dropdown.vue";
 import Field from "components/form/Field.vue";
@@ -276,6 +177,105 @@ export default {
   },
 };
 </script>
+
+<template>
+  <section
+    v-show="isWriting"
+    class="writing"
+    :style="{
+      width: stageSize.width + 'px',
+      height: stageSize.height + 'px',
+      top: stageSize.top + 'px',
+      left: stageSize.left + 'px',
+    }"
+    @click="onClickWriting"
+  >
+    <p ref="el" :style="options" contenteditable="true">
+      Write or paste
+      <br />your text here
+    </p>
+  </section>
+  <template v-if="!isWriting">
+    <div class="text-tool" @click="createText">
+      <div class="icon is-large">
+        <Icon size="36" src="new.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("new_text") }}</span>
+    </div>
+    <div v-for="text in savedTexts" :key="text" class="is-pulled-left saved-text">
+      <ContextMenu>
+        <template #trigger>
+          <Skeleton :data="text" />
+        </template>
+        <template #context>
+          <a class="panel-block has-text-danger" @click="deleteTextPermanently(text)">
+            <span class="panel-icon">
+              <Icon src="remove.svg" />
+            </span>
+            <span>{{ $t("delete_permanently") }}</span>
+          </a>
+        </template>
+      </ContextMenu>
+    </div>
+  </template>
+  <template v-else>
+    <div class="text-tool" style="width: 200px; z-index: 1005">
+      <span class="tag muted is-block">{{ $t("font") }}</span>
+      <Dropdown
+        v-model="options.fontFamily"
+        class="font-dropdown"
+        :data="fontFamilies"
+        @open="fontDropdownOpen"
+      >
+        <template #option="{ label }">
+          <span :style="{ 'font-family': label }">{{ label }}</span>
+        </template>
+      </Dropdown>
+    </div>
+    <div class="text-tool" style="z-index: 1004">
+      <span class="tag muted is-block">Size (px)</span>
+      <Field
+        :model-value="options.fontSize.slice(0, -2)"
+        type="number"
+        @update:model-value="changeFontSize"
+      />
+    </div>
+    <div class="text-tool" style="z-index: 1003">
+      <span class="tag muted is-block">{{ $t("colour") }}</span>
+      <ColorPicker v-model="options.color" />
+    </div>
+    <div class="text-tool" :class="{ active: options.fontWeight }" @click="toggleBold">
+      <div class="icon is-large">
+        <Icon size="36" src="bold.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("bold") }}</span>
+    </div>
+    <div class="text-tool" :class="{ active: options.fontStyle }" @click="toggleItalic">
+      <div class="icon is-large">
+        <Icon size="36" src="italic.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("italic") }}</span>
+    </div>
+    <div class="text-tool" :class="{ active: options.textDecoration }" @click="toggleUnderline">
+      <div class="icon is-large">
+        <Icon size="36" src="underline.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("underline") }}</span>
+    </div>
+    <div class="text-tool has-tooltip-bottom" @click="saveText">
+      <div class="icon is-large">
+        <Icon size="40" src="check.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("save") }}</span>
+    </div>
+    <div class="text-tool" @click="cancelWriting">
+      <div class="icon is-large">
+        <Icon size="32" src="cancel.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("cancel") }}</span>
+    </div>
+  </template>
+</template>
 
 <style lang="scss">
 .writing {

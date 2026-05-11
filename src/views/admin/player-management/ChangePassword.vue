@@ -20,7 +20,7 @@ export default {
     },
     saving: {
       type: Object as PropType<{ value: boolean }>,
-      default: false,
+      default: () => ({ value: false }),
     },
   },
   setup(props) {
@@ -70,7 +70,7 @@ export default {
                     ...toRaw(values),
                   });
                   visible.value = false;
-                } catch (error) {
+                } catch {
                   message.error("Password is required");
                 }
               },

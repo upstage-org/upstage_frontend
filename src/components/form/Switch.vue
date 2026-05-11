@@ -1,9 +1,32 @@
+<script>
+import { v4 as uuidv4 } from "uuid";
+import Icon from "components/Icon.vue";
+import Loading from "components/Loading.vue";
+
+export default {
+  components: { Icon, Loading },
+  props: {
+    className: String,
+    modelValue: Boolean,
+    label: String,
+    checkedLabel: String,
+    uncheckedLabel: String,
+    loading: Boolean,
+  },
+  emits: ["update:modelValue"],
+  setup: () => {
+    const id = uuidv4();
+    return { id };
+  },
+};
+</script>
+
 <template>
   <div class="field is-inline-block is-relative">
-    <span class="on-switch-label" v-if="!!checkedLabel && modelValue" style="left: 10px">
+    <span v-if="!!checkedLabel && modelValue" class="on-switch-label" style="left: 10px">
       {{ checkedLabel }}
     </span>
-    <span class="on-switch-label" v-if="!!uncheckedLabel && !modelValue" style="left: 25px">
+    <span v-if="!!uncheckedLabel && !modelValue" class="on-switch-label" style="left: 25px">
       {{ uncheckedLabel }}
     </span>
     <input
@@ -11,8 +34,8 @@
       type="checkbox"
       v-bind="$attrs"
       :checked="modelValue"
-      @input="$emit('update:modelValue', $event.target.checked)"
       style="display: none"
+      @input="$emit('update:modelValue', $event.target.checked)"
     />
     <label class="clickable" :for="id">
       <Loading v-if="loading" height="24px" />
@@ -24,22 +47,6 @@
     </label>
   </div>
 </template>
-
-<script>
-import { v4 as uuidv4 } from "uuid";
-import Icon from "components/Icon.vue";
-import Loading from "components/Loading.vue";
-
-export default {
-  props: ["className", "modelValue", "label", "checkedLabel", "uncheckedLabel", "loading"],
-  emits: ["update:modelValue"],
-  components: { Icon, Loading },
-  setup: () => {
-    const id = uuidv4();
-    return { id };
-  },
-};
-</script>
 
 <style scoped>
 .on-switch-label {

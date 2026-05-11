@@ -1,52 +1,5 @@
-<template>
-  <div v-for="assetType in types" :key="assetType" class="columns is-vcentered has-text-centered">
-    <div class="column is-1">
-      <h4 class="subtitle">
-        <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px" />
-        <br />
-        {{ assetType }}
-        <br />
-        <small>({{ mediaGroups[assetType]?.length }})</small>
-      </h4>
-    </div>
-    <div class="column is-11">
-      <div class="toolbox">
-        <div class="scroller">
-          <div
-            v-for="item in mediaGroups[assetType]"
-            :key="item.id"
-            :id="item.id"
-            class="media-preview"
-            draggable="true"
-            @dragstart="dragstart"
-            @dragend="dragend"
-            @dragenter.prevent
-            @dragover.prevent="dragover"
-            @dragleave.prevent="dragleave"
-            @drop.prevent="drop"
-          >
-            <div style="pointer-events: none">
-              <div v-if="assetType === 'audio'">
-                <Icon src="audio.svg" />
-                <br />
-                <b>{{ item.name }}</b>
-              </div>
-              <div v-else-if="assetType === 'video'">
-                <Icon src="stream.svg" />
-                <br />
-                <b>{{ item.name }}</b>
-              </div>
-              <Asset v-else :asset="item" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
-import { defineProps, defineEmits, computed, watch } from "vue";
+import { computed } from "vue";
 import Icon from "components/Icon.vue";
 import Asset from "components/Asset.vue";
 
@@ -92,14 +45,62 @@ const drop = (e) => {
   const fromIndex = props.modelValue.findIndex((t) => t.id === fromId);
   const toIndex = props.modelValue.findIndex((t) => t.id === toId);
   if (fromIndex > -1 && toIndex > -1) {
-    const media = props.modelValue.splice(fromIndex, 1)[0];
-    emit(
-      "update:modelValue",
-      props.modelValue.slice(0, toIndex).concat(media).concat(props.modelValue.slice(toIndex)),
-    );
+    // Clone first; splice() on props.modelValue would mutate the parent's
+    // array (vue/no-mutating-props). The new ordering is communicated via
+    // update:modelValue below — the parent owns the canonical array.
+    const next = props.modelValue.slice();
+    const media = next.splice(fromIndex, 1)[0];
+    emit("update:modelValue", next.slice(0, toIndex).concat(media).concat(next.slice(toIndex)));
   }
 };
 </script>
+
+<template>
+  <div v-for="assetType in types" :key="assetType" class="columns is-vcentered has-text-centered">
+    <div class="column is-1">
+      <h4 class="subtitle">
+        <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px" />
+        <br />
+        {{ assetType }}
+        <br />
+        <small>({{ mediaGroups[assetType]?.length }})</small>
+      </h4>
+    </div>
+    <div class="column is-11">
+      <div class="toolbox">
+        <div class="scroller">
+          <div
+            v-for="item in mediaGroups[assetType]"
+            :id="item.id"
+            :key="item.id"
+            class="media-preview"
+            draggable="true"
+            @dragstart="dragstart"
+            @dragend="dragend"
+            @dragenter.prevent
+            @dragover.prevent="dragover"
+            @dragleave.prevent="dragleave"
+            @drop.prevent="drop"
+          >
+            <div style="pointer-events: none">
+              <div v-if="assetType === 'audio'">
+                <Icon src="audio.svg" />
+                <br />
+                <b>{{ item.name }}</b>
+              </div>
+              <div v-else-if="assetType === 'video'">
+                <Icon src="stream.svg" />
+                <br />
+                <b>{{ item.name }}</b>
+              </div>
+              <Asset v-else :asset="item" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .subtitle {

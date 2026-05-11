@@ -119,18 +119,18 @@ export default {
       v-if="!blocked"
       :data="data"
       class="p-2"
-      :onDragstart="join"
+      :on-dragstart="join"
       style="flex-direction: column"
     >
       <video
+        ref="el"
         :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"
         :onClick="join"
         autoplay
-        ref="el"
-        @loadeddata="loadeddata"
         disablePictureInPicture
-        @contextmenu.prevent
         controlslist="nodownload nofullscreen noremoteplayback"
+        @loadeddata="loadeddata"
+        @contextmenu.prevent
       ></video>
       <span class="tag">{{ nickname }}</span>
     </Skeleton>

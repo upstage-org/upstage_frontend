@@ -1,9 +1,3 @@
-<template>
-  <div class="event-indicator">
-    <div v-for="event in events" :key="event.id" :style="{ left: position(event) + '%' }"></div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
@@ -22,6 +16,12 @@ const duration = computed<number>(() => end.value - begin.value);
 const position = (event: ReplayEvent): number =>
   ((Number(event.mqttTimestamp) - begin.value) * 100) / duration.value;
 </script>
+
+<template>
+  <div class="event-indicator">
+    <div v-for="event in events" :key="event.id" :style="{ left: position(event) + '%' }"></div>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .event-indicator {

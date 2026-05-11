@@ -1,13 +1,3 @@
-<template>
-  <div class="columns is-mobile is-centered is-vcentered foyer-background">
-    <div
-      class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen"
-    >
-      <LoginForm @success="onLoginSuccess" />
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import LoginForm from "components/LoginForm.vue";
 import { useRouter } from "vue-router";
@@ -22,5 +12,15 @@ const onLoginSuccess = () => {
   router.push({ name: "Stages" });
 };
 </script>
+
+<template>
+  <div class="columns is-mobile is-centered is-vcentered foyer-background">
+    <div
+      class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen"
+    >
+      <LoginForm @success="onLoginSuccess" />
+    </div>
+  </div>
+</template>
 
 <style></style>

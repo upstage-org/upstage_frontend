@@ -1,17 +1,3 @@
-<template>
-  <div v-for="object in objects" :key="object.id">
-    <Icon
-      class="current-avatar"
-      v-if="object.holder"
-      :style="{
-        filter: `grayscale(${object.id === currentAvatar ? 0 : 1})`,
-      }"
-      src="my-avatar.svg"
-    />
-    <Skeleton :real="true" :data="object" :ghost="object.holder && object.id !== currentAvatar" />
-  </div>
-</template>
-
 <script>
 import { computed } from "vue";
 import { useStore } from "vuex";
@@ -29,6 +15,20 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div v-for="object in objects" :key="object.id">
+    <Icon
+      v-if="object.holder"
+      class="current-avatar"
+      :style="{
+        filter: `grayscale(${object.id === currentAvatar ? 0 : 1})`,
+      }"
+      src="my-avatar.svg"
+    />
+    <Skeleton :real="true" :data="object" :ghost="object.holder && object.id !== currentAvatar" />
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .current-avatar {

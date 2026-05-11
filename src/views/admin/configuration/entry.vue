@@ -41,8 +41,8 @@ const save = async () => {
       <a-input-group compact style="display: flex">
         <RichTextEditor
           v-if="richTextEditor"
-          :readonly="!editing"
           v-model="value"
+          :readonly="!editing"
           :style="{
             boxShadow: 'none',
             pointerEvents: editing ? 'auto' : 'none',
@@ -51,22 +51,22 @@ const save = async () => {
         <template v-else>
           <a-textarea
             v-if="props.multiline"
-            :disabled="!editing"
             v-model:value="value"
+            :disabled="!editing"
             style="color: black"
             auto-size
           ></a-textarea>
-          <a-input v-else :disabled="!editing" v-model:value="value" style="color: black" />
+          <a-input v-else v-model:value="value" :disabled="!editing" style="color: black" />
         </template>
         <a-button v-if="!editing && !loading" type="primary" @click="editing = true">Edit</a-button>
-        <a-button v-else type="primary" @click="save" :loading="loading">Save</a-button>
+        <a-button v-else type="primary" :loading="loading" @click="save">Save</a-button>
       </a-input-group>
     </template>
     <a-switch
       v-if="typeof value === 'boolean'"
       v-model:checked="value"
-      @change="save"
       :loading="loading"
+      @change="save"
     />
     <help v-if="help" class="mt-2" />
   </a-form-item>

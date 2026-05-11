@@ -1,14 +1,3 @@
-<template>
-  <div class="card-header">
-    <span class="card-header-title">{{ $t("scene_name") }}</span>
-  </div>
-  <div class="card-content voice-parameters">
-    <Field v-model="form.name" />
-
-    <SaveButton @click="saveScene">{{ $t("save_scene") }}</SaveButton>
-  </div>
-</template>
-
 <script>
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
@@ -63,5 +52,16 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="card-header">
+    <span class="card-header-title">{{ $t("scene_name") }}</span>
+  </div>
+  <div class="card-content voice-parameters">
+    <Field v-model="form.name" />
+
+    <SaveButton @click="saveScene">{{ $t("save_scene") }}</SaveButton>
+  </div>
+</template>
 
 <style></style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { LayoutSider, Menu, MenuItem, Spin, SubMenu } from "ant-design-vue";
+import { LayoutSider, Menu, MenuItem, SubMenu } from "ant-design-vue";
 import { useRouter } from "vue-router";
 import PlayerForm from "views/admin/player-management/PlayerForm.vue";
 import { h, computed } from "vue";
@@ -14,7 +14,7 @@ import configs from "config";
 import { useStore } from "vuex";
 
 export default {
-  setup(_, { slots }) {
+  setup() {
     const router = useRouter();
 
     const store = useStore();

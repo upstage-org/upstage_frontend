@@ -1,13 +1,3 @@
-<template>
-  <footer v-if="notInIframe" class="footer">
-    <div class="content has-text-centered">
-      UpStage v{{ version }} -
-      <span v-if="release">{{ release }}</span>
-      <span v-else>{{ $t("under_construction") }}</span>
-    </div>
-  </footer>
-</template>
-
 <script>
 import configs from "config";
 
@@ -21,6 +11,16 @@ export default {
   },
 };
 </script>
+
+<template>
+  <footer v-if="notInIframe" class="footer">
+    <div class="content has-text-centered">
+      UpStage v{{ version }} -
+      <span v-if="release">{{ release }}</span>
+      <span v-else>{{ $t("under_construction") }}</span>
+    </div>
+  </footer>
+</template>
 
 <style>
 footer.footer {

@@ -1,3 +1,14 @@
+<script>
+export default {
+  props: {
+    selected: Boolean,
+    revert: Boolean,
+    multiple: Boolean,
+  },
+  emits: ["select"],
+};
+</script>
+
 <template>
   <div class="selectable" :class="{ selected }" @click="$emit('select')">
     <slot></slot>
@@ -13,17 +24,6 @@
     </div>
   </div>
 </template>
-
-<script>
-export default {
-  props: {
-    selected: Boolean,
-    revert: Boolean,
-    multiple: Boolean,
-  },
-  emits: ["select"],
-};
-</script>
 
 <style lang="scss" scoped>
 .selectable {

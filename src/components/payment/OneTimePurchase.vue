@@ -1,3 +1,31 @@
+<script>
+import { ref } from "vue";
+import { useStore } from "vuex";
+import { message } from "ant-design-vue";
+
+export default {
+  setup: () => {
+    const store = useStore();
+    const amount = ref(null);
+
+    const openPurchasePopup = () => {
+      if (amount.value && amount.value != 0) {
+        store.dispatch("stage/openPurchasePopup", {
+          type: "OneTimePurchase",
+          amount: amount.value,
+          title: "Donate to UpStage (amounts shown in US dollars)",
+        });
+        amount.value = null;
+      } else {
+        message.warning("Please select amount to donate!");
+      }
+    };
+
+    return { amount, openPurchasePopup };
+  },
+};
+</script>
+
 <template>
   <div class="payment mb-4">
     <div class="columns is-vcentered">
@@ -27,6 +55,7 @@
           <span class="input-symbol-dollar"></span>
           <input
             ref="custom_amount"
+            v-model="amount"
             type="number"
             step="0.01"
             min="0"
@@ -34,7 +63,6 @@
             class="button payment-button"
             placeholder="Custom"
             @input="amount = $event.target.value"
-            v-model="amount"
           />
         </div>
       </div>
@@ -48,34 +76,6 @@
     </div>
   </div>
 </template>
-
-<script>
-import { ref } from "vue";
-import { useStore } from "vuex";
-import { message } from "ant-design-vue";
-
-export default {
-  setup: () => {
-    const store = useStore();
-    const amount = ref(null);
-
-    const openPurchasePopup = () => {
-      if (amount.value && amount.value != 0) {
-        store.dispatch("stage/openPurchasePopup", {
-          type: "OneTimePurchase",
-          amount: amount.value,
-          title: "Donate to UpStage (amounts shown in US dollars)",
-        });
-        amount.value = null;
-      } else {
-        message.warning("Please select amount to donate!");
-      }
-    };
-
-    return { amount, openPurchasePopup };
-  },
-};
-</script>
 <style lang="scss" scoped>
 .payment {
   width: 90%;

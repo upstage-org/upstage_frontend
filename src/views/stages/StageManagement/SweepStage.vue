@@ -1,14 +1,3 @@
-<template>
-  <button class="button ml-2 is-warning" @click="onConfirm">
-    <template v-if="status">
-      <button class="button is-warning is-loading"></button>
-      <span>{{ status }}</span>
-    </template>
-    <span v-else></span>
-    <slot>{{ $t("sweep_stage") }}</slot>
-  </button>
-</template>
-
 <script>
 import { inject, ref, createVNode } from "vue";
 import { message } from "ant-design-vue";
@@ -78,5 +67,16 @@ export default {
   },
 };
 </script>
+
+<template>
+  <button class="button ml-2 is-warning" @click="onConfirm">
+    <template v-if="status">
+      <button class="button is-warning is-loading"></button>
+      <span>{{ status }}</span>
+    </template>
+    <span v-else></span>
+    <slot>{{ $t("sweep_stage") }}</slot>
+  </button>
+</template>
 
 <style></style>

@@ -1,5 +1,14 @@
+<!--
+  Parent (MediaForm) passes `voice` as a shared reactive object so this
+  child writes back into voice.voice / variant / pitch / speed / amplitude
+  via v-model and Object.assign. Refactoring to emit-based v-models would
+  require parallel changes in MediaForm and is out of scope for this lint
+  pass. The vue/no-mutating-props warnings on these mutations are silenced
+  at the file level.
+-->
+<!-- eslint-disable vue/no-mutating-props -->
 <script lang="ts" setup>
-import { PropType, reactive, ref } from "vue";
+import { PropType, ref } from "vue";
 import { AvatarVoice } from "models/studio";
 import { avatarSpeak } from "services/speech";
 import { getVoiceList, getVariantList, defaultTestMessage } from "services/speech/voice";
@@ -23,7 +32,8 @@ const handleVoicePicked = (voice: AvatarVoice) => {
 </script>
 
 <template>
-  <a-form-item label="Voice" :labelCol="{ span: 3 }" class="mb-2">
+  <!-- eslint-disable vue/no-mutating-props -->
+  <a-form-item label="Voice" :label-col="{ span: 3 }" class="mb-2">
     <div class="flex">
       <a-select
         v-model:value="props.voice.voice"
@@ -34,23 +44,23 @@ const handleVoicePicked = (voice: AvatarVoice) => {
     </div>
   </a-form-item>
   <template v-if="props.voice.voice">
-    <a-form-item label="Variant" :labelCol="{ span: 3 }" class="mb-2">
+    <a-form-item label="Variant" :label-col="{ span: 3 }" class="mb-2">
       <a-select v-model:value="props.voice.variant" :options="getVariantList()" />
     </a-form-item>
-    <a-form-item label="Pitch" :labelCol="{ span: 3 }" class="mb-2">
+    <a-form-item label="Pitch" :label-col="{ span: 3 }" class="mb-2">
       <a-slider v-model:value="props.voice.pitch" />
     </a-form-item>
-    <a-form-item label="Rate" :labelCol="{ span: 3 }" class="mb-2">
+    <a-form-item label="Rate" :label-col="{ span: 3 }" class="mb-2">
       <a-slider
         :value="props.voice.speed / 3.5"
         @change="props.voice.speed = Number($event) * 3.5"
       />
     </a-form-item>
-    <a-form-item label="Volume" :labelCol="{ span: 3 }" class="mb-2">
+    <a-form-item label="Volume" :label-col="{ span: 3 }" class="mb-2">
       <a-slider v-model:value="props.voice.amplitude" />
     </a-form-item>
-    <a-form-item label="Test voice" :labelCol="{ span: 3 }" class="mb-2">
-      <a-input-search :placeholder="defaultTestMessage" v-model:value="test" @search="testVoice">
+    <a-form-item label="Test voice" :label-col="{ span: 3 }" class="mb-2">
+      <a-input-search v-model:value="test" :placeholder="defaultTestMessage" @search="testVoice">
         <template #enterButton>
           <sound-outlined />
         </template>

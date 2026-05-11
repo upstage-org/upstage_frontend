@@ -13,7 +13,7 @@ const scanFolder = (path) => {
 
 const processFile = (path) => {
   const filename = path.substring(path.lastIndexOf("/") + 1);
-  const [_, extension] = filename.split(".");
+  const extension = filename.split(".")[1];
   if (extension === "vue") {
     const regex = />[a-zA-Z0-9 ]+</g;
     const file = fs.readFileSync(path, "utf8");

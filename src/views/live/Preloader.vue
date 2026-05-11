@@ -1,74 +1,3 @@
-<template>
-  <transition @leave="leave">
-    <section
-      v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading)"
-      class="hero is-fullheight is-fullwidth cover-image"
-      :class="{ replaying }"
-      :style="{
-        'background-image': model && `url(&quot;${model.cover || '/img/greencurtain.jpg'}&quot;)`,
-        'background-color': backdropColor,
-      }"
-      @click="clicked = true"
-    >
-      <div class="hero-body">
-        <div class="container">
-          <template v-if="model">
-            <h1 class="title" :class="{ 'mb-0': model.description }">
-              {{ model.name }}
-            </h1>
-            <h2 v-if="model.description" class="subtittle">
-              {{ model.description }}
-            </h2>
-            <!--
-              Hidden preload must mount whenever we have assets, independent of the
-              status/ready branch below. Otherwise `status !== 'live' && !canPlay` renders
-              the "closed" copy but skips the v-else block — no imgs mount, @load never
-              fires, and preloading/ready never clear (infinite "loading").
-            -->
-            <div v-if="preloadableAssets.length" id="preloading-area" aria-hidden="true">
-              <img
-                v-for="(src, idx) in preloadableAssets"
-                :key="`${idx}-${src}`"
-                :src="src"
-                @load="increaseProgress"
-                @error="increaseProgress"
-              />
-            </div>
-            <template v-if="status !== 'live' && !canPlay">
-              <span v-if="status" class="tag is-dark">{{ status.toUpperCase() }}</span
-              >&nbsp;
-              <span>This stage is not currently open to the public. Please come back later!</span>
-            </template>
-            <h2 v-else-if="ready" class="subtitle">
-              <span class="sparkle" style="line-height: 2"
-                >Stage loaded 100%, click anywhere to continue...</span
-              >
-            </h2>
-            <h2 v-else class="subtitle">
-              <template v-if="preloadableAssets.length">
-                <button class="button is-primary is-loading" />
-                <span style="line-height: 2">
-                  <span> Preloading media... {{ progress }}/{{ preloadableAssets.length }} </span>
-                </span>
-              </template>
-            </h2>
-          </template>
-          <template v-else-if="preloading">
-            <h2 class="subtitle">
-              <button class="button is-primary is-loading" />
-              <span style="line-height: 2">Loading stage information...</span>
-            </h2>
-          </template>
-          <template v-else>
-            <h1 class="title">Stage not found!</h1>
-            <span>Are you sure the stage url is correct?</span>
-          </template>
-        </div>
-      </div>
-    </section>
-  </transition>
-</template>
-
 <script setup lang="ts">
 import { computed, inject, onUnmounted, ref, watch, watchEffect } from "vue";
 import { useStore } from "vuex";
@@ -145,6 +74,77 @@ const backdropColor = computed<string>(() => store.state.stage.backdropColor);
 const canPlay = computed<boolean>(() => store.getters["stage/canPlay"]);
 const masquerading = computed<boolean>(() => store.state.stage.masquerading);
 </script>
+
+<template>
+  <transition @leave="leave">
+    <section
+      v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading)"
+      class="hero is-fullheight is-fullwidth cover-image"
+      :class="{ replaying }"
+      :style="{
+        'background-image': model && `url(&quot;${model.cover || '/img/greencurtain.jpg'}&quot;)`,
+        'background-color': backdropColor,
+      }"
+      @click="clicked = true"
+    >
+      <div class="hero-body">
+        <div class="container">
+          <template v-if="model">
+            <h1 class="title" :class="{ 'mb-0': model.description }">
+              {{ model.name }}
+            </h1>
+            <h2 v-if="model.description" class="subtittle">
+              {{ model.description }}
+            </h2>
+            <!--
+              Hidden preload must mount whenever we have assets, independent of the
+              status/ready branch below. Otherwise `status !== 'live' && !canPlay` renders
+              the "closed" copy but skips the v-else block — no imgs mount, @load never
+              fires, and preloading/ready never clear (infinite "loading").
+            -->
+            <div v-if="preloadableAssets.length" id="preloading-area" aria-hidden="true">
+              <img
+                v-for="(src, idx) in preloadableAssets"
+                :key="`${idx}-${src}`"
+                :src="src"
+                @load="increaseProgress"
+                @error="increaseProgress"
+              />
+            </div>
+            <template v-if="status !== 'live' && !canPlay">
+              <span v-if="status" class="tag is-dark">{{ status.toUpperCase() }}</span
+              >&nbsp;
+              <span>This stage is not currently open to the public. Please come back later!</span>
+            </template>
+            <h2 v-else-if="ready" class="subtitle">
+              <span class="sparkle" style="line-height: 2"
+                >Stage loaded 100%, click anywhere to continue...</span
+              >
+            </h2>
+            <h2 v-else class="subtitle">
+              <template v-if="preloadableAssets.length">
+                <button class="button is-primary is-loading" />
+                <span style="line-height: 2">
+                  <span> Preloading media... {{ progress }}/{{ preloadableAssets.length }} </span>
+                </span>
+              </template>
+            </h2>
+          </template>
+          <template v-else-if="preloading">
+            <h2 class="subtitle">
+              <button class="button is-primary is-loading" />
+              <span style="line-height: 2">Loading stage information...</span>
+            </h2>
+          </template>
+          <template v-else>
+            <h1 class="title">Stage not found!</h1>
+            <span>Are you sure the stage url is correct?</span>
+          </template>
+        </div>
+      </div>
+    </section>
+  </transition>
+</template>
 
 <style scoped lang="scss">
 #preloading-area {

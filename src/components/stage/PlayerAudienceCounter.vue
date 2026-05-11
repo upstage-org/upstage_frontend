@@ -1,3 +1,16 @@
+<script>
+import Loading from "components/Loading.vue";
+import { useCounter } from "./composable";
+export default {
+  components: { Loading },
+  props: { stageUrl: String },
+  setup(props) {
+    const [players, audiences, loading] = useCounter(props.stageUrl);
+    return { players, audiences, loading };
+  },
+};
+</script>
+
 <template>
   <Loading v-if="loading" height="24px" />
   <span v-else-if="players > 0 || audiences > 0" class="tag is-dark is-small">
@@ -11,18 +24,5 @@
     <span>{{ audiences }}</span>
   </span>
 </template>
-
-<script>
-import Loading from "components/Loading.vue";
-import { useCounter } from "./composable";
-export default {
-  props: ["stageUrl"],
-  components: { Loading },
-  setup(props) {
-    const [players, audiences, loading] = useCounter(props.stageUrl);
-    return { players, audiences, loading };
-  },
-};
-</script>
 
 <style></style>

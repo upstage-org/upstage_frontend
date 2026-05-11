@@ -1,55 +1,3 @@
-<template>
-  <div
-    class="dropdown"
-    :class="{ 'is-active': isActive, 'is-right': isRight, 'is-up': isUp }"
-    v-click-outside="() => (isActive = false)"
-  >
-    <div class="dropdown-trigger">
-      <button
-        class="button"
-        :class="{ 'is-rounded': isRounded }"
-        aria-haspopup="true"
-        aria-controls="dropdown-menu"
-        @click="isActive = !isActive"
-      >
-        <span v-if="selectedItem">
-          <slot name="selected" :item="selectedItem">
-            {{ renderLabel(selectedItem) }}
-          </slot>
-        </span>
-        <span v-else>{{ placeholder }}</span>
-        <span class="icon is-small">
-          <i class="fas fa-angle-down" aria-hidden="true"></i>
-        </span>
-      </button>
-    </div>
-    <div class="dropdown-menu" id="dropdown-menu" role="menu">
-      <div class="dropdown-content" ref="el" :style="{ position: fixed ? 'fixed' : 'unset' }">
-        <template v-if="data && data.length">
-          <a
-            v-for="item in data"
-            :key="item"
-            @click="select(renderValue(item), item)"
-            class="dropdown-item"
-            :class="{ 'is-active': modelValue === renderValue(item) }"
-          >
-            <slot name="option" :label="renderLabel(item)" :item="item">
-              <div :title="renderDescription(item)" v-if="renderDescription">
-                <b>{{ renderLabel(item) }}</b>
-                <i class="fas fa-info-circle ml-1"></i>
-              </div>
-              <template v-else>{{ renderLabel(item) }}</template>
-            </slot>
-          </a>
-        </template>
-        <div v-else class="dropdown-item">
-          <p class="has-text-dark">{{ $t("no_content") }}</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script>
 import { computed, onMounted, ref, watch } from "vue";
 export default {
@@ -92,6 +40,58 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div
+    v-click-outside="() => (isActive = false)"
+    class="dropdown"
+    :class="{ 'is-active': isActive, 'is-right': isRight, 'is-up': isUp }"
+  >
+    <div class="dropdown-trigger">
+      <button
+        class="button"
+        :class="{ 'is-rounded': isRounded }"
+        aria-haspopup="true"
+        aria-controls="dropdown-menu"
+        @click="isActive = !isActive"
+      >
+        <span v-if="selectedItem">
+          <slot name="selected" :item="selectedItem">
+            {{ renderLabel(selectedItem) }}
+          </slot>
+        </span>
+        <span v-else>{{ placeholder }}</span>
+        <span class="icon is-small">
+          <i class="fas fa-angle-down" aria-hidden="true"></i>
+        </span>
+      </button>
+    </div>
+    <div id="dropdown-menu" class="dropdown-menu" role="menu">
+      <div ref="el" class="dropdown-content" :style="{ position: fixed ? 'fixed' : 'unset' }">
+        <template v-if="data && data.length">
+          <a
+            v-for="item in data"
+            :key="item"
+            class="dropdown-item"
+            :class="{ 'is-active': modelValue === renderValue(item) }"
+            @click="select(renderValue(item), item)"
+          >
+            <slot name="option" :label="renderLabel(item)" :item="item">
+              <div v-if="renderDescription" :title="renderDescription(item)">
+                <b>{{ renderLabel(item) }}</b>
+                <i class="fas fa-info-circle ml-1"></i>
+              </div>
+              <template v-else>{{ renderLabel(item) }}</template>
+            </slot>
+          </a>
+        </template>
+        <div v-else class="dropdown-item">
+          <p class="has-text-dark">{{ $t("no_content") }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .dropdown-content {

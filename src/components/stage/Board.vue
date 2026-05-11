@@ -1,43 +1,3 @@
-<template>
-  <section
-    id="live-stage"
-    class="hero bg-cover is-fullheight"
-    :style="{ 'background-color': backdropColor }"
-  >
-    <div
-      id="board"
-      data-testid="board"
-      @dragenter.prevent
-      @dragover.prevent
-      @drop.prevent="drop"
-      :style="{
-        width: stageSize.width + 'px',
-        height: stageSize.height + 'px',
-        transform: 'translateX(' + stageSize.left + 'px) translateY(' + stageSize.top + 'px)',
-      }"
-    >
-      <Backdrop />
-      <transition-group name="stage-avatars" :css="false" @enter="avatarEnter" @leave="avatarLeave">
-        <component
-          v-for="object in objects"
-          :id="object.id"
-          :key="object.id"
-          :is="
-            object.drawingId
-              ? 'drawing'
-              : object.type == 'video'
-                ? 'avatar'
-                : (object.type ?? 'avatar')
-          "
-          :object="object"
-        />
-      </transition-group>
-    </div>
-  </section>
-  <Whiteboard />
-  <Curtain />
-</template>
-
 <script>
 import { computed } from "vue";
 import { useStore } from "vuex";
@@ -45,22 +5,43 @@ import Avatar from "components/objects/Avatar/index.vue";
 import Drawing from "components/objects/Drawing.vue";
 import Meeting from "components/objects/MeetingObject/index.vue";
 import Jitsi from "components/objects/MeetingObject/Jitsi.vue";
-import Text from "components/objects/Text.vue";
+// Aliased: "Text" and "Image" are reserved HTML element names
+// (vue/no-reserved-component-names). Renaming the registration keys would
+// break the previous `<component :is="object.type">` lookup (Vue resolves
+// 'text'/'image' case-insensitively to the registered key), so resolution
+// now goes through resolveType() which maps object.type to the alias.
+import TextObject from "components/objects/Text.vue";
 import Curtain from "components/stage/Curtain.vue";
 import Whiteboard from "components/stage/Whiteboard.vue";
-import Image from "../Image.vue";
+import AppImage from "../Image.vue";
 import { animate } from "animejs";
 import Backdrop from "./Backdrop.vue";
+
+const TYPE_TO_COMPONENT = {
+  drawing: "Drawing",
+  avatar: "Avatar",
+  prop: "Prop",
+  text: "TextObject",
+  image: "AppImage",
+  meeting: "Meeting",
+  jitsi: "Jitsi",
+};
+
+const resolveType = (object) => {
+  if (object.drawingId) return "Drawing";
+  if (object.type === "video") return "Avatar";
+  return TYPE_TO_COMPONENT[object.type] || "Avatar";
+};
 
 export default {
   components: {
     Avatar,
     Prop: Avatar,
     Drawing,
-    Text,
+    TextObject,
     Curtain,
     Whiteboard,
-    Image,
+    AppImage,
     Backdrop,
     Meeting,
     Jitsi,
@@ -122,10 +103,45 @@ export default {
       stageSize,
       backdropColor,
       canPlay,
+      resolveType,
     };
   },
 };
 </script>
+
+<template>
+  <section
+    id="live-stage"
+    class="hero bg-cover is-fullheight"
+    :style="{ 'background-color': backdropColor }"
+  >
+    <div
+      id="board"
+      data-testid="board"
+      :style="{
+        width: stageSize.width + 'px',
+        height: stageSize.height + 'px',
+        transform: 'translateX(' + stageSize.left + 'px) translateY(' + stageSize.top + 'px)',
+      }"
+      @dragenter.prevent
+      @dragover.prevent
+      @drop.prevent="drop"
+    >
+      <Backdrop />
+      <transition-group name="stage-avatars" :css="false" @enter="avatarEnter" @leave="avatarLeave">
+        <component
+          :is="resolveType(object)"
+          v-for="object in objects"
+          :id="object.id"
+          :key="object.id"
+          :object="object"
+        />
+      </transition-group>
+    </div>
+  </section>
+  <Whiteboard />
+  <Curtain />
+</template>
 
 <style scoped>
 #board {

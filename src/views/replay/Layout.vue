@@ -1,17 +1,3 @@
-<template>
-  <Logo id="live-logo" />
-  <div id="main-content">
-    <Preloader />
-    <template v-if="ready">
-      <Board />
-      <Controls />
-      <ConnectionStatus />
-      <Chat />
-      <AudioPlayer />
-    </template>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed, provide } from "vue";
 import { useStore } from "vuex";
@@ -35,6 +21,20 @@ store.dispatch("stage/loadStage", {
 
 provide("replaying", true);
 </script>
+
+<template>
+  <Logo id="live-logo" />
+  <div id="main-content">
+    <Preloader />
+    <template v-if="ready">
+      <Board />
+      <Controls />
+      <ConnectionStatus />
+      <Chat />
+      <AudioPlayer />
+    </template>
+  </div>
+</template>
 
 <style lang="scss">
 #main-content {

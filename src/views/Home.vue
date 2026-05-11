@@ -1,24 +1,3 @@
-<template>
-  <section id="welcome" class="hero is-fullheight foyer-background">
-    <div class="hero-body">
-      <div class="container">
-        <div class="describe">
-          <h1 class="title" v-html="foyer.title?.value" />
-          <div v-if="foyer.description" class="subtitle" v-html="foyer.description.value" />
-        </div>
-        <Loading v-if="loading" />
-        <div v-else class="stages my-4 pt-6">
-          <masonry-wall :items="visibleStages" :ssr-columns="1" :column-width="300" :gap="32">
-            <template #default="{ item }">
-              <Entry :stage="item" :fallback-cover="'greencurtain.jpg'" />
-            </template>
-          </masonry-wall>
-        </div>
-      </div>
-    </div>
-  </section>
-</template>
-
 <script>
 import { computed } from "vue";
 import { useStore } from "vuex";
@@ -26,7 +5,6 @@ import Loading from "components/Loading.vue";
 import { absolutePath } from "utils/common";
 import Entry from "components/stage/Entry.vue";
 import { MasonryWall } from "@yeger/vue-masonry-wall";
-import { stageGraph } from "services/graphql";
 import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
 
@@ -63,6 +41,27 @@ export default {
   },
 };
 </script>
+
+<template>
+  <section id="welcome" class="hero is-fullheight foyer-background">
+    <div class="hero-body">
+      <div class="container">
+        <div class="describe">
+          <h1 class="title" v-html="foyer.title?.value" />
+          <div v-if="foyer.description" class="subtitle" v-html="foyer.description.value" />
+        </div>
+        <Loading v-if="loading" />
+        <div v-else class="stages my-4 pt-6">
+          <MasonryWall :items="visibleStages" :ssr-columns="1" :column-width="300" :gap="32">
+            <template #default="{ item }">
+              <Entry :stage="item" :fallback-cover="'greencurtain.jpg'" />
+            </template>
+          </MasonryWall>
+        </div>
+      </div>
+    </div>
+  </section>
+</template>
 
 <style scoped lang="scss">
 #welcome {

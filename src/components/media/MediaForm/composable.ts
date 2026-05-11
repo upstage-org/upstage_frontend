@@ -34,7 +34,7 @@ const getBase64 = (file: File) =>
     reader.onload = function () {
       resolve(reader.result as string);
     };
-    reader.onerror = function (error) {
+    reader.onerror = function (_error) {
       resolve("");
     };
   });

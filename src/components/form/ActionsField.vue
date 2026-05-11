@@ -1,3 +1,7 @@
+<script>
+export default {};
+</script>
+
 <template>
   <div class="field is-horizontal">
     <div class="field-label">
@@ -12,9 +16,5 @@
     </div>
   </div>
 </template>
-
-<script>
-export default {};
-</script>
 
 <style></style>

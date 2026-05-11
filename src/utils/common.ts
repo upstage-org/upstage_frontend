@@ -1,6 +1,6 @@
 // @ts-nocheck
 import configs from "config";
-import { SharedAuth, SharedConfigs } from "models/config";
+import { SharedAuth } from "models/config";
 import { User as LegacyUser } from "models/studio";
 import { message } from "ant-design-vue";
 
@@ -15,7 +15,7 @@ export function getSharedAuth(): SharedAuth | undefined {
       const sharedState = JSON.parse(sharedStateJSON);
       return sharedState.auth;
     }
-  } catch (error) {
+  } catch {
     console.log("No shared auth found. Try login using dashboard first!");
   }
 }
@@ -86,7 +86,7 @@ export function includesIgnoreCase(value: string, keyword: string) {
 export const isJson = (d: any) => {
   try {
     JSON.parse(d);
-  } catch (e) {
+  } catch {
     return false;
   }
   return true;

@@ -1,3 +1,47 @@
+<script>
+import dayjs from "@utils/dayjs";
+import Linkify from "components/Linkify.vue";
+import Divider from "components/Divider.vue";
+import ContextMenu from "components/ContextMenu.vue";
+import Icon from "components/Icon.vue";
+import { useStore } from "vuex";
+import { computed } from "vue";
+
+export default {
+  components: { Linkify, Divider, ContextMenu, Icon },
+  props: {
+    messages: Array,
+    style: [String, Object],
+  },
+  setup: () => {
+    const store = useStore();
+    const messageClass = {
+      think: "has-text-info has-background-info-light",
+      shout: "has-text-danger",
+      highlighted: "has-background-warning",
+    };
+    const canPlay = computed(() => store.getters["stage/canPlay"]);
+    const session = computed(() => store.state.stage.session);
+
+    const time = (value) => {
+      return dayjs(value).fromNow();
+    };
+
+    const removeChat = (item, closeMenu) => {
+      store.dispatch("stage/removeChat", item.id).then(closeMenu);
+    };
+
+    const highlightChat = (item, closeMenu) => {
+      if (canPlay.value) {
+        store.dispatch("stage/highlightChat", item.id).then(closeMenu);
+      }
+    };
+
+    return { messageClass, time, removeChat, highlightChat, canPlay, session };
+  },
+};
+</script>
+
 <template>
   <div v-if="!messages.length" class="columns is-vcentered is-fullheight">
     <div class="column has-text-centered has-text-light">
@@ -100,47 +144,6 @@
     </p>
   </div>
 </template>
-
-<script>
-import dayjs from "@utils/dayjs";
-import Linkify from "components/Linkify.vue";
-import Divider from "components/Divider.vue";
-import ContextMenu from "components/ContextMenu.vue";
-import Icon from "components/Icon.vue";
-import { useStore } from "vuex";
-import { computed } from "vue";
-
-export default {
-  props: ["messages", "style"],
-  components: { Linkify, Divider, ContextMenu, Icon },
-  setup: () => {
-    const store = useStore();
-    const messageClass = {
-      think: "has-text-info has-background-info-light",
-      shout: "has-text-danger",
-      highlighted: "has-background-warning",
-    };
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const session = computed(() => store.state.stage.session);
-
-    const time = (value) => {
-      return dayjs(value).fromNow();
-    };
-
-    const removeChat = (item, closeMenu) => {
-      store.dispatch("stage/removeChat", item.id).then(closeMenu);
-    };
-
-    const highlightChat = (item, closeMenu) => {
-      if (canPlay.value) {
-        store.dispatch("stage/highlightChat", item.id).then(closeMenu);
-      }
-    };
-
-    return { messageClass, time, removeChat, highlightChat, canPlay, session };
-  },
-};
-</script>
 
 <style lang="scss">
 .tag.message {

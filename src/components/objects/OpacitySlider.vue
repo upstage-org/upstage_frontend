@@ -1,38 +1,15 @@
-<template>
-  <input
-    class="opacity-slider slider is-fullwidth"
-    :class="{
-      'is-primary': sliderMode === 'opacity',
-      'is-warning': sliderMode === 'volume',
-      'is-danger': sliderMode === 'speed',
-    }"
-    step="0.01"
-    min="0"
-    max="1"
-    :value="value"
-    type="range"
-    :style="{
-      top: '-26px',
-      left: '-15px',
-      width: object.h + 'px',
-    }"
-    v-show="showSlider"
-    @change="handleChange"
-    @mousedown.stop="keepActive"
-    @mouseover.stop="keepActive"
-    @mouseup.stop="keepActive"
-  />
-</template>
-
 <script>
 import { computed } from "vue";
 import { useStore } from "vuex";
 export default {
-  props: ["active", "object", "sliderMode"],
+  props: {
+    active: Boolean,
+    object: Object,
+    sliderMode: String,
+  },
   emits: ["update:active"],
   setup: (props, { emit }) => {
     const store = useStore();
-    const maxFrameSpeed = 50;
     const maxMoveSpeed = 1000;
     const value = computed(() => {
       switch (props.sliderMode) {
@@ -98,6 +75,32 @@ export default {
   },
 };
 </script>
+
+<template>
+  <input
+    v-show="showSlider"
+    class="opacity-slider slider is-fullwidth"
+    :class="{
+      'is-primary': sliderMode === 'opacity',
+      'is-warning': sliderMode === 'volume',
+      'is-danger': sliderMode === 'speed',
+    }"
+    step="0.01"
+    min="0"
+    max="1"
+    :value="value"
+    type="range"
+    :style="{
+      top: '-26px',
+      left: '-15px',
+      width: object.h + 'px',
+    }"
+    @change="handleChange"
+    @mousedown.stop="keepActive"
+    @mouseover.stop="keepActive"
+    @mouseup.stop="keepActive"
+  />
+</template>
 
 <style>
 .opacity-slider {

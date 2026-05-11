@@ -2,11 +2,11 @@
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 import { gql } from "@apollo/client/core";
-import { computed, reactive, watch, provide, ref, inject, Ref, ComputedRef, onMounted } from "vue";
+import { computed, reactive, watch, provide, inject, Ref, ComputedRef, onMounted } from "vue";
 import { editingMediaVar, inquiryVar } from "apollo";
 import configs from "config";
 import { permissionFragment } from "models/fragment";
-import { Media, MediaAttributes, StudioGraph, UploadFile, User } from "models/studio";
+import { Media, MediaAttributes, StudioGraph, UploadFile } from "models/studio";
 import { absolutePath } from "utils/common";
 import MediaPreview from "./MediaPreview.vue";
 import RequestPermission from "./MediaForm/RequestPermission.vue";
@@ -199,13 +199,6 @@ interface Pagination {
   total: number;
 }
 
-interface Sorter {
-  column: any;
-  columnKey: string;
-  field: string;
-  order: "ascend" | "descend";
-}
-
 const handleTableChange = (
   { current = 1, pageSize = 10 }: TablePaginationConfig,
   _: any,
@@ -224,11 +217,7 @@ const handleTableChange = (
 };
 const dataSource = computed(() => (result.value ? result.value.media.edges : []));
 
-const {
-  loading: deleting,
-  mutate: deleteMedia,
-  onDone,
-} = useMutation(gql`
+const { onDone } = useMutation(gql`
   mutation deleteMedia($id: ID!) {
     deleteMedia(id: $id) {
       success
@@ -298,9 +287,8 @@ const filterTag = (tag: string) => {
       class="w-full overflow-auto"
       :columns="columns as ColumnType<Media>[]"
       :data-source="dataSource"
-      rowKey="id"
+      row-key="id"
       :loading="loading"
-      @change="handleTableChange"
       :pagination="
         {
           showQuickJumper: true,
@@ -308,6 +296,7 @@ const filterTag = (tag: string) => {
           total: result ? result.media.totalCount : 0,
         } as Pagination
       "
+      @change="handleTableChange"
     >
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'preview'">
@@ -341,8 +330,8 @@ const filterTag = (tag: string) => {
             v-for="(tag, i) in text"
             :key="i"
             :color="tag"
-            @click="filterTag(tag)"
             class="cursor-pointer"
+            @click="filterTag(tag)"
             >{{ tag }}
           </a-tag>
         </template>

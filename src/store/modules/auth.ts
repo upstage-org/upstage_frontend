@@ -64,7 +64,6 @@ export default {
       window.location.href = "/";
     },
 
-    // eslint-disable-next-line no-unused-vars
     fetchRefreshToken({ commit, state }) {
       return userGraph
         .refreshUser(
@@ -80,7 +79,7 @@ export default {
           commit("SET_TOKEN", token);
           return token;
         })
-        .catch((err) => {
+        .catch((_err) => {
           commit("CLEAR_USER_DATA");
           localStorage.clear();
           removeToken();

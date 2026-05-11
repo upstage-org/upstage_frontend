@@ -1,11 +1,7 @@
 <script lang="ts">
 import { ref, watch, computed, onMounted } from "vue";
-import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
-import { gql } from "@apollo/client/core";
-import { StudioGraph } from "models/studio";
 import { inquiryVar } from "apollo";
-import { getSharedAuth } from "utils/common";
 import { h } from "vue";
 import { Button, InputSearch, RangePicker, Space } from "ant-design-vue";
 import Header from "components/Header.vue";
@@ -26,8 +22,6 @@ export default {
     //     }
     //   }
     // `);
-
-    const sharedAuth = getSharedAuth();
 
     const name = ref("");
     const dates = ref<[Dayjs, Dayjs] | undefined>();
@@ -61,7 +55,7 @@ export default {
         ...vars,
       });
 
-    const watchInquiryVar = (vars: any) => {
+    const watchInquiryVar = (_vars: any) => {
       inquiryVar.onNextChange(watchInquiryVar);
     };
     inquiryVar.onNextChange(watchInquiryVar);

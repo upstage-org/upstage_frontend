@@ -1,52 +1,3 @@
-<template>
-  <div id="connection-status">
-    <ReloadStream />
-    <span
-      class="tag is-light is-small"
-      :class="{
-        'is-danger': status === 'LIVE',
-        'is-warning': status === 'CONNECTING',
-        'is-rehearsal': status === 'REHEARSAL',
-      }"
-    >
-      <template v-if="replaying">
-        <span class="icon">
-          <i ref="dot" class="fas fa-circle"></i>
-        </span>
-        <span class="status-text">{{ $t("replaying") }}</span>
-      </template>
-      <template v-else>
-        <span class="icon" v-show="masquerading || status !== 'OFFLINE'">
-          <i ref="dot" class="fas fa-circle"></i>
-        </span>
-        <span class="icon" v-show="status === 'OFFLINE'">
-          <i class="far fa-circle"></i>
-        </span>
-        <span class="status-text">{{ masquerading ? "REHEARSAL" : status }}</span>
-      </template>
-    </span>
-
-    <Popover>
-      <template #trigger>
-        <span class="tag is-dark is-small">
-          <span class="icon">
-            <i class="fas fa-user"></i>
-          </span>
-          <span>{{ players.length }}</span>
-          <span class="icon">
-            <i class="fas fa-desktop"></i>
-          </span>
-          <span>{{ audiences.length }}</span>
-        </span>
-      </template>
-      <div style="max-height: 50vh; overflow-y: auto">
-        <Session v-for="player in players" :key="player" :session="player" />
-        <Session v-for="audience in audiences" :key="audience" :session="audience" />
-      </div>
-    </Popover>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed, inject, onMounted, ref } from "vue";
 import { useStore } from "vuex";
@@ -79,6 +30,55 @@ onMounted(() => {
   }
 });
 </script>
+
+<template>
+  <div id="connection-status">
+    <ReloadStream />
+    <span
+      class="tag is-light is-small"
+      :class="{
+        'is-danger': status === 'LIVE',
+        'is-warning': status === 'CONNECTING',
+        'is-rehearsal': status === 'REHEARSAL',
+      }"
+    >
+      <template v-if="replaying">
+        <span class="icon">
+          <i ref="dot" class="fas fa-circle"></i>
+        </span>
+        <span class="status-text">{{ $t("replaying") }}</span>
+      </template>
+      <template v-else>
+        <span v-show="masquerading || status !== 'OFFLINE'" class="icon">
+          <i ref="dot" class="fas fa-circle"></i>
+        </span>
+        <span v-show="status === 'OFFLINE'" class="icon">
+          <i class="far fa-circle"></i>
+        </span>
+        <span class="status-text">{{ masquerading ? "REHEARSAL" : status }}</span>
+      </template>
+    </span>
+
+    <Popover>
+      <template #trigger>
+        <span class="tag is-dark is-small">
+          <span class="icon">
+            <i class="fas fa-user"></i>
+          </span>
+          <span>{{ players.length }}</span>
+          <span class="icon">
+            <i class="fas fa-desktop"></i>
+          </span>
+          <span>{{ audiences.length }}</span>
+        </span>
+      </template>
+      <div style="max-height: 50vh; overflow-y: auto">
+        <Session v-for="player in players" :key="player" :session="player" />
+        <Session v-for="audience in audiences" :key="audience" :session="audience" />
+      </div>
+    </Popover>
+  </div>
+</template>
 
 <style scoped lang="scss">
 #connection-status {
