@@ -4,14 +4,14 @@
  *   1. Drawing (drawn-on-stage, saved as a prop)
  *   2. Drawing saved as an avatar (toolbox + holdable avatar object)
  *   3. Opacity changes propagating over MQTT to a non-cast observer
- *   4. Depth (z-order via stage/bringToFrontOf) propagating to observers
+ *   4. Depth (z-order via `stage.bringToFrontOf`) propagating to observers
  *
  * Each test:
- *   • Drives the admin seat via `__UPSTAGE_STORE__` (the same dev hook
- *     perform.spec.ts uses; the underlying dispatches are exactly what the
+ *   • Drives the admin seat via `__UPSTAGE_PINIA__.stage` (the same dev hook
+ *     perform.spec.ts uses; the underlying calls are exactly what the
  *     SPA itself runs after a real toolbox click / pointer drag).
  *   • Asserts the cross-client contract on a separate, unauthenticated
- *     audience seat (state.board.objects + DOM where reasonable).
+ *     audience seat (board.objects + DOM where reasonable).
  *   • Cleans up its own placements so tests can run in any order or
  *     individually via `--grep`.
  *
@@ -284,15 +284,10 @@ async function openAudience(browser: Browser, runtime: RuntimeState): Promise<Au
 
   // Wait for MQTT joinStage to complete — same pattern perform.spec.ts uses.
   // Without this the audience can be subscribed *after* the admin's first
-  // dispatch lands on the broker and miss the message entirely.
-  await page.waitForFunction(
-    () => {
-      type DevStore = { state: { stage: { status: string } } };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      return store?.state?.stage?.status === "LIVE";
-    },
-    { timeout: 30_000 },
-  );
+  // call lands on the broker and miss the message entirely.
+  await page.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+    timeout: 30_000,
+  });
 
   // Dismiss the LoginPrompt modal so the board is interactable for headed
   // viewers. Best-effort; perform.spec.ts has the canonical implementation
@@ -352,24 +347,19 @@ async function placeProp({
         src?: string;
         assetType?: { name: string };
       };
-      type DevStore = {
-        dispatch: (t: string, p?: unknown) => Promise<unknown>;
-        state: {
-          stage: {
-            tools: { props: ToolboxProp[] };
-            board: { objects: Array<{ id: string }> };
-          };
-        };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        tools: { props: ToolboxProp[] };
+        board: { objects: Array<{ id: string }> };
+        placeObjectOnStage: (p: unknown) => { id: string };
+        shapeObject: (p: unknown) => unknown | Promise<unknown>;
       };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      if (!store) throw new Error("Vuex store not exposed.");
 
       const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
       let prop: ToolboxProp | undefined;
       // Toolbox seeds from GraphQL; on a fresh load the props array can be
       // briefly empty. Poll for ~10s rather than racing.
       for (let i = 0; i < 40; i += 1) {
-        const candidates = store.state.stage.tools.props ?? [];
+        const candidates = stage.tools.props ?? [];
         prop =
           candidates.find((p) => p.name === mediaName) ??
           candidates.find((p) => String(p.id) === String(mediaId));
@@ -377,28 +367,30 @@ async function placeProp({
         await sleep(250);
       }
       if (!prop) {
-        const ids = (store.state.stage.tools.props ?? []).map((p) => String(p.id)).join(",");
+        const ids = (stage.tools.props ?? []).map((p) => String(p.id)).join(",");
         throw new Error(`prop ${mediaName} (${mediaId}) not in toolbox; known ids: [${ids}]`);
       }
 
-      const placed = (await store.dispatch("stage/placeObjectOnStage", {
+      const placed = stage.placeObjectOnStage({
         ...prop,
         name: mediaName,
         x: to.x,
         y: to.y,
         ...(size ? { w: size.w, h: size.h } : {}),
-      })) as { id: string };
+      });
 
       // Mirror perform.spec.ts: a follow-up shapeObject(liveAction) is what
       // the SPA fires after a real drag-end so observers actually see
       // the placement land on their board.
-      const fromBoard = store.state.stage.board.objects.find((o) => o.id === placed.id);
+      const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
       if (!fromBoard) throw new Error("placeObjectOnStage did not push into board.objects");
-      await store.dispatch("stage/shapeObject", {
-        ...fromBoard,
-        liveAction: true,
-        published: false,
-      });
+      await Promise.resolve(
+        stage.shapeObject({
+          ...fromBoard,
+          liveAction: true,
+          published: false,
+        }),
+      );
       return placed.id;
     },
     { mediaId: ref.id, mediaName: ref.name, to, size: size ?? null },
@@ -409,8 +401,8 @@ async function placeProp({
  * Publish a locally-placed object so observers actually see it.
  *
  * `placeObjectOnStage` (and therefore `addDrawing`, which wraps it) only
- * mutates the placer's local Vuex — there is NO MQTT broadcast in that
- * action. The "go live" publish is a separate `shapeObject` dispatch with
+ * mutates the placer's local store — there is NO MQTT broadcast in that
+ * action. The "go live" publish is a separate `shapeObject` call with
  * `liveAction: true, published: false`, which is exactly what the SPA's
  * QuickAction "go live" button does (and what Moveable's drag-end fires
  * for already-live objects). `serializeWithoutLoading` in store/reusable.ts
@@ -419,25 +411,25 @@ async function placeProp({
  *
  * `placeProp()` above bakes this follow-up in. For drawings we have to
  * call this helper after `addDrawing` because Draw/index.vue's `save()`
- * (the production path) also dispatches just `addDrawing` — meaning a
+ * (the production path) also calls just `addDrawing` — meaning a
  * freshly-saved drawing is ALSO local-only until the admin clicks the
  * QuickAction toggle. That's by design; tests just have to mirror it.
  */
 async function publishObject(admin: AdminSeat, objectId: string): Promise<void> {
   await admin.page.evaluate(async (id) => {
-    type DevStore = {
-      dispatch: (t: string, p?: unknown) => Promise<unknown>;
-      state: { stage: { board: { objects: Array<{ id: string } & Record<string, unknown>> } } };
+    const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+      board: { objects: Array<{ id: string } & Record<string, unknown>> };
+      shapeObject: (p: unknown) => unknown | Promise<unknown>;
     };
-    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-    if (!store) throw new Error("Vuex store not exposed.");
-    const obj = store.state.stage.board.objects.find((o) => o.id === id);
+    const obj = stage.board.objects.find((o) => o.id === id);
     if (!obj) throw new Error(`publishObject: ${id} not found in admin board.objects`);
-    await store.dispatch("stage/shapeObject", {
-      ...obj,
-      liveAction: true,
-      published: false,
-    });
+    await Promise.resolve(
+      stage.shapeObject({
+        ...obj,
+        liveAction: true,
+        published: false,
+      }),
+    );
   }, objectId);
 }
 
@@ -449,14 +441,12 @@ async function addAndPublishDrawing(
   admin: AdminSeat,
   payload: Record<string, unknown> & { drawingId: string },
 ): Promise<string> {
-  await admin.live.dispatchAction("stage/addDrawing", payload);
+  await admin.live.callStageAction("addDrawing", payload);
   const placedId = await admin.page.evaluate((drawingId) => {
-    type DevStore = {
-      state: { stage: { board: { objects: Array<{ id: string; drawingId?: string }> } } };
+    const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+      board: { objects: Array<{ id: string; drawingId?: string }> };
     };
-    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-    if (!store) throw new Error("Vuex store not exposed.");
-    const placed = store.state.stage.board.objects.find((o) => o.drawingId === drawingId);
+    const placed = stage.board.objects.find((o) => o.drawingId === drawingId);
     if (!placed) throw new Error(`addDrawing: no board object with drawingId=${drawingId}`);
     return placed.id;
   }, payload.drawingId);
@@ -466,25 +456,23 @@ async function addAndPublishDrawing(
 
 async function deleteObjectAdmin(admin: AdminSeat, objectId: string): Promise<void> {
   await admin.page.evaluate(async (id) => {
-    type DevStore = {
-      dispatch: (t: string, p?: unknown) => Promise<unknown>;
-      state: { stage: { board: { objects: Array<{ id: string }> } } };
+    const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+      board: { objects: Array<{ id: string }> };
+      deleteObject: (p: unknown) => unknown | Promise<unknown>;
     };
-    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-    if (!store) return;
-    const obj = store.state.stage.board.objects.find((o) => o.id === id);
+    const obj = stage.board.objects.find((o) => o.id === id);
     if (obj) {
-      await store.dispatch("stage/deleteObject", obj);
+      await Promise.resolve(stage.deleteObject(obj));
     }
   }, objectId);
 }
 
 async function popDrawingAdmin(admin: AdminSeat, drawingId: string): Promise<void> {
   await admin.page.evaluate((id) => {
-    type DevStore = { commit: (t: string, p?: unknown) => void };
-    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-    if (!store) return;
-    store.commit("stage/POP_DRAWING", id);
+    const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+      POP_DRAWING: (p: unknown) => void;
+    };
+    stage.POP_DRAWING(id);
   }, drawingId);
 }
 
@@ -502,19 +490,17 @@ async function popDrawingAdmin(admin: AdminSeat, drawingId: string): Promise<voi
 async function cleanBoard(admin: AdminSeat, audience: AudienceSeat): Promise<void> {
   const beforeIds = await admin.page.evaluate(async () => {
     type Obj = { id: string; drawingId?: string };
-    type DevStore = {
-      dispatch: (t: string, p?: unknown) => Promise<unknown>;
-      commit: (t: string, p?: unknown) => void;
-      state: { stage: { board: { objects: Obj[]; drawings: Array<{ drawingId: string }> } } };
+    const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+      board: { objects: Obj[]; drawings: Array<{ drawingId: string }> };
+      deleteObject: (p: unknown) => unknown | Promise<unknown>;
+      POP_DRAWING: (p: unknown) => void;
     };
-    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-    if (!store) throw new Error("Vuex store not exposed.");
-    const objects = [...store.state.stage.board.objects];
+    const objects = [...stage.board.objects];
     for (const obj of objects) {
-      await store.dispatch("stage/deleteObject", obj);
+      await Promise.resolve(stage.deleteObject(obj));
     }
-    for (const d of [...store.state.stage.board.drawings]) {
-      store.commit("stage/POP_DRAWING", d.drawingId);
+    for (const d of [...stage.board.drawings]) {
+      stage.POP_DRAWING(d.drawingId);
     }
     return objects.map((o) => o.id);
   });
@@ -708,13 +694,10 @@ test.describe("features: drawing + opacity + depth @features", () => {
     expect(placed.id).toBe(placedId);
 
     // Admin should now hold this avatar. After Phase 5 the avatarId lives
-    // in Pinia, exposed via __UPSTAGE_PINIA__ rather than the (Vuex-only)
-    // __UPSTAGE_STORE__.state.user path.
-    const heldId = await admin.page.evaluate(() => {
-      type Pinia = { user: { avatarId: string | null } };
-      const pinia = (window as unknown as { __UPSTAGE_PINIA__?: Pinia }).__UPSTAGE_PINIA__;
-      return pinia?.user?.avatarId ?? null;
-    });
+    // in Pinia, exposed via `__UPSTAGE_PINIA__.user`.
+    const heldId = await admin.page.evaluate(
+      () => (window.__UPSTAGE_PINIA__!.user.avatarId as string | number | null) ?? null,
+    );
     expect(heldId).toBe(placed.id);
 
     await settle(audience.page);
@@ -733,9 +716,9 @@ test.describe("features: drawing + opacity + depth @features", () => {
   });
 
   // ---------------------------------------------------------------------
-  // 3. Opacity — the OpacitySlider component dispatches `stage/shapeObject`
+  // 3. Opacity — the OpacitySlider component calls `stage.shapeObject`
   //    with a new opacity. Verify that change reaches the audience seat
-  //    in both Vuex state AND the rendered DOM (Object.vue binds opacity
+  //    in both store state AND the rendered DOM (Object.vue binds opacity
   //    via :style="{ opacity: object.opacity }").
   // ---------------------------------------------------------------------
   test("opacity change on a placed prop propagates to observers", async () => {
@@ -776,15 +759,13 @@ test.describe("features: drawing + opacity + depth @features", () => {
     // shapeObject action's non-liveAction branch broadcasts an UPDATE
     // BOARD message that audience receives via handleBoardMessage.
     await admin.page.evaluate(async (id) => {
-      type DevStore = {
-        dispatch: (t: string, p?: unknown) => Promise<unknown>;
-        state: { stage: { board: { objects: Array<{ id: string } & Record<string, unknown>> } } };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        board: { objects: Array<{ id: string } & Record<string, unknown>> };
+        shapeObject: (p: unknown) => unknown | Promise<unknown>;
       };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      if (!store) throw new Error("Vuex store not exposed.");
-      const obj = store.state.stage.board.objects.find((o) => o.id === id);
+      const obj = stage.board.objects.find((o) => o.id === id);
       if (!obj) throw new Error(`admin lost track of object ${id} before opacity dispatch`);
-      await store.dispatch("stage/shapeObject", { ...obj, opacity: 0.3 });
+      await Promise.resolve(stage.shapeObject({ ...obj, opacity: 0.3 }));
     }, placedId);
 
     const settled = await pollUntil<BoardObject[]>(
@@ -909,7 +890,7 @@ test.describe("features: drawing + opacity + depth @features", () => {
     await settle(audience.page);
 
     // Dispatch the same action Skeleton.vue's drop handler fires.
-    await admin.live.dispatchAction("stage/bringToFrontOf", { front: id1, back: id3 });
+    await admin.live.callStageAction("bringToFrontOf", { front: id1, back: id3 });
 
     // Trace BRING_TO_FRONT_OF on [id1, id2, id3] with front=id1, back=id3:
     //   1. splice(0, 1) removes id1 → state becomes [id2, id3] (length 2)

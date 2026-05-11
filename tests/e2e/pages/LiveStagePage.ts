@@ -10,8 +10,9 @@ export type ChatMode = "speak" | "shout" | "think" | "audience";
  *
  * `Preloader.vue` covers the app with a full-height `section.hero` until the
  * user clicks — see `v-if` on the transition and the @click on that section
- * (even when `store.getters['stage/ready']` is already true). We must dismiss
- * that layer before the board is interactable/visible in Playwright.
+ * (even when the Pinia stage store's `ready` getter is already true). We
+ * must dismiss that layer before the board is interactable/visible in
+ * Playwright.
  */
 export class LiveStagePage {
   constructor(private readonly page: Page) {}
@@ -93,9 +94,10 @@ export class LiveStagePage {
    * inside Moveable's slot, so it has a real bounding box and is visible to
    * Playwright. This pointer-drag path is therefore usable, but for perform
    * `move` beats we still prefer `moveAvatar()` in `perform.spec.ts`
-   * (dispatches `stage/shapeObject` directly via the dev store hook), which is
-   * what the SPA itself does after a real drag finishes — no fragile pointer
-   * timing, and it works even when the board is not in the viewport.
+   * (calls `stage.shapeObject(...)` directly via the Pinia dev hook), which
+   * is what the SPA itself does after a real drag finishes — no fragile
+   * pointer timing, and it works even when the board is not in the
+   * viewport.
    */
   async moveObjectByName(objectName: string, to: { x: number; y: number }): Promise<void> {
     const target = this.objectByName(objectName);
@@ -141,8 +143,9 @@ export class LiveStagePage {
    * conditionally rendered while `object.speak` is set.
    *
    * This is the canonical assertion for **player speech** (in-world
-   * bubble + TTS, dispatched via `stage/speakAsAvatar` → `TOPICS.BOARD/SPEAK`,
-   * intentionally not in the chat log). The bubble is ephemeral: Topping's
+   * bubble + TTS, dispatched via `stage.speakAsAvatar` →
+   * `TOPICS.BOARD/SPEAK`, intentionally not in the chat log). The bubble
+   * is ephemeral: Topping's
    * `BUBBLE_TIMEOUT` is 5s and `SET_OBJECT_SPEAK` clears `object.speak` after
    * 1s + 1s/word — assert promptly after the dispatch.
    */
@@ -166,32 +169,29 @@ export class LiveStagePage {
   }
 
   // ---------------------------------------------------------------------
-  // Vuex dev-hook helpers
+  // Pinia stage-store dev-hook helpers
   // ---------------------------------------------------------------------
-  // Builds (`pnpm dev` and `vite build` with VITE_E2E=1) expose the live
-  // Vuex store under `window.__UPSTAGE_STORE__` (see src/main.ts). These
-  // helpers wrap the boilerplate so individual specs don't have to repeat
-  // the cast + null-check + dispatch dance for every action.
+  // Builds (`pnpm dev` and `vite build` with VITE_E2E=1) expose every
+  // Pinia store under `window.__UPSTAGE_PINIA__` (see src/main.ts). These
+  // helpers wrap the boilerplate so individual specs don't repeat the
+  // cast + property-read dance for every cross-client assertion. The hook
+  // is guaranteed to exist in dev/e2e builds (the user-supplied invariant
+  // for Wave F), so no null-guards.
 
   /**
    * Read a slice of stage state on the page. Useful for cross-client
    * assertions where the spec needs to wait for an MQTT-delivered mutation
-   * to land in the audience's local Vuex (see e.g. `pollUntilStateMatches`
-   * in features.spec.ts).
-   *
-   * Returns `null` if the dev hook isn't installed (production build
-   * without VITE_E2E) so callers can emit a clearer error than
-   * "evaluate failed".
+   * to land in the audience's local Pinia store (see e.g.
+   * `pollUntilStateMatches` in features.spec.ts).
    */
   async getStageState<T = unknown>(selectorPath: string): Promise<T | null> {
     return this.page.evaluate((path: string): T | null => {
-      type DevStore = { state: { stage: Record<string, unknown> } };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      if (!store) return null;
-      // Walk dot-path against state.stage. Returning `null` for any missing
-      // segment keeps callers from having to special-case partial paths.
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as Record<string, unknown>;
+      // Walk dot-path against the stage store proxy. Returning `null` for
+      // any missing segment keeps callers from having to special-case
+      // partial paths.
       const segments = path.split(".").filter(Boolean);
-      let cursor: unknown = store.state.stage;
+      let cursor: unknown = stage;
       for (const seg of segments) {
         if (cursor == null || typeof cursor !== "object") return null;
         cursor = (cursor as Record<string, unknown>)[seg];
@@ -201,43 +201,34 @@ export class LiveStagePage {
   }
 
   /**
-   * Dispatch a Vuex action on the page. Awaits the action's resolved value
-   * (so callers chaining on async actions like `placeObjectOnStage` can
-   * read back the new object id).
+   * Call a stage-store action on the page by name (e.g. `"addDrawing"`,
+   * `"bringToFrontOf"`). Awaits the return value, so callers chaining on
+   * actions that resolve to a useful value still see it. Async actions
+   * stay awaited; sync actions (the majority — Pinia actions are plain
+   * functions) resolve immediately via `Promise.resolve`.
    *
-   * Throws via the dev hook if the store isn't exposed — that's a
-   * configuration regression and we want it loud.
+   * For state reads use `getStageState` above; for mutations call the
+   * underlying setter action — the legacy Vuex `commit("stage/X", ...)`
+   * shape has no Pinia equivalent because mutations are just store
+   * methods.
    */
-  async dispatchAction<TPayload = unknown, TResult = unknown>(
-    type: string,
+  async callStageAction<TPayload = unknown, TResult = unknown>(
+    name: string,
     payload?: TPayload,
   ): Promise<TResult> {
     return this.page.evaluate(
-      async ({ actionType, actionPayload }: { actionType: string; actionPayload: unknown }) => {
-        type DevStore = { dispatch: (t: string, p?: unknown) => Promise<unknown> };
-        const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-        if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__ missing).");
-        return (await store.dispatch(actionType, actionPayload)) as unknown;
+      async ({ actionName, actionPayload }: { actionName: string; actionPayload: unknown }) => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as Record<
+          string,
+          (p?: unknown) => unknown
+        >;
+        const fn = stage[actionName];
+        if (typeof fn !== "function") {
+          throw new Error(`Pinia stage store has no method "${actionName}".`);
+        }
+        return (await Promise.resolve(fn.call(stage, actionPayload))) as unknown;
       },
-      { actionType: type, actionPayload: payload ?? null },
+      { actionName: name, actionPayload: payload ?? null },
     ) as Promise<TResult>;
-  }
-
-  /**
-   * Commit a Vuex mutation on the page. Used for the rare cases where a
-   * spec needs to bypass an action wrapper (e.g. `SET_REPLAY` for replay
-   * speed). Prefer `dispatchAction` whenever an action is available, since
-   * actions handle MQTT broadcasts.
-   */
-  async commitMutation<TPayload = unknown>(type: string, payload?: TPayload): Promise<void> {
-    await this.page.evaluate(
-      ({ mutationType, mutationPayload }: { mutationType: string; mutationPayload: unknown }) => {
-        type DevStore = { commit: (t: string, p?: unknown) => void };
-        const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-        if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__ missing).");
-        store.commit(mutationType, mutationPayload);
-      },
-      { mutationType: type, mutationPayload: payload ?? null },
-    );
   }
 }

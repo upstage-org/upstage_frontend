@@ -602,11 +602,12 @@ async function setStageStatus(
  * throws — that's intentional and matches real audience UX.
  *
  * Two non-obvious things:
- * 1. `joinStage` is dispatched AUTOMATICALLY on the `mqtt.client.connect`
- *    event (see stage/index.ts `connect` action). So the audience is
- *    subscribed to the stage's MQTT topics as soon as `state.status` flips
- *    to "LIVE", *without* the human ever clicking the modal. Functionally
- *    we don't need to call `saveNickname` from the test.
+ * 1. `joinStage` is called AUTOMATICALLY on the `mqtt.client.connect`
+ *    event (see `src/store/pinia/stage.ts` `connect` action). So the
+ *    audience is subscribed to the stage's MQTT topics as soon as
+ *    `stage.status` flips to "LIVE", *without* the human ever clicking
+ *    the modal. Functionally we don't need to call `saveNickname` from
+ *    the test.
  * 2. BUT the LoginPrompt modal's `.modal-background` is an opaque overlay
  *    (rgba(10,10,10,0.86)) covering the board. If we don't dismiss it,
  *    the human watching headed Chromium sees nothing happen on the
@@ -633,22 +634,17 @@ async function openAudienceSeat({
   await live.goto(runtime.stageSlug);
 
   console.log("[perform] audience: waiting for MQTT status=LIVE…");
-  await page.waitForFunction(
-    () => {
-      const store = (
-        window as unknown as { __UPSTAGE_STORE__?: { state: { stage: { status: string } } } }
-      ).__UPSTAGE_STORE__;
-      return store?.state?.stage?.status === "LIVE";
-    },
-    { timeout: 30_000 },
-  );
+  await page.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+    timeout: 30_000,
+  });
   console.log("[perform] audience: MQTT LIVE ✓ (joinStage fired automatically)");
 
   // Wait for the LoginPrompt to actually mount and become active. It lives
   // inside `<template v-if="ready">` in Layout.vue, so it appears the same
-  // tick `stage/ready` flips. We narrow to `.modal.is-active` so the
-  // selector unambiguously points at LoginPrompt (the only `.modal` that's
-  // is-active for an unauthenticated, just-arrived visitor).
+  // tick the Pinia stage store's `ready` getter flips. We narrow to
+  // `.modal.is-active` so the selector unambiguously points at LoginPrompt
+  // (the only `.modal` that's is-active for an unauthenticated, just-
+  // arrived visitor).
   const loginModal = page.locator(".modal.is-active").first();
   try {
     await loginModal.waitFor({ state: "visible", timeout: 15_000 });
@@ -741,7 +737,7 @@ async function reloadCastSeats({
 
 /**
  * Navigate the audience seat to the SPA's actual replay route
- * (`/replay/:url/:id`), pin speed to 1x, dispatch `stage/replayRecording`,
+ * (`/replay/:url/:id`), pin speed to 1x, call `stage.replayRecording`,
  * and wait for it to self-pause when the recording reaches its end.
  *
  * The caller supplies `performanceId`. Two callsites today:
@@ -788,8 +784,8 @@ async function runReplay({
   );
 
   // Navigate the audience context to the proper replay URL. The SPA route
-  // `/replay/:url/:id` mounts views/replay/Layout.vue which auto-dispatches
-  // `stage/loadStage({url, recordId})` on setup.
+  // `/replay/:url/:id` mounts views/replay/Layout.vue which auto-calls
+  // `stage.loadStage({url, recordId})` on setup.
   await audience.page.goto(`/replay/${stageSlug}/${performanceId}`);
   await audience.page.waitForLoadState("domcontentloaded");
 
@@ -808,49 +804,40 @@ async function runReplay({
     .first()
     .waitFor({ state: "visible", timeout: 30_000 });
 
-  // Wait until loadStage has finished filling state.replay.timestamp from
+  // Wait until loadStage has finished filling stage.replay.timestamp from
   // the recording's events (the dev hook is exposed by main.ts under
   // VITE_E2E, same as on the live route).
   await audience.page.waitForFunction(
     () => {
-      type DevStore = {
-        state: {
-          stage: {
-            replay: { timestamp: { begin: number; end: number } };
-            model: { events?: unknown[] };
-          };
-        };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        replay: { timestamp: { begin: number; end: number } };
+        model: { events?: unknown[] } | null;
       };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      const ts = store?.state?.stage?.replay?.timestamp;
-      const events = store?.state?.stage?.model?.events;
+      const ts = stage.replay?.timestamp;
+      const events = stage.model?.events;
       return Boolean(ts && Number(ts.end) > Number(ts.begin) && events && events.length > 0);
     },
     { timeout: 30_000 },
   );
 
   // Pin speed=1 and snapshot the begin/end window so the wait loop has a
-  // sane wall-clock bound. SET_REPLAY merges into state.replay and
-  // replayRecording reads `state.replay.speed` at the top of the action.
+  // sane wall-clock bound. SET_REPLAY (now a Pinia method) merges into
+  // stage.replay; replayRecording reads `stage.replay.speed` at the top of
+  // the action.
   const { durationMs, eventCount } = await audience.page.evaluate(() => {
-    type ReplayState = {
-      timestamp: { begin: number; end: number };
-      speed: number;
+    const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+      replay: { timestamp: { begin: number; end: number }; speed: number };
+      model: { events?: unknown[] } | null;
+      SET_REPLAY: (p: { speed: number }) => void;
     };
-    type DevStore = {
-      commit: (type: string, payload?: unknown) => void;
-      state: { stage: { replay: ReplayState; model: { events?: unknown[] } } };
-    };
-    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-    if (!store) throw new Error("Vuex store not exposed.");
-    store.commit("stage/SET_REPLAY", { speed: 1 });
-    const ts = store.state.stage.replay.timestamp;
+    stage.SET_REPLAY({ speed: 1 });
+    const ts = stage.replay.timestamp;
     // mqttTimestamp is POSIX seconds (event_archive subscriber writes
     // time.time()), so wall-clock duration at speed=1 is (end-begin)*1000.
     const seconds = Math.max(0, Number(ts.end) - Number(ts.begin));
     return {
       durationMs: Math.round(seconds * 1000),
-      eventCount: store.state.stage.model.events?.length ?? 0,
+      eventCount: stage.model?.events?.length ?? 0,
     };
   });
   console.log(
@@ -859,12 +846,10 @@ async function runReplay({
   );
 
   await audience.page.evaluate(async () => {
-    type DevStore = {
-      dispatch: (type: string, payload?: unknown) => Promise<unknown>;
+    const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+      replayRecording: () => unknown | Promise<unknown>;
     };
-    const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-    if (!store) throw new Error("Vuex store not exposed.");
-    await store.dispatch("stage/replayRecording");
+    await Promise.resolve(stage.replayRecording());
   });
 
   await audience.page.screenshot({
@@ -880,9 +865,10 @@ async function runReplay({
   const timeoutMs = durationMs + tailMs;
   await audience.page.waitForFunction(
     () => {
-      type DevStore = { state: { stage: { replay: { isReplaying: boolean } } } };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      return store?.state?.stage?.replay?.isReplaying === false;
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        replay: { isReplaying: boolean };
+      };
+      return stage.replay.isReplaying === false;
     },
     { timeout: timeoutMs, polling: 500 },
   );
@@ -929,7 +915,7 @@ async function runBeat({
     //      AND it isn't broadcast over MQTT, so the event_archive worker
     //      never sees it and the recording can't replay it.
     //
-    //   2. MQTT `stage/setBackground` — broadcasts a CHANGE_BACKGROUND
+    //   2. MQTT `stage.setBackground` — broadcasts a CHANGE_BACKGROUND
     //      event over TOPICS.BACKGROUND. Every connected client commits
     //      `SET_BACKGROUND`, which sets `state.background`, which is what
     //      `Backdrop.vue` actually renders. The event is also captured by
@@ -1007,7 +993,7 @@ async function runBeat({
     );
 
     // 2. Broadcast over MQTT from the admin's seat. We pull the backdrop
-    //    object straight out of `state.stage.tools.backdrops` because that
+    //    object straight out of `stage.tools.backdrops` because that
     //    is exactly what the real toolbox UI passes to setBackground —
     //    same `id`, `src` (already absolutized by SET_MODEL), and any
     //    multi-frame metadata. SET_BACKGROUND does change-detection on
@@ -1016,12 +1002,11 @@ async function runBeat({
     await adminLive["page"].evaluate(
       async ({ mediaId }) => {
         type Backdrop = Record<string, unknown> & { id: string | number };
-        type DevStore = {
-          dispatch: (type: string, payload?: unknown) => Promise<unknown>;
-          state: { stage: { tools: { backdrops?: Backdrop[] }; status: string } };
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          tools: { backdrops?: Backdrop[] };
+          status: string;
+          setBackground: (b: Backdrop) => unknown | Promise<unknown>;
         };
-        const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-        if (!store) throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
 
         const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -1029,13 +1014,13 @@ async function runBeat({
         // freshly reloaded admin page it may not be there yet. Poll briefly.
         let backdrop: Backdrop | undefined;
         for (let attempt = 0; attempt < 60; attempt += 1) {
-          const list = store.state.stage.tools.backdrops ?? [];
+          const list = stage.tools.backdrops ?? [];
           backdrop = list.find((b) => String(b.id) === String(mediaId));
           if (backdrop) break;
           await sleep(250);
         }
         if (!backdrop) {
-          const ids = (store.state.stage.tools.backdrops ?? []).map((b) => String(b.id)).join(", ");
+          const ids = (stage.tools.backdrops ?? []).map((b) => String(b.id)).join(", ");
           throw new Error(
             `setBackground: backdrop ${mediaId} not in admin tools.backdrops; available: [${ids}]`,
           );
@@ -1045,12 +1030,10 @@ async function runBeat({
         // so we don't need to set it. MQTT must be LIVE on the admin page
         // (it always is — admin has been on the stage since the start), but
         // assert just in case so a regression here surfaces clearly.
-        if (store.state.stage.status !== "LIVE") {
-          throw new Error(
-            `setBackground: admin MQTT status=${store.state.stage.status}, expected LIVE`,
-          );
+        if (stage.status !== "LIVE") {
+          throw new Error(`setBackground: admin MQTT status=${stage.status}, expected LIVE`);
         }
-        await store.dispatch("stage/setBackground", backdrop);
+        await Promise.resolve(stage.setBackground(backdrop));
       },
       { mediaId: ref.id },
     );
@@ -1064,8 +1047,9 @@ async function runBeat({
   }
 
   if (beat.kind === "enter") {
-    // Avatars are placed from the toolbox via drag/drop; we shortcut through Vuex
-    // (same as Board.vue) plus shapeObject(liveAction) so MQTT reaches observers.
+    // Avatars are placed from the toolbox via drag/drop; we shortcut through
+    // the Pinia stage store (same as Board.vue) plus shapeObject(liveAction)
+    // so MQTT reaches observers.
     const mediaRef = runtime.mediaByPersona[beat.speaker];
     if (!mediaRef) throw new Error(`${tag}: no avatar media for ${beat.speaker}`);
     await placeAvatar({
@@ -1096,7 +1080,7 @@ async function runBeat({
   if (beat.kind === "move") {
     const mediaRef = runtime.mediaByPersona[beat.speaker];
     if (!mediaRef) return;
-    // We dispatch `stage/shapeObject` directly rather than driving a pointer
+    // We call `stage.shapeObject` directly rather than driving a pointer
     // drag through the DOM. With liveAction: true on an already-published
     // object this emits BOARD_ACTIONS.MOVE_TO over MQTT for every observer —
     // exactly what a real drag does on dragEnd. Avoids the fragility of
@@ -1113,7 +1097,7 @@ async function runBeat({
     if (!beat.line) throw new Error(`${tag}: missing line`);
     // Players speak in-world: their line is the avatar's voice (TTS via
     // meSpeak) and a transient bubble over the avatar (Topping.vue), and is
-    // *not* an OOC chat-panel message. We dispatch `stage/speakAsAvatar`
+    // *not* an OOC chat-panel message. We call `stage.speakAsAvatar`
     // (TOPICS.BOARD/SPEAK only — no TOPICS.CHAT) instead of typing into the
     // chat input.
     await speakAsAvatar({ seat, message: beat.line, behavior: beat.kind });
@@ -1122,7 +1106,7 @@ async function runBeat({
     if (mediaRef) {
       // The bubble showing on the *viewer* is proof that SPEAK round-tripped
       // to a non-speaker client. SET_OBJECT_SPEAK then calls avatarSpeak() on
-      // every observer (gated by `state.status === "LIVE"`, which is the
+      // every observer (gated by `stage.status === "LIVE"`, which is the
       // MQTT lifecycle state — green by the time MQTT delivered this event),
       // so a visible bubble is the same code-path proof that meSpeak fired.
       // In pass 2 the viewer is the audience, which is the case the human
@@ -1148,13 +1132,13 @@ async function runBeat({
 }
 
 // ---------------------------------------------------------------------------
-// SEAT-LEVEL VUEX HELPERS (speak / place / move)
+// SEAT-LEVEL PINIA HELPERS (speak / place / move)
 // ---------------------------------------------------------------------------
 
 /**
  * Drive in-world avatar speech (bubble + meSpeak TTS) from the speaker's seat
- * by dispatching `stage/speakAsAvatar` directly via the dev-store hook. This
- * intentionally skips the chat input / `stage/sendChat` path so the line does
+ * by calling `stage.speakAsAvatar` directly via the Pinia dev hook. This
+ * intentionally skips the chat input / `stage.sendChat` path so the line does
  * NOT appear in the public chat log — matching how player speech behaves in
  * the real app (in-world performance, not OOC chat).
  *
@@ -1174,27 +1158,22 @@ async function speakAsAvatar({
 }): Promise<void> {
   await seat.page.evaluate(
     async ({ message, behavior }) => {
-      type DevStore = {
-        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
-        getters: Record<string, unknown>;
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        currentAvatar: unknown;
+        canPlay: boolean;
+        speakAsAvatar: (p: { message: string; behavior: string }) => unknown | Promise<unknown>;
       };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      if (!store) {
-        throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
-      }
-      const avatar = store.getters["stage/currentAvatar"];
-      if (!avatar) {
+      if (!stage.currentAvatar) {
         throw new Error(
           "speakAsAvatar: no currentAvatar held — the speaker hasn't entered or `enter` did not publish.",
         );
       }
-      const canPlay = store.getters["stage/canPlay"];
-      if (!canPlay) {
+      if (!stage.canPlay) {
         throw new Error(
           "speakAsAvatar: canPlay=false on this seat — backend permission resolution did not grant `player`.",
         );
       }
-      await store.dispatch("stage/speakAsAvatar", { message, behavior });
+      await Promise.resolve(stage.speakAsAvatar({ message, behavior }));
     },
     { message, behavior },
   );
@@ -1216,38 +1195,30 @@ async function placeAvatar({
   await seat.page.evaluate(
     async ({ mediaId, mediaName, to, voice }) => {
       type ToolboxAvatar = Record<string, unknown> & { id: unknown };
-      type StageSlice = {
+      type BoardObject = Record<string, unknown> & { id: string };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
         status: string;
         tools: { avatars?: ToolboxAvatar[] };
-        board: { objects: Array<Record<string, unknown> & { id: string }> };
+        board: { objects: BoardObject[] };
+        placeObjectOnStage: (p: unknown) => { id: string };
+        shapeObject: (p: unknown) => unknown | Promise<unknown>;
       };
-      type DevStore = {
-        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
-        state: { stage: StageSlice };
-      };
-
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      if (!store) {
-        throw new Error(
-          "Vuex store not exposed (__UPSTAGE_STORE__). Serve the SPA with `pnpm dev` for perform E2E.",
-        );
-      }
 
       const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
       for (let attempt = 0; attempt < 120; attempt += 1) {
-        if (store.state.stage.status === "LIVE") break;
+        if (stage.status === "LIVE") break;
         await sleep(250);
       }
-      if (store.state.stage.status !== "LIVE") {
+      if (stage.status !== "LIVE") {
         throw new Error(
-          `stage MQTT not LIVE yet (status=${store.state.stage.status}); cannot broadcast avatar placement.`,
+          `stage MQTT not LIVE yet (status=${stage.status}); cannot broadcast avatar placement.`,
         );
       }
 
       let avatar: ToolboxAvatar | undefined;
       for (let attempt = 0; attempt < 40; attempt += 1) {
-        const avatars = store.state.stage.tools.avatars ?? [];
+        const avatars = stage.tools.avatars ?? [];
         avatar =
           avatars.find((a) => a.name === mediaName) ??
           avatars.find((a) => String(a.id) === String(mediaId));
@@ -1255,7 +1226,7 @@ async function placeAvatar({
         await sleep(250);
       }
       if (!avatar) {
-        const avatars = store.state.stage.tools.avatars ?? [];
+        const avatars = stage.tools.avatars ?? [];
         const ids = avatars.map((a) => String(a.id)).join(", ");
         throw new Error(
           `avatar not in toolbox (name=${mediaName}, id=${mediaId}); known ids: [${ids}]`,
@@ -1266,28 +1237,31 @@ async function placeAvatar({
       // our payload, so anything set here wins. We always include the persona's
       // meSpeak voice (when provided) as `object.voice` so:
       //   1. The placed object's MQTT broadcast carries the voice → every
-      //      observer's local `state.board.objects[i].voice` is set →
+      //      observer's local `stage.board.objects[i].voice` is set →
       //      `SET_OBJECT_SPEAK` → `avatarSpeak(model, …)` actually fires
       //      meSpeak instead of short-circuiting on `!avatar.voice.voice`.
       //   2. The speaker also hears their own voice locally.
-      const placed = (await store.dispatch("stage/placeObjectOnStage", {
+      // Pinia's placeObjectOnStage is synchronous and returns the new object.
+      const placed = stage.placeObjectOnStage({
         ...avatar,
         ...(voice ? { voice } : {}),
         name: mediaName,
         x: to.x,
         y: to.y,
-      })) as { id: string };
+      });
 
-      const fromBoard = store.state.stage.board.objects.find((o) => o.id === placed.id);
+      const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
       if (!fromBoard) {
         throw new Error("placeObjectOnStage did not add object to board.objects");
       }
 
-      await store.dispatch("stage/shapeObject", {
-        ...fromBoard,
-        liveAction: true,
-        published: false,
-      });
+      await Promise.resolve(
+        stage.shapeObject({
+          ...fromBoard,
+          liveAction: true,
+          published: false,
+        }),
+      );
     },
     { mediaId, mediaName, to, voice },
   );
@@ -1304,31 +1278,24 @@ async function moveAvatar({
 }): Promise<void> {
   await seat.page.evaluate(
     async ({ mediaName, to }) => {
-      type StageSlice = {
-        board: {
-          objects: Array<
-            Record<string, unknown> & { id: string; name?: string; published?: boolean }
-          >;
-        };
+      type BoardObject = Record<string, unknown> & {
+        id: string;
+        name?: string;
+        published?: boolean;
       };
-      type DevStore = {
-        dispatch: (type: string, payload?: unknown) => Promise<unknown>;
-        state: { stage: StageSlice };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        board: { objects: BoardObject[] };
+        shapeObject: (p: unknown) => unknown | Promise<unknown>;
       };
-
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      if (!store) {
-        throw new Error("Vuex store not exposed (__UPSTAGE_STORE__).");
-      }
 
       const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
       // Object placement is async (MQTT round-trip via shapeObject in placeAvatar);
       // a follow-up move beat may run before the seat's local board state has
       // settled. Poll briefly so we don't race the placement.
-      let target: (Record<string, unknown> & { id: string; published?: boolean }) | undefined;
+      let target: BoardObject | undefined;
       for (let attempt = 0; attempt < 40; attempt += 1) {
-        target = store.state.stage.board.objects.find((o) => o.name === mediaName);
+        target = stage.board.objects.find((o) => o.name === mediaName);
         if (target) break;
         await sleep(150);
       }
@@ -1339,13 +1306,15 @@ async function moveAvatar({
       // shapeObject with liveAction: true emits BOARD_ACTIONS.MOVE_TO when the
       // object is already published (placeAvatar publishes on enter), or
       // PLACE_OBJECT_ON_STAGE if not — either way observers see the new x/y.
-      await store.dispatch("stage/shapeObject", {
-        ...target,
-        x: to.x,
-        y: to.y,
-        liveAction: true,
-        published: target.published ?? true,
-      });
+      await Promise.resolve(
+        stage.shapeObject({
+          ...target,
+          x: to.x,
+          y: to.y,
+          liveAction: true,
+          published: target.published ?? true,
+        }),
+      );
     },
     { mediaName, to },
   );
