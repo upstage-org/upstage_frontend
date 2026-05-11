@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from "vue";
-import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { useTitle } from "@vueuse/core";
 import { useStageViewport } from "store/modules/stage/reactiveViewport";
+import { useUserStore } from "@stores/pinia/user";
+import { useConfigStore } from "@stores/pinia/config";
 import "styles/bulma.css";
 import "styles/bulma_slider.css";
 import "styles/custom.less";
 
-// Store initialization
-const store = useStore();
-store.dispatch("user/fetchCurrent");
-store.dispatch("config/fetchConfig");
+useUserStore().fetchCurrent();
+useConfigStore().fetchConfig();
 const route = useRoute();
 useStageViewport();
 

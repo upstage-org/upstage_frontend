@@ -4,6 +4,7 @@ import AppObject from "../Object.vue";
 import Loading from "components/Loading.vue";
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
 import { useJitsiDomain } from "./composable";
 
 export default {
@@ -11,6 +12,7 @@ export default {
   props: { object: Object },
   setup: (props) => {
     const store = useStore();
+    const userStore = useUserStore();
     const room = ref();
     const meeting = computed(() => props.object);
 
@@ -23,8 +25,8 @@ export default {
         height: "100%",
         parentNode: room.value,
         userInfo: {
-          email: store.state.user.user?.email,
-          displayName: store.getters["user/chatname"],
+          email: userStore.user?.email,
+          displayName: userStore.chatname,
         },
         configOverwrite: {
           prejoinPageEnabled: false,

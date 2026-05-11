@@ -1,9 +1,12 @@
 import { defineStore } from "pinia";
 import { computed, reactive, ref } from "vue";
+import { stageGraph } from "@services/graphql";
+import { useRequest } from "@services/graphql/composable";
 
 interface StageNode {
   id: string | number;
   visibility?: boolean;
+  attributes?: Array<{ name: string; description: unknown }>;
   [key: string]: unknown;
 }
 
@@ -42,6 +45,31 @@ export const useCacheStore = defineStore("cache", () => {
     if (stage) stage.visibility = visibility;
   };
 
+  /**
+   * Fetch the stage list from GraphQL and cache it. Mirrors the Vuex
+   * `cache/fetchStages` action: attaches each node's attribute values
+   * back onto the node as flat properties (legacy admin views read
+   * `node.someAttribute` directly rather than walking `attributes[]`).
+   *
+   * On any failure the list is set to `[]` (not left at `null`) so
+   * `loadingStages` flips to false and consumers don't spin forever.
+   */
+  const fetchStages = async (): Promise<void> => {
+    try {
+      const { nodes, refresh } = useRequest(stageGraph.stageList);
+      await refresh();
+      const list = (nodes.value ?? []) as StageNode[];
+      list.forEach((node) => {
+        node.attributes?.forEach((attr) => {
+          (node as Record<string, unknown>)[attr.name] = attr.description;
+        });
+      });
+      stageList.value = list;
+    } catch {
+      stageList.value = [];
+    }
+  };
+
   return {
     graphql,
     stageList,
@@ -52,5 +80,6 @@ export const useCacheStore = defineStore("cache", () => {
     clearAllGraphqlCaches,
     setStageList,
     updateStageVisibility,
+    fetchStages,
   };
 });

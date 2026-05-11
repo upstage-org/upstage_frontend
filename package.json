@@ -81,8 +81,7 @@
     "vue-slicksort": "2.0.5",
     "vue-stripe-js": "2.0.2",
     "vue-turnstile": "1.0.11",
-    "vuex": "4.1.0",
-    "vuex-persistedstate": "4.1.0"
+    "vuex": "4.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

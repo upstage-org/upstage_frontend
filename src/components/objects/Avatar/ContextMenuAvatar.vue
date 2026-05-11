@@ -1,5 +1,6 @@
 <script>
 import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
 import { computed, inject, ref } from "vue";
 import Icon from "components/Icon.vue";
 
@@ -16,13 +17,16 @@ export default {
   emits: ["update:active", "hold"],
   setup: (props, { emit }) => {
     const store = useStore();
+    const userStore = useUserStore();
 
     const holdAvatar = () => {
-      store.dispatch("user/setAvatarId", props.object.id).then(props.closeMenu);
+      userStore.setAvatarId(props.object.id);
+      props.closeMenu();
     };
 
     const releaseAvatar = () => {
-      store.dispatch("user/setAvatarId", null).then(props.closeMenu);
+      userStore.setAvatarId(null);
+      props.closeMenu();
     };
 
     const deleteObject = () => {

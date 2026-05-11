@@ -3,17 +3,18 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import Entry from "./entry.vue";
-import { h, computed } from "vue";
+import { h } from "vue";
 import { Skeleton, Space } from "ant-design-vue";
 import Header from "components/Header.vue";
-import { useStore } from "vuex";
-const store = useStore();
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
+
+const configStore = useConfigStore();
 const route = useRoute();
 const activeKey = ref(route.query.tab === "system" ? "system" : "foyer");
 const { t } = useI18n();
 
-const foyer = computed(() => store.getters["config/foyer"]);
-const system = computed(() => store.getters["config/system"]);
+const { foyer, system } = storeToRefs(configStore);
 
 const foyerConfigs = () =>
   foyer.value && system.value
@@ -71,7 +72,7 @@ const systemConfigs = () =>
           name: "MANUAL",
           defaultValue: system.value.manual?.value ?? "",
           async refresh() {
-            await store.dispatch("config/fetchConfig");
+            await configStore.fetchConfig();
           },
         }),
         h(Entry, {

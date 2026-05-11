@@ -4,20 +4,22 @@ import { useStore } from "vuex";
 import { animate } from "animejs";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
+import { useUserStore } from "@stores/pinia/user";
 
 export default {
   components: { ChatInput, Icon },
   props: { customEmoji: Object },
   setup: () => {
     const store = useStore();
+    const userStore = useUserStore();
     const reactionVisibility = computed(() => store.state.stage.settings.reactionVisibility);
     watch(reactionVisibility, console.log);
     const nickname = computed(() => {
-      const nickname = store.getters["user/nickname"];
-      if (nickname.length > 15) {
-        return nickname.slice(0, 10) + "...";
+      const n = userStore.nickname;
+      if (n.length > 15) {
+        return n.slice(0, 10) + "...";
       }
-      return nickname;
+      return n;
     });
 
     const reactions = ["❤️", "🤣", "🙌", "👏"];

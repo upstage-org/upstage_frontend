@@ -1,7 +1,9 @@
 <script>
 import { computed, ref } from "vue";
 import { loggedIn, logout } from "utils/auth";
-import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 import Logo from "./Logo.vue";
 import LanguageSelector from "./LanguageSelector.vue";
 import configs from "config";
@@ -9,16 +11,12 @@ import configs from "config";
 export default {
   components: { Logo, LanguageSelector },
   setup() {
-    const store = useStore();
     const expanded = ref(false);
     const toggleExpanded = () => (expanded.value = !expanded.value);
 
-    const navigations = computed(() => store.getters["config/navigations"]);
-    const showRegistration = computed(
-      () => store.getters["config/foyer"]?.showRegistration?.value ?? false,
-    );
-    const isAdmin = computed(() => store.getters["user/isAdmin"]);
-    const isGuest = computed(() => store.getters["user/isGuest"]);
+    const { navigations, foyer } = storeToRefs(useConfigStore());
+    const { isAdmin, isGuest } = storeToRefs(useUserStore());
+    const showRegistration = computed(() => foyer.value?.showRegistration?.value ?? false);
 
     const isShow = (seeByAdmin) => {
       if (isAdmin.value) {

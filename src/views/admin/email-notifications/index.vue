@@ -13,7 +13,8 @@ import Header from "components/Header.vue";
 import { configGraph } from "services/graphql";
 import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
-import store from "store";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 
 const { t } = useI18n();
 
@@ -30,7 +31,7 @@ const directToEmails = ref<string[]>([]);
 const customRecipients = ref<string[]>([]);
 
 const filterRole = ref<number | undefined>();
-const system = computed(() => store.getters["config/system"]);
+const { system } = storeToRefs(useConfigStore());
 
 const filterOption = (keyword: string, option: { title?: string }) =>
   option.title?.toLowerCase().includes(keyword.toLowerCase()) ?? false;

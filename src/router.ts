@@ -5,7 +5,8 @@ import {
   type RouteLocationNormalized,
   type RouteRecordRaw,
 } from "vue-router";
-import store from "@stores/index";
+import { useAuthStore } from "@stores/pinia/auth";
+import { useUserStore } from "@stores/pinia/user";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -158,7 +159,7 @@ router.beforeEach(
   ) => {
     document.body.classList.add("waiting");
 
-    const loggedIn: boolean = store.getters["auth/loggedIn"];
+    const loggedIn: boolean = useAuthStore().loggedIn;
 
     if (to.matched.some((record) => record.meta.requireAuth) && !loggedIn) {
       return next("/login");
@@ -171,14 +172,14 @@ router.beforeEach(
     setViewportMeta(to.name === "Live" ? "" : "width=device-width,initial-scale=1.0");
 
     if (to.fullPath.includes("admin") && loggedIn) {
-      const isAdmin: boolean = await store.dispatch("user/checkIsAdmin");
+      const isAdmin = await useUserStore().checkIsAdmin();
       if (!isAdmin) {
         return next("/");
       }
     }
 
     if (to.meta.requireAuth && loggedIn) {
-      const isGuest: boolean = await store.dispatch("user/checkIsGuest");
+      const isGuest = await useUserStore().checkIsGuest();
       if (isGuest) {
         return next("/");
       }

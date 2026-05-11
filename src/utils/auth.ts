@@ -1,6 +1,6 @@
 import Cookies from "js-cookie";
-import store from "@stores/index";
 import { computed } from "vue";
+import { useAuthStore } from "@stores/pinia/auth";
 import { ROLES } from "./constants";
 import { titleCase } from "./common";
 
@@ -26,8 +26,11 @@ export const setRefreshToken = (token: string): string | undefined =>
 export const getRefreshToken = (): string | undefined => Cookies.get(REFRESH_TOKEN);
 export const removeRefreshToken = (): void => Cookies.remove(REFRESH_TOKEN);
 
-export const loggedIn = computed<boolean>(() => store.getters["auth/loggedIn"]);
-export const logout = (): Promise<void> => store.dispatch("auth/logout");
+// `useAuthStore` is invoked lazily inside the callbacks (not at module load),
+// which keeps the utils/auth ↔ pinia/auth import cycle resolvable: the store
+// uses ES-module live bindings to call `setToken`/`removeToken` exported here.
+export const loggedIn = computed<boolean>(() => useAuthStore().loggedIn);
+export const logout = (): void => useAuthStore().logout();
 
 export function displayName(user: AuthUser | null | undefined): string {
   if (!user) return "";

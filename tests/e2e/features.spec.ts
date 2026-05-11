@@ -22,6 +22,14 @@
  *     is unrelated to the cross-client contract this spec is asserting.
  *   • perform.spec.ts already proved (with screenshots and bubble assertions)
  *     that the dev-hook path matches the production click path.
+ *
+ * Headed pacing:
+ *   When run headed (the default for `pnpm e2e:features`), each step pauses
+ *   long enough that an operator can actually SEE what's happening — the
+ *   drawings are large and bright, a banner is overlaid identifying the
+ *   current beat, and a settle delay sits between operations. In CI /
+ *   headless the pace collapses to ~0 to keep wall-clock low. Override
+ *   with `E2E_PACE=fast|normal|slow`.
  */
 
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
@@ -34,6 +42,7 @@ import { ADMIN } from "./personas";
 import { LoginPage } from "./pages/LoginPage";
 import { LiveStagePage } from "./pages/LiveStagePage";
 import { readRuntime, type RuntimeState } from "./fixtures/runtime";
+import { loadE2eConfig } from "./e2e-config";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,6 +78,41 @@ interface AudienceSeat {
 const POLL_TIMEOUT_MS = 10_000;
 const POLL_INTERVAL_MS = 200;
 
+// ---------------------------------------------------------------------------
+// Pacing
+// ---------------------------------------------------------------------------
+type PaceKind = "fast" | "normal" | "slow";
+
+function resolvePace(): PaceKind {
+  const explicit = process.env.E2E_PACE?.trim().toLowerCase();
+  if (explicit === "fast" || explicit === "normal" || explicit === "slow") {
+    return explicit;
+  }
+  return loadE2eConfig().headless ? "fast" : "slow";
+}
+
+const PACE = resolvePace();
+
+/**
+ * Pause length in ms between visible beats. Tuned so a human watching the
+ * play can register each event, while CI / headless still completes the
+ * suite in well under a minute.
+ */
+function beatPauseMs(kind: "settle" | "between-tests" | "post-screenshot"): number {
+  if (PACE === "fast") return 0;
+  const slowMs = { settle: 1500, "between-tests": 2500, "post-screenshot": 800 }[kind];
+  const normalMs = Math.round(slowMs * 0.4);
+  return PACE === "normal" ? normalMs : slowMs;
+}
+
+async function settle(
+  page: Page,
+  kind: Parameters<typeof beatPauseMs>[0] = "settle",
+): Promise<void> {
+  const ms = beatPauseMs(kind);
+  if (ms > 0) await page.waitForTimeout(ms);
+}
+
 /**
  * Generic poll-until-predicate. We use this rather than `page.waitForFunction`
  * for state we already pull through `getStageState` because this lets us
@@ -96,39 +140,78 @@ async function pollUntil<T>(
 
 /**
  * Build a synthetic `addDrawing` payload. We hand-build the canvas commands
- * (a small triangle) because the in-product flow is mouse → useDrawable →
+ * (a thick, multi-color star) because the in-product flow is mouse → useDrawable →
  * `history` → save; we shortcut directly to the saved shape.
  *
  * Coordinates are absolute relative to the stage (Board.vue uses absolute
- * coordinates that get scaled per-client by Object.vue). 100×100 keeps
- * the drawing visible without dominating the audience board.
+ * coordinates that get scaled per-client by Object.vue). The drawing is
+ * deliberately oversized (default 400×400) and uses a thick stroke + bright
+ * color so it's unmistakable when the test runs headed — the user reported
+ * they couldn't see drawings whizzing past, and the original 100×100 red
+ * triangle was easy to miss against the stage background.
  */
 function buildDrawingPayload(opts: {
   drawingId: string;
   type: "avatar" | "prop";
   x: number;
   y: number;
+  w?: number;
+  h?: number;
+  color?: string;
+  size?: number;
+  shape?: "star" | "triangle";
 }): Record<string, unknown> & { drawingId: string } {
   const { drawingId, type, x, y } = opts;
-  const w = 100;
-  const h = 100;
-  // useDrawable's history items are objects with type + size + color +
-  // lines[]; Object.vue → SavedDrawing/Drawing.vue replays them via
-  // useRelativeCommands which subtracts `original.{x,y}` from each line
-  // coordinate, so we must include `original` matching x/y/w/h.
+  const w = opts.w ?? 400;
+  const h = opts.h ?? 400;
+  const color = opts.color ?? "#ff2266";
+  const size = opts.size ?? 18;
+  const shape = opts.shape ?? "star";
   const original = { x, y, w, h };
+
+  // useDrawable's history items are objects with type + size + color +
+  // lines[]; Drawing.vue → useRelativeCommands subtracts `original.{x,y}`
+  // from each line coordinate, so we use absolute (x + offset) coords here.
+  const points: Array<{ x: number; y: number }> = (() => {
+    if (shape === "triangle") {
+      return [
+        { x: x + w / 2, y: y + h * 0.1 },
+        { x: x + w * 0.9, y: y + h * 0.9 },
+        { x: x + w * 0.1, y: y + h * 0.9 },
+        { x: x + w / 2, y: y + h * 0.1 },
+      ];
+    }
+    // 5-point star — visually bold, exercises multiple line segments.
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const outer = Math.min(w, h) * 0.45;
+    const inner = outer * 0.42;
+    const out: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= 10; i += 1) {
+      const r = i % 2 === 0 ? outer : inner;
+      const angle = (Math.PI / 5) * i - Math.PI / 2;
+      out.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+    }
+    return out;
+  })();
+
+  const lines: Array<{ fromX: number; fromY: number; x: number; y: number }> = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    lines.push({
+      fromX: points[i].x,
+      fromY: points[i].y,
+      x: points[i + 1].x,
+      y: points[i + 1].y,
+    });
+  }
   const commands = [
     {
       type: "draw",
-      size: 6,
-      color: "#cc2222",
-      x: x + 50,
-      y: y + 10,
-      lines: [
-        { fromX: x + 50, fromY: y + 10, x: x + 90, y: y + 90 },
-        { fromX: x + 90, fromY: y + 90, x: x + 10, y: y + 90 },
-        { fromX: x + 10, fromY: y + 90, x: x + 50, y: y + 10 },
-      ],
+      size,
+      color,
+      x: points[0].x,
+      y: points[0].y,
+      lines,
     },
   ];
   return {
@@ -141,6 +224,56 @@ function buildDrawingPayload(opts: {
     original,
     commands,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Page banner — overlay identifying the current beat so a human watching
+// can tell what's happening on screen. No-op in headless / fast mode.
+// ---------------------------------------------------------------------------
+async function showBanner(page: Page, text: string, sub = ""): Promise<void> {
+  if (PACE === "fast") return;
+  await page.evaluate(
+    ({ text, sub }) => {
+      const id = "__features-banner__";
+      let el = document.getElementById(id);
+      if (!el) {
+        el = document.createElement("div");
+        el.id = id;
+        Object.assign(el.style, {
+          position: "fixed",
+          top: "12px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          padding: "10px 18px",
+          background: "rgba(20, 20, 35, 0.92)",
+          color: "#fff",
+          fontFamily: "system-ui, sans-serif",
+          fontSize: "16px",
+          fontWeight: "600",
+          borderRadius: "8px",
+          zIndex: "999999",
+          pointerEvents: "none",
+          boxShadow: "0 6px 20px rgba(0,0,0,0.35)",
+          maxWidth: "70vw",
+          textAlign: "center",
+        });
+        document.body.appendChild(el);
+      }
+      el.innerHTML = `<div>${text}</div>${
+        sub
+          ? `<div style="font-size:13px;font-weight:400;opacity:0.8;margin-top:3px">${sub}</div>`
+          : ""
+      }`;
+    },
+    { text, sub },
+  );
+}
+
+async function clearBanner(page: Page): Promise<void> {
+  if (PACE === "fast") return;
+  await page.evaluate(() => {
+    document.getElementById("__features-banner__")?.remove();
+  });
 }
 
 async function openAudience(browser: Browser, runtime: RuntimeState): Promise<AudienceSeat> {
@@ -196,11 +329,13 @@ async function placeProp({
   runtime,
   propKey,
   to,
+  size,
 }: {
   admin: AdminSeat;
   runtime: RuntimeState;
   propKey: string;
   to: { x: number; y: number };
+  size?: { w: number; h: number };
 }): Promise<string> {
   const ref = runtime.props[propKey];
   if (!ref) {
@@ -210,7 +345,7 @@ async function placeProp({
     );
   }
   return admin.page.evaluate(
-    async ({ mediaId, mediaName, to }) => {
+    async ({ mediaId, mediaName, to, size }) => {
       type ToolboxProp = {
         id: string | number;
         name?: string;
@@ -251,6 +386,7 @@ async function placeProp({
         name: mediaName,
         x: to.x,
         y: to.y,
+        ...(size ? { w: size.w, h: size.h } : {}),
       })) as { id: string };
 
       // Mirror perform.spec.ts: a follow-up shapeObject(liveAction) is what
@@ -265,7 +401,7 @@ async function placeProp({
       });
       return placed.id;
     },
-    { mediaId: ref.id, mediaName: ref.name, to },
+    { mediaId: ref.id, mediaName: ref.name, to, size: size ?? null },
   );
 }
 
@@ -395,7 +531,9 @@ async function cleanBoard(admin: AdminSeat, audience: AudienceSeat): Promise<voi
 
 test.describe("features: drawing + opacity + depth @features", () => {
   test.describe.configure({ mode: "serial" });
-  test.setTimeout(5 * 60_000);
+  // Slow pacing extends each test to multiple seconds; bump the budget so
+  // the suite never times out a watchable run.
+  test.setTimeout(PACE === "slow" ? 10 * 60_000 : 5 * 60_000);
 
   let admin: AdminSeat;
   let audience: AudienceSeat;
@@ -410,7 +548,7 @@ test.describe("features: drawing + opacity + depth @features", () => {
     // wipe so each test sees a deterministic starting board.
     await cleanBoard(admin, audience);
     console.log(
-      `[features] seats ready: stage=${runtime.stageSlug} ` +
+      `[features] seats ready (pace=${PACE}): stage=${runtime.stageSlug} ` +
         `props=${Object.keys(runtime.props).join(",")}`,
     );
   });
@@ -419,12 +557,17 @@ test.describe("features: drawing + opacity + depth @features", () => {
   // assertion threw before the cleanup line), the next test starts clean.
   test.afterEach(async () => {
     try {
+      await clearBanner(admin.page);
+      await clearBanner(audience.page);
       await cleanBoard(admin, audience);
     } catch (err) {
       console.warn(
         `[features] afterEach cleanBoard failed: ${err instanceof Error ? err.message : err}`,
       );
     }
+    // Visible breath between tests so a human watching can tell where one
+    // beat ends and the next begins.
+    await settle(audience.page, "between-tests");
   });
 
   test.afterAll(async () => {
@@ -435,10 +578,35 @@ test.describe("features: drawing + opacity + depth @features", () => {
   // ---------------------------------------------------------------------
   // 1. Drawing — admin saves a drawing as a prop; audience sees the placed
   //    object (with `drawingId`) on their board and the rendered <canvas>.
+  //
+  //    The drawing is a 400x400 bright pink star centered on the stage so
+  //    a human watching headed can actually SEE it appear.
   // ---------------------------------------------------------------------
   test("drawing saved as prop appears on audience board", async () => {
+    await showBanner(
+      admin.page,
+      "Test 1 — Drawing as prop",
+      "drawing a bright pink star (admin side)",
+    );
+    await showBanner(
+      audience.page,
+      "Test 1 — Drawing as prop",
+      "watching for the star to appear (audience side)",
+    );
+    await settle(admin.page);
+
     const drawingId = uuidv4();
-    const payload = buildDrawingPayload({ drawingId, type: "prop", x: 200, y: 200 });
+    const payload = buildDrawingPayload({
+      drawingId,
+      type: "prop",
+      x: 300,
+      y: 200,
+      w: 400,
+      h: 400,
+      color: "#ff2266",
+      size: 18,
+      shape: "star",
+    });
 
     const placedId = await addAndPublishDrawing(admin, payload);
 
@@ -461,12 +629,40 @@ test.describe("features: drawing + opacity + depth @features", () => {
     // the board (relevant once future tests don't tear down between runs).
     const wrapper = audience.page.locator(`[data-object-id="${placed.id}"]`).first();
     await expect(wrapper).toBeVisible({ timeout: 5_000 });
-    await expect(wrapper.locator("canvas").first()).toBeVisible({ timeout: 5_000 });
+    const canvas = wrapper.locator("canvas").first();
+    await expect(canvas).toBeVisible({ timeout: 5_000 });
 
-    await audience.page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "drawing-prop.png"),
-      fullPage: true,
+    // Stronger render assertion: useDrawing draws strokes onto the canvas
+    // bitmap on mount + every drawing-prop change. If the commands list
+    // was empty or malformed, the bitmap would be all-transparent (pixel
+    // data == 0). Sample the bitmap and require at least *some* non-zero
+    // alpha pixels — that's the smallest credible "the strokes actually
+    // hit the canvas" assertion we can write without fixture images.
+    const nonZeroAlphaPixels = await canvas.evaluate((el) => {
+      const c = el as HTMLCanvasElement;
+      const ctx = c.getContext("2d");
+      if (!ctx || !c.width || !c.height) return 0;
+      const data = ctx.getImageData(0, 0, c.width, c.height).data;
+      let nonZero = 0;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 0) nonZero += 1;
+      }
+      return nonZero;
     });
+    expect(nonZeroAlphaPixels).toBeGreaterThan(100);
+
+    // Settle so a human can register the drawing onscreen, then take
+    // screenshots from BOTH seats so post-mortem inspection is easy.
+    await settle(audience.page);
+    await audience.page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "drawing-prop-audience.png"),
+      fullPage: false,
+    });
+    await admin.page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "drawing-prop-admin.png"),
+      fullPage: false,
+    });
+    await settle(audience.page, "post-screenshot");
 
     await deleteObjectAdmin(admin, placed.id);
     await popDrawingAdmin(admin, drawingId);
@@ -479,8 +675,26 @@ test.describe("features: drawing + opacity + depth @features", () => {
   //    branch dispatches user/setAvatarId for the placer).
   // ---------------------------------------------------------------------
   test("drawing saved as avatar produces a holdable avatar object", async () => {
+    await showBanner(
+      admin.page,
+      "Test 2 — Drawing as avatar",
+      "drawing a teal triangle that becomes a holdable avatar",
+    );
+    await showBanner(audience.page, "Test 2 — Drawing as avatar", "watching the avatar appear");
+    await settle(admin.page);
+
     const drawingId = uuidv4();
-    const payload = buildDrawingPayload({ drawingId, type: "avatar", x: 400, y: 200 });
+    const payload = buildDrawingPayload({
+      drawingId,
+      type: "avatar",
+      x: 350,
+      y: 200,
+      w: 350,
+      h: 350,
+      color: "#1aa899",
+      size: 20,
+      shape: "triangle",
+    });
 
     const placedId = await addAndPublishDrawing(admin, payload);
 
@@ -493,21 +707,26 @@ test.describe("features: drawing + opacity + depth @features", () => {
     expect(placed.type).toBe("avatar");
     expect(placed.id).toBe(placedId);
 
-    // Admin should now hold this avatar (placeObjectOnStage avatar branch
-    // calls user/setAvatarId on the dispatcher). Asserting on admin keeps
-    // this test honest about the side-effect; audience won't see `holder`
-    // change until the admin moves and the MQTT MOVE_TO carries it.
+    // Admin should now hold this avatar. After Phase 5 the avatarId lives
+    // in Pinia, exposed via __UPSTAGE_PINIA__ rather than the (Vuex-only)
+    // __UPSTAGE_STORE__.state.user path.
     const heldId = await admin.page.evaluate(() => {
-      type DevStore = { state: { user: { avatarId: string | null } } };
-      const store = (window as unknown as { __UPSTAGE_STORE__?: DevStore }).__UPSTAGE_STORE__;
-      return store?.state?.user?.avatarId ?? null;
+      type Pinia = { user: { avatarId: string | null } };
+      const pinia = (window as unknown as { __UPSTAGE_PINIA__?: Pinia }).__UPSTAGE_PINIA__;
+      return pinia?.user?.avatarId ?? null;
     });
     expect(heldId).toBe(placed.id);
 
+    await settle(audience.page);
     await audience.page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "drawing-avatar.png"),
-      fullPage: true,
+      path: path.join(SCREENSHOT_DIR, "drawing-avatar-audience.png"),
+      fullPage: false,
     });
+    await admin.page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "drawing-avatar-admin.png"),
+      fullPage: false,
+    });
+    await settle(audience.page, "post-screenshot");
 
     await deleteObjectAdmin(admin, placed.id);
     await popDrawingAdmin(admin, drawingId);
@@ -520,6 +739,10 @@ test.describe("features: drawing + opacity + depth @features", () => {
   //    via :style="{ opacity: object.opacity }").
   // ---------------------------------------------------------------------
   test("opacity change on a placed prop propagates to observers", async () => {
+    await showBanner(admin.page, "Test 3 — Opacity", "placing a prop, then dialing it down to 30%");
+    await showBanner(audience.page, "Test 3 — Opacity", "watching the prop fade");
+    await settle(admin.page);
+
     const propKey = Object.keys(runtime.props)[0];
     if (!propKey) test.skip(true, "runtime.json has no props — re-run pnpm e2e:setup");
 
@@ -528,6 +751,9 @@ test.describe("features: drawing + opacity + depth @features", () => {
       runtime,
       propKey,
       to: { x: 350, y: 350 },
+      // Make the prop nice and large so the opacity change is unmistakable
+      // when watching headed. Default 100×100 was easy to overlook.
+      size: { w: 280, h: 280 },
     });
 
     // Confirm placement reached the audience (and default opacity is 1).
@@ -539,6 +765,10 @@ test.describe("features: drawing + opacity + depth @features", () => {
         return Boolean(o && (o.opacity ?? 1) > 0.95);
       },
     );
+
+    // Settle at full opacity so the contrast with the dimmed state below
+    // is visible to a human watching.
+    await settle(audience.page);
 
     // Drive the opacity change the same way OpacitySlider.vue does:
     // shapeObject({...object, opacity: 0.3}). No `liveAction` flag here —
@@ -593,10 +823,16 @@ test.describe("features: drawing + opacity + depth @features", () => {
       .poll(readComputedOpacity, { timeout: 10_000, intervals: [100, 200, 500] })
       .toBeCloseTo(0.3, 1);
 
+    await settle(audience.page);
     await audience.page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "opacity.png"),
-      fullPage: true,
+      path: path.join(SCREENSHOT_DIR, "opacity-audience.png"),
+      fullPage: false,
     });
+    await admin.page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "opacity-admin.png"),
+      fullPage: false,
+    });
+    await settle(audience.page, "post-screenshot");
 
     await deleteObjectAdmin(admin, placedId);
   });
@@ -608,6 +844,14 @@ test.describe("features: drawing + opacity + depth @features", () => {
   //    audience should see the same final ordering.
   // ---------------------------------------------------------------------
   test("depth (bringToFrontOf) reorders board.objects on observers", async () => {
+    await showBanner(
+      admin.page,
+      "Test 4 — Depth (z-order)",
+      "placing 3 props, then bringing #1 in front of #3",
+    );
+    await showBanner(audience.page, "Test 4 — Depth (z-order)", "watching the layer order change");
+    await settle(admin.page);
+
     const propKeys = Object.keys(runtime.props);
     if (propKeys.length < 1) {
       test.skip(true, "runtime.json has no props — re-run pnpm e2e:setup");
@@ -620,9 +864,30 @@ test.describe("features: drawing + opacity + depth @features", () => {
     const k2 = propKeys[1] ?? propKeys[0];
     const k3 = propKeys[2] ?? propKeys[0];
 
-    const id1 = await placeProp({ admin, runtime, propKey: k1, to: { x: 200, y: 450 } });
-    const id2 = await placeProp({ admin, runtime, propKey: k2, to: { x: 300, y: 450 } });
-    const id3 = await placeProp({ admin, runtime, propKey: k3, to: { x: 400, y: 450 } });
+    // Overlap them noticeably so the z-reorder is actually visible. Big
+    // sizes + close coordinates = props clearly stacked on top of each
+    // other.
+    const id1 = await placeProp({
+      admin,
+      runtime,
+      propKey: k1,
+      to: { x: 250, y: 350 },
+      size: { w: 220, h: 220 },
+    });
+    const id2 = await placeProp({
+      admin,
+      runtime,
+      propKey: k2,
+      to: { x: 380, y: 350 },
+      size: { w: 220, h: 220 },
+    });
+    const id3 = await placeProp({
+      admin,
+      runtime,
+      propKey: k3,
+      to: { x: 510, y: 350 },
+      size: { w: 220, h: 220 },
+    });
 
     // Wait for audience to see all three in the [id1, id2, id3] order
     // (placeObjectOnStage appends to board.objects, so the placement
@@ -638,6 +903,10 @@ test.describe("features: drawing + opacity + depth @features", () => {
         return i1 >= 0 && i2 > i1 && i3 > i2;
       },
     );
+
+    // Settle at the initial order so a watcher can register it before the
+    // reorder lands.
+    await settle(audience.page);
 
     // Dispatch the same action Skeleton.vue's drop handler fires.
     await admin.live.dispatchAction("stage/bringToFrontOf", { front: id1, back: id3 });
@@ -666,10 +935,16 @@ test.describe("features: drawing + opacity + depth @features", () => {
     expect(i3 + 1).toBe(i1); // id1 immediately after id3 (rendered on top)
     expect(i2).toBeLessThan(i3); // id2 stayed earlier than both
 
+    await settle(audience.page);
     await audience.page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "depth.png"),
-      fullPage: true,
+      path: path.join(SCREENSHOT_DIR, "depth-audience.png"),
+      fullPage: false,
     });
+    await admin.page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "depth-admin.png"),
+      fullPage: false,
+    });
+    await settle(audience.page, "post-screenshot");
 
     await deleteObjectAdmin(admin, id1);
     await deleteObjectAdmin(admin, id2);

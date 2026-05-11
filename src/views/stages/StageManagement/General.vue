@@ -11,7 +11,9 @@ import ClearChatInStage from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
 import DuplicateStage from "components/stage/DuplicateStage.vue";
 import DeleteStage from "components/stage/DeleteStage.vue";
-import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
+import { useCacheStore } from "@stores/pinia/cache";
+import { storeToRefs } from "pinia";
 // Aliased: "Switch" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppSwitch from "components/form/Switch.vue";
 import { message } from "ant-design-vue";
@@ -29,8 +31,8 @@ export default {
     AppSwitch,
   },
   setup: () => {
-    const store = useStore();
-    const whoami = computed(() => store.getters["user/whoami"]);
+    const cacheStore = useCacheStore();
+    const { whoami } = storeToRefs(useUserStore());
     const router = useRouter();
     const stage = inject("stage");
     /** Refetch stage in parent layout so injected `stage` matches DB after save (clearCache alone leaves stale data). */
@@ -160,7 +162,7 @@ export default {
       try {
         const stage = await mutation();
         message.success("Stage created successfully!");
-        store.dispatch("cache/fetchStages");
+        cacheStore.fetchStages();
         router.push(`/stages/stage-management/${stage.id}/`);
       } catch (error) {
         message.error(error);
@@ -170,10 +172,7 @@ export default {
       try {
         await mutation();
         message.success("Stage updated successfully!");
-        store.commit("cache/UPDATE_STAGE_VISIBILITY", {
-          stageId: form.id,
-          visibility: form.visibility,
-        });
+        cacheStore.updateStageVisibility(form.id, form.visibility);
         await refresh(stage.value.id);
       } catch (error) {
         handleError(error);
@@ -217,12 +216,12 @@ export default {
     });
 
     const afterDelete = () => {
-      store.dispatch("cache/fetchStages");
+      cacheStore.fetchStages();
       router.push("/stages");
     };
 
     const afterDuplicate = () => {
-      store.dispatch("cache/fetchStages");
+      cacheStore.fetchStages();
     };
 
     provide("afterDuplicate", afterDuplicate);

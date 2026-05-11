@@ -4,7 +4,8 @@ import { message } from "ant-design-vue";
 import { gql } from "@apollo/client/core";
 import { computed, inject, PropType, ref, watch } from "vue";
 import { Media, AssignedStage } from "models/studio";
-import store from "store";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 import MediaPreview from "./MediaPreview.vue";
 import { uniq } from "lodash";
 
@@ -16,7 +17,7 @@ const props = defineProps({
 });
 const stages = ref<string[]>([]);
 const visible = ref(false);
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { isAdmin } = storeToRefs(useUserStore());
 const note = computed(() => {
   try {
     const description = JSON.parse(props.media.description);

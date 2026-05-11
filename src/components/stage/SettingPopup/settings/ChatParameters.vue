@@ -1,6 +1,7 @@
 <script>
 import { computed, reactive, ref } from "vue";
 import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
 import HorizontalField from "components/form/HorizontalField.vue";
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
@@ -16,7 +17,8 @@ export default {
     const form = reactive({});
     const loading = ref(false);
     const store = useStore();
-    const nickname = computed(() => store.getters["user/chatname"]);
+    const userStore = useUserStore();
+    const nickname = computed(() => userStore.chatname);
     const downloadOptions = ref({
       audienceChat: false,
       playerChat: false,
@@ -28,7 +30,7 @@ export default {
 
     const saveNickname = () => {
       loading.value = true;
-      store.dispatch("user/saveNickname", form).then((nickname) => {
+      userStore.saveNickname(form).then((nickname) => {
         emit("close");
         loading.value = false;
         message.success("You new nickname is: " + nickname);

@@ -7,7 +7,8 @@ import { editingMediaVar, inquiryVar } from "apollo";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
 import dayjs, { type Dayjs } from "@utils/dayjs";
-import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
 const { result: response, loading } = useQuery(gql`
   {
@@ -49,8 +50,7 @@ const { result: response, loading } = useQuery(gql`
     }
   }
 `);
-const store = useStore();
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { isAdmin } = storeToRefs(useUserStore());
 const result = computed(() => response?.value);
 
 const sharedAuth = getSharedAuth();

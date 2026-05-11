@@ -18,6 +18,18 @@ declare global {
      * Don't rely on it in feature code — it may be stripped from real prod bundles.
      */
     __UPSTAGE_STORE__?: import("vuex").Store<unknown>;
+    /**
+     * Hook for Playwright tests that need access to Pinia stores
+     * (auth/cache/config/user) — added in Phase 5 alongside the Vuex
+     * cutover. Exposes a frozen object whose property getters lazily
+     * call `useXxxStore()` so tests get the real reactive Pinia instance.
+     */
+    __UPSTAGE_PINIA__?: {
+      readonly auth: ReturnType<typeof import("@stores/pinia/auth").useAuthStore>;
+      readonly cache: ReturnType<typeof import("@stores/pinia/cache").useCacheStore>;
+      readonly config: ReturnType<typeof import("@stores/pinia/config").useConfigStore>;
+      readonly user: ReturnType<typeof import("@stores/pinia/user").useUserStore>;
+    };
     $: JQueryStatic;
     jQuery: JQueryStatic;
     JitsiMeetExternalAPI: JitsiMeetExternalAPIConstructor;

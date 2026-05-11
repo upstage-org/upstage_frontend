@@ -23,6 +23,8 @@ import { stageGraph } from "services/graphql";
 import { useAttribute } from "services/graphql/composable";
 import { avatarSpeak, stopSpeaking } from "services/speech";
 import { animate } from "animejs";
+import { useUserStore } from "@stores/pinia/user";
+import { useAuthStore } from "@stores/pinia/auth";
 // Native Promise is sufficient on modern (Node 22 / evergreen) targets.
 
 const mqtt = buildClient();
@@ -157,8 +159,10 @@ export default {
     audios(state) {
       return state.tools.audios;
     },
-    currentAvatar(state, getters, rootState) {
-      const id = rootState.user.avatarId;
+    currentAvatar(state) {
+      // Phase 5: avatarId moved to Pinia user store. We can't `useUserStore()`
+      // at the top of this file (cycles), so look it up at call time.
+      const id = useUserStore().avatarId;
       return state.board.objects.find((o) => o.id === id);
     },
     activeMovable(state) {
@@ -752,9 +756,9 @@ export default {
           break;
       }
     },
-    sendChat({ state, rootGetters, getters }, { message, isPrivate }) {
+    sendChat({ state, getters }, { message, isPrivate }) {
       if (!message) return;
-      let user = rootGetters["user/chatname"];
+      let user = useUserStore().chatname;
       let isPlayer = getters["canPlay"];
       let behavior = "speak";
       const session = state.session;
@@ -809,7 +813,7 @@ export default {
      * No-op when there is no held avatar, the user is not a player, or the
      * message is empty — same silent-precondition pattern as `sendChat`.
      */
-    speakAsAvatar({ state, rootGetters, getters }, { message, behavior }) {
+    speakAsAvatar({ state, getters }, { message, behavior }) {
       if (!message) return;
       const avatar = getters["currentAvatar"];
       if (!avatar) return;
@@ -818,7 +822,7 @@ export default {
       const finalBehavior = behavior === "shout" || behavior === "think" ? behavior : "speak";
       const finalMessage = finalBehavior === "shout" ? String(message).toUpperCase() : message;
       const speak = {
-        user: rootGetters["user/chatname"],
+        user: useUserStore().chatname,
         message: finalMessage,
         behavior: finalBehavior,
         isPlayer: true,
@@ -833,7 +837,7 @@ export default {
         speak,
       });
     },
-    handleChatMessage({ commit, state, rootGetters, dispatch }, { message }) {
+    handleChatMessage({ commit, state, dispatch }, { message }) {
       if (message.clear) {
         commit("CLEAR_CHAT");
         return;
@@ -866,7 +870,7 @@ export default {
           if (state.showPlayerChat) {
             commit("SEEN_PRIVATE_MESSAGES");
           } else {
-            const nickname = rootGetters["user/nickname"];
+            const nickname = useUserStore().nickname ?? "";
             if (message.message.toLowerCase().includes(`@${nickname.trim().toLowerCase()}`)) {
               dispatch("showPlayerChat", true);
             }
@@ -876,7 +880,7 @@ export default {
         commit("PUSH_CHAT_MESSAGE", model);
       }
     },
-    placeObjectOnStage({ commit, dispatch, state }, data) {
+    placeObjectOnStage({ commit, state }, data) {
       const object = {
         w: 100,
         h: 100,
@@ -900,13 +904,12 @@ export default {
       }
       commit("PUSH_OBJECT", serializeObject(object));
       if (object.type === "avatar") {
-        dispatch("user/setAvatarId", object.id, { root: true }).then(() => {
-          commit("SET_ACTIVE_MOVABLE", null);
-        });
+        useUserStore().setAvatarId(object.id);
+        commit("SET_ACTIVE_MOVABLE", null);
       }
       return object;
     },
-    shapeObject({ commit, state, rootGetters }, object) {
+    shapeObject({ commit, state }, object) {
       if (object.liveAction) {
         if (object.published) {
           mqtt.sendMessage(TOPICS.BOARD, {
@@ -915,7 +918,7 @@ export default {
           });
         } else {
           object.published = true;
-          object.displayName = rootGetters["user/nickname"];
+          object.displayName = useUserStore().nickname ?? "";
           mqtt.sendMessage(TOPICS.BOARD, {
             type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
             object: serializeObject(object),
@@ -1341,17 +1344,18 @@ export default {
     handleCounterMessage({ commit, state }, { message }) {
       commit("UPDATE_SESSIONS_COUNTER", message);
       if (message.id === state.session && message.avatarId) {
-        commit("user/SET_AVATAR_ID", message.avatarId, { root: true });
+        useUserStore().avatarId = message.avatarId;
       }
     },
-    async joinStage({ rootGetters, state, rootState, commit, dispatch }) {
+    async joinStage({ state, commit, dispatch }) {
+      const userStore = useUserStore();
       if (!state.session) {
-        state.session = rootState.user.user?.id ?? uuidv4();
+        state.session = userStore.user?.id ?? uuidv4();
       }
       const id = state.session;
-      const isPlayer = rootGetters["auth/loggedIn"];
-      const nickname = rootGetters["user/nickname"];
-      const avatarId = rootGetters["user/avatarId"];
+      const isPlayer = useAuthStore().loggedIn;
+      const nickname = userStore.nickname;
+      const avatarId = userStore.avatarId;
       commit("SET_ACTIVE_MOVABLE", avatarId);
       const at = +new Date();
       const payload = { id, isPlayer, nickname, at, avatarId };
@@ -1362,7 +1366,7 @@ export default {
       await Promise.all([dispatch("sendStatisticsBeforeDisconnect"), dispatch("sendCounterLeave")]);
     },
     async sendStatisticsBeforeDisconnect({ rootGetters }) {
-      const isPlayer = rootGetters["auth/loggedIn"];
+      const isPlayer = useAuthStore().loggedIn;
       let players = rootGetters["stage/players"].length;
       let audiences = rootGetters["stage/audiences"].length;
       if (isPlayer) {

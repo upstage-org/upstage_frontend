@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import Sidebar from "components/Sidebar.vue";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 
-const store = useStore();
 const route = useRoute();
-const enableDonate = computed<boolean>(() => store.getters["config/enableDonate"]);
+const { enableDonate } = storeToRefs(useConfigStore());
 
 defineExpose({ enableDonate });
 </script>

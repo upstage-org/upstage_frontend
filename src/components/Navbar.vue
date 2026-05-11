@@ -4,15 +4,15 @@ import LanguageSelector from "components/LanguageSelector.vue";
 import logo from "assets/upstage.png";
 import StudioVersion from "./StudioVersion.vue";
 import PlayerForm from "views/admin/player-management/PlayerForm.vue";
-import { useStore } from "vuex";
 import { computed } from "vue";
 import { logout } from "utils/auth";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
-const store = useStore();
-const whoami = computed(() => store.getters["user/whoami"]);
-const loading = computed(() => store.getters["user/loading"]);
+const userStore = useUserStore();
+const { whoami, loadingUser: loading } = storeToRefs(userStore);
 const roleName = computed(() => {
-  switch (whoami.value.role) {
+  switch (whoami.value?.role) {
     case "4":
       return "Guest";
     case "1":
@@ -25,7 +25,7 @@ const roleName = computed(() => {
   return "";
 });
 const onSave = (payload: any) => {
-  store.dispatch("user/updateUserProfile", payload);
+  userStore.updateUserProfile(payload);
 };
 </script>
 

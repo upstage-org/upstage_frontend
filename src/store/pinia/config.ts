@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, reactive } from "vue";
+import { configGraph } from "@services/graphql";
 
 interface ConfigValue {
   value?: string;
@@ -82,6 +83,15 @@ export const useConfigStore = defineStore("config", () => {
     Object.assign(state, configs);
   };
 
+  /**
+   * Fetch nginx + system + foyer configs from GraphQL and merge into
+   * state. Mirrors the Vuex `config/fetchConfig` action.
+   */
+  const fetchConfig = async (): Promise<void> => {
+    const configs = (await configGraph.configs()) as Partial<ConfigState>;
+    Object.assign(state, configs);
+  };
+
   return {
     state,
     uploadLimit,
@@ -93,5 +103,6 @@ export const useConfigStore = defineStore("config", () => {
     system,
     navigations,
     setConfig,
+    fetchConfig,
   };
 });

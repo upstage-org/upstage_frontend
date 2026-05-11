@@ -11,16 +11,17 @@ import {
   SettingOutlined,
 } from "@ant-design/icons-vue";
 import configs from "config";
-import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 
 export default {
   setup() {
     const router = useRouter();
 
-    const store = useStore();
-    const whoami = computed(() => store.getters["user/whoami"]);
-    const saving = computed(() => store.getters["user/loading"]);
-    const system = computed(() => store.getters["config/system"]);
+    const userStore = useUserStore();
+    const { whoami, loadingUser: saving } = storeToRefs(userStore);
+    const { system } = storeToRefs(useConfigStore());
 
     const isAdmin = computed(
       () =>
@@ -59,7 +60,7 @@ export default {
                           player: whoami.value,
                           saving: saving.value,
                           onSave: (payload) => {
-                            store.dispatch("user/updateUserProfile", payload);
+                            userStore.updateUserProfile(payload);
                           },
                           noUploadLimit: true,
                           noStatusToggle: true,
@@ -127,7 +128,7 @@ export default {
                   label: "Manual",
                   disabled: !system.value.manual,
                   onClick: () =>
-                    open(system.value.manual.value ?? "https://docs.upstage.live/", "_blank"),
+                    open(system.value.manual?.value ?? "https://docs.upstage.live/", "_blank"),
                 },
               ].map((item) =>
                 item.children

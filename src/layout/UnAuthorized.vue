@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useStore } from "vuex";
 import Footer from "components/Footer.vue";
 import NavBar from "components/NavBarHome.vue";
 import OneTimePurchase from "components/payment/OneTimePurchase.vue";
 import PurchasePopup from "components/payment/PurchasePopup.vue";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 
-const store = useStore();
-const enableDonate = computed<boolean>(() => store.getters["config/enableDonate"]);
+const { enableDonate } = storeToRefs(useConfigStore());
 </script>
 
 <template>

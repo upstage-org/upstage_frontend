@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import LoginForm from "components/LoginForm.vue";
 import { useRouter } from "vue-router";
-import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
+import { useConfigStore } from "@stores/pinia/config";
 
-const store = useStore();
 const router = useRouter();
 
 const onLoginSuccess = () => {
-  store.dispatch("user/fetchCurrent");
-  store.dispatch("config/fetchConfig");
+  useUserStore().fetchCurrent();
+  useConfigStore().fetchConfig();
   router.push({ name: "Stages" });
 };
 </script>

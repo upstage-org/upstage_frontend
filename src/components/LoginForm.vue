@@ -4,7 +4,7 @@ import TermsOfService from "components/TermsOfService.vue";
 import { userGraph } from "services/graphql";
 import { useMutation } from "services/graphql/composable";
 import { ref, defineEmits } from "vue";
-import { useStore } from "vuex";
+import { useAuthStore } from "@stores/pinia/auth";
 import Turnstile from "vue-turnstile";
 import configs from "config";
 
@@ -18,7 +18,7 @@ const showPassword = ref(false);
 const username = ref("");
 const password = ref("");
 const loading = ref(false);
-const store = useStore();
+const authStore = useAuthStore();
 const resetMode = ref(false);
 
 const toggleShowPassword = () => {
@@ -31,10 +31,14 @@ const submit = () => {
     ...(token.value ? { token: token.value } : {}),
   };
   loading.value = true;
-  store
-    .dispatch("auth/login", user)
+  authStore
+    .login(user)
     .then(() => {
       emit("success");
+    })
+    .catch(() => {
+      // Error toast already surfaced inside `authStore.login`; swallow so the
+      // promise chain doesn't bubble an unhandled rejection.
     })
     .finally(() => {
       loading.value = false;

@@ -1,10 +1,10 @@
 // @ts-nocheck
-import store from "store";
 import { computed, reactive, ref } from "vue";
 import hash from "object-hash";
 import { message } from "ant-design-vue";
 import { configGraph } from "services/graphql";
 import { logout } from "utils/auth";
+import { useCacheStore } from "@stores/pinia/cache";
 
 export const useRequest = (service, ...params) => {
   const loading = ref(false);
@@ -46,17 +46,15 @@ export const useRequest = (service, ...params) => {
     try {
       const payload = newParams.length ? newParams : params;
       const cacheKey = hash({ service, payload });
-      const cached = store.state.cache.graphql[cacheKey];
+      const cacheStore = useCacheStore();
+      const cached = cacheStore.graphql[cacheKey];
       if (cached) {
         data.value = cached;
       } else {
         loading.value = true;
         data.value = await service(...payload);
         if (data.value) {
-          store.commit("cache/SET_GRAPHQL_CACHE", {
-            key: cacheKey,
-            value: data.value,
-          });
+          cacheStore.setGraphqlCache(cacheKey, data.value);
           cacheKeys.push(cacheKey);
         }
       }
@@ -77,10 +75,7 @@ export const useRequest = (service, ...params) => {
       loading.value = true;
       data.value = await service(...payload);
       if (data.value) {
-        store.commit("cache/SET_GRAPHQL_CACHE", {
-          key: cacheKey,
-          value: data.value,
-        });
+        useCacheStore().setGraphqlCache(cacheKey, data.value);
         cacheKeys.push(cacheKey);
       }
       return data.value;
@@ -96,7 +91,7 @@ export const useRequest = (service, ...params) => {
 
   const clearCache = () => {
     cacheKeys.push(hash({ service, payload: params }));
-    store.commit("cache/CLEAR_GRAPHQL_CACHES", { keys: cacheKeys });
+    useCacheStore().clearGraphqlCaches(cacheKeys);
     cacheKeys.length = 0;
   };
 

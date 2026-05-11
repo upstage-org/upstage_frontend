@@ -15,11 +15,10 @@ import { ColumnType, TablePaginationConfig } from "ant-design-vue/lib/table";
 import { SorterResult } from "ant-design-vue/lib/table/interface";
 import QuickStageAssignment from "./QuickStageAssignment.vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
-const store = useStore();
-const whoami = computed(() => store.getters["user/whoami"]);
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { whoami, isAdmin } = storeToRefs(useUserStore());
 
 const { t } = useI18n();
 const files = inject<Ref<UploadFile[]>>("files");

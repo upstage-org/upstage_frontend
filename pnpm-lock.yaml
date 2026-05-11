@@ -160,9 +160,6 @@ importers:
       vuex:
         specifier: 4.1.0
         version: 4.1.0(vue@3.5.34(typescript@6.0.3))
-      vuex-persistedstate:
-        specifier: 4.1.0
-        version: 4.1.0(vuex@4.1.0(vue@3.5.34(typescript@6.0.3)))
     devDependencies:
       '@eslint/js':
         specifier: ^9.39.4
@@ -2673,10 +2670,6 @@ packages:
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
 
-  deepmerge@4.3.1:
-    resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
-    engines: {node: '>=0.10.0'}
-
   default-browser-id@5.0.1:
     resolution: {integrity: sha512-x1VCxdX4t+8wVfd1so/9w+vQ4vx7lKd2Qp5tDRutErwmR85OgmfX7RlLRMWafRMY7hbEiXIbudNrjOAPa/hL8Q==}
     engines: {node: '>=18'}
@@ -4595,10 +4588,6 @@ packages:
     resolution: {integrity: sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw==}
     engines: {node: '>= 0.4'}
 
-  shvl@2.0.3:
-    resolution: {integrity: sha512-V7C6S9Hlol6SzOJPnQ7qzOVEWUQImt3BNmmzh40wObhla3XOYMe4gGiYzLrJd5TFa+cI2f9LKIRJTTKZSTbWgw==}
-    deprecated: older versions vulnerable to prototype pollution
-
   side-channel-list@1.0.1:
     resolution: {integrity: sha512-mjn/0bi/oUURjc5Xl7IaWi/OJJJumuoJFQJfDDyO46+hBWsfaVM65TBHq2eoZBhzl9EchxOijpkbRC8SVBQU0w==}
     engines: {node: '>= 0.4'}
@@ -5226,12 +5215,6 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
-
-  vuex-persistedstate@4.1.0:
-    resolution: {integrity: sha512-3SkEj4NqwM69ikJdFVw6gObeB0NHyspRYMYkR/EbhR0hbvAKyR5gksVhtAfY1UYuWUOCCA0QNGwv9pOwdj+XUQ==}
-    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
-    peerDependencies:
-      vuex: ^3.0 || ^4.0.0-rc
 
   vuex@4.1.0:
     resolution: {integrity: sha512-hmV6UerDrPcgbSy9ORAtNXDr9M4wlNP4pEFKye4ujJF8oqgFFuxDCdOLS3eNoRTtq5O3hoBDh9Doj1bQMYHRbQ==}
@@ -8130,8 +8113,6 @@ snapshots:
 
   deep-is@0.1.4: {}
 
-  deepmerge@4.3.1: {}
-
   default-browser-id@5.0.1: {}
 
   default-browser@5.5.0:
@@ -10249,8 +10230,6 @@ snapshots:
 
   shell-quote@1.8.3: {}
 
-  shvl@2.0.3: {}
-
   side-channel-list@1.0.1:
     dependencies:
       es-errors: 1.3.0
@@ -10906,12 +10885,6 @@ snapshots:
       '@vue/shared': 3.5.34
     optionalDependencies:
       typescript: 6.0.3
-
-  vuex-persistedstate@4.1.0(vuex@4.1.0(vue@3.5.34(typescript@6.0.3))):
-    dependencies:
-      deepmerge: 4.3.1
-      shvl: 2.0.3
-      vuex: 4.1.0(vue@3.5.34(typescript@6.0.3))
 
   vuex@4.1.0(vue@3.5.34(typescript@6.0.3)):
     dependencies:

@@ -1,18 +1,18 @@
 <script>
 import { computed } from "vue";
-import { useStore } from "vuex";
 import Loading from "components/Loading.vue";
 import { absolutePath } from "utils/common";
 import Entry from "components/stage/Entry.vue";
 import { MasonryWall } from "@yeger/vue-masonry-wall";
 import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 
 export default {
   name: "Home",
   components: { Loading, Entry, MasonryWall },
   setup: () => {
-    const store = useStore();
     const { result, loading } = useQuery(
       gql`
         query ListFoyerStage {
@@ -30,7 +30,7 @@ export default {
       `,
       null,
     );
-    const foyer = computed(() => store.getters["config/foyer"]);
+    const { foyer } = storeToRefs(useConfigStore());
     const visibleStages = computed(() => result?.value?.foyerStageList || []);
     return {
       visibleStages,

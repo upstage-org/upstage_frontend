@@ -9,7 +9,7 @@ import Icon from "components/Icon.vue";
 import { computed } from "vue";
 import humanizeDuration from "humanize-duration";
 import dayjs from "@utils/dayjs";
-import { useStore } from "vuex";
+import { useCacheStore } from "@stores/pinia/cache";
 import { notification } from "utils/notification";
 import { useClearStage } from "./composable";
 
@@ -17,8 +17,7 @@ export default {
   components: { CustomConfirm, Field, Icon, Loading },
   props: { stage: Object },
   setup: (props) => {
-    const store = useStore();
-    const refresh = () => store.dispatch("cache/fetchStages");
+    const refresh = () => useCacheStore().fetchStages();
 
     const form = reactive({
       name: "",

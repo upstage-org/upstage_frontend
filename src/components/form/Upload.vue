@@ -2,7 +2,9 @@
 import { ref } from "vue";
 import { computed, watch } from "vue";
 import { humanFileSize } from "utils/common";
-import { useStore } from "vuex";
+import { useConfigStore } from "@stores/pinia/config";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 import { imageExtensions, audioExtensions, videoExtensions } from "utils/constants";
 export default {
   props: {
@@ -14,10 +16,10 @@ export default {
   },
   emits: ["update:modelValue", "change"],
   setup: (props, { emit }) => {
-    const store = useStore();
-    const nginxLimit = computed(() => store.getters["config/uploadLimit"]);
+    const { uploadLimit: nginxLimit } = storeToRefs(useConfigStore());
+    const { user: currentUser } = storeToRefs(useUserStore());
     const mediaLimit = computed(() => {
-      let limit = store.state.user.user?.uploadLimit;
+      let limit = currentUser.value?.uploadLimit;
       if (!limit || props.acceptVideo) {
         limit = nginxLimit.value;
       }

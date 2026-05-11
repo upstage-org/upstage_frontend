@@ -1,11 +1,10 @@
 <script>
-import { computed } from "vue";
-import { useStore } from "vuex";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 
 export default {
   setup: () => {
-    const store = useStore();
-    const url = computed(() => store.getters["config/termsOfService"]);
+    const { termsOfService: url } = storeToRefs(useConfigStore());
     return { url };
   },
 };

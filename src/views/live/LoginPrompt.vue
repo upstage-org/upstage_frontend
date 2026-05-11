@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { animate } from "animejs";
 import { message } from "ant-design-vue";
 import LoginForm from "components/LoginForm.vue";
 import InputButtonPostfix from "components/form/InputButtonPostfix.vue";
+import { useAuthStore } from "@stores/pinia/auth";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
 const store = useStore();
-const loggedIn = computed<boolean>(() => store.getters["auth/loggedIn"]);
+const userStore = useUserStore();
+const { loggedIn } = storeToRefs(useAuthStore());
 const showing = ref<boolean>(!loggedIn.value);
 const showLoginForm = ref<boolean>(false);
 const nickname = ref<string>();
@@ -29,15 +33,15 @@ const close = () => (showing.value = false);
 
 watch(loggedIn, () => {
   if (loggedIn.value) {
-    store.dispatch("user/fetchCurrent").then(() => store.dispatch("stage/joinStage"));
+    userStore.fetchCurrent().then(() => store.dispatch("stage/joinStage"));
     close();
   }
 });
 
 const enterAsAudience = () => {
   if (!showLoginForm.value) {
-    store
-      .dispatch("user/saveNickname", { nickname: nickname.value })
+    userStore
+      .saveNickname({ nickname: nickname.value ?? "Guest" })
       .then((resolved: string = "Guest") => {
         message.success("Welcome to the stage! Your nickname is " + resolved + "!");
         close();

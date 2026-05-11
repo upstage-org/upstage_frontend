@@ -1,7 +1,7 @@
 <script>
 import Skeleton from "components/stage/Toolboxs/Skeleton.vue";
 import { computed, inject, onMounted, reactive, ref, watch } from "vue";
-import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
 import { useLowLevelAPI } from "./composable";
 
 export default {
@@ -70,8 +70,8 @@ export default {
       }
     };
 
-    const store = useStore();
-    const nickname = computed(() => store.getters["user/nickname"]);
+    const userStore = useUserStore();
+    const nickname = computed(() => userStore.nickname);
 
     const loadeddata = () => {
       loading.value = false;

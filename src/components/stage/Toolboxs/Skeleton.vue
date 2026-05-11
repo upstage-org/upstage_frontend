@@ -1,5 +1,6 @@
 <script>
 import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
 import { computed, reactive, ref } from "vue";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
@@ -76,7 +77,7 @@ export default {
     const holdable = computed(() => ["avatar"].includes(props.data.type));
     const hold = () => {
       if (props.real && holdable.value && !props.data.holder) {
-        store.dispatch("user/setAvatarId", props.data.id);
+        useUserStore().setAvatarId(props.data.id);
       }
     };
     const showMovable = () => {

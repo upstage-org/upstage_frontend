@@ -8,21 +8,50 @@ export function absolutePath(path: string) {
   return `${configs.STATIC_ASSETS_ENDPOINT}${path}`;
 }
 
+// `upstage-auth` is the key written by `pinia-plugin-persistedstate` for the
+// Pinia auth store (see `src/store/pinia/auth.ts`). After the Phase 5 cutover
+// from Vuex this is the single source of truth for the persisted access /
+// refresh tokens; the old `vuex` key (vuex-persistedstate, paths: ['auth'])
+// is gone.
+//
+// Both helpers read AND fall back to the legacy `vuex` key so a stale tab
+// (held open across a redeploy) still hands a token to Apollo for one final
+// refresh cycle, then the Pinia store will repersist under the new key on
+// the next setSharedAuth call.
+const AUTH_STORAGE_KEY = "upstage-auth";
+const LEGACY_AUTH_STORAGE_KEY = "vuex";
+
 export function getSharedAuth(): SharedAuth | undefined {
   try {
-    const sharedStateJSON = localStorage.getItem("vuex");
-    if (sharedStateJSON) {
-      const sharedState = JSON.parse(sharedStateJSON);
-      return sharedState.auth;
+    const piniaJSON = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (piniaJSON) {
+      const parsed = JSON.parse(piniaJSON);
+      // pinia-plugin-persistedstate writes the picked fields at the top level.
+      if (parsed && typeof parsed === "object") {
+        return parsed as SharedAuth;
+      }
+    }
+    const legacyJSON = localStorage.getItem(LEGACY_AUTH_STORAGE_KEY);
+    if (legacyJSON) {
+      const sharedState = JSON.parse(legacyJSON);
+      return sharedState?.auth;
     }
   } catch {
     console.log("No shared auth found. Try login using dashboard first!");
   }
+  return undefined;
 }
 
 export function setSharedAuth(auth: SharedAuth) {
-  const vuex = JSON.parse(localStorage.getItem("vuex") || "{}");
-  localStorage.setItem("vuex", JSON.stringify({ ...vuex, auth }));
+  const existing = (() => {
+    try {
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as Partial<SharedAuth>) : {};
+    } catch {
+      return {};
+    }
+  })();
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ ...existing, ...auth }));
 }
 
 export function humanFileSize(bytes: number, si = false, dp = 1) {

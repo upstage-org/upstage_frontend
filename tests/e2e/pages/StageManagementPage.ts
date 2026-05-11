@@ -63,8 +63,23 @@ export class StageManagementPage {
   async assignMediaIds(stageId: string, mediaIds: string[]): Promise<number> {
     return this.page.evaluate(
       async ({ stageId, mediaIds }) => {
-        const raw = window.localStorage.getItem("vuex");
-        const token = raw ? (JSON.parse(raw)?.auth?.token ?? null) : null;
+        // Auth lives at `upstage-auth` (Pinia) since Phase 5; fall back to
+        // the legacy `vuex` key so a stale tab still yields a token.
+        const readToken = (): string | null => {
+          for (const key of ["upstage-auth", "vuex"] as const) {
+            const raw = window.localStorage.getItem(key);
+            if (!raw) continue;
+            try {
+              const parsed = JSON.parse(raw) as { token?: string; auth?: { token?: string } };
+              const t = parsed?.token ?? parsed?.auth?.token ?? null;
+              if (t) return t;
+            } catch {
+              /* ignore */
+            }
+          }
+          return null;
+        };
+        const token = readToken();
         if (!token) throw new Error("[e2e] no auth token in localStorage");
         // Same origin as the SPA (Vite proxy → studio API) — never hit :3001 from
         // a page on :3000 (CORS) unless the backend lists that origin.
@@ -122,8 +137,23 @@ export class StageManagementPage {
   ): Promise<void> {
     await this.page.evaluate(
       async ({ stageId, userIdsByLevel }) => {
-        const raw = window.localStorage.getItem("vuex");
-        const token = raw ? (JSON.parse(raw)?.auth?.token ?? null) : null;
+        // Auth lives at `upstage-auth` (Pinia) since Phase 5; fall back to
+        // the legacy `vuex` key so a stale tab still yields a token.
+        const readToken = (): string | null => {
+          for (const key of ["upstage-auth", "vuex"] as const) {
+            const raw = window.localStorage.getItem(key);
+            if (!raw) continue;
+            try {
+              const parsed = JSON.parse(raw) as { token?: string; auth?: { token?: string } };
+              const t = parsed?.token ?? parsed?.auth?.token ?? null;
+              if (t) return t;
+            } catch {
+              /* ignore */
+            }
+          }
+          return null;
+        };
+        const token = readToken();
         if (!token) throw new Error("[e2e] no auth token in localStorage");
         const endpoint = new URL("studio_graphql", `${window.location.origin}/api/`).toString();
         const playerAccess = JSON.stringify([userIdsByLevel.player, userIdsByLevel.playerEdit]);

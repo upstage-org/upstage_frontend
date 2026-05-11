@@ -10,11 +10,12 @@ import { useI18n } from "vue-i18n";
 import { capitalize } from "utils/common";
 import { message } from "ant-design-vue";
 import { FetchResult } from "@apollo/client/core";
-import store from "store";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 import PlayerAudienceCounter from "components/stage/PlayerAudienceCounter.vue";
 
 const { t } = useI18n();
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { isAdmin } = storeToRefs(useUserStore());
 const enterStage = (stage: Stage) => {
   window.open(`/${stage.fileLocation}`, "_blank");
 };

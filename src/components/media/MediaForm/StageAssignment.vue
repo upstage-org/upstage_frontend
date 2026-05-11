@@ -3,7 +3,8 @@ import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
 import { ref, computed, watchEffect, PropType } from "vue";
 import { TransferItem } from "ant-design-vue/lib/transfer";
-import store from "store";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
 const props = defineProps({
   modelValue: {
@@ -13,7 +14,7 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["update:modelValue"]);
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { isAdmin } = storeToRefs(useUserStore());
 
 const { result } = useQuery(
   gql`
