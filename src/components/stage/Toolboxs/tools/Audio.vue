@@ -1,5 +1,5 @@
 <script>
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import { computed, ref } from "vue";
 import { useShortcut } from "../../composable";
@@ -9,35 +9,35 @@ import { animate } from "animejs";
 export default {
   components: { Icon },
   setup: () => {
-    const store = useStore();
-    const audios = ref(store.getters["stage/audios"] || []);
-    const audioPlayers = computed(() => store.state.stage.audioPlayers);
+    const stageStore = useStageStore();
+    const audios = ref(stageStore.audios || []);
+    const audioPlayers = computed(() => stageStore.audioPlayers);
 
     const togglePlaying = (audio, currentTime) => {
       audio.isPlaying = !audio.isPlaying;
       audio.currentTime = currentTime;
       audio.saken = true;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
     const stopAudio = (audio) => {
       audio.currentTime = 0;
       audio.saken = true;
       audio.isPlaying = false;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
     const toggleLoop = (audio, currentTime) => {
       audio.loop = !audio.loop;
       audio.currentTime = currentTime;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
     const seek = (audio, e) => {
       audio.currentTime = e.target.value;
       audio.saken = true;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
     const setVolume = (audio, _e) => {
       //audio.volume = e.target.value;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
 
     useShortcut((e) => {

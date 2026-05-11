@@ -1,7 +1,8 @@
 <script>
 import { computed, onMounted, ref, watch, watchEffect } from "vue";
 import { animate } from "animejs";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
 import Reaction from "./Reaction.vue";
@@ -12,14 +13,17 @@ export default {
   components: { ChatInput, Reaction, Icon, Messages, ClearChat },
   setup: () => {
     const theContent = ref();
-    const store = useStore();
-    const chatVisibility = computed(() => store.state.stage.settings.chatVisibility);
-    const chatDarkMode = computed(() => store.state.stage.settings.chatDarkMode);
+    const stageStore = useStageStore();
+    const userStore = useUserStore();
+    const chatVisibility = computed(() => stageStore.settings.chatVisibility);
+    const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
 
-    store.dispatch("stage/loadPermission");
+    stageStore.loadPermission();
 
-    const messages = computed(() => store.state.stage.chat.messages);
-    const loadingUser = computed(() => store.state.user.loadingUser);
+    const messages = computed(() => stageStore.chat.messages);
+    // `store.state.user.loadingUser` was a broken read after the user
+    // module moved to Pinia; Pinia user store has the real flag.
+    const loadingUser = computed(() => userStore.loadingUser);
     const message = ref("");
     const collapsed = ref(false);
     const scrollToEnd = () => {
@@ -30,7 +34,7 @@ export default {
     };
     const sendChat = () => {
       if (message.value.trim() && !loadingUser.value) {
-        store.dispatch("stage/sendChat", { message: message.value });
+        stageStore.sendChat({ message: message.value });
         message.value = "";
         scrollToEnd();
       }
@@ -46,12 +50,12 @@ export default {
     });
 
     const openChatSetting = () =>
-      store.dispatch("stage/openSettingPopup", {
+      stageStore.openSettingPopup({
         type: "ChatParameters",
       });
 
-    const opacity = computed(() => store.state.stage.chat.opacity);
-    const fontSize = computed(() => store.state.stage.chat.fontSize);
+    const opacity = computed(() => stageStore.chat.opacity);
+    const fontSize = computed(() => stageStore.chat.fontSize);
 
     const enter = (el, complete) => {
       animate(el, {
@@ -72,10 +76,10 @@ export default {
       let incValue = fontSize.value?.replace("px", "");
       incValue++;
       const parameters = {
-        opacity: store.state.stage.chat.opacity,
+        opacity: stageStore.chat.opacity,
         fontSize: `${incValue}px`,
       };
-      store.commit("stage/SET_CHAT_PARAMETERS", parameters);
+      stageStore.SET_CHAT_PARAMETERS(parameters);
       setTimeout(() => (theContent.value.scrollTop = theContent.value.scrollHeight));
     };
 
@@ -83,14 +87,14 @@ export default {
       let decValue = fontSize.value?.replace("px", "");
       decValue > 1 && decValue--;
       const parameters = {
-        opacity: store.state.stage.chat.opacity,
+        opacity: stageStore.chat.opacity,
         fontSize: `${decValue}px`,
       };
-      store.commit("stage/SET_CHAT_PARAMETERS", parameters);
+      stageStore.SET_CHAT_PARAMETERS(parameters);
     };
-    const chatPosition = computed(() => store.state.stage.chatPosition);
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+    const chatPosition = computed(() => stageStore.chatPosition);
+    const canPlay = computed(() => stageStore.canPlay);
+    const stageSize = computed(() => stageStore.stageSize);
 
     watchEffect(() => {
       if (!collapsed.value) {

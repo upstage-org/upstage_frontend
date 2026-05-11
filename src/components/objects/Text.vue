@@ -2,7 +2,7 @@
 // Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppObject from "./Object.vue";
 import MenuContent from "./Avatar/ContextMenuAvatar.vue"; // Text should inherit all of avatar behavior
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { computed, onMounted, ref, watch } from "vue";
 
 export default {
@@ -10,13 +10,13 @@ export default {
   props: { object: Object },
   setup: (props) => {
     const el = ref();
-    const store = useStore();
+    const stageStore = useStageStore();
 
     const isFocus = ref(false);
 
     const liveTyping = () => {
       const content = el.value.innerHTML;
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         content,
       });
@@ -34,7 +34,7 @@ export default {
       },
     );
 
-    const activeMovable = computed(() => store.getters["stage/activeMovable"] === props.object.id);
+    const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
     const mousedown = (e) => {
       if (activeMovable.value && props.object.editing) {
         e.stopPropagation();

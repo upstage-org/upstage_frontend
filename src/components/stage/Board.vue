@@ -1,6 +1,6 @@
 <script>
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import Avatar from "components/objects/Avatar/index.vue";
 import Drawing from "components/objects/Drawing.vue";
 import Meeting from "components/objects/MeetingObject/index.vue";
@@ -47,29 +47,30 @@ export default {
     Jitsi,
   },
   setup: () => {
-    const store = useStore();
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
+    const stageStore = useStageStore();
+    const canPlay = computed(() => stageStore.canPlay);
 
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const config = computed(() => store.getters["stage/config"]);
-    const objects = computed(() => store.getters["stage/objects"]);
+    const stageSize = computed(() => stageStore.stageSize);
+    const config = computed(() => stageStore.config);
+    const objects = computed(() => stageStore.objects);
     const drop = (e) => {
       const { object, isReal, nodrop } = JSON.parse(e.dataTransfer.getData("text"));
       if (isReal) {
         if (confirm("Are you sure you want to take this object off the stage?")) {
-          store.dispatch("stage/deleteObject", object);
+          stageStore.deleteObject(object);
         }
       } else {
         if (e.clientX > 0 && e.clientY > 0 && !nodrop) {
-          store
-            .dispatch("stage/placeObjectOnStage", {
-              ...object,
-              x: e.clientX - 50 - stageSize.value.left,
-              y: e.clientY - 50 - stageSize.value.top,
-            })
-            .then(({ id }) => {
-              store.dispatch("stage/autoFocusMoveable", id);
-            });
+          // Pinia `placeObjectOnStage` is synchronous and returns the
+          // placed object directly (the Vuex version's dispatch wrapper
+          // turned that into `Promise.resolve(object).then(({id}) =>
+          // ...)`). Consume the return value inline instead.
+          const placed = stageStore.placeObjectOnStage({
+            ...object,
+            x: e.clientX - 50 - stageSize.value.left,
+            y: e.clientY - 50 - stageSize.value.top,
+          });
+          stageStore.autoFocusMoveable(placed.id);
         }
       }
     };
@@ -93,7 +94,7 @@ export default {
       });
     };
 
-    const backdropColor = computed(() => store.state.stage.backdropColor);
+    const backdropColor = computed(() => stageStore.backdropColor);
 
     return {
       objects,

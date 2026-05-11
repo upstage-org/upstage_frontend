@@ -3,7 +3,7 @@
 import AppObject from "../Object.vue";
 import Loading from "components/Loading.vue";
 import { computed, inject, onMounted, ref, watch } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
 
 export default {
@@ -13,19 +13,17 @@ export default {
     closeMenu: Function,
   },
   setup: (props) => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const videoEl = ref();
     const audioEl = ref();
     const loading = ref(true);
 
     const tracks = computed(() =>
-      store.getters["stage/jitsiTracks"].filter(
-        (t) => t.getParticipantId() === props.object.participantId,
-      ),
+      stageStore.jitsiTracks.filter((t) => t.getParticipantId() === props.object.participantId),
     );
     const volume = computed(() => props.object.volume);
 
-    const reloadStreams = computed(() => store.getters["stage/reloadStreams"]);
+    const reloadStreams = computed(() => stageStore.reloadStreams);
     const videoTrack = computed(() => {
       const vTracks = tracks.value.filter((t) => t.type === "video");
       if (vTracks.find((t) => t.stream.active)) return vTracks.find((t) => t.stream.active);
@@ -64,7 +62,7 @@ export default {
             .map((p) => p.getId())
             .concat(jitsi.room.myUserId());
           if (!participants.some((p) => p === props.object.participantId)) {
-            store.dispatch("stage/deleteObject", props.object);
+            stageStore.deleteObject(props.object);
           }
         }
       },
@@ -84,7 +82,7 @@ export default {
     onMounted(() => loadTrack);
 
     const clip = (shape) => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         shape,
       });
@@ -105,18 +103,20 @@ export default {
       { immediate: true },
     );
 
-    const isPlayer = computed(() => store.getters["stage/canPlay"]);
+    const isPlayer = computed(() => stageStore.canPlay);
 
     const timeupdate = () => {
       interval && clearInterval(interval);
     };
 
+    // `openSettingPopup` is synchronous in Pinia; the previous
+    // `.then(slotProps.closeMenu)` chained onto Vuex's dispatch result
+    // ran on the next microtask. Inline is equivalent.
     const openVolumePopup = (slotProps) => {
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "VolumeParameters",
-        })
-        .then(slotProps.closeMenu);
+      stageStore.openSettingPopup({
+        type: "VolumeParameters",
+      });
+      slotProps.closeMenu();
     };
 
     const loadeddata = () => {

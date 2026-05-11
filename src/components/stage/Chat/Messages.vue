@@ -4,7 +4,7 @@ import Linkify from "components/Linkify.vue";
 import Divider from "components/Divider.vue";
 import ContextMenu from "components/ContextMenu.vue";
 import Icon from "components/Icon.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { computed } from "vue";
 
 export default {
@@ -14,26 +14,33 @@ export default {
     style: [String, Object],
   },
   setup: () => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const messageClass = {
       think: "has-text-info has-background-info-light",
       shout: "has-text-danger",
       highlighted: "has-background-warning",
     };
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const session = computed(() => store.state.stage.session);
+    const canPlay = computed(() => stageStore.canPlay);
+    const session = computed(() => stageStore.session);
 
     const time = (value) => {
       return dayjs(value).fromNow();
     };
 
+    // `removeChat` / `highlightChat` are synchronous in Pinia (the
+    // mqtt.sendMessage call is not awaited inside the action). The
+    // previous `.then(closeMenu)` chained onto Vuex's dispatch result
+    // ran on the next microtask; running the callback inline is
+    // equivalent.
     const removeChat = (item, closeMenu) => {
-      store.dispatch("stage/removeChat", item.id).then(closeMenu);
+      stageStore.removeChat(item.id);
+      closeMenu();
     };
 
     const highlightChat = (item, closeMenu) => {
       if (canPlay.value) {
-        store.dispatch("stage/highlightChat", item.id).then(closeMenu);
+        stageStore.highlightChat(item.id);
+        closeMenu();
       }
     };
 

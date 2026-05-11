@@ -1,19 +1,19 @@
 <script>
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { reactive, computed } from "vue";
 import HorizontalField from "components/form/HorizontalField.vue";
 export default {
   components: { Field, SaveButton, HorizontalField },
   emits: ["close"],
   setup: (_, { emit }) => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
 
     const form = reactive({ name: "" });
     const createRoom = async () => {
-      store.commit("stage/CREATE_ROOM", {
+      stageStore.CREATE_ROOM({
         type: "meeting",
         name: form.name,
         description: "",

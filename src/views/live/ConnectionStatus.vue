@@ -1,23 +1,27 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 import Popover from "components/Popover.vue";
 import Session from "./Session.vue";
 import ReloadStream from "./ReloadStream.vue";
 
-const store = useStore();
+const stageStore = useStageStore();
 const dot = ref<HTMLElement>();
 
+// `stageStore.model` is typed as `null` (see Pinia stage store header
+// comment); cast for the `status` read. Runtime guard handles the
+// pre-loadStage `null` case via the optional chain.
 const status = computed<string>(() => {
-  if (store.state.stage?.model?.status == "rehearsal") {
+  const model = stageStore.model as { status?: string } | null;
+  if (model?.status == "rehearsal") {
     return "REHEARSAL";
   }
-  return store.state.stage.status;
+  return stageStore.status;
 });
-const players = computed(() => store.getters["stage/players"]);
-const audiences = computed(() => store.getters["stage/audiences"]);
-const masquerading = computed<boolean>(() => store.state.stage.masquerading);
+const players = computed(() => stageStore.players);
+const audiences = computed(() => stageStore.audiences);
+const masquerading = computed<boolean>(() => stageStore.masquerading);
 const replaying = inject<boolean>("replaying");
 
 onMounted(() => {

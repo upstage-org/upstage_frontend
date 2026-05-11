@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, provide } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useRoute } from "vue-router";
 import Logo from "components/Logo.vue";
 import Chat from "components/stage/Chat/index.vue";
@@ -10,11 +10,11 @@ import Preloader from "views/live/Preloader.vue";
 import ConnectionStatus from "views/live/ConnectionStatus.vue";
 import Controls from "./Controls.vue";
 
-const store = useStore();
-const ready = computed<boolean>(() => store.state.stage.model && !store.state.stage.preloading);
+const stageStore = useStageStore();
+const ready = computed<boolean>(() => !!stageStore.model && !stageStore.preloading);
 
 const route = useRoute();
-store.dispatch("stage/loadStage", {
+stageStore.loadStage({
   url: route.params.url,
   recordId: route.params.id,
 });

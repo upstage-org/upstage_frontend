@@ -1,6 +1,6 @@
 <script>
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useDrawable } from "./composable";
 import ColorPicker from "components/form/ColorPicker.vue";
 import Icon from "components/Icon.vue";
@@ -11,11 +11,11 @@ import { v4 as uuidv4 } from "uuid";
 export default {
   components: { Skeleton, ColorPicker, Icon, ContextMenu },
   setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const drawings = computed(() => store.state.stage.board.drawings);
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
+    const drawings = computed(() => stageStore.board.drawings);
     const isDrawing = computed(() => {
-      return store.state.stage.preferences.isDrawing;
+      return stageStore.preferences.isDrawing;
     });
     const {
       el,
@@ -30,19 +30,19 @@ export default {
       history,
     } = useDrawable();
     const create = () => {
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
-      store.commit("stage/UPDATE_IS_DRAWING", true);
+      stageStore.SET_ACTIVE_MOVABLE(null);
+      stageStore.UPDATE_IS_DRAWING(true);
       clearCanvas(true);
     };
     const cancel = () => {
-      store.commit("stage/UPDATE_IS_DRAWING", false);
+      stageStore.UPDATE_IS_DRAWING(false);
     };
     const save = (type) => {
       const area = getDrawedArea();
       if (area) {
         const drawingId = uuidv4();
         const commands = [...history];
-        store.dispatch("stage/addDrawing", {
+        stageStore.addDrawing({
           ...area,
           commands,
           type,
@@ -53,11 +53,11 @@ export default {
     };
 
     const deleteDrawingPermanently = (drawing) => {
-      store.commit("stage/POP_DRAWING", drawing.drawingId);
-      store.getters["stage/objects"]
+      stageStore.POP_DRAWING(drawing.drawingId);
+      stageStore.objects
         .filter((o) => o.drawingId === drawing.drawingId)
         .forEach((o) => {
-          store.dispatch("stage/deleteObject", o);
+          stageStore.deleteObject(o);
         });
     };
 

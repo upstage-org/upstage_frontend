@@ -1,5 +1,5 @@
 <script>
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import Icon from "components/Icon.vue";
@@ -9,15 +9,15 @@ import Skeleton from "../Skeleton.vue";
 export default {
   components: { AppImage, Icon, Skeleton },
   setup: () => {
-    const store = useStore();
-    const curtains = store.state.stage.tools.curtains;
+    const stageStore = useStageStore();
+    const curtains = stageStore.tools.curtains;
 
-    const currentCurtain = computed(() => store.state.stage.curtain);
+    const currentCurtain = computed(() => stageStore.curtain);
     const toggleCurtain = (curtain) => {
       if (currentCurtain.value === curtain) {
-        store.dispatch("stage/drawCurtain", null);
+        stageStore.drawCurtain(null);
       } else {
-        store.dispatch("stage/drawCurtain", curtain);
+        stageStore.drawCurtain(curtain);
       }
     };
 

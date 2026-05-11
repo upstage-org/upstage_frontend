@@ -1,12 +1,12 @@
 <script>
 import Skeleton from "../Skeleton.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 
 export default {
   components: { Skeleton },
   setup: () => {
-    const store = useStore();
-    const props = store.state.stage.tools.props;
+    const stageStore = useStageStore();
+    const props = stageStore.tools.props;
     return { props };
   },
 };

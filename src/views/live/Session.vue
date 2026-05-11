@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import dayjs from "@utils/dayjs";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 
 interface SessionInfo {
   isPlayer?: boolean;
@@ -11,14 +11,17 @@ interface SessionInfo {
 
 const props = defineProps<{ session: SessionInfo }>();
 
-const store = useStore();
+const stageStore = useStageStore();
 const joinedAt = computed(() => dayjs(new Date(props.session.at)));
 const isOnline = computed(() => dayjs().diff(joinedAt.value, "minutes") < 60);
 
 const tagPlayer = () => {
   if (props.session.isPlayer) {
-    store.commit("stage/TAG_PLAYER", props.session);
-    store.dispatch("stage/showPlayerChat", true);
+    stageStore.TAG_PLAYER(props.session);
+    // Pinia rename: Vuex `dispatch("stage/showPlayerChat", v)` →
+    // Pinia `setShowPlayerChat(v)` (the original action name collided
+    // with the same-named state ref in Pinia setup-store syntax).
+    stageStore.setShowPlayerChat(true);
   }
 };
 </script>

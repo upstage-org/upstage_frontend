@@ -3,7 +3,7 @@ import Icon from "components/Icon.vue";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useMutation } from "services/graphql/composable";
 import { stageGraph } from "services/graphql";
 import { message } from "ant-design-vue";
@@ -13,16 +13,16 @@ export default {
   components: { Icon, AppImage, ContextMenu, Skeleton },
   props: { scene: Object },
   setup: (props) => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const switchScene = () => {
-      store.dispatch("stage/switchScene", props.scene.id);
+      stageStore.switchScene(props.scene.id);
       const audios = JSON.parse(props.scene.payload).audios;
       const audioPlayers = JSON.parse(props.scene.payload).audioPlayers;
       audios.forEach((audio, index) => {
         audio.currentTime = audioPlayers[index].currentTime;
         audio.changed = true;
         audio.saken = true;
-        store.dispatch("stage/updateAudioStatus", audio);
+        stageStore.updateAudioStatus(audio);
       });
     };
 
@@ -33,7 +33,7 @@ export default {
         const { success } = result.deleteScene;
         if (success) {
           message.success(result.deleteScene.message);
-          store.dispatch("stage/loadScenes");
+          stageStore.loadScenes();
         } else {
           message.error(result.deleteScene.message);
         }

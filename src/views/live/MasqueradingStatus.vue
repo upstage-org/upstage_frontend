@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 
-const store = useStore();
-const masquerading = computed<boolean>(() => store.state.stage.masquerading);
+const stageStore = useStageStore();
+const masquerading = computed<boolean>(() => stageStore.masquerading);
 const exitAudienceView = () => {
-  store.commit("stage/TOGGLE_MASQUERADING");
+  stageStore.TOGGLE_MASQUERADING();
 };
 </script>
 

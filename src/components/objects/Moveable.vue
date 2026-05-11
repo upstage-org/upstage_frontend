@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 
 export default {
@@ -16,9 +16,9 @@ export default {
     const el = ref();
     const isDragging = ref(false);
 
-    const store = useStore();
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const config = store.getters["stage/config"];
+    const stageStore = useStageStore();
+    const canPlay = computed(() => stageStore.canPlay);
+    const config = stageStore.config;
     const moveable = new Moveable(document.body, {
       draggable: true,
       resizable: true,
@@ -31,7 +31,7 @@ export default {
     const sendMovement = (target, { left, top }) => {
       target.style.left = `${props.object.x}px`;
       target.style.top = `${props.object.y}px`;
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         x: left,
         y: top,
@@ -56,7 +56,7 @@ export default {
       });
 
     const sendResize = (target, { width, height, left, top }) => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         x: left,
         y: top,
@@ -94,7 +94,7 @@ export default {
 
     const sendRotation = (target, rotate) => {
       target.style.transform = `rotate(${props.object.rotate}deg)`;
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         rotate,
       });
@@ -143,18 +143,18 @@ export default {
       }
     };
 
-    const activeMovable = computed(() => store.getters["stage/activeMovable"] === props.object.id);
+    const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
     const clickInside = (e) => {
       if (props.controlable && canPlay.value) {
         showControls(true, e);
-        store.commit("stage/SET_ACTIVE_MOVABLE", props.object.id);
+        stageStore.SET_ACTIVE_MOVABLE(props.object.id);
       }
     };
 
     const clickOutside = (e) => {
       if ((!e || e.target.id === "board") && props.controlable && canPlay.value) {
-        store.commit("stage/SET_ACTIVE_MOVABLE", null);
+        stageStore.SET_ACTIVE_MOVABLE(null);
       }
     };
     watch(
@@ -219,7 +219,7 @@ export default {
     });
 
     const transformOrigin = computed(() => {
-      const wearer = store.state.stage.board.objects.find((a) => a.id === props.object.wornBy);
+      const wearer = stageStore.board.objects.find((a) => a.id === props.object.wornBy);
       if (wearer) {
         return `${wearer.x + wearer.w / 2 - props.object.x}px ${
           wearer.y + wearer.h / 2 - props.object.y

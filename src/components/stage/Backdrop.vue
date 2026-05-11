@@ -1,17 +1,17 @@
 <script>
 import { computed, reactive } from "vue";
 import { watch } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "../Image.vue";
 
 export default {
   components: { AppImage },
   setup: () => {
-    const store = useStore();
-    const background = computed(() => store.state.stage.background);
-    const backgroundOpacity = computed(() => store.state.stage.background?.opacity ?? 1);
-    const transitionDuration = computed(() => (store.state.stage.background?.speed || 0) * 1000);
+    const stageStore = useStageStore();
+    const background = computed(() => stageStore.background);
+    const backgroundOpacity = computed(() => stageStore.background?.opacity ?? 1);
+    const transitionDuration = computed(() => (stageStore.background?.speed || 0) * 1000);
 
     const frameAnimation = reactive({
       interval: null,

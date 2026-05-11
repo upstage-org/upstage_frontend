@@ -1,10 +1,10 @@
 <script setup>
 import Track from "components/objects/MeetingObject/Track.vue";
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 
-const store = useStore();
-const tracks = computed(() => store.getters["stage/jitsiTracks"]);
+const stageStore = useStageStore();
+const tracks = computed(() => stageStore.jitsiTracks);
 </script>
 
 <template>

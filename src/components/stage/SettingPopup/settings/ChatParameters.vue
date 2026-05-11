@@ -1,6 +1,6 @@
 <script>
 import { computed, reactive, ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import HorizontalField from "components/form/HorizontalField.vue";
 import Field from "components/form/Field.vue";
@@ -16,7 +16,7 @@ export default {
   setup: (props, { emit }) => {
     const form = reactive({});
     const loading = ref(false);
-    const store = useStore();
+    const stageStore = useStageStore();
     const userStore = useUserStore();
     const nickname = computed(() => userStore.chatname);
     const downloadOptions = ref({
@@ -24,9 +24,9 @@ export default {
       playerChat: false,
     });
 
-    const chats = computed(() => store.state.stage.chat);
-    const downloadChatVisibility = computed(() => store.state.stage.showDownloadChatSetting);
-    const stageUrl = store.getters["stage/url"];
+    const chats = computed(() => stageStore.chat);
+    const downloadChatVisibility = computed(() => stageStore.showDownloadChatSetting);
+    const stageUrl = stageStore.url;
 
     const saveNickname = () => {
       loading.value = true;
@@ -119,11 +119,11 @@ export default {
 
     const currentTab = ref("nickname");
     const parameters = reactive({
-      opacity: store.state.stage.chat.opacity,
-      fontSize: store.state.stage.chat.fontSize,
+      opacity: stageStore.chat.opacity,
+      fontSize: stageStore.chat.fontSize,
     });
     const saveParameters = () => {
-      store.commit("stage/SET_CHAT_PARAMETERS", parameters);
+      stageStore.SET_CHAT_PARAMETERS(parameters);
       emit("close");
       message.success("Chat parameters saved successfully!");
     };

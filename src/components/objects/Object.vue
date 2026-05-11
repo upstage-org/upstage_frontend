@@ -1,5 +1,5 @@
 <script>
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { computed, provide, reactive, ref, watch } from "vue";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
@@ -22,20 +22,17 @@ export default {
   props: { object: Object },
   emits: ["dblclick"],
   setup(props) {
-    // Dom refs
     const el = ref();
     const video = ref();
-    // Vuex store
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
 
-    // Local state
     const active = ref(false);
     const sliderMode = ref("opacity");
     const beforeDragPosition = ref();
-    const isHolding = computed(() => props.object.holder?.id === store.state.stage.session);
+    const isHolding = computed(() => props.object.holder?.id === stageStore.session);
     const holdable = computed(() => ["avatar"].includes(props.object.type));
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
+    const canPlay = computed(() => stageStore.canPlay);
     const controlable = computed(() => {
       return holdable.value ? isHolding.value : canPlay.value && !props.object.wornBy;
     });
@@ -43,7 +40,7 @@ export default {
 
     const deleteObject = () => {
       if (controlable.value) {
-        //store.dispatch("stage/deleteObject", props.object);
+        //stageStore.deleteObject(props.object);
       }
     };
 
@@ -89,10 +86,10 @@ export default {
         useUserStore().setAvatarId(props.object.id);
       }
     };
-    const activeMovable = computed(() => store.getters["stage/activeMovable"] === props.object.id);
+    const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
     const isWearing = computed(
-      () => props.object.wornBy && store.getters["stage/currentAvatar"]?.id === props.object.wornBy,
+      () => props.object.wornBy && stageStore.currentAvatar?.id === props.object.wornBy,
     );
     provide("isWearing", isWearing);
 

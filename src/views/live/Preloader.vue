@@ -1,13 +1,24 @@
 <script setup lang="ts">
 import { computed, inject, onUnmounted, ref, watch, watchEffect } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 import { useAttribute } from "services/graphql/composable";
 
-const store = useStore();
-const preloading = computed<boolean>(() => store.state.stage.preloading);
-const preloadableAssets = computed<string[]>(() => store.getters["stage/preloadableAssets"]);
-const model = computed(() => store.state.stage.model);
+const stageStore = useStageStore();
+const preloading = computed<boolean>(() => stageStore.preloading);
+const preloadableAssets = computed<string[]>(() => stageStore.preloadableAssets);
+// `stageStore.model` is inferred as `null` because the Pinia store
+// file uses `// @ts-nocheck` (its types never escape). A local cast
+// is the smallest patch; tightening the store's exported types is
+// tracked as a follow-up.
+interface ModelShape {
+  id?: string | number;
+  cover?: string;
+  name?: string;
+  description?: string;
+  status?: string;
+}
+const model = computed(() => stageStore.model as unknown as ModelShape | null);
 const progress = ref<number>(0);
 watch(
   () => model.value?.id,
@@ -15,7 +26,7 @@ watch(
     progress.value = 0;
   },
 );
-const stopLoading = () => store.commit("stage/SET_PRELOADING_STATUS", false);
+const stopLoading = () => stageStore.SET_PRELOADING_STATUS(false);
 const increaseProgress = () => {
   progress.value++;
   if (
@@ -61,7 +72,10 @@ onUnmounted(() => {
 });
 
 const replaying = inject<boolean>("replaying");
-const ready = computed<boolean>(() => store.getters["stage/ready"]);
+// `stageStore.ready` returns `null | boolean` (it's `model && !preloading`
+// in the store, and `model` is typed as `null`). Coerce to a proper
+// boolean for the explicit `<boolean>` annotation.
+const ready = computed<boolean>(() => !!stageStore.ready);
 const clicked = ref<boolean>(false);
 const leave = (el: Element, complete: () => void) => {
   animate(el as HTMLElement, {
@@ -70,9 +84,11 @@ const leave = (el: Element, complete: () => void) => {
     onComplete: complete,
   });
 };
-const backdropColor = computed<string>(() => store.state.stage.backdropColor);
-const canPlay = computed<boolean>(() => store.getters["stage/canPlay"]);
-const masquerading = computed<boolean>(() => store.state.stage.masquerading);
+const backdropColor = computed<string>(() => stageStore.backdropColor);
+// `canPlay` is `permission?.role === 'player'` in the store, which
+// narrows to `boolean | null` since `permission` is nullable. Coerce.
+const canPlay = computed<boolean>(() => !!stageStore.canPlay);
+const masquerading = computed<boolean>(() => stageStore.masquerading);
 </script>
 
 <template>
@@ -82,7 +98,9 @@ const masquerading = computed<boolean>(() => store.state.stage.masquerading);
       class="hero is-fullheight is-fullwidth cover-image"
       :class="{ replaying }"
       :style="{
-        'background-image': model && `url(&quot;${model.cover || '/img/greencurtain.jpg'}&quot;)`,
+        'background-image': model
+          ? `url(&quot;${model.cover || '/img/greencurtain.jpg'}&quot;)`
+          : undefined,
         'background-color': backdropColor,
       }"
       @click="clicked = true"

@@ -22,10 +22,13 @@ const app = createApp(App)
   .directive("click-outside", ClickOutside);
 
 if (import.meta.env.DEV || import.meta.env.VITE_E2E) {
-  // Vuex (now stage-only) — kept under the original name so existing test
-  // helpers continue to dispatch `stage/...` actions without changes.
+  // Vuex (now stage-only, and itself just a Pinia-backed facade after
+  // Wave D). Still exposed under its original name so the e2e suites
+  // in `tests/e2e/*` can keep calling `dispatch("stage/...")` /
+  // reading `state.stage.X` without refactoring. Wave F deletes both
+  // the Vuex facade and this hook in favour of `__UPSTAGE_PINIA__.stage`.
   window.__UPSTAGE_STORE__ = store;
-  // Pinia (auth/cache/config/user). Tests that previously read
+  // Pinia (auth/cache/config/user/stage). Tests that previously read
   // `__UPSTAGE_STORE__.state.user.avatarId` etc. should switch to
   // `__UPSTAGE_PINIA__.user.avatarId`. We attach lazy getter functions
   // (rather than calling `useAuthStore()` etc. at load time) so the dev
@@ -58,9 +61,10 @@ if (import.meta.env.DEV || import.meta.env.VITE_E2E) {
         get user() {
           return useUserStore();
         },
-        // Wave C scaffold: Pinia `stage` store is exposed for probes but
-        // no app code consumes it yet (Wave D will start migrating
-        // consumers off `store.state.stage` / `store.dispatch("stage/…")`).
+        // Pinia stage store — after Wave E, this is the authoritative
+        // source for stage state. The Vuex hook above is a thin
+        // forwarder that routes back here. Migrate e2e helpers to use
+        // this directly in Wave F.
         get stage() {
           return useStageStore();
         },

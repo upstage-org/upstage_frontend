@@ -1,6 +1,7 @@
 <script>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Linkify from "components/Linkify.vue";
@@ -13,11 +14,15 @@ export default {
     active: Boolean,
   },
   setup: (props) => {
-    const store = useStore();
-    const isHolding = computed(() => props.object.id === store.state.user.avatarId);
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
+    const stageStore = useStageStore();
+    const userStore = useUserStore();
+    // `store.state.user.avatarId` was a broken read after the user
+    // module moved to Pinia (Vuex root has no `user` slot); reading
+    // from the Pinia user store is correct.
+    const isHolding = computed(() => props.object.id === userStore.avatarId);
+    const canPlay = computed(() => stageStore.canPlay);
 
-    const config = computed(() => store.getters["stage/config"]);
+    const config = computed(() => stageStore.config);
 
     const now = ref(Date.now());
     let timer = null;
@@ -118,13 +123,13 @@ export default {
 
     const openChatBox = () => {
       if (isHolding.value) {
-        store.dispatch("stage/openSettingPopup", {
+        stageStore.openSettingPopup({
           type: "ChatBox",
           simple: true,
         });
       }
     };
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+    const stageSize = computed(() => stageStore.stageSize);
     const bubbleStyle = computed(() => {
       if (!props.object.speak?.message) {
         return {};

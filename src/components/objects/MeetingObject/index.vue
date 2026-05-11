@@ -3,7 +3,7 @@
 import AppObject from "../Object.vue";
 import Loading from "components/Loading.vue";
 import { computed, onMounted, ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { useJitsiDomain } from "./composable";
 
@@ -11,7 +11,7 @@ export default {
   components: { AppObject, Loading },
   props: { object: Object },
   setup: (props) => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const userStore = useUserStore();
     const room = ref();
     const meeting = computed(() => props.object);
@@ -40,7 +40,7 @@ export default {
       console.log(api);
     });
 
-    const activeMovable = computed(() => store.getters["stage/activeMovable"]);
+    const activeMovable = computed(() => stageStore.activeMovable);
 
     return { meeting, room, activeMovable };
   },

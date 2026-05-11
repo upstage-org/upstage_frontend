@@ -1,6 +1,7 @@
 <script>
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 export default {
   props: {
     active: Boolean,
@@ -9,7 +10,8 @@ export default {
   },
   emits: ["update:active"],
   setup: (props, { emit }) => {
-    const store = useStore();
+    const stageStore = useStageStore();
+    const userStore = useUserStore();
     const maxMoveSpeed = 1000;
     const value = computed(() => {
       switch (props.sliderMode) {
@@ -23,7 +25,7 @@ export default {
     });
 
     const sendChangeOpacity = (e) => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         opacity: e.target.value,
       });
@@ -32,7 +34,7 @@ export default {
     const calcMoveSpeed = (e) => (e.target.value == 0 ? 10000 : maxMoveSpeed / e.target.value);
 
     const sendChangeMoveSpeed = (e) => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         moveSpeed: calcMoveSpeed(e),
       });
@@ -43,7 +45,7 @@ export default {
     };
 
     const sendChangeVolume = (e) => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         volume: e.target.value,
       });
@@ -64,9 +66,12 @@ export default {
       }
     };
 
-    const isHolding = computed(() => props.object.id === store.state.user.avatarId);
+    // `store.state.user.avatarId` was a broken read after the user
+    // module moved to Pinia in Phase 5 (Vuex root has no `user` slot).
+    // Pinia user store is the real source of truth.
+    const isHolding = computed(() => props.object.id === userStore.avatarId);
     const holdable = computed(() => ["avatar"].includes(props.object.type));
-    const activeMovable = computed(() => store.getters["stage/activeMovable"]);
+    const activeMovable = computed(() => stageStore.activeMovable);
     const showSlider = computed(
       () => (isHolding.value || !holdable.value) && activeMovable.value === props.object.id,
     );

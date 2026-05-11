@@ -1,7 +1,8 @@
 <script>
 import { computed, onMounted, ref, watch } from "vue";
 import { animate } from "animejs";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
 import Messages from "./Messages.vue";
@@ -13,12 +14,16 @@ export default {
   setup: () => {
     const theChatbox = ref();
     const theContent = ref();
-    const store = useStore();
+    const stageStore = useStageStore();
+    const userStore = useUserStore();
 
-    const messages = computed(() => store.state.stage.chat.privateMessages);
-    const loadingUser = computed(() => store.state.user.loadingUser);
-    const chat = store.state.stage.chat;
-    const message = computed(() => store.state.stage.chat.privateMessage);
+    const messages = computed(() => stageStore.chat.privateMessages);
+    // `store.state.user.loadingUser` was a broken read after the user
+    // module moved to Pinia (Vuex root has no `user` slot). Pinia user
+    // store has the real flag.
+    const loadingUser = computed(() => userStore.loadingUser);
+    const chat = stageStore.chat;
+    const message = computed(() => stageStore.chat.privateMessage);
     const scrollToEnd = () => {
       animate(theContent.value, {
         scrollTop: theContent.value?.scrollHeight,
@@ -27,7 +32,7 @@ export default {
     };
     const sendChat = () => {
       if (message.value.trim() && !loadingUser.value) {
-        store.dispatch("stage/sendChat", {
+        stageStore.sendChat({
           message: message.value,
           isPrivate: true,
         });
@@ -38,8 +43,8 @@ export default {
     watch(messages.value, scrollToEnd);
     onMounted(scrollToEnd);
 
-    const opacity = computed(() => store.state.stage.chat.opacity);
-    const fontSize = computed(() => store.state.stage.chat.playerFontSize);
+    const opacity = computed(() => stageStore.chat.opacity);
+    const fontSize = computed(() => stageStore.chat.playerFontSize);
 
     const enter = (el, complete) => {
       animate(el, {
@@ -96,9 +101,11 @@ export default {
       isMovingable.value = !isMovingable.value;
     };
 
-    const playerChatVisibility = computed(() => store.state.stage.showPlayerChat);
+    const playerChatVisibility = computed(() => stageStore.showPlayerChat);
     const minimiseToToolbox = () => {
-      store.dispatch("stage/showPlayerChat", false);
+      // Pinia rename: action `showPlayerChat` → `setShowPlayerChat`
+      // (collided with same-named state ref in Pinia setup store).
+      stageStore.setShowPlayerChat(false);
       moveable.setState({ target: null });
       isMovingable.value = false;
     };
@@ -109,7 +116,7 @@ export default {
       const parameters = {
         playerFontSize: `${incValue}px`,
       };
-      store.commit("stage/SET_PLAYER_CHAT_PARAMETERS", parameters);
+      stageStore.SET_PLAYER_CHAT_PARAMETERS(parameters);
       setTimeout(() => (theContent.value.scrollTop = theContent.value.scrollHeight));
     };
 
@@ -119,7 +126,7 @@ export default {
       const parameters = {
         playerFontSize: `${decValue}px`,
       };
-      store.commit("stage/SET_PLAYER_CHAT_PARAMETERS", parameters);
+      stageStore.SET_PLAYER_CHAT_PARAMETERS(parameters);
     };
 
     // Click and drag functionality

@@ -1,47 +1,48 @@
 <script>
 import Icon from "components/Icon.vue";
 import ColorPicker from "components/form/ColorPicker.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { computed } from "vue";
 import { message } from "ant-design-vue";
 export default {
   components: { Icon, ColorPicker },
   setup: () => {
-    const store = useStore();
-    const chatVisibility = computed(() => store.state.stage.settings.chatVisibility);
-    const chatDarkMode = computed(() => store.state.stage.settings.chatDarkMode);
-    const reactionVisibility = computed(() => store.state.stage.settings.reactionVisibility);
+    const stageStore = useStageStore();
+    const chatVisibility = computed(() => stageStore.settings.chatVisibility);
+    const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
+    const reactionVisibility = computed(() => stageStore.settings.reactionVisibility);
 
     const showChat = (value) => {
-      store.dispatch("stage/showChatBox", value);
+      stageStore.showChatBox(value);
     };
 
     const enableDarkModeChat = (value) => {
-      store.dispatch("stage/enableDarkModeChat", value);
+      stageStore.enableDarkModeChat(value);
     };
 
     const showReactions = (value) => {
-      store.dispatch("stage/showReactionsBar", value);
+      stageStore.showReactionsBar(value);
     };
 
+    // `clearChat` is synchronous in Pinia; the previous `.then(...)`
+    // was a Vuex-dispatch artefact.
     const clearChat = () => {
-      store.dispatch("stage/clearChat").then(() => {
-        message.success("Chat cleared successfully!");
-      });
+      stageStore.clearChat();
+      message.success("Chat cleared successfully!");
     };
 
-    const backdropColor = computed(() => store.state.stage.backdropColor);
+    const backdropColor = computed(() => stageStore.backdropColor);
     const sendBackdropColor = (color) => {
-      store.dispatch("stage/setBackdropColor", color);
+      stageStore.setBackdropColor(color);
     };
 
-    const chatPosition = computed(() => store.state.stage.chatPosition);
+    const chatPosition = computed(() => stageStore.chatPosition);
     const toggleChatPosition = () => {
-      store.dispatch("stage/setChatPosition", chatPosition.value === "left" ? "right" : "left");
+      stageStore.setChatPosition(chatPosition.value === "left" ? "right" : "left");
     };
 
     const masqueradeAudience = () => {
-      store.commit("stage/TOGGLE_MASQUERADING");
+      stageStore.TOGGLE_MASQUERADING();
     };
 
     return {

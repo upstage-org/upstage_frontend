@@ -1,23 +1,29 @@
 <script>
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 import { reactive, computed } from "vue";
 import HorizontalField from "components/form/HorizontalField.vue";
 export default {
   components: { Field, SaveButton, HorizontalField },
   emits: ["close"],
   setup: (_, { emit }) => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+    const stageStore = useStageStore();
+    const userStore = useUserStore();
+    const stageSize = computed(() => stageStore.stageSize);
 
     const form = reactive({ name: "" });
     const createRoom = async () => {
-      store.commit("stage/CREATE_STREAM", {
+      // Note: `store.state.user.user?.email` worked by accident — the
+      // Vuex root store no longer has a `user` module (it was migrated
+      // to Pinia), so the read returned undefined under a swallowed
+      // error. Reading from the Pinia user store directly is correct.
+      stageStore.CREATE_STREAM({
         type: "stream",
         jitsi: true,
         name: form.name,
-        description: store.state.user.user?.email,
+        description: userStore.user?.email,
         w: stageSize.value.width / 2,
         h: stageSize.value.height / 2,
       });

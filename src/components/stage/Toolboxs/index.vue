@@ -3,26 +3,26 @@ import { computed, provide, ref } from "vue";
 import TopBar from "./TopBar.vue";
 import PanelItem from "./PanelItem.vue";
 import PlayerChatTool from "./PlayerChatTool.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 
 export default {
   components: { TopBar, PanelItem, PlayerChatTool },
   setup: () => {
     const tool = ref();
-    const store = useStore();
+    const stageStore = useStageStore();
     const changeTool = (newTool) => {
       if (tool.value === newTool) {
         tool.value = undefined;
       } else {
         tool.value = newTool;
       }
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
+      stageStore.SET_ACTIVE_MOVABLE(null);
     };
     provide("tool", tool);
     provide("changeTool", changeTool);
 
     const isScene = computed(() => tool.value === "Scene");
-    const enabledLiveStreaming = computed(() => store.getters["stage/enabledLiveStreaming"]);
+    const enabledLiveStreaming = computed(() => stageStore.enabledLiveStreaming);
 
     return {
       tool,

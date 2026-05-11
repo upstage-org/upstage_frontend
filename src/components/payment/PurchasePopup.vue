@@ -1,6 +1,6 @@
 <script>
 import { computed, ref, watch, onBeforeMount } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import { paymentGraph } from "services/graphql";
 import { useMutation } from "services/graphql/composable";
@@ -12,12 +12,12 @@ import config from "config";
 export default {
   components: { Icon, StripeElements, StripeElement },
   setup() {
-    const store = useStore();
-    const isActive = computed(() => store.state.stage.purchasePopup.isActive);
-    const title = computed(() => store.state.stage.purchasePopup.title);
-    const amount = computed(() => store.state.stage.purchasePopup.amount);
-    const isReceiptPopupActive = computed(() => store.state.stage.receiptPopup.isActive);
-    const donationDetails = computed(() => store.state.stage.receiptPopup.donationDetails);
+    const stageStore = useStageStore();
+    const isActive = computed(() => stageStore.purchasePopup.isActive);
+    const title = computed(() => stageStore.purchasePopup.title);
+    const amount = computed(() => stageStore.purchasePopup.amount);
+    const isReceiptPopupActive = computed(() => stageStore.receiptPopup.isActive);
+    const donationDetails = computed(() => stageStore.receiptPopup.donationDetails);
     const loading = ref(false);
     const clientSecret = ref();
     const isReceiptFormActive = ref(false);
@@ -25,11 +25,11 @@ export default {
     const generating = ref(false);
 
     const close = () => {
-      store.dispatch("stage/closePurchasePopup");
+      stageStore.closePurchasePopup();
     };
 
     const closeReceiptPopup = () => {
-      store.dispatch("stage/closeReceiptPopup");
+      stageStore.closeReceiptPopup();
     };
 
     const openReceiptForm = () => {
@@ -105,7 +105,7 @@ export default {
           } else {
             message.success("Donate to UpStage success!");
             close();
-            store.dispatch("stage/openReceiptPopup", {
+            stageStore.openReceiptPopup({
               amount: amount.value,
               date: new Date().toLocaleDateString(),
             });

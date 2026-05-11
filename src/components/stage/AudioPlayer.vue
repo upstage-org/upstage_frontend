@@ -1,18 +1,18 @@
 <script>
 import { computed, onMounted, watch } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 export default {
   setup: () => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const stopAudio = (audio) => {
-      store.dispatch("stage/updateAudioStatus", {
+      stageStore.updateAudioStatus({
         ...audio,
         isPlaying: false,
         currentTime: 0,
       });
     };
-    const audios = store.getters["stage/audios"];
+    const audios = stageStore.audios;
     let refs = [];
     const setRef = (el) => {
       const index = refs.length;
@@ -29,13 +29,13 @@ export default {
           }
         });
         el.addEventListener("loadedmetadata", function () {
-          store.commit("stage/UPDATE_AUDIO_PLAYER_STATUS", {
+          stageStore.UPDATE_AUDIO_PLAYER_STATUS({
             index,
             duration: el.duration,
           });
         });
         el.addEventListener("timeupdate", function () {
-          store.commit("stage/UPDATE_AUDIO_PLAYER_STATUS", {
+          stageStore.UPDATE_AUDIO_PLAYER_STATUS({
             index,
             currentTime: el.currentTime,
           });
@@ -51,8 +51,8 @@ export default {
     };
 
     const speed = computed(() => {
-      if (store.state.stage.replay.isReplaying) {
-        return Math.min(store.state.stage.replay.speed, 8);
+      if (stageStore.replay.isReplaying) {
+        return Math.min(stageStore.replay.speed, 8);
       }
       return 1;
     });

@@ -1,6 +1,6 @@
 <script>
 import { computed, onMounted, onUnmounted, watch } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import ColorPicker from "components/form/ColorPicker.vue";
 import Icon from "components/Icon.vue";
 import { useDrawable } from "./Draw/composable";
@@ -8,19 +8,19 @@ import { useDrawable } from "./Draw/composable";
 export default {
   components: { ColorPicker, Icon },
   setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
     const isDrawing = computed(() => {
-      return store.state.stage.preferences.isDrawing;
+      return stageStore.preferences.isDrawing;
     });
     const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } = useDrawable();
 
     onMounted(() => {
-      store.commit("stage/UPDATE_IS_DRAWING", true);
+      stageStore.UPDATE_IS_DRAWING(true);
     });
 
     onUnmounted(() => {
-      store.commit("stage/UPDATE_IS_DRAWING", false);
+      stageStore.UPDATE_IS_DRAWING(false);
     });
 
     watch(history, (val) => {
@@ -39,18 +39,18 @@ export default {
             fromY: line.fromY * ratio,
           })),
         };
-        store.dispatch("stage/sendDrawWhiteboard", command);
+        stageStore.sendDrawWhiteboard(command);
         clearCanvas(true);
       }
     });
 
     const undo = () => {
-      store.dispatch("stage/sendUndoWhiteboard");
+      stageStore.sendUndoWhiteboard();
       clearCanvas(true);
     };
 
     const clear = () => {
-      store.dispatch("stage/sendClearWhiteboard");
+      stageStore.sendClearWhiteboard();
       clearCanvas(true);
     };
 

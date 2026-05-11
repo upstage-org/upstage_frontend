@@ -1,14 +1,20 @@
 // @ts-nocheck
 import configs from "config";
-import store from "store";
+import { useStageStore } from "@stores/pinia/stage";
+
+// These helpers used to read from the Vuex root store. They now go
+// straight to the Pinia stage store; during Wave D the Vuex stage
+// module is a thin Pinia-backed facade, so the previous indirection
+// added a Proxy hop with no benefit. `useStageStore()` is cheap to
+// call repeatedly — Pinia caches the instance.
 
 export function toRelative(size) {
-  const stageSize = store.getters["stage/stageSize"];
+  const stageSize = useStageStore().stageSize;
   return size / stageSize.width;
 }
 
 export function toAbsolute(size) {
-  const stageSize = store.getters["stage/stageSize"];
+  const stageSize = useStageStore().stageSize;
   return size * stageSize.width;
 }
 
@@ -45,14 +51,14 @@ export function deserializeObject(object) {
 }
 
 export function namespaceTopic(topicName, stageUrl) {
-  const url = stageUrl ?? store.getters["stage/url"];
+  const url = stageUrl ?? useStageStore().url;
   const namespace = configs.MQTT_NAMESPACE;
   return `${namespace}/${url}/${topicName}`;
 }
 
 export function unnamespaceTopic(topicName) {
   if (topicName == null || typeof topicName !== "string") return "";
-  const url = store.getters["stage/url"];
+  const url = useStageStore().url;
   const namespace = configs.MQTT_NAMESPACE;
   if (url == null || namespace == null) return topicName;
   const prefixLen = String(namespace).length + String(url).length + 2;
@@ -77,6 +83,7 @@ export function getDefaultStageSettings() {
 }
 
 export function takeSnapshotFromStage() {
+  const stageStore = useStageStore();
   const {
     background,
     backdropColor,
@@ -84,7 +91,7 @@ export function takeSnapshotFromStage() {
     settings,
     audioPlayers,
     tools,
-  } = store.state.stage;
+  } = stageStore;
   const board = Object.assign({}, originalBoard);
   board.objects = originalBoard.objects.filter((o) => o.liveAction).map(serializeObject);
   board.tracks = [];
@@ -97,7 +104,7 @@ export function takeSnapshotFromStage() {
     audios: tools.audios,
   });
   tools.audios?.forEach((audio) => {
-    store.dispatch("stage/updateAudioStatus", {
+    stageStore.updateAudioStatus({
       ...audio,
       isPlaying: false,
     });

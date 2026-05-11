@@ -1,7 +1,7 @@
 <script>
 import { computed, reactive, ref } from "vue";
 import SaveButton from "components/form/SaveButton.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { avatarSpeak } from "services/speech";
 import { getDefaultVariant, getVariantList, getVoiceList } from "services/speech/voice";
 
@@ -12,8 +12,8 @@ export default {
   props: { modelValue: Object },
   emits: ["close", "update:modelValue"],
   setup: (props, { emit }) => {
-    const store = useStore();
-    const currentAvatar = computed(() => store.getters["stage/currentAvatar"]);
+    const stageStore = useStageStore();
+    const currentAvatar = computed(() => stageStore.currentAvatar);
     const voices = getVoiceList();
     const variants = getVariantList();
     const parameters = reactive(props.modelValue ? props.modelValue : currentAvatar.value?.voice);
@@ -25,13 +25,17 @@ export default {
       avatarSpeak({ voice: parameters }, test.value);
     };
 
+    // `shapeObject` is synchronous in Pinia (fires MQTT publish but
+    // doesn't await it). The Vuex version was the same shape; Vuex's
+    // dispatch just wrapped the undefined return in Promise.resolve(),
+    // so the previous `.then(() => emit("close"))` ran on the next
+    // microtask. Running the emit inline is functionally equivalent.
     const save = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...currentAvatar.value,
-          voice: parameters,
-        })
-        .then(() => emit("close"));
+      stageStore.shapeObject({
+        ...currentAvatar.value,
+        voice: parameters,
+      });
+      emit("close");
     };
 
     return { save, parameters, voices, variants, test, testVoice };

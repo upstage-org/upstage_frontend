@@ -1,5 +1,5 @@
 <script>
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { computed } from "vue";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
@@ -11,17 +11,17 @@ import Skeleton from "../Skeleton.vue";
 export default {
   components: { AppImage, Icon, ContextMenu, Skeleton },
   setup: () => {
-    const store = useStore();
-    const currentBackground = computed(() => store.state.stage.background ?? {});
+    const stageStore = useStageStore();
+    const currentBackground = computed(() => stageStore.background ?? {});
 
-    const backgrounds = computed(() => store.state.stage.tools.backdrops);
+    const backgrounds = computed(() => stageStore.tools.backdrops);
 
     const setBackground = (background) => {
-      store.dispatch("stage/setBackground", background);
+      stageStore.setBackground(background);
     };
 
     const changeBackdropSpeed = (e) => {
-      store.dispatch("stage/setBackground", {
+      stageStore.setBackground({
         ...currentBackground.value,
         speed: e.target.value,
       });
@@ -32,7 +32,7 @@ export default {
       if (!currentBackground.value.speed) {
         speed = currentBackground.value.lastSpeed ?? 0.5;
       }
-      store.dispatch("stage/setBackground", {
+      stageStore.setBackground({
         ...currentBackground.value,
         lastSpeed: currentBackground.value.speed,
         speed,
@@ -40,7 +40,7 @@ export default {
     };
 
     const switchBackdropFrame = (currentFrame) => {
-      store.dispatch("stage/setBackground", {
+      stageStore.setBackground({
         ...currentBackground.value,
         currentFrame,
       });

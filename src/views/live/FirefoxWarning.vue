@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
-import { useStore } from "vuex";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
 import Copy from "components/Copy.vue";
+import { useStageStore } from "@stores/pinia/stage";
 
 const publicPath = "/";
-const store = useStore();
+const stageStore = useStageStore();
 const isFirefox = navigator.userAgent.indexOf("Firefox") != -1;
-const status = computed<string>(() => store.state.stage.status);
+const status = computed<string>(() => stageStore.status);
 const visible = computed<boolean>(
   () => isFirefox && (status.value === "CONNECTING" || status.value === "OFFLINE"),
 );

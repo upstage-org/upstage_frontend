@@ -5,17 +5,17 @@ import ColorPicker from "components/form/ColorPicker.vue";
 import ContextMenu from "components/ContextMenu.vue";
 import Skeleton from "../Skeleton.vue";
 import Icon from "components/Icon.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { computed, onUnmounted, ref } from "vue";
 import { v4 as uuidv4 } from "uuid";
 
 export default {
   components: { Dropdown, Field, ColorPicker, Skeleton, Icon, ContextMenu },
   setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const isWriting = computed(() => store.state.stage.preferences.isWriting);
-    const options = store.state.stage.preferences.text;
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
+    const isWriting = computed(() => stageStore.preferences.isWriting);
+    const options = stageStore.preferences.text;
     const fontFamilies = [
       "Josefin Sans",
       "Arial",
@@ -65,8 +65,8 @@ export default {
     };
 
     const createText = () => {
-      store.commit("stage/UPDATE_IS_WRITING", true);
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
+      stageStore.UPDATE_IS_WRITING(true);
+      stageStore.SET_ACTIVE_MOVABLE(null);
       onClickWriting({
         clientX: window.innerWidth / 2 - 200,
         clientY: window.innerHeight / 2 - 50,
@@ -74,7 +74,7 @@ export default {
     };
 
     const cancelWriting = () => {
-      store.commit("stage/UPDATE_IS_WRITING", false);
+      stageStore.UPDATE_IS_WRITING(false);
     };
 
     const el = ref();
@@ -82,7 +82,7 @@ export default {
       const { width, height } = el.value.getBoundingClientRect() ?? {};
       const x = e.clientX - stageSize.value.left - width / 2;
       const y = e.clientY - stageSize.value.top - height / 2;
-      store.commit("stage/UPDATE_TEXT_OPTIONS", {
+      stageStore.UPDATE_TEXT_OPTIONS({
         left: x + "px",
         top: y + "px",
         x,
@@ -93,9 +93,9 @@ export default {
 
     const saveText = async () => {
       const { width, height } = el.value.getBoundingClientRect() ?? {};
-      store.commit("stage/UPDATE_IS_WRITING", false);
+      stageStore.UPDATE_IS_WRITING(false);
       const textId = uuidv4();
-      store.dispatch("stage/addText", {
+      stageStore.addText({
         ...options,
         content: el.value.innerHTML,
         w: width + 10,
@@ -109,7 +109,7 @@ export default {
       if (!options.fontWeight) {
         fontWeight = "bold";
       }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { fontWeight });
+      stageStore.UPDATE_TEXT_OPTIONS({ fontWeight });
     };
 
     const toggleItalic = () => {
@@ -117,7 +117,7 @@ export default {
       if (!options.fontStyle) {
         fontStyle = "italic";
       }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { fontStyle });
+      stageStore.UPDATE_TEXT_OPTIONS({ fontStyle });
     };
 
     const toggleUnderline = () => {
@@ -125,10 +125,10 @@ export default {
       if (!options.textDecoration) {
         textDecoration = "underline";
       }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { textDecoration });
+      stageStore.UPDATE_TEXT_OPTIONS({ textDecoration });
     };
 
-    const savedTexts = computed(() => store.state.stage.board.texts);
+    const savedTexts = computed(() => stageStore.board.texts);
     const fontDropdownOpen = (visible) => {
       const topbar = document.querySelector("#topbar");
       if (topbar) {
@@ -144,11 +144,11 @@ export default {
     });
 
     const deleteTextPermanently = (text) => {
-      store.commit("stage/POP_TEXT", text.textId);
-      store.getters["stage/objects"]
+      stageStore.POP_TEXT(text.textId);
+      stageStore.objects
         .filter((o) => o.textId === text.textId)
         .forEach((o) => {
-          store.dispatch("stage/deleteObject", o);
+          stageStore.deleteObject(o);
         });
     };
     onUnmounted(() => {

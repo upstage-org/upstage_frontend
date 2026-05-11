@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
 import EventIndicator from "./EventIndicator.vue";
@@ -13,10 +13,14 @@ interface ReplayTimestamp {
   end: number;
 }
 
-const store = useStore();
-const timestamp = computed<ReplayTimestamp>(() => store.state.stage.replay.timestamp);
-const isPlaying = computed<boolean>(() => store.state.stage.replay.interval);
-const speed = computed<number>(() => store.state.stage.replay.speed);
+const stageStore = useStageStore();
+const timestamp = computed<ReplayTimestamp>(() => stageStore.replay.timestamp);
+// `replay.interval` is a `setInterval` handle (number) when playing
+// and `null` when paused. The original `<boolean>` annotation worked
+// because Vuex state was typed as `any`; under Pinia it surfaces as
+// `number | null`. Coerce to boolean for the template guard.
+const isPlaying = computed<boolean>(() => !!stageStore.replay.interval);
+const speed = computed<number>(() => stageStore.replay.speed);
 const speeds = [0.5, 1, 2, 4, 8, 16, 32];
 const speedIndex = computed<number>(() => {
   // Allow for an unknown stored speed (e.g., set externally) by snapping
@@ -40,19 +44,19 @@ const showSpeedWarning = ref<boolean>(false);
 
 const seek = (e: Event) => {
   const target = e.target as HTMLInputElement;
-  store.dispatch("stage/replayRecording", target.value);
+  stageStore.replayRecording(target.value);
 };
 
 const play = () => {
-  store.dispatch("stage/replayRecording", timestamp.value.current);
+  stageStore.replayRecording(timestamp.value.current);
 };
 
 const pause = () => {
-  store.dispatch("stage/pauseReplay");
+  stageStore.pauseReplay();
 };
 
 const applySpeed = (newSpeed: number) => {
-  store.commit("stage/SET_REPLAY", { speed: newSpeed });
+  stageStore.SET_REPLAY({ speed: newSpeed });
   // If we're mid-playback, restart at the current timestamp so the new
   // rate takes effect immediately (replayRecording reads `speed` at the
   // top of the action and reschedules every event timer).
@@ -73,8 +77,8 @@ const onSpeedSelect = (e: Event) => {
   }
 };
 
-const seekForward = () => store.dispatch("stage/seekForwardReplay");
-const seekBackward = () => store.dispatch("stage/seekBackwardReplay");
+const seekForward = () => stageStore.seekForwardReplay();
+const seekBackward = () => stageStore.seekBackwardReplay();
 
 const collapsed = ref<boolean>(false);
 

@@ -1,5 +1,5 @@
 <script>
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { computed, reactive, ref } from "vue";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
@@ -29,7 +29,7 @@ export default {
   },
   emits: ["dragstart"],
   setup: (props, { emit }) => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const position = reactive({
       isDragging: false,
     });
@@ -51,7 +51,7 @@ export default {
     const dragend = () => {
       document.getElementById("meeting-room")?.classList.remove("disable-pointer");
       if (props.real) {
-        store.commit("stage/SET_ACTIVE_MOVABLE", null);
+        stageStore.SET_ACTIVE_MOVABLE(null);
       }
     };
 
@@ -67,11 +67,16 @@ export default {
 
     const touchend = () => {
       position.isDragging = false;
-      store.dispatch(props.real ? "stage/shapeObject" : "stage/placeObjectOnStage", {
+      const payload = {
         ...props.data,
         x: position.x,
         y: position.y,
-      });
+      };
+      if (props.real) {
+        stageStore.shapeObject(payload);
+      } else {
+        stageStore.placeObjectOnStage(payload);
+      }
     };
 
     const holdable = computed(() => ["avatar"].includes(props.data.type));
@@ -83,11 +88,9 @@ export default {
     const showMovable = () => {
       if (
         props.real &&
-        (!props.data.holder ||
-          !holdable.value ||
-          props.data.holder.id === store.state.stage.session)
+        (!props.data.holder || !holdable.value || props.data.holder.id === stageStore.session)
       ) {
-        store.commit("stage/SET_ACTIVE_MOVABLE", props.data.id);
+        stageStore.SET_ACTIVE_MOVABLE(props.data.id);
       }
     };
 
@@ -95,13 +98,13 @@ export default {
       dropzone.value = false;
       const { object } = JSON.parse(e.dataTransfer.getData("text"));
       if (props.real) {
-        store.dispatch("stage/bringToFrontOf", {
+        stageStore.bringToFrontOf({
           front: object.id,
           back: props.data.id,
         });
       } else {
         // Re-order toolbox
-        store.commit("stage/REORDER_TOOLBOX", {
+        stageStore.REORDER_TOOLBOX({
           from: object,
           to: props.data,
         });

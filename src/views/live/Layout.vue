@@ -11,7 +11,7 @@ import Preloader from "./Preloader.vue";
 import LoginPrompt from "./LoginPrompt.vue";
 import ConnectionStatus from "./ConnectionStatus.vue";
 import MasqueradingStatus from "./MasqueradingStatus.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { computed, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import { loggedIn } from "utils/auth";
@@ -32,23 +32,26 @@ export default {
     Shell,
   },
   setup: () => {
-    const store = useStore();
-    const ready = computed(() => store.getters["stage/ready"]);
+    const stageStore = useStageStore();
+    const ready = computed(() => stageStore.ready);
 
     const route = useRoute();
-    store.dispatch("stage/loadStage", { url: route.params.url }).then(() => {
-      store.dispatch("stage/connect");
+    // `loadStage` is an async Pinia action (it awaits a GraphQL
+    // request), so the .then(...) chain remains valid after the move
+    // off Vuex's dispatch wrapper.
+    stageStore.loadStage({ url: route.params.url }).then(() => {
+      stageStore.connect();
     });
 
     onUnmounted(() => {
-      store.dispatch("stage/disconnect");
+      stageStore.disconnect();
     });
 
     window.addEventListener("beforeunload", () => {
-      store.dispatch("stage/disconnect");
+      stageStore.disconnect();
     });
 
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
+    const canPlay = computed(() => stageStore.canPlay);
 
     return {
       ready,

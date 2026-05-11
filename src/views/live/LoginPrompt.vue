@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import { useStore } from "vuex";
 import { animate } from "animejs";
 import { message } from "ant-design-vue";
 import LoginForm from "components/LoginForm.vue";
 import InputButtonPostfix from "components/form/InputButtonPostfix.vue";
 import { useAuthStore } from "@stores/pinia/auth";
+import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 
-const store = useStore();
+const stageStore = useStageStore();
 const userStore = useUserStore();
 const { loggedIn } = storeToRefs(useAuthStore());
 const showing = ref<boolean>(!loggedIn.value);
@@ -33,7 +33,7 @@ const close = () => (showing.value = false);
 
 watch(loggedIn, () => {
   if (loggedIn.value) {
-    userStore.fetchCurrent().then(() => store.dispatch("stage/joinStage"));
+    userStore.fetchCurrent().then(() => stageStore.joinStage());
     close();
   }
 });
@@ -50,7 +50,7 @@ const enterAsAudience = () => {
 };
 
 const onLoginSuccess = () => {
-  store.dispatch("stage/reloadPermission");
+  stageStore.reloadPermission();
 };
 </script>
 

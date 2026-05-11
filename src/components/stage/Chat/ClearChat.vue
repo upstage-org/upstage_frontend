@@ -6,8 +6,8 @@ import buildClient from "services/mqtt";
 import { TOPICS } from "utils/constants";
 import { namespaceTopic } from "store/modules/stage/reusable";
 import { useRoute } from "vue-router";
-import { useStore } from "vuex";
 import { computed } from "vue";
+import { useStageStore } from "@stores/pinia/stage";
 const mqttClient = buildClient();
 
 export default {
@@ -16,7 +16,7 @@ export default {
   setup: (props) => {
     const clearing = ref(false);
     const route = useRoute();
-    const store = useStore();
+    const stageStore = useStageStore();
     console.log(props.option);
     const clearChat = async () => {
       clearing.value = true;
@@ -38,7 +38,7 @@ export default {
       }
     };
 
-    const clearChatVisibility = computed(() => store.state.stage.showClearChatSetting);
+    const clearChatVisibility = computed(() => stageStore.showClearChatSetting);
 
     return { clearChat, clearing, clearChatVisibility };
   },

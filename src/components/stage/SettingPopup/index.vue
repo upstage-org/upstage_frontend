@@ -1,6 +1,6 @@
 <script>
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import ChatBox from "./settings/ChatBox.vue";
 import ChatParameters from "./settings/ChatParameters.vue";
 import VoiceParameters from "./settings/VoiceParameters.vue";
@@ -20,15 +20,15 @@ export default {
     CreateRoom,
   },
   setup: () => {
-    const store = useStore();
-    const isActive = computed(() => store.state.stage.settingPopup.isActive);
-    const type = computed(() => store.state.stage.settingPopup.type);
-    const title = computed(() => store.state.stage.settingPopup.title);
-    const simple = computed(() => store.state.stage.settingPopup.simple);
+    const stageStore = useStageStore();
+    const isActive = computed(() => stageStore.settingPopup.isActive);
+    const type = computed(() => stageStore.settingPopup.type);
+    const title = computed(() => stageStore.settingPopup.title);
+    const simple = computed(() => stageStore.settingPopup.simple);
     const modal = ref();
 
     const close = () => {
-      store.dispatch("stage/closeSettingPopup");
+      stageStore.closeSettingPopup();
     };
     return { isActive, close, modal, type, title, simple };
   },

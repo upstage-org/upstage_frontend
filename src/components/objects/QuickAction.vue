@@ -1,6 +1,7 @@
 <script>
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 export default {
   props: {
     object: Object,
@@ -8,33 +9,37 @@ export default {
   },
   emits: ["update:active"],
   setup: (props, { emit }) => {
-    const store = useStore();
-    const isHolding = computed(() => props.object.id === store.state.user.avatarId);
+    const stageStore = useStageStore();
+    const userStore = useUserStore();
+    // `store.state.user.avatarId` was a broken read after the user
+    // module moved to Pinia in Phase 5; Pinia user store is the
+    // correct source.
+    const isHolding = computed(() => props.object.id === userStore.avatarId);
 
     const keepActive = () => {
       emit("update:active", true);
     };
 
     const toggleLiveAction = () => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         liveAction: !props.object.liveAction,
       });
     };
 
     const deleteObject = () => {
-      store.dispatch("stage/deleteObject", props.object);
+      stageStore.deleteObject(props.object);
     };
 
     const editText = () => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         editing: !props.object.editing,
       });
     };
 
     const holdable = computed(() => ["avatar"].includes(props.object.type));
-    const activeMovable = computed(() => store.getters["stage/activeMovable"]);
+    const activeMovable = computed(() => stageStore.activeMovable);
     const showQuickActions = computed(
       () => (isHolding.value || !holdable.value) && activeMovable.value === props.object.id,
     );

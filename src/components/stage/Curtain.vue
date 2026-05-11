@@ -1,13 +1,13 @@
 <script>
 import { computed } from "vue";
 import { animate } from "animejs";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 export default {
   setup: () => {
-    const store = useStore();
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const curtain = computed(() => store.state.stage.curtain);
-    const config = computed(() => store.getters["stage/config"]);
+    const stageStore = useStageStore();
+    const canPlay = computed(() => stageStore.canPlay);
+    const curtain = computed(() => stageStore.curtain);
+    const config = computed(() => stageStore.config);
     const curtainSpeed = computed(() => config.value?.animations?.curtainSpeed ?? 3000);
 
     const curtainEnter = (el, complete) => {

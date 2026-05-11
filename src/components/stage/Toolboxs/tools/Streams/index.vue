@@ -1,6 +1,6 @@
 <script>
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import Skeleton from "../../Skeleton.vue";
 
 export default {
@@ -8,10 +8,10 @@ export default {
     Skeleton,
   },
   setup: () => {
-    const store = useStore();
+    const stageStore = useStageStore();
 
     const videos = computed(() => {
-      const res = [...(store.state.stage.tools?.videos || [])];
+      const res = [...(stageStore.tools?.videos || [])];
       return res;
     });
 

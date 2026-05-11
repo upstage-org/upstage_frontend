@@ -1,9 +1,18 @@
 <script>
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { computed, inject, ref } from "vue";
 import Icon from "components/Icon.vue";
 
+// `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
+// `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
+// synchronous in Pinia (the underlying MQTT publish isn't awaited).
+// In Vuex, `dispatch(...)` wrapped the undefined return in
+// `Promise.resolve(undefined)`, so callers could chain `.then(...)` to
+// run their continuation on the next microtask. The continuations
+// here (`props.closeMenu` / `emit('update:active', true)`) don't need
+// to wait for the publish to land, so we call them inline — which is
+// the same observable behaviour, minus one microtask of latency.
 export default {
   components: { Icon },
   props: {
@@ -16,7 +25,7 @@ export default {
   },
   emits: ["update:active", "hold"],
   setup: (props, { emit }) => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const userStore = useUserStore();
 
     const holdAvatar = () => {
@@ -30,11 +39,12 @@ export default {
     };
 
     const deleteObject = () => {
-      store.dispatch("stage/deleteObject", props.object).then(props.closeMenu);
+      stageStore.deleteObject(props.object);
+      props.closeMenu();
     };
 
     const switchFrame = (frame) => {
-      store.dispatch("stage/switchFrame", {
+      stageStore.switchFrame({
         ...props.object,
         src: frame,
       });
@@ -42,7 +52,7 @@ export default {
 
     const flipHorizontal = () => {
       const scaleX = -1 * (props.object.scaleX ?? 1);
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         scaleX,
       });
@@ -50,43 +60,42 @@ export default {
 
     const flipVertical = () => {
       const scaleY = -1 * (props.object.scaleY ?? 1);
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         scaleY,
       });
     };
 
     const toggleAutoplayFrames = () => {
-      store
-        .dispatch("stage/toggleAutoplayFrames", {
-          ...props.object,
-          ...(props.object.autoplayFrames
-            ? {
-                autoplayFrames: null,
-                lastAutoplayFrames: props.object.autoplayFrames,
-              }
-            : {
-                autoplayFrames: props.object.lastAutoplayFrames || 1,
-              }),
-        })
-        .then(() => {
-          emit("update:active", true);
-        });
+      stageStore.toggleAutoplayFrames({
+        ...props.object,
+        ...(props.object.autoplayFrames
+          ? {
+              autoplayFrames: null,
+              lastAutoplayFrames: props.object.autoplayFrames,
+            }
+          : {
+              autoplayFrames: props.object.lastAutoplayFrames || 1,
+            }),
+      });
+      emit("update:active", true);
     };
 
-    const changeNickname = () =>
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "ChatParameters",
-        })
-        .then(props.closeMenu);
+    const changeNickname = () => {
+      stageStore.openSettingPopup({
+        type: "ChatParameters",
+      });
+      props.closeMenu();
+    };
 
     const bringToFront = () => {
-      store.dispatch("stage/bringToFront", props.object).then(props.closeMenu);
+      stageStore.bringToFront(props.object);
+      props.closeMenu();
     };
 
     const sendToBack = () => {
-      store.dispatch("stage/sendToBack", props.object).then(props.closeMenu);
+      stageStore.sendToBack(props.object);
+      props.closeMenu();
     };
 
     const changeSliderMode = (mode) => {
@@ -97,51 +106,50 @@ export default {
 
     const holdable = inject("holdable") ?? ref();
     const isHolding = computed(
-      () => props.object.holder && props.object.holder.id === store.state.stage.session,
+      () => props.object.holder && props.object.holder.id === stageStore.session,
     );
 
     const openVoiceSetting = () => {
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "VoiceParameters",
-        })
-        .then(props.closeMenu);
+      stageStore.openSettingPopup({
+        type: "VoiceParameters",
+      });
+      props.closeMenu();
     };
 
     const isWearing = inject("isWearing");
-    const currentAvatar = computed(() => store.getters["stage/currentAvatar"]);
+    const currentAvatar = computed(() => stageStore.currentAvatar);
 
     const wearCostume = () => {
       if (currentAvatar.value) {
-        store
-          .dispatch("stage/shapeObject", {
-            ...props.object,
-            rotate: 0,
-            wornBy: currentAvatar.value.id,
-          })
-          .then(props.closeMenu);
+        stageStore.shapeObject({
+          ...props.object,
+          rotate: 0,
+          wornBy: currentAvatar.value.id,
+        });
+        props.closeMenu();
       }
     };
 
     const takeOffCostume = () => {
       if (isWearing.value) {
-        store
-          .dispatch("stage/shapeObject", {
-            ...props.object,
-            wornBy: null,
-          })
-          .then(props.closeMenu);
+        stageStore.shapeObject({
+          ...props.object,
+          wornBy: null,
+        });
+        props.closeMenu();
       }
     };
 
     const deletePermanently = () => {
       if (props.object.drawingId) {
-        store.dispatch("stage/deleteObject", props.object).then(props.closeMenu);
-        store.commit("stage/POP_DRAWING", props.object.drawingId);
+        stageStore.deleteObject(props.object);
+        props.closeMenu();
+        stageStore.POP_DRAWING(props.object.drawingId);
       }
       if (props.object.textId) {
-        store.dispatch("stage/deleteObject", props.object).then(props.closeMenu);
-        store.commit("stage/POP_TEXT", props.object.textId);
+        stageStore.deleteObject(props.object);
+        props.closeMenu();
+        stageStore.POP_TEXT(props.object.textId);
       }
     };
 
@@ -155,50 +163,45 @@ export default {
       return props.object.autoplayFrames || "";
     });
     const handleChangeAnimationSpeed = (e) => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         autoplayFrames: e.target.value,
       });
     };
 
     const pauseVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          isPlaying: false,
-        })
-        .then(props.closeMenu);
+      stageStore.shapeObject({
+        ...props.object,
+        isPlaying: false,
+      });
+      props.closeMenu();
     };
     const playVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          isPlaying: true,
-        })
-        .then(props.closeMenu);
+      stageStore.shapeObject({
+        ...props.object,
+        isPlaying: true,
+      });
+      props.closeMenu();
     };
     const openVolumePopup = () => {
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "VolumeParameters",
-        })
-        .then(props.closeMenu);
+      stageStore.openSettingPopup({
+        type: "VolumeParameters",
+      });
+      props.closeMenu();
     };
     const toggleVideoLoop = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          loop: !props.object.loop,
-        })
-        .then(props.closeMenu);
+      stageStore.shapeObject({
+        ...props.object,
+        loop: !props.object.loop,
+      });
+      props.closeMenu();
     };
     const restartVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          replayed: (props.object.replayed || 0) + 1,
-        })
-        .then(props.closeMenu);
+      stageStore.shapeObject({
+        ...props.object,
+        replayed: (props.object.replayed || 0) + 1,
+      });
+      props.closeMenu();
     };
     return {
       switchFrame,

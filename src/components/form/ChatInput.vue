@@ -4,7 +4,7 @@ import { computed, ref, nextTick } from "vue";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import ElasticInput from "components/form/ElasticInput.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { useHoldingShift } from "../stage/composable";
 
 export default {
@@ -21,9 +21,9 @@ export default {
     const input = ref();
     const isPicking = ref(false);
     const emojiPicker = ref();
-    const store = useStore();
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const chatDarkMode = computed(() => store.state.stage.settings.chatDarkMode);
+    const stageStore = useStageStore();
+    const canPlay = computed(() => stageStore.canPlay);
+    const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
 
     const isHoldingShift = useHoldingShift();
 

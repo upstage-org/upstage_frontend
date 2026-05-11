@@ -1,7 +1,7 @@
 // @ts-nocheck
 import configs from "config";
 import { onMounted, ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 
 export const useLowLevelAPI = () => {
   const { JitsiMeetJS } = window;
@@ -18,8 +18,8 @@ export const useJitsi = () => {
   const joined = ref(false);
   const jitsi = { room: null, connection: null };
   const domain = useJitsiDomain();
-  const store = useStore();
-  const stageUrl = store.getters["stage/url"];
+  const stageStore = useStageStore();
+  const stageUrl = stageStore.url;
 
   const JitsiMeetJS = useLowLevelAPI();
 
@@ -39,7 +39,7 @@ export const useJitsi = () => {
       console.log("Connection established", e);
       jitsi.room = jitsi.connection.initJitsiConference(stageUrl, {});
       jitsi.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track) => {
-        store.dispatch("stage/addTrack", track);
+        stageStore.addTrack(track);
       });
       jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e) => {
         console.log("Conference joined", e);

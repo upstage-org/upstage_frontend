@@ -1,6 +1,6 @@
 <script>
 import { computed, watch } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
@@ -10,9 +10,9 @@ export default {
   components: { ChatInput, Icon },
   props: { customEmoji: Object },
   setup: () => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const userStore = useUserStore();
-    const reactionVisibility = computed(() => store.state.stage.settings.reactionVisibility);
+    const reactionVisibility = computed(() => stageStore.settings.reactionVisibility);
     watch(reactionVisibility, console.log);
     const nickname = computed(() => {
       const n = userStore.nickname;
@@ -24,10 +24,10 @@ export default {
 
     const reactions = ["❤️", "🤣", "🙌", "👏"];
     const sendReaction = (react) => {
-      store.dispatch("stage/sendReaction", react);
+      stageStore.sendReaction(react);
     };
 
-    const flyingReactions = computed(() => store.state.stage.reactions);
+    const flyingReactions = computed(() => stageStore.reactions);
 
     const flyin = (el) => {
       animate(el, {
@@ -53,7 +53,7 @@ export default {
     };
 
     const openChatSetting = () =>
-      store.dispatch("stage/openSettingPopup", {
+      stageStore.openSettingPopup({
         type: "ChatParameters",
       });
 

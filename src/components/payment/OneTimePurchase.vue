@@ -1,16 +1,16 @@
 <script>
 import { ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { message } from "ant-design-vue";
 
 export default {
   setup: () => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const amount = ref(null);
 
     const openPurchasePopup = () => {
       if (amount.value && amount.value != 0) {
-        store.dispatch("stage/openPurchasePopup", {
+        stageStore.openPurchasePopup({
           type: "OneTimePurchase",
           amount: amount.value,
           title: "Donate to UpStage (amounts shown in US dollars)",
