@@ -188,8 +188,18 @@ export default {
     });
 
     const join = async () => {
-      if (!joined.value) return;
+      console.log("[diag] Yourself.join() entered", {
+        joined: joined.value,
+        tracksLen: tracks.length,
+        myUserId: jitsi.room?.myUserId?.(),
+        dataParticipantId: data.participantId,
+      });
+      if (!joined.value) {
+        console.warn("[diag] Yourself.join(): early-return because joined === false");
+        return;
+      }
       for (const t of tracks) {
+        console.log("[diag] Yourself.join(): calling room.addTrack for track", t?.type);
         try {
           // room.addTrack returns a Promise that resolves once
           // lib-jitsi-meet has registered the track on the local
@@ -202,6 +212,7 @@ export default {
           // ownerless" entry that never re-evaluates (Vue cannot track
           // a JS method call on a non-reactive JitsiTrack).
           await jitsi.room.addTrack(t);
+          console.log("[diag] Yourself.join(): room.addTrack resolved for", t?.type, "participantId:", t.getParticipantId?.());
         } catch (err) {
           console.warn("room.addTrack failed:", err);
           continue;
@@ -217,6 +228,7 @@ export default {
         // TRACK_ADDED for the local conference (the republish will
         // simply swap in the same JitsiTrack reference).
         stageStore.addTrack(t);
+        console.log("[diag] Yourself.join(): stageStore.addTrack pushed; jitsiTracks length now", stageStore.jitsiTracks?.length);
       }
     };
 
@@ -258,7 +270,7 @@ export default {
     <div v-if="blocked" class="blocked-tag" :title="blockedMessage">
       <span class="tag is-warning is-small">{{ blockedMessage }}</span>
     </div>
-    <Skeleton v-else :data="data" class="p-2" :on-dragstart="join" style="flex-direction: column">
+    <Skeleton v-else :data="data" class="p-2" style="flex-direction: column" @dragstart="join">
       <video
         ref="el"
         :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"

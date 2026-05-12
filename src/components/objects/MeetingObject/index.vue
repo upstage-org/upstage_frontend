@@ -5,7 +5,7 @@ import Loading from "components/Loading.vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
-import { useJitsiDomain } from "./composable";
+import { useJitsiEndpoint } from "./composable";
 
 // Embed the Jitsi room as a direct <iframe> rather than via the
 // JitsiMeetExternalAPI script. Two reasons:
@@ -64,8 +64,9 @@ export default {
     //    so getUserMedia inside the iframe would fail at the browser
     //    boundary.
     const iframeSrc = computed(() => {
-      const domain = useJitsiDomain();
-      if (!domain) return "";
+      const endpoint = useJitsiEndpoint();
+      if (!endpoint) return "";
+      const { host, httpScheme } = endpoint;
 
       const config = {
         prejoinPageEnabled: false,
@@ -105,7 +106,7 @@ export default {
       }
 
       const room = encodeURIComponent(props.object.name);
-      return `https://${domain}/${room}#${fragmentParts.join("&")}`;
+      return `${httpScheme}://${host}/${room}#${fragmentParts.join("&")}`;
     });
 
     // Permissions Policy delegation. Performer iframes get full media

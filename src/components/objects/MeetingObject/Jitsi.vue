@@ -34,6 +34,17 @@ export default {
       const remote = stageStore.jitsiTracks.filter(
         (t) => t.getParticipantId() === props.object.participantId,
       );
+      console.log("[diag] Jitsi.vue tracks recompute", {
+        objectId: props.object.id,
+        objectParticipantId: props.object.participantId,
+        myUserId: jitsi?.room?.myUserId?.(),
+        isOwnTile: isOwnTile.value,
+        storeJitsiTracksLen: stageStore.jitsiTracks.length,
+        storeJitsiTracksParticipantIds: stageStore.jitsiTracks.map((t) => t.getParticipantId?.()),
+        roomLocalTracksLen: jitsi?.room?.getLocalTracks?.()?.length,
+        roomLocalTracksParticipantIds: jitsi?.room?.getLocalTracks?.()?.map((t) => t.getParticipantId?.()),
+        remoteMatchLen: remote.length,
+      });
       if (!isOwnTile.value) return remote;
 
       // Local tile: also include the conference's local tracks. The
@@ -70,13 +81,24 @@ export default {
       return aTracks[0];
     });
     const loadTrack = () => {
+      console.log("[diag] Jitsi.vue loadTrack invoked", {
+        objectId: props.object.id,
+        tracksLen: tracks.value.length,
+        videoTrack: videoTrack.value?.type,
+        videoElExists: !!videoEl.value,
+        audioTrack: audioTrack.value?.type,
+        audioTrackIsLocal: audioTrack.value?.isLocal?.(),
+        audioElExists: !!audioEl.value,
+      });
       if (tracks.value.length) {
         try {
-          if (videoTrack.value) {
+          if (videoTrack.value && videoEl.value) {
             videoTrack.value.attach(videoEl.value);
+            console.log("[diag] Jitsi.vue loadTrack attached video to <video ref=videoEl>");
           }
-          if (audioTrack.value && !audioTrack.value.isLocal()) {
+          if (audioTrack.value && !audioTrack.value.isLocal() && audioEl.value) {
             audioTrack.value.attach(audioEl.value);
+            console.log("[diag] Jitsi.vue loadTrack attached audio to <audio ref=audioEl>");
           }
         } catch (error) {
           console.log("Error on attaching track", error);
@@ -120,7 +142,18 @@ export default {
       { immediate: true },
     );
 
-    onMounted(() => loadTrack);
+    // The previous `onMounted(() => loadTrack)` was a no-op: the arrow
+    // returned the `loadTrack` reference instead of calling it, so the
+    // initial attach only happened on the next 3-second polling tick
+    // (and even then it raced with the DOM swap between the no-track
+    // loading branch and the `<video ref=videoEl>` branch). Call it on
+    // mount, and *also* re-run it any time the `tracks` computed flips
+    // (e.g. when the local performer drags their self-preview onto the
+    // stage and `stageStore.addTrack(t)` fires synchronously after
+    // `await room.addTrack(t)` resolves). `flush: "post"` ensures Vue
+    // has applied the conditional swap before we read `videoEl.value`.
+    onMounted(loadTrack);
+    watch(tracks, loadTrack, { flush: "post" });
 
     const clip = (shape) => {
       stageStore.shapeObject({

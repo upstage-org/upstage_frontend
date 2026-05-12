@@ -16,6 +16,22 @@ interface ImportMetaEnv {
   readonly VITE_MQTT_USERNAME?: string;
   readonly VITE_MQTT_PASSWORD?: string;
   readonly VITE_JITSI_ENDPOINT?: string;
+  /**
+   * Optional XMPP virtual-host overrides for Jitsi. Production installs
+   * usually have the XMPP domain == HTTP hostname (e.g. `meet.example.com`)
+   * and can leave these unset — `useJitsiEndpoint()` will derive them from
+   * `VITE_JITSI_ENDPOINT`. Local installs (notably the
+   * `jitsi/docker-jitsi-meet` quickstart) fix the XMPP domain at
+   * `meet.jitsi` regardless of which HTTP host the web UI is exposed on, so
+   * the browser must address its XMPP stream to `meet.jitsi`, not to the
+   * transport hostname, to avoid Prosody replying with empty
+   * `<mechanisms>` ("Server did not offer a supported authentication
+   * mechanism").
+   */
+  readonly VITE_JITSI_XMPP_DOMAIN?: string;
+  readonly VITE_JITSI_XMPP_MUC_DOMAIN?: string;
+  readonly VITE_JITSI_XMPP_FOCUS_DOMAIN?: string;
+  readonly VITE_JITSI_PREFER_WEBSOCKET?: string;
   readonly VITE_STRIPE_KEY?: string;
   readonly VITE_RELEASE_VERSION?: string;
   readonly VITE_ALIAS_RELEASE_VERSION?: string;
