@@ -2,8 +2,9 @@
 // Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppObject from "../Object.vue";
 import Loading from "components/Loading.vue";
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { isIOS } from "utils/common";
 import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
 
 export default {
@@ -49,7 +50,15 @@ export default {
       }
     };
 
+    // Polling fallback in case the initial CONFERENCE_JOINED -> TRACK_ADDED
+    // sequence races the component mount. Cleared inside `timeupdate`
+    // (when the video starts producing frames) AND on unmount, so it does
+    // not keep firing against a stale ref after the meeting tile is
+    // removed from the stage.
     const interval = setInterval(loadTrack, 3000);
+    onUnmounted(() => {
+      if (interval) clearInterval(interval);
+    });
     const joined = inject("joined");
     const jitsi = inject("jitsi");
 
@@ -98,6 +107,26 @@ export default {
       (audio) => {
         if (audio) {
           audio.volume = (volume.value || 0) / 100;
+          // Safari (desktop and iOS) blocks <audio autoplay> on a
+          // MediaStream that carries an unmuted audio track until the
+          // user has interacted with the page. The audience needs to
+          // hear the stream from the first packet, so attempt play()
+          // explicitly and surface (not throw) the rejection — the next
+          // user gesture (e.g. clicking on the stage) will re-trigger
+          // it via the browser's autoplay-allowance window.
+          const playPromise = audio.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch((err) => {
+              console.warn("Remote stream audio autoplay was blocked:", err);
+              const retry = () => {
+                audio.play().catch(() => {});
+                window.removeEventListener("pointerdown", retry);
+                window.removeEventListener("keydown", retry);
+              };
+              window.addEventListener("pointerdown", retry, { once: true });
+              window.addEventListener("keydown", retry, { once: true });
+            });
+          }
         }
       },
       { immediate: true },
@@ -121,6 +150,11 @@ export default {
       loading.value = false;
     };
 
+    // iOS / iPadOS: HTMLMediaElement.volume is read-only, so a per-stream
+    // volume slider would silently do nothing. Hide it on iOS rather than
+    // present a control that lies to the performer.
+    const supportsPerStreamVolume = !isIOS();
+
     return {
       videoTrack,
       audioTrack,
@@ -130,6 +164,7 @@ export default {
       localMuted,
       toggleMuted,
       isPlayer,
+      supportsPerStreamVolume,
 
       timeupdate,
       loadTrack,
@@ -199,7 +234,7 @@ export default {
         </span>
         <span>{{ localMuted ? "UnMute locally" : "Mute locally" }}</span>
       </a>
-      <a class="panel-block" @click="openVolumePopup(slotProps)">
+      <a v-if="supportsPerStreamVolume" class="panel-block" @click="openVolumePopup(slotProps)">
         <span class="panel-icon">
           <Icon src="voice-setting.svg" />
         </span>

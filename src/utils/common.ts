@@ -238,6 +238,30 @@ export function throttle(callback, limit) {
 }
 
 /**
+ * Detect iOS / iPadOS devices.
+ *
+ * All browsers on iOS / iPadOS are forced (by App Store policy) to use
+ * Apple's WebKit, so they share Safari's quirks regardless of brand
+ * (Chrome iOS, Firefox iOS, Edge iOS, Brave iOS, etc., are all WebKit
+ * underneath). The most relevant quirk for this codebase is that
+ * `HTMLMediaElement.volume` is read-only — setting it has no effect; the
+ * device's hardware volume buttons are the only way to change playback
+ * volume. UI that exposes a per-stream volume slider should therefore be
+ * suppressed on these devices to avoid showing controls that silently
+ * do nothing.
+ *
+ * iPadOS 13+ spoofs `navigator.userAgent` as `MacIntel` (so an iPad on
+ * iPadOS reports the same UA as a desktop Mac). The `maxTouchPoints`
+ * check disambiguates them — desktop macOS exposes 0 touch points,
+ * iPadOS exposes >= 1.
+ */
+export const isIOS = (): boolean => {
+  if (typeof navigator === "undefined") return false;
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+};
+
+/**
  * Cross-browser number-input coercion.
  *
  * `<input type="number">` is one of the surfaces where browsers diverge:

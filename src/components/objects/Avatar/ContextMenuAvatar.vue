@@ -3,7 +3,7 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { computed, inject, ref } from "vue";
 import Icon from "components/Icon.vue";
-import { coerceNumber } from "utils/common";
+import { coerceNumber, isIOS } from "utils/common";
 
 // `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
 // `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
@@ -204,6 +204,11 @@ export default {
       });
       props.closeMenu();
     };
+    // iOS / iPadOS HTMLMediaElement.volume is read-only; suppress the
+    // per-stream volume UI on those devices so performers don't see a
+    // control that silently does nothing.
+    const supportsPerStreamVolume = !isIOS();
+
     return {
       switchFrame,
       holdAvatar,
@@ -234,6 +239,7 @@ export default {
       openVolumePopup,
       toggleVideoLoop,
       restartVideo,
+      supportsPerStreamVolume,
     };
   },
 };
@@ -292,7 +298,7 @@ export default {
         </span>
         <span>{{ $t("restart") }}</span>
       </a>
-      <a class="panel-block" @click="openVolumePopup(slotProps)">
+      <a v-if="supportsPerStreamVolume" class="panel-block" @click="openVolumePopup(slotProps)">
         <span class="panel-icon">
           <Icon src="voice-setting.svg" />
         </span>
@@ -372,7 +378,7 @@ export default {
           </button>
         </a-tooltip>
       </p>
-      <p v-if="object.type == 'jitsi'" class="control menu-group-item">
+      <p v-if="object.type == 'jitsi' && supportsPerStreamVolume" class="control menu-group-item">
         <a-tooltip title="Volume" placement="bottom">
           <button
             class="button is-light"

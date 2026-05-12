@@ -85,17 +85,23 @@ export default {
 </script>
 
 <template>
-  <audio v-for="audio in audios" :key="audio" :ref="setRef" preload="auto">
-    <source :src="audio.src" type="audio/mpeg" />
-    <source :src="audio.src" type="audio/ogg" />
-    <source :src="audio.src" type="audio/wav" />
-    <source :src="audio.src" type="audio/x-aiff" />
-    <object>
-      <param name="src" :value="audio.src" />
-      <param name="controller" value="false" />
-      <embed :src="audio.src" controller="false" type="audio/mpeg" />
-    </object>
-  </audio>
+  <!--
+    Bind the asset URL directly to the <audio> element. Previously this
+    template wrapped four <source> tags with mismatched MIME types
+    (audio/mpeg, audio/ogg, audio/wav, audio/x-aiff) all pointing at the
+    SAME `audio.src` URL. That produced misleading hints across browsers:
+    Safari, which doesn't decode Vorbis/Opus, would accept the audio/mpeg
+    hint, fetch the URL, fail to decode, then walk the same URL three
+    more times under different `type` hints — net effect: silently broken
+    on Safari for non-MP3/WAV uploads.
+
+    The <object>/<embed>/<param> fallback targeted the Netscape Plugin
+    API, which has been removed from every modern browser since ~2018,
+    so it was dead code. We now let the browser sniff the format from
+    the response Content-Type — works uniformly in Chromium / Firefox /
+    Safari for any container the browser can decode natively.
+  -->
+  <audio v-for="audio in audios" :key="audio" :ref="setRef" :src="audio.src" preload="auto" />
 </template>
 
 <style scoped>

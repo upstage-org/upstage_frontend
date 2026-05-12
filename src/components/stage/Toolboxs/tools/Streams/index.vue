@@ -25,7 +25,29 @@ export default {
     <img class="overlay" src="/img/videoloading.gif" />
     <div style="z-index: 1">
       <Skeleton :data="video">
-        <video :src="video.url"></video>
+        <!--
+          Performer-side stream thumbnail. The previous version was just
+          `<video :src="...">` with no attributes, which gave wildly
+          different cross-browser results:
+            - Chromium: showed the poster frame (first decoded frame)
+            - Firefox: showed a black rectangle until clicked
+            - Safari (incl. iOS): nothing until clicked, and on iOS
+              would force fullscreen on play
+          Adding `muted` + `playsinline` makes the element honour the
+          autoplay-allowance window on Safari without forcing fullscreen.
+          `preload="metadata"` lets the browser fetch enough of the file
+          to display the poster frame without downloading the whole
+          video, keeping the toolbox lightweight. `controls` exposes the
+          standard play/seek UI on every browser.
+        -->
+        <video
+          :src="video.url"
+          muted
+          playsinline
+          preload="metadata"
+          controls
+          controlslist="nodownload"
+        ></video>
       </Skeleton>
     </div>
   </div>
