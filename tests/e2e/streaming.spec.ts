@@ -223,19 +223,28 @@ test.describe("streaming: performer streams, audience views @full", () => {
      * Stub helper applied to BOTH performer and audience contexts.
      *
      * MeetingObject builds the iframe URL as
-     * `https://${useJitsiDomain()}/${roomName}#config...`. In the test
-     * environment `useJitsiDomain()` falls back to `window.location.origin`
-     * (no VITE_JITSI_ENDPOINT in .env.test), so the iframe would otherwise
-     * try to fetch `https://127.0.0.1:3001/<roomName>` — which either 404s
-     * or recursively serves the SPA. We don't need a real Jitsi response
-     * for this test: the assertions cover the iframe's `allow=` attribute
-     * and src fragment, both of which our component sets BEFORE the
-     * iframe ever fetches. A 1-line stub HTML satisfies the load handler
-     * (`onLoad` fires → loading overlay clears) without touching real
-     * infrastructure.
+     * `https://${useJitsiDomain()}/${roomName}#config...`. We don't need
+     * a real Jitsi response for this test: the assertions cover the
+     * iframe's `allow=` attribute and src fragment, both of which our
+     * component sets BEFORE the iframe ever fetches. A 1-line stub HTML
+     * satisfies the load handler (`onLoad` fires → loading overlay
+     * clears) without touching real infrastructure.
+     *
+     * The stub matches `**\/streaming-test-*` rather than just our exact
+     * `roomName` because MQTT is configured with `retain: true` (see
+     * `src/config.ts` MQTT_CONNECTION). Prior streaming runs leave their
+     * `PLACE_OBJECT_ON_STAGE` messages on the broker, and every new
+     * audience/performer page receives them on connect — so the
+     * `board.objects` array on a freshly-loaded seat may already contain
+     * meeting iframes pointing at long-dead room URLs. If we stubbed
+     * only our own room, those stale iframes would hit their real
+     * (unreachable) URLs, fire `error`, render `.failed`, and pollute
+     * the "no .failed overlays" negative assertion below. Stubbing the
+     * whole `streaming-test-*` namespace neutralises stale rooms while
+     * still satisfying our own iframe load.
      */
     const stubMeetingFor = async (context: BrowserContext) => {
-      await context.route(`**/${roomName}*`, async (route) => {
+      await context.route("**/streaming-test-*", async (route) => {
         await route.fulfill({
           status: 200,
           contentType: "text/html",
@@ -281,11 +290,27 @@ test.describe("streaming: performer streams, audience views @full", () => {
       // --------- 3. Performer dispatches a meeting room ----------
       await publishMeetingFromPerformer(performerPage, roomName);
 
-      // --------- 4. Both sides render an iframe.room ----------
-      const performerIframe = performerPage.locator("iframe.room").first();
-      const audienceIframe = audience.page.locator("iframe.room").first();
-      await performerIframe.waitFor({ state: "attached", timeout: 30_000 });
-      await audienceIframe.waitFor({ state: "attached", timeout: 30_000 });
+      // --------- 4. Both sides render an iframe.room for OUR room ----------
+      // Scope the iframe locator by room name. MQTT retains
+      // `PLACE_OBJECT_ON_STAGE` messages on `TOPICS.BOARD`, so a freshly
+      // loaded page may already contain meeting iframes from prior
+      // streaming runs. `iframe.room.first()` would race the audience-
+      // side MQTT delivery and frequently return one of those stale
+      // iframes; using the room name in the selector pins the assertion
+      // to the iframe our test just dispatched. Same .frame parent is
+      // used to scope the `.failed` negative assertion later, so a
+      // stale meeting whose stub-less URL fails to load doesn't false-
+      // positive on us.
+      const performerFrame = performerPage
+        .locator(`.frame:has(iframe.room[src*="${roomName}"])`)
+        .first();
+      const audienceFrame = audience.page
+        .locator(`.frame:has(iframe.room[src*="${roomName}"])`)
+        .first();
+      await performerFrame.waitFor({ state: "attached", timeout: 30_000 });
+      await audienceFrame.waitFor({ state: "attached", timeout: 30_000 });
+      const performerIframe = performerFrame.locator("iframe.room");
+      const audienceIframe = audienceFrame.locator("iframe.room");
 
       // --------- 5. Assertions: PERFORMER iframe contract ----------
       const performerSrc = (await performerIframe.getAttribute("src")) ?? "";
@@ -352,10 +377,11 @@ test.describe("streaming: performer streams, audience views @full", () => {
 
       // --------- 7. Iframe load succeeded → no .failed overlay ----------
       // The stub responds 200; `onLoad` fires; `loading.value` clears;
-      // `failed.value` stays false. If the stub failed (or our timeout
-      // path triggered) the .failed div would be in the DOM.
-      await expect(performerPage.locator(".failed")).toHaveCount(0, { timeout: 5_000 });
-      await expect(audience.page.locator(".failed")).toHaveCount(0, { timeout: 5_000 });
+      // `failed.value` stays false. Scoped to the .frame for OUR room so
+      // a stale meeting from a previous run (whose URL the stub also
+      // intercepts, see stubMeetingFor) doesn't influence the result.
+      await expect(performerFrame.locator(".failed")).toHaveCount(0, { timeout: 5_000 });
+      await expect(audienceFrame.locator(".failed")).toHaveCount(0, { timeout: 5_000 });
 
       await performerPage.screenshot({
         path: path.join(SCREENSHOT_DIR, "meeting-performer.png"),
@@ -380,14 +406,34 @@ test.describe("streaming: performer streams, audience views @full", () => {
     let performerCtx: BrowserContext | null = null;
     try {
       performerCtx = await browser.newContext();
-      // Simulate Brave Shields / uBlock blocking the iframe URL. With
-      // route.abort('blockedbyclient') the iframe's `error` handler runs
-      // synchronously in the page; the .failed div is rendered without
-      // having to wait the full 15s loadTimer fallback. (The loadTimer
-      // path is the more conservative fallback for content blockers
-      // that swallow `error` instead of firing it; we exercise the
-      // `error` branch here because it's deterministic.)
-      await performerCtx.route(`**/${roomName}*`, (route) => route.abort("blockedbyclient"));
+      // Simulate Brave Shields / uBlock silently dropping the iframe
+      // request. The most common content-blocker behaviour in the wild
+      // is NOT to fire the iframe's `error` event — they either return
+      // an empty response (which Chromium reports as a successful
+      // `load` with no content) or hang the request. To exercise our
+      // component's TIMEOUT_MS fallback path (the safety net we
+      // specifically added for this case), we hang the request for a
+      // hair longer than the component's 15-second loadTimer; the
+      // resulting "spinner stuck → failed=true" transition is what we
+      // assert on.
+      //
+      // We do NOT use `route.abort('blockedbyclient')` here: in
+      // Chromium that actually fires `load` (with about:blank-like
+      // content) on the iframe element, not `error`, so neither
+      // onError nor the loadTimer would ever set failed=true.
+      //
+      // Block ONLY our specific room URL (not the whole streaming-test-*
+      // namespace) so any stale meeting iframes from prior runs go
+      // through their normal load path without our assertions caring
+      // about them.
+      const HANG_MS = 17_000; // > component TIMEOUT_MS (15s)
+      await performerCtx.route(`**/${roomName}*`, async (route) => {
+        await new Promise<void>((resolve) => setTimeout(resolve, HANG_MS));
+        // Eventually fulfil so Playwright doesn't leak an open request
+        // when the test ends; by this point the component has already
+        // surfaced the .failed overlay.
+        await route.fulfill({ status: 504, contentType: "text/plain", body: "" }).catch(() => {});
+      });
 
       const performerPage = await performerCtx.newPage();
       const loginPage = new LoginPage(performerPage);
@@ -397,14 +443,21 @@ test.describe("streaming: performer streams, audience views @full", () => {
 
       await publishMeetingFromPerformer(performerPage, roomName);
 
-      // The .failed overlay is rendered in addition to the (hidden via
-      // v-show) iframe; assert the user-facing fallback shows up.
-      await expect(performerPage.locator(".failed").first()).toBeVisible({
-        timeout: 30_000,
-      });
+      // Scope to OUR meeting object's frame so any stale meeting
+      // iframes on the board (left over from prior runs by retained
+      // MQTT messages) can't satisfy or break this assertion.
+      const ourFrame = performerPage
+        .locator(`.frame:has(iframe.room[src*="${roomName}"])`)
+        .first();
+      await ourFrame.waitFor({ state: "attached", timeout: 30_000 });
+
+      // .failed overlay shows up after the component's 15s loadTimer
+      // fires. Allow the full 25s + a small buffer (in case the test
+      // host is heavily loaded and the timer's setTimeout slips).
+      await expect(ourFrame.locator(".failed")).toBeVisible({ timeout: 25_000 });
       // The fallback exposes the blocked host name in a <code> element
       // so the operator knows what to whitelist.
-      await expect(performerPage.locator(".failed code").first()).toBeVisible();
+      await expect(ourFrame.locator(".failed code")).toBeVisible();
 
       await performerPage.screenshot({
         path: path.join(SCREENSHOT_DIR, "meeting-blocked.png"),
@@ -450,7 +503,29 @@ test.describe("streaming: performer streams, audience views @full", () => {
       // createLocalTracks resolved AND that the JitsiTrack.attach() bound
       // the MediaStream to our element.
       const yourselfVideo = performerPage.locator("#topbar video[playsinline][muted]").first();
-      await yourselfVideo.waitFor({ state: "attached", timeout: 30_000 });
+      try {
+        await yourselfVideo.waitFor({ state: "attached", timeout: 30_000 });
+      } catch (e) {
+        const dump = await performerPage.evaluate(() => {
+          const topbar = document.querySelector("#topbar");
+          const videos = Array.from(document.querySelectorAll("video")).map((v) => ({
+            id: v.id,
+            class: v.className,
+            playsinline: v.hasAttribute("playsinline"),
+            muted: v.hasAttribute("muted"),
+            inTopbar: Boolean(topbar?.contains(v)),
+            attrs: Array.from(v.attributes).map((a) => `${a.name}="${a.value}"`),
+          }));
+          return {
+            topbarExists: Boolean(topbar),
+            topbarHTML: topbar?.innerHTML?.slice(0, 800) ?? null,
+            videoCount: videos.length,
+            videos,
+          };
+        });
+        console.log("[streaming] yourself-preview DOM dump:", JSON.stringify(dump, null, 2));
+        throw e;
+      }
 
       const videoAttrs = await yourselfVideo.evaluate((el) => {
         const v = el as HTMLVideoElement;
