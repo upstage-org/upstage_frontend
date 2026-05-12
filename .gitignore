@@ -85,6 +85,10 @@ vite.config.*.timestamp-*
 
 # npm
 package-lock.json
+# container-runtime/ is an npm-based subproject (the production static server).
+# `npm ci` in the Dockerfile requires this lockfile, so it MUST be tracked
+# even though the root project uses pnpm.
+!container-runtime/package-lock.json
 
 # pnpm : commit this!
 #pnpm-lock.yaml

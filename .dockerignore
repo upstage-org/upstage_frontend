@@ -16,6 +16,9 @@
 env_backup*
 
 node_modules/
+# Keep `container-runtime/` itself (package.json, package-lock.json,
+# static-api-server.mjs) — the runtime stage's `COPY container-runtime/...`
+# and `npm ci` depend on it. Only its node_modules/ is excluded.
 container-runtime/node_modules/
 dist/
 
