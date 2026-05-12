@@ -187,24 +187,36 @@ export default {
       immediate: true,
     });
 
-    const join = () => {
-      if (joined.value) {
-        for (const t of tracks) {
-          jitsi.room.addTrack(t);
-          // Local conferences in lib-jitsi-meet do not reliably emit
-          // TRACK_ADDED for tracks the local user added themselves —
-          // the event fires on remote peers' conferences as the SSRC
-          // propagates over RTC, but not on this conference. Without
-          // this line, the performer's own on-stage <Jitsi> tile
-          // filters stageStore.jitsiTracks by their own participantId
-          // and gets [], dropping the tile into the loading state
-          // (the camera-with-slash videoloading.gif) forever, even
-          // though every other client sees the stream fine.
-          // ADD_TRACK dedupes by JitsiTrack.getId(), so this is safe
-          // if a future lib-jitsi-meet does also emit TRACK_ADDED
-          // for the local conference.
-          stageStore.addTrack(t);
+    const join = async () => {
+      if (!joined.value) return;
+      for (const t of tracks) {
+        try {
+          // room.addTrack returns a Promise that resolves once
+          // lib-jitsi-meet has registered the track on the local
+          // conference and assigned it a participantId. Awaiting here
+          // means the subsequent stageStore.addTrack(t) — and the
+          // canonical TRACK_ADDED event the conference emits — both
+          // publish a track whose getParticipantId() already returns
+          // the local user id, so Jitsi.vue's per-participantId filter
+          // matches immediately instead of caching an "early,
+          // ownerless" entry that never re-evaluates (Vue cannot track
+          // a JS method call on a non-reactive JitsiTrack).
+          await jitsi.room.addTrack(t);
+        } catch (err) {
+          console.warn("room.addTrack failed:", err);
+          continue;
         }
+        // Local conferences in lib-jitsi-meet do not reliably emit
+        // TRACK_ADDED for tracks the local user added themselves; the
+        // event fires on remote peers' conferences as the SSRC
+        // propagates over RTC, but not on this conference. Push the
+        // local track into the stage store directly so this user's own
+        // on-stage <Jitsi> tile finds it via the participantId filter
+        // and can render. ADD_TRACK re-places by JitsiTrack.getId(), so
+        // this is safe if a future lib-jitsi-meet does also emit
+        // TRACK_ADDED for the local conference (the republish will
+        // simply swap in the same JitsiTrack reference).
+        stageStore.addTrack(t);
       }
     };
 

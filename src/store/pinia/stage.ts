@@ -1117,18 +1117,26 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   function ADD_TRACK(track: JitsiTrack) {
-    // Dedupe by JitsiTrack id. The local-track path (Yourself.vue.join)
-    // pushes tracks here directly because lib-jitsi-meet's local
-    // conference does not reliably emit TRACK_ADDED for tracks the
-    // local user added themselves; if a future version starts firing
-    // it (or join() is invoked twice before the conference is torn
-    // down), we must not end up with the same JitsiTrack in
-    // board.value.tracks twice — the per-participantId filter in
-    // Jitsi.vue would then attach the same MediaStream to the same
-    // <video> element repeatedly.
+    // Re-place by JitsiTrack id rather than skipping a duplicate. The
+    // Yourself.vue dragstart path can publish the local track here
+    // before lib-jitsi-meet has finished assigning it a participantId;
+    // the conference's TRACK_ADDED then re-publishes the same
+    // JitsiTrack instance after the assignment. We must not silently
+    // drop that republish — Jitsi.vue's per-participantId filter is a
+    // Vue computed and only re-evaluates when board.value.tracks
+    // changes (it cannot observe a JS method call on a non-reactive
+    // JitsiTrack), so swapping in a new array reference is the only
+    // way the local user's own on-stage tile recovers from the
+    // "ownerless early add" state.
     const id = track.getId?.();
-    if (id !== undefined && board.value.tracks.some((t) => t.getId?.() === id)) {
-      return;
+    if (id !== undefined) {
+      const existingIdx = board.value.tracks.findIndex((t) => t.getId?.() === id);
+      if (existingIdx !== -1) {
+        const next = [...board.value.tracks];
+        next[existingIdx] = track;
+        board.value.tracks = next;
+        return;
+      }
     }
     board.value.tracks = [...board.value.tracks, track];
   }

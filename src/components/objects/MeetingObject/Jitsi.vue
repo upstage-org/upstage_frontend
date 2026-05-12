@@ -15,13 +15,47 @@ export default {
   },
   setup: (props) => {
     const stageStore = useStageStore();
+    // jitsi must be injected before the `tracks` computed so the
+    // local-tile fallback below can read jitsi.room.getLocalTracks().
+    // jitsi.room may be null until CONFERENCE_JOINED has fired; the
+    // computed handles that with optional chaining.
+    const jitsi = inject("jitsi");
+    const joined = inject("joined");
     const videoEl = ref();
     const audioEl = ref();
     const loading = ref(true);
 
-    const tracks = computed(() =>
-      stageStore.jitsiTracks.filter((t) => t.getParticipantId() === props.object.participantId),
-    );
+    const isOwnTile = computed(() => {
+      const myId = jitsi?.room?.myUserId?.();
+      return myId != null && props.object.participantId === myId;
+    });
+
+    const tracks = computed(() => {
+      const remote = stageStore.jitsiTracks.filter(
+        (t) => t.getParticipantId() === props.object.participantId,
+      );
+      if (!isOwnTile.value) return remote;
+
+      // Local tile: also include the conference's local tracks. The
+      // qmu_copy code implicitly relied on lib-jitsi-meet putting
+      // local tracks into `getLocalTracks()` synchronously after
+      // `room.addTrack()` resolved, so the per-participantId filter
+      // always saw them. Mirror that behaviour explicitly here so the
+      // performer's own on-stage tile renders even if the store entry
+      // hasn't been re-published yet via TRACK_ADDED. Dedupe by
+      // JitsiTrack.getId() so we never attach the same MediaStream
+      // twice.
+      const local = jitsi?.room?.getLocalTracks?.() ?? [];
+      const seen = new Set(remote.map((t) => t.getId?.()));
+      for (const t of local) {
+        const id = t.getId?.();
+        if (id === undefined || !seen.has(id)) {
+          remote.push(t);
+          if (id !== undefined) seen.add(id);
+        }
+      }
+      return remote;
+    });
     const volume = computed(() => props.object.volume);
 
     const reloadStreams = computed(() => stageStore.reloadStreams);
@@ -59,8 +93,6 @@ export default {
     onUnmounted(() => {
       if (interval) clearInterval(interval);
     });
-    const joined = inject("joined");
-    const jitsi = inject("jitsi");
 
     watch(
       joined,
