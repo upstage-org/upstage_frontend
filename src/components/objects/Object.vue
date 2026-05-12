@@ -207,11 +207,11 @@ export default {
         >
           <slot name="render">
             <!--
-              The @ended handler writes to object.isPlaying directly. The
-              parent (stage objects in the Vuex store) holds the canonical
-              isPlaying state, but this mutation has been the load-bearing
-              "video stopped naturally" signal for a long time. Reshaping it
-              into a store dispatch is a separate, behaviour-affecting
+              The @ended handler writes to object.isPlaying directly.
+              The stage store holds the canonical isPlaying state, but
+              this in-place mutation has been the load-bearing "video
+              stopped naturally" signal for a long time. Reshaping it
+              into a store action is a separate, behaviour-affecting
               change; suppress the rule on this template line for now.
             -->
             <!-- eslint-disable-next-line vue/no-mutating-props -->

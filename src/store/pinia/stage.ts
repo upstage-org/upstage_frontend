@@ -1,44 +1,29 @@
 /**
- * Pinia `stage` store — Phase 5.3 (Pinia migration target).
+ * Pinia `stage` store — authoritative source of stage state,
+ * mutations, and actions. Every consumer reads/writes through
+ * `useStageStore()`; the dev hook `__UPSTAGE_PINIA__.stage` lets the
+ * Playwright e2e suites drive the same surface from outside the app.
  *
- * Authoritative source of stage state, mutations, and actions. Wave F
- * deleted the Vuex stage facade (`src/store/modules/stage/index.ts`)
- * along with the `vuex` dependency; every consumer now reads/writes
- * through `useStageStore()` directly. The dev hook
- * `__UPSTAGE_PINIA__.stage` lets the Playwright e2e suites drive the
- * same surface from outside the app.
+ * **Name collisions.** Setup stores can't have two return-object keys
+ * with the same name, so a handful of state/getter/action triples that
+ * were free to share a name under the old store had to disambiguate:
  *
- * **Name collisions** (Vuex allowed `state.x`, `getters.x`, and
- * `actions.x` to coexist via separate namespaces; Pinia setup stores
- * cannot — a single return object exposes everything).
+ * State ↔ getter collisions (raw ref carries a `_` prefix, public
+ * computed keeps the original name so consumers don't have to migrate):
+ *   • `_activeMovable` (ref) / `activeMovable` (computed)
+ *   • `_config` (ref) / `config` (computed)
+ *   • `_reloadStreams` (ref) / `reloadStreams` (computed)
+ *   • `_enabledLiveStreaming` (ref) / `enabledLiveStreaming` (computed)
  *
- * State ↔ getter collisions (raw ref renamed with `_` prefix, public
- * computed keeps the Vuex getter name):
- *   • Vuex `state.activeMovable`    → Pinia `_activeMovable` (ref)
- *     Vuex `getters.activeMovable`  → Pinia `activeMovable` (computed)
- *   • Vuex `state.config`           → Pinia `_config` (ref)
- *     Vuex `getters.config`         → Pinia `config` (computed)
- *   • Vuex `state.reloadStreams`    → Pinia `_reloadStreams` (ref)
- *     Vuex `getters.reloadStreams`  → Pinia `reloadStreams` (computed)
- *   • Vuex `state.enabledLiveStreaming`   → Pinia `_enabledLiveStreaming`
- *     Vuex `getters.enabledLiveStreaming` → Pinia `enabledLiveStreaming`
+ * State/getter ↔ action collisions (action renamed; the state/getter
+ * keeps the original name):
+ *   • `showPlayerChat` (ref) + `setShowPlayerChat(visible)` (action).
+ *     Three call sites: PlayerChat.vue, PlayerChatTool.vue, Session.vue.
+ *   • `reloadStreams` (computed) + `triggerReloadStreams()` (action).
+ *     One call site: ReloadStream.vue.
  *
- * State/getter ↔ action collisions (action renamed; state/getter
- * keeps the Vuex name so reading consumers don't have to migrate):
- *   • Vuex `state.showPlayerChat` (ref) + action `showPlayerChat(visible)`
- *     → Pinia ref stays `showPlayerChat`; action becomes
- *     `setShowPlayerChat(visible)`. Wave D consumers calling
- *     `dispatch("stage/showPlayerChat", v)` switch to
- *     `useStageStore().setShowPlayerChat(v)`. Three call sites:
- *     PlayerChat.vue, PlayerChatTool.vue, Session.vue.
- *   • Vuex `getters.reloadStreams` (computed) + action `reloadStreams()`
- *     → Pinia computed stays `reloadStreams`; action becomes
- *     `triggerReloadStreams()`. Wave D: ReloadStream.vue switches
- *     `dispatch("stage/reloadStreams")` to
- *     `useStageStore().triggerReloadStreams()`.
- *
- * All other state keys, getter names, and action names keep their
- * Vuex names verbatim.
+ * All other state keys, getter names, and action names map straight
+ * across with no rename.
  */
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
@@ -357,7 +342,7 @@ export interface StageSize {
 
 export const useStageStore = defineStore("stage", () => {
   // ====================================================================
-  // STATE — 1:1 port of the Vuex `state` object (src/store/modules/stage/index.ts L34-115)
+  // STATE
   // ====================================================================
 
   const preloading = ref<boolean>(true);
@@ -408,9 +393,10 @@ export const useStageStore = defineStore("stage", () => {
     text: { fontSize: "20px", fontFamily: "Josefin Sans" },
   });
   const reactions = ref<Reaction[]>([]);
-  // Static placeholder; the Wave-C port of reactiveViewport.ts will
-  // start mutating this once App.vue mounts. Same TDZ-avoidance note
-  // as the Vuex original — do not call getViewport() here.
+  // Static placeholder; `useStageViewport()` (reactiveViewport.ts)
+  // starts mutating this once App.vue mounts. TDZ caveat: do not call
+  // `getViewport()` here — the helper depends on `window.innerWidth`
+  // which is `0` during SSR / pre-mount Vite startup.
   const viewport = ref<Viewport>({ width: 0, height: 0 });
   const sessions = ref<Session[]>([]);
   const session = ref<string | null>(null);
@@ -444,7 +430,7 @@ export const useStageStore = defineStore("stage", () => {
   const _enabledLiveStreaming = ref<boolean>(true);
 
   // ====================================================================
-  // GETTERS — 1:1 port of the Vuex `getters` object (L116-228)
+  // GETTERS
   // ====================================================================
 
   // ready: model loaded and preload finished
@@ -491,8 +477,9 @@ export const useStageStore = defineStore("stage", () => {
 
   const audios = computed(() => tools.value.audios);
 
-  // currentAvatar: matches Vuex getter, including the lazy
-  // useUserStore() lookup to dodge the auth/user/stage import cycle.
+  // Lazy `useUserStore()` lookup keeps the auth/user/stage import
+  // graph acyclic — user.ts and stage.ts both import each other for
+  // cross-store reads, so the resolution has to happen at call time.
   const currentAvatar = computed(() => {
     const id = useUserStore().avatarId;
     return board.value.objects.find((o) => o.id === id);
@@ -559,14 +546,12 @@ export const useStageStore = defineStore("stage", () => {
   const enabledLiveStreaming = computed(() => _enabledLiveStreaming.value);
 
   // ====================================================================
-  // MUTATIONS (Wave B) — 1:1 port of the Vuex `mutations` object (L229-678).
+  // MUTATIONS
   //
-  // In Pinia setup stores there is no notion of `commit`. Mutations are
-  // plain functions that mutate the refs above. Names mirror the Vuex
-  // UPPER_SNAKE_CASE contract so Wave C actions and Wave D consumers can
-  // call them directly with no rename. The functions are intentionally
-  // not exported individually; they go on the store via the return
-  // object at the bottom of this file.
+  // Plain functions that mutate the refs above. The UPPER_SNAKE_CASE
+  // names are a stylistic hold-over from when these were Vuex
+  // `commit(...)` targets — kept intact so the e2e dev hook and a few
+  // call sites that pattern-match on the name don't need updating.
   // ====================================================================
 
   function SET_MODEL(newModel: StageModel | null) {
@@ -951,21 +936,11 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   /**
-   * Restore stage state from a saved-scene snapshot produced by
-   * `takeSnapshotFromStage` (see reusable.ts). The snapshot carries
-   * keys: background, backdropColor, board, settings, audioPlayers, audios.
-   *
-   * The Vuex original used `state[key] = snapshot[key]` in a dynamic
-   * loop, which also created a never-read top-level `state.audios`.
-   * Pinia setup stores can't add refs at runtime, so we restore each
-   * known key explicitly. The snapshot's `audios` maps to
-   * `tools.audios` (the only place that field is read).
-   */
-  /**
    * Scene snapshot shape. Snapshots are produced by
-   * `takeSnapshotFromStage` (see reusable.ts) and stored as JSON strings
-   * inside `Scene.payload`. The `audios` key on the snapshot maps to
-   * `tools.audios`, not a top-level state ref.
+   * `takeSnapshotFromStage` (see reusable.ts) and stored as JSON
+   * strings inside `Scene.payload`. The snapshot's `audios` key maps
+   * to `tools.audios` (the only place that field is read), not a
+   * top-level state ref.
    */
   interface SceneSnapshot {
     background?: Background | null;
@@ -1162,25 +1137,21 @@ export const useStageStore = defineStore("stage", () => {
   // ====================================================================
   // MQTT CLIENT WRAPPER
   //
-  // `buildClient()` returns an unconnected wrapper. The underlying broker
-  // connection only opens when the `connect()` action below is invoked.
-  // Pinia setup functions run exactly once per store (the result is
-  // memoized) so we get a single wrapper instance per app lifetime.
-  //
-  // During Wave D's gradual consumer migration both this wrapper and the
-  // Vuex stage module's wrapper will exist. Only one should call
-  // `mqtt.connect()` to avoid double subscriptions; the migration plan
-  // (see REMAINING_STEPS.md §3 Wave D) addresses that.
+  // `buildClient()` returns an unconnected wrapper. The underlying
+  // broker connection only opens when the `connect()` action below is
+  // invoked. Pinia setup functions run exactly once per store (the
+  // result is memoized) so we get a single wrapper instance per app
+  // lifetime.
   // ====================================================================
   const mqtt = buildClient();
 
   // ====================================================================
-  // ACTIONS (Wave C) — 1:1 port of the Vuex `actions` object (L679-1460).
+  // ACTIONS
   //
-  // Pinia setup stores have no commit/dispatch — actions just call
-  // mutation functions and other action functions directly. Function
-  // declarations are hoisted, so cross-references (e.g. `connect` calls
-  // `subscribe` which is defined later) work without ordering pain.
+  // Plain functions that call mutations and each other. Function
+  // declarations are hoisted, so cross-references (e.g. `connect`
+  // calls `subscribe` which is defined later) work without ordering
+  // pain.
   // ====================================================================
 
   /**
@@ -1899,6 +1870,18 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
+  /**
+   * Tear down the active replay loop. Called both from the top of
+   * `replayRecording` (to clear any previous interval/timers before
+   * starting a fresh replay) and from inside the 1Hz interval body
+   * when `current` runs past `end`. The natural-end call must flip
+   * `isReplaying` back to `false` so consumers waiting on the end
+   * of replay (notably `perform.spec.ts`, which polls
+   * `stage.replay.isReplaying === false` after the recording's
+   * wall-clock duration) actually unblock. The `replayRecording`
+   * call site immediately re-sets `isReplaying = true` afterwards,
+   * so the temporary flip is invisible there.
+   */
   function pauseReplay() {
     if (replay.value.interval !== null) {
       clearInterval(replay.value.interval);
@@ -1910,6 +1893,7 @@ export const useStageStore = defineStore("stage", () => {
       audio.isPlaying = false;
       audio.changed = true;
     });
+    replay.value.isReplaying = false;
   }
 
   function seekForwardReplay() {
@@ -2017,10 +2001,10 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   /**
-   * Set the player-chat panel visibility. Renamed from Vuex's
-   * `showPlayerChat(visible)` action because the state ref of the same
-   * name already lives on the return object (Pinia setup stores can't
-   * have two keys with the same name). See file-header note.
+   * Set the player-chat panel visibility. Renamed from the bare
+   * `showPlayerChat(visible)` action — the state ref of the same name
+   * already occupies the return-object key (see file-header
+   * name-collision note).
    */
   function setShowPlayerChat(visible: boolean) {
     SET_SHOW_PLAYER_CHAT(visible);
@@ -2076,10 +2060,10 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   /**
-   * Trigger a stream-reload tick. Renamed from Vuex's `reloadStreams()`
-   * action because the getter `reloadStreams` lives on the return object
-   * (Pinia setup stores can't have two keys with the same name). See
-   * file-header note.
+   * Trigger a stream-reload tick. Renamed from the bare
+   * `reloadStreams()` action — the computed getter of the same name
+   * already occupies the return-object key (see file-header
+   * name-collision note).
    */
   function triggerReloadStreams() {
     RELOAD_STREAMS();
@@ -2087,13 +2071,10 @@ export const useStageStore = defineStore("stage", () => {
 
   // ====================================================================
   // RETURN — public store surface
-  //
-  // Wave D will start migrating consumers to this surface; Wave E will
-  // retire the Vuex stage module entirely.
   // ====================================================================
 
   return {
-    // state (raw refs, named to match Vuex `state.stage.*` paths)
+    // state (raw refs)
     preloading,
     model,
     background,
@@ -2127,7 +2108,7 @@ export const useStageStore = defineStore("stage", () => {
     receiptPopup,
     _reloadStreams,
     _enabledLiveStreaming,
-    // getters (computed views, named to match Vuex `getters['stage/...']`)
+    // getters (computed views)
     ready,
     url,
     objects,
@@ -2146,7 +2127,7 @@ export const useStageStore = defineStore("stage", () => {
     reloadStreams,
     activeObject,
     enabledLiveStreaming,
-    // mutations (UPPER_SNAKE_CASE, named to match Vuex `commit('stage/X')`)
+    // mutations (UPPER_SNAKE_CASE)
     SET_MODEL,
     CLEAN_STAGE,
     SET_BACKGROUND,
@@ -2208,10 +2189,8 @@ export const useStageStore = defineStore("stage", () => {
     RELOAD_STREAMS,
     OPEN_RECEIPT_POPUP,
     CLOSE_RECEIPT_POPUP,
-    // actions (lowerCamelCase, named to match Vuex `dispatch('stage/X')`
-    // except where a collision with a state ref or getter forced a rename
-    // — see file-header note for `setShowPlayerChat` and
-    // `triggerReloadStreams`).
+    // actions (lowerCamelCase; the `setShowPlayerChat` and
+    // `triggerReloadStreams` renames are documented in the file header).
     connect,
     subscribe,
     disconnect,

@@ -6,13 +6,9 @@ import Icon from "components/Icon.vue";
 
 // `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
 // `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
-// synchronous in Pinia (the underlying MQTT publish isn't awaited).
-// In Vuex, `dispatch(...)` wrapped the undefined return in
-// `Promise.resolve(undefined)`, so callers could chain `.then(...)` to
-// run their continuation on the next microtask. The continuations
-// here (`props.closeMenu` / `emit('update:active', true)`) don't need
-// to wait for the publish to land, so we call them inline — which is
-// the same observable behaviour, minus one microtask of latency.
+// synchronous (the underlying MQTT publish isn't awaited), so the
+// `props.closeMenu` / `emit('update:active', true)` continuations
+// below can run inline rather than chaining off a Promise.
 export default {
   components: { Icon },
   props: {

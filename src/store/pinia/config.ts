@@ -85,7 +85,7 @@ export const useConfigStore = defineStore("config", () => {
 
   /**
    * Fetch nginx + system + foyer configs from GraphQL and merge into
-   * state. Mirrors the Vuex `config/fetchConfig` action.
+   * state.
    */
   const fetchConfig = async (): Promise<void> => {
     const configs = (await configGraph.configs()) as Partial<ConfigState>;

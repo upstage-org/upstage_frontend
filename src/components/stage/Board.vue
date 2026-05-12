@@ -61,10 +61,8 @@ export default {
         }
       } else {
         if (e.clientX > 0 && e.clientY > 0 && !nodrop) {
-          // Pinia `placeObjectOnStage` is synchronous and returns the
-          // placed object directly (the Vuex version's dispatch wrapper
-          // turned that into `Promise.resolve(object).then(({id}) =>
-          // ...)`). Consume the return value inline instead.
+          // `placeObjectOnStage` is synchronous and returns the placed
+          // object directly — no .then() wrapping needed.
           const placed = stageStore.placeObjectOnStage({
             ...object,
             x: e.clientX - 50 - stageSize.value.left,

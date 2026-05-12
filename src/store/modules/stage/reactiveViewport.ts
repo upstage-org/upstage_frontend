@@ -1,17 +1,11 @@
 /**
  * Stage viewport helper.
  *
- * The legacy implementation registered a `window.addEventListener("resize", ...)`
- * at module-load time and committed Vuex mutations from inside the listener,
- * which leaked across HMR boundaries and could fire before the store was
- * ready. The listener now lives in a composable that the App component opts
- * into via `useStageViewport()` in `App.vue`, using `useEventListener` from
- * `@vueuse/core` so it is automatically cleaned up.
- *
- * Wave E migration: was committing to the Vuex stage facade; now goes
- * straight to the Pinia stage store. Both paths land in the same
- * `UPDATE_VIEWPORT` / `RESCALE_OBJECTS` mutations, so the migration is
- * a pure shortening of the dispatch path.
+ * The resize listener lives in a composable that App.vue opts into via
+ * `useStageViewport()`, using `useEventListener` from `@vueuse/core` so
+ * it is automatically cleaned up — important because an earlier
+ * module-load-time `window.addEventListener("resize", ...)` leaked
+ * across HMR boundaries and could fire before the store was ready.
  */
 import { useEventListener } from "@vueuse/core";
 import { useStageStore } from "@stores/pinia/stage";

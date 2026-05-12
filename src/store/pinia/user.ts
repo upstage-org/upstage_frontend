@@ -31,10 +31,9 @@ const AUTH_ERRORS = [
 ];
 
 /**
- * If a server response contains one of the well-known auth errors, hard
- * logout. Mirrors the Vuex handler exactly; we do NOT import the router
- * here to avoid the `store -> router -> store` cycle the route guards
- * already depend on.
+ * If a server response contains one of the well-known auth errors,
+ * hard logout. We do NOT import the router here to avoid the
+ * `store -> router -> store` cycle the route guards already depend on.
  */
 const handleAuthFailure = (errorMsg: string | undefined): void => {
   if (errorMsg && AUTH_ERRORS.some((m) => errorMsg.includes(m))) {
@@ -44,24 +43,21 @@ const handleAuthFailure = (errorMsg: string | undefined): void => {
 };
 
 /**
- * User profile store + actions. Mirrors the legacy Vuex `user` module
- * API; consumers call `useUserStore()` instead of `store.state.user.X`
- * / `store.dispatch("user/...")`.
+ * User profile store + actions. Consumers call `useUserStore()` for
+ * state, getters, and actions.
  *
- * **Cross-store coupling**: `saveNickname` and `setAvatarId` reach into
- * the stage store, and the `avatar` getter reads `stage.board.objects`.
- * After Phase 5.3 Wave F these go via the Pinia stage store
- * (`useStageStore()`); the lazy in-function call dodges the
- * `user → stage → user` import cycle the route guards already rely on.
+ * **Cross-store coupling**: `saveNickname` and `setAvatarId` reach
+ * into the stage store, and the `avatar` getter reads
+ * `stage.board.objects`. The lazy in-function `useStageStore()` call
+ * dodges the `user → stage → user` import cycle the route guards
+ * already rely on.
  */
 export const useUserStore = defineStore("user", () => {
   const user = ref<UserData | null>(null);
   const loadingUser = ref<boolean>(false);
   /**
    * Raw nickname override (set by `saveNickname`). When unset, the
-   * resolved `nickname` getter falls back to the user's display name —
-   * matching the legacy Vuex `user/nickname` getter contract that
-   * consumers across the app rely on.
+   * resolved `nickname` getter falls back to the user's display name.
    */
   const nicknameOverride = ref<string | null>(null);
   const avatarId = ref<string | number | null>(null);

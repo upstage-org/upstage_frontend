@@ -16,9 +16,6 @@ export default {
   setup: (props) => {
     const stageStore = useStageStore();
     const userStore = useUserStore();
-    // `store.state.user.avatarId` was a broken read after the user
-    // module moved to Pinia (Vuex root has no `user` slot); reading
-    // from the Pinia user store is correct.
     const isHolding = computed(() => props.object.id === userStore.avatarId);
     const canPlay = computed(() => stageStore.canPlay);
 

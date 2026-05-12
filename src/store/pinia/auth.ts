@@ -5,17 +5,11 @@ import { removeRefreshToken, removeToken, setRefreshToken, setToken } from "@uti
 import { userGraph } from "@services/graphql";
 
 /**
- * Authentication state + auth-related actions.
- *
- * Mirrors the Vuex `auth` module API: `login`, `logout`, `fetchRefreshToken`
- * actions; `loggedIn` / `getToken` / `getRefreshToken` getters; reactive
- * `username` / `token` / `refresh_token` state. Once the Vuex `auth` module
- * is removed (Phase 5.2), this is the single source of truth for auth.
- *
- * Persistence is handled by `pinia-plugin-persistedstate`, replacing the
- * old `vuex-persistedstate` plugin which was scoped to `paths: ['auth']`.
- * After Phase 5.2 cuts over consumers, `vuex-persistedstate` becomes dead
- * code and is removed entirely.
+ * Authentication state + auth-related actions. Single source of truth
+ * for auth across the SPA: `username` / `token` / `refresh_token`
+ * state, `loggedIn` / `getToken` / `getRefreshToken` getters, and
+ * `login` / `logout` / `fetchRefreshToken` actions. Persistence is
+ * handled by `pinia-plugin-persistedstate`.
  */
 
 interface LoginPayload {
@@ -70,12 +64,10 @@ export const useAuthStore = defineStore(
 
     /**
      * Authenticate against the studio GraphQL endpoint and persist the
-     * returned tokens. Returns a Promise so the LoginForm component can
-     * `await login()` and react to success/failure.
-     *
-     * Mirrors the Vuex action's contract: resolves with no value on
-     * success, rejects with the underlying error on failure (and surfaces
-     * a user-facing toast via ant-design's `message`).
+     * returned tokens. Resolves with no value on success; rejects with
+     * the underlying error on failure (and surfaces a user-facing toast
+     * via ant-design's `message`). Returns a Promise so the LoginForm
+     * component can `await login()` and react to success/failure.
      */
     const login = async (user: LoginPayload): Promise<void> => {
       try {
@@ -105,9 +97,8 @@ export const useAuthStore = defineStore(
     };
 
     /**
-     * Clear local session and redirect to the home page. Matches the Vuex
-     * `logout` action which also did a hard navigation; route guards then
-     * re-evaluate from the (now-empty) auth state.
+     * Clear local session and hard-navigate to the home page. Route
+     * guards then re-evaluate from the (now-empty) auth state.
      */
     const logout = (): void => {
       logoutLocal();
@@ -117,8 +108,8 @@ export const useAuthStore = defineStore(
     /**
      * Exchange the refresh token for a new access token. Used by the
      * Apollo error link on `Signature has expired` / `Authenticated
-     * Failed`. Resolves with the new access token on success; on failure
-     * clears the session and redirects to "/" (same as Vuex behavior).
+     * Failed`. Resolves with the new access token on success; on
+     * failure clears the session and redirects to "/".
      */
     const fetchRefreshToken = async (): Promise<string | undefined> => {
       try {

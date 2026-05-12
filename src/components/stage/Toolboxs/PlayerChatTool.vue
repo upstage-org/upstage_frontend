@@ -8,8 +8,6 @@ export default {
     const stageStore = useStageStore();
     const showPlayerChat = computed(() => stageStore.showPlayerChat);
     const togglePlayerChat = () => {
-      // Pinia rename: Vuex `dispatch("stage/showPlayerChat", v)` →
-      // Pinia `setShowPlayerChat(v)`.
       stageStore.setShowPlayerChat(!showPlayerChat.value);
     };
     const unread = computed(() => stageStore.unreadPrivateMessageCount);

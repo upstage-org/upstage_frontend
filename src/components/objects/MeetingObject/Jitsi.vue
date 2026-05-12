@@ -109,9 +109,7 @@ export default {
       interval && clearInterval(interval);
     };
 
-    // `openSettingPopup` is synchronous in Pinia; the previous
-    // `.then(slotProps.closeMenu)` chained onto Vuex's dispatch result
-    // ran on the next microtask. Inline is equivalent.
+    // `openSettingPopup` is synchronous — call the continuation inline.
     const openVolumePopup = (slotProps) => {
       stageStore.openSettingPopup({
         type: "VolumeParameters",

@@ -36,9 +36,6 @@ export default {
     const ready = computed(() => stageStore.ready);
 
     const route = useRoute();
-    // `loadStage` is an async Pinia action (it awaits a GraphQL
-    // request), so the .then(...) chain remains valid after the move
-    // off Vuex's dispatch wrapper.
     stageStore.loadStage({ url: route.params.url }).then(() => {
       stageStore.connect();
     });

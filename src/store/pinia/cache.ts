@@ -46,10 +46,10 @@ export const useCacheStore = defineStore("cache", () => {
   };
 
   /**
-   * Fetch the stage list from GraphQL and cache it. Mirrors the Vuex
-   * `cache/fetchStages` action: attaches each node's attribute values
-   * back onto the node as flat properties (legacy admin views read
-   * `node.someAttribute` directly rather than walking `attributes[]`).
+   * Fetch the stage list from GraphQL and cache it. Each node's
+   * attribute values are flattened back onto the node as flat
+   * properties because legacy admin views read `node.someAttribute`
+   * directly rather than walking `attributes[]`.
    *
    * On any failure the list is set to `[]` (not left at `null`) so
    * `loadingStages` flips to false and consumers don't spin forever.

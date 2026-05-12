@@ -15,10 +15,8 @@ interface ReplayTimestamp {
 
 const stageStore = useStageStore();
 const timestamp = computed<ReplayTimestamp>(() => stageStore.replay.timestamp);
-// `replay.interval` is a `setInterval` handle (number) when playing
-// and `null` when paused. The original `<boolean>` annotation worked
-// because Vuex state was typed as `any`; under Pinia it surfaces as
-// `number | null`. Coerce to boolean for the template guard.
+// `replay.interval` is a `setInterval` handle when playing and `null`
+// when paused — coerce to boolean for the template guard.
 const isPlaying = computed<boolean>(() => !!stageStore.replay.interval);
 const speed = computed<number>(() => stageStore.replay.speed);
 const speeds = [0.5, 1, 2, 4, 8, 16, 32];

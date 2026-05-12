@@ -66,9 +66,6 @@ export default {
       }
     };
 
-    // `store.state.user.avatarId` was a broken read after the user
-    // module moved to Pinia in Phase 5 (Vuex root has no `user` slot).
-    // Pinia user store is the real source of truth.
     const isHolding = computed(() => props.object.id === userStore.avatarId);
     const holdable = computed(() => ["avatar"].includes(props.object.type));
     const activeMovable = computed(() => stageStore.activeMovable);

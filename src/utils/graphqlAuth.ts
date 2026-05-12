@@ -5,11 +5,15 @@ const ACCESS = "access_token";
 const REFRESH = "refresh_token";
 
 /**
- * Resolves a JWT for Apollo the same way the old `graphql-request` path did, but
- * without importing the Vuex store (avoids circular imports: `store` → `graphql` → `apollo` → `store`).
+ * Resolves a JWT for Apollo without importing the auth store directly
+ * (avoids the circular import `store → graphql → apollo → store`).
  *
- * 1) `getSharedAuth()` — `vuex` persisted `auth` module (in sync with the live store)
- * 2) Legacy cookie — login uses `setToken` / `setRefreshToken` in `utils/auth` alongside Vuex
+ * Resolution order:
+ *   1. `getSharedAuth()` — reads the persisted auth blob from
+ *      `localStorage` (kept in sync with the live Pinia auth store via
+ *      `pinia-plugin-persistedstate`, with a fallback to the legacy
+ *      `vuex` key for stale tabs — see `utils/common.ts`).
+ *   2. Cookie set by `setToken` / `setRefreshToken` in `utils/auth`.
  */
 function parseCookieAccessToken(): string | undefined {
   const raw = Cookies.get(ACCESS);
@@ -26,9 +30,9 @@ function cookieRefreshToken(): string | undefined {
 }
 
 export function getAccessTokenForGraphql(): string | undefined {
-  const fromVuex = getSharedAuth()?.token;
-  if (typeof fromVuex === "string" && fromVuex.length > 0) {
-    return fromVuex;
+  const fromStore = getSharedAuth()?.token;
+  if (typeof fromStore === "string" && fromStore.length > 0) {
+    return fromStore;
   }
   return parseCookieAccessToken();
 }

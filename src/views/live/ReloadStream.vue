@@ -5,9 +5,6 @@ import { useStageStore } from "@stores/pinia/stage";
 const stageStore = useStageStore();
 const objects = computed<{ type?: string }[]>(() => stageStore.objects);
 const hasJitsi = computed(() => objects.value.some((el) => el.type === "jitsi"));
-// Pinia rename: Vuex `dispatch("stage/reloadStreams")` → Pinia
-// `triggerReloadStreams()` (action name collided with same-named
-// getter in Pinia setup-store syntax).
 const onReload = () => stageStore.triggerReloadStreams();
 </script>
 

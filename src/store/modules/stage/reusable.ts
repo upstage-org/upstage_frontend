@@ -2,11 +2,10 @@
 import configs from "config";
 import { useStageStore } from "@stores/pinia/stage";
 
-// These helpers used to read from the Vuex root store. They now go
-// straight to the Pinia stage store; during Wave D the Vuex stage
-// module is a thin Pinia-backed facade, so the previous indirection
-// added a Proxy hop with no benefit. `useStageStore()` is cheap to
-// call repeatedly — Pinia caches the instance.
+// `useStageStore()` is cheap to call repeatedly — Pinia caches the
+// instance — so these helpers re-resolve the store on each call rather
+// than memoizing a module-scoped reference (which would be initialized
+// before the Pinia plugin in a few import orders).
 
 export function toRelative(size) {
   const stageSize = useStageStore().stageSize;
