@@ -218,6 +218,11 @@ export interface WhiteboardCommand {
 }
 
 export interface JitsiTrack {
+  // `getId` is the only lib-jitsi-meet method we invoke from typed code
+  // (see ADD_TRACK dedupe). Declaring it here keeps the rest of the
+  // interface loose while letting TS resolve the call signature; without
+  // this, `track.getId?.()` narrows to `{}` and fails to typecheck.
+  getId?: () => string | number | undefined;
   [k: string]: unknown;
 }
 
