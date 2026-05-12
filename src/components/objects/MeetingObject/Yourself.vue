@@ -38,6 +38,26 @@ export default {
                   e.preventDefault();
                   console.log("Picture-in-Picture đã bị chặn");
                 });
+
+                // Safari (desktop and iOS) blocks autoplay on a <video>
+                // bound to a MediaStream that has any unmuted audio track,
+                // even via srcObject. We already render `muted` in the
+                // template (a self-preview must not echo your own voice
+                // back), but we also call play() defensively here:
+                //  - In Chromium / Firefox this is a no-op (already
+                //    autoplaying).
+                //  - In Safari, if anything still rejects (e.g. user
+                //    disabled autoplay site-wide), we surface it instead
+                //    of leaving `loading.value` stuck at true forever.
+                const playPromise = el.value.play();
+                if (playPromise && typeof playPromise.catch === "function") {
+                  playPromise.catch((err) => {
+                    console.warn("Local preview autoplay was blocked:", err);
+                    // Drop the loading overlay so the user can see the
+                    // first decoded frame even if playback hasn't begun.
+                    loading.value = false;
+                  });
+                }
               }
 
               el.value.addEventListener("loadedmetadata", () => {
@@ -127,6 +147,8 @@ export default {
         :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"
         :onClick="join"
         autoplay
+        muted
+        playsinline
         disablePictureInPicture
         controlslist="nodownload nofullscreen noremoteplayback"
         @loadeddata="loadeddata"

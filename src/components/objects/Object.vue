@@ -223,6 +223,7 @@ export default {
               :src="object.url"
               preload="auto"
               :loop="object.loop"
+              playsinline
               @ended="
                 /* eslint-disable-next-line vue/no-mutating-props -- intentional: object.isPlaying is a load-bearing signal mutated in-place by parent contract */
                 object.isPlaying = false

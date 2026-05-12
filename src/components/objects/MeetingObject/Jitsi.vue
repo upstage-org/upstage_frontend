@@ -151,6 +151,8 @@ export default {
         <video
           ref="videoEl"
           autoplay
+          muted
+          playsinline
           :style="{
             'border-radius': object.shape === 'circle' ? '100%' : '12px',
           }"
@@ -159,6 +161,15 @@ export default {
         >
           Please click on Refresh Stream button.
         </video>
+        <!--
+          The remote peer's audio is intentionally routed through the
+          sibling <audio> element below (so per-stream volume/mute can be
+          managed independently of the <video>). The <video> itself is
+          therefore always `muted`, which has the side benefit of
+          satisfying Safari's autoplay policy for MediaStreams that carry
+          an audio track. `playsinline` keeps iOS Safari from yanking the
+          stream into fullscreen the first frame it decodes.
+        -->
         <audio :id="'video' + object.id" ref="audioEl" autoplay :muted="localMuted"></audio>
         <img v-if="loading" class="overlay" src="/img/videoloading.gif" />
       </template>
