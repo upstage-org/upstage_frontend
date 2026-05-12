@@ -14,9 +14,14 @@ const stageStore = useStageStore();
 const ready = computed<boolean>(() => !!stageStore.model && !stageStore.preloading);
 
 const route = useRoute();
+// `route.params.*` is `string | string[]` — the dynamic segments
+// `:url` and `:id` are scalars in our router, so coerce once here so
+// the rest of the surface stays string-typed.
+const url = Array.isArray(route.params.url) ? route.params.url[0] : route.params.url;
+const id = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id;
 stageStore.loadStage({
-  url: route.params.url,
-  recordId: route.params.id,
+  url,
+  recordId: id,
 });
 
 provide("replaying", true);

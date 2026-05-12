@@ -7,18 +7,7 @@ import { useAttribute } from "services/graphql/composable";
 const stageStore = useStageStore();
 const preloading = computed<boolean>(() => stageStore.preloading);
 const preloadableAssets = computed<string[]>(() => stageStore.preloadableAssets);
-// `stageStore.model` is inferred as `null` because the Pinia store
-// file uses `// @ts-nocheck` (its types never escape). A local cast
-// is the smallest patch; tightening the store's exported types is
-// tracked as a follow-up.
-interface ModelShape {
-  id?: string | number;
-  cover?: string;
-  name?: string;
-  description?: string;
-  status?: string;
-}
-const model = computed(() => stageStore.model as unknown as ModelShape | null);
+const model = computed(() => stageStore.model);
 const progress = ref<number>(0);
 watch(
   () => model.value?.id,
@@ -57,10 +46,7 @@ watch(
 // `ListStage` includes `status` on the stage payload; the attributes array can lag
 // or duplicate it — prefer the root field from `loadStage`, then `attributes`.
 const statusFromAttributes = useAttribute(model, "status");
-const status = computed(() => {
-  const m = model.value as { status?: string } | undefined;
-  return m?.status ?? statusFromAttributes.value ?? "rehearsal";
-});
+const status = computed(() => model.value?.status ?? statusFromAttributes.value ?? "rehearsal");
 const timer = ref<ReturnType<typeof setTimeout>>();
 watch(model, (val) => {
   if (val && status.value === "live") {
@@ -72,9 +58,9 @@ onUnmounted(() => {
 });
 
 const replaying = inject<boolean>("replaying");
-// `stageStore.ready` returns `null | boolean` (it's `model && !preloading`
-// in the store, and `model` is typed as `null`). Coerce to a proper
-// boolean for the explicit `<boolean>` annotation.
+// `stageStore.ready` is `StageModel | null && !preloading`, i.e.
+// `StageModel | false | null` — coerce to a plain boolean for the
+// `v-if` check below.
 const ready = computed<boolean>(() => !!stageStore.ready);
 const clicked = ref<boolean>(false);
 const leave = (el: Element, complete: () => void) => {
@@ -85,8 +71,9 @@ const leave = (el: Element, complete: () => void) => {
   });
 };
 const backdropColor = computed<string>(() => stageStore.backdropColor);
-// `canPlay` is `permission?.role === 'player'` in the store, which
-// narrows to `boolean | null` since `permission` is nullable. Coerce.
+// `canPlay` includes the model permission check, which can yield a
+// truthy string (`"owner"`/`"editor"`/etc.) before the final
+// `!== "audience"` step — coerce to a proper boolean.
 const canPlay = computed<boolean>(() => !!stageStore.canPlay);
 const masquerading = computed<boolean>(() => stageStore.masquerading);
 </script>

@@ -1,20 +1,12 @@
-// @ts-nocheck
 /**
- * Pinia `stage` store — Phase 5.3 migration target.
+ * Pinia `stage` store — Phase 5.3 (Pinia migration target).
  *
- * Mirrors the public surface of `src/store/modules/stage/index.ts` (the
- * still-authoritative Vuex stage module). State, getters, mutations,
- * and actions are all ported here (Waves A/B/C). Wave D will migrate
- * consumers off the Vuex module; Wave E will retire it. See
- * `REMAINING_STEPS.md` §3 for the full wave plan.
- *
- * Through Wave C the store is exported from `pinia/index.ts` and
- * exposed under `__UPSTAGE_PINIA__.stage` (dev/e2e only) so probes can
- * inspect it, but nothing in app code reads from it yet. The Pinia
- * `connect()` action is never called by any consumer during the Wave
- * C/D transition, so the wrapper's underlying MQTT client stays in
- * its initial unconnected state and there is no duplicate broker
- * traffic with the Vuex store.
+ * Authoritative source of stage state, mutations, and actions. Wave F
+ * deleted the Vuex stage facade (`src/store/modules/stage/index.ts`)
+ * along with the `vuex` dependency; every consumer now reads/writes
+ * through `useStageStore()` directly. The dev hook
+ * `__UPSTAGE_PINIA__.stage` lets the Playwright e2e suites drive the
+ * same surface from outside the app.
  *
  * **Name collisions** (Vuex allowed `state.x`, `getters.x`, and
  * `actions.x` to coexist via separate namespaces; Pinia setup stores
@@ -77,24 +69,310 @@ import { avatarSpeak, stopSpeaking } from "@services/speech";
 import { useAuthStore } from "@stores/pinia/auth";
 import { useUserStore } from "@stores/pinia/user";
 
+// ====================================================================
+// SHAPES
+//
+// First-party shapes for the stage store. Kept intentionally permissive
+// — most of this data originates as GraphQL responses or MQTT message
+// bodies and carries fields beyond what the SPA reads, so each shape
+// allows arbitrary extra keys via an index signature. The narrow
+// fields here are the ones the store + its consumers actually touch.
+// ====================================================================
+
+export type ObjectId = string | number;
+
+export interface BoardObject {
+  id: ObjectId;
+  type?: string;
+  name?: string;
+  src?: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotate: number;
+  opacity?: number;
+  volume?: number;
+  moveSpeed?: number;
+  voice?: Record<string, unknown>;
+  liveAction?: boolean;
+  published?: boolean;
+  displayName?: string;
+  hostId?: ObjectId | null;
+  drawingId?: string;
+  textId?: string;
+  wornBy?: ObjectId | null;
+  multi?: boolean;
+  frames?: string[];
+  assetType?: { name?: string };
+  description?: string;
+  fontSize?: string;
+  speak?: Speak | null;
+  commands?: unknown;
+  holder?: Session;
+  [k: string]: unknown;
+}
+
+export interface ToolboxItem {
+  id: ObjectId;
+  name?: string;
+  src?: string;
+  url?: string;
+  multi?: boolean;
+  frames?: string[];
+  assetType?: { name?: string };
+  description?: string;
+  fileLocation?: string;
+  isPlaying?: boolean;
+  changed?: boolean;
+  [k: string]: unknown;
+}
+
+export interface Background {
+  id?: ObjectId;
+  at?: number;
+  opacity?: number;
+  speed?: number;
+  src?: string;
+  multi?: boolean;
+  frames?: string[];
+  [k: string]: unknown;
+}
+
+export interface Curtain {
+  id?: ObjectId;
+  src?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Stage model — GraphQL `stage` query response. The SPA reads a small
+ * fixed set of fields, but the payload carries many more (attributes,
+ * media subobjects, etc.). Extra keys are allowed via the index
+ * signature; consumers that need them cast on read.
+ */
+export interface StageModel {
+  id?: ObjectId;
+  fileLocation?: string;
+  cover?: string | null;
+  name?: string;
+  description?: string;
+  status?: string;
+  /** `"owner" | "editor" | "player" | "audience"` — string-typed because GraphQL also returns nulls and ad-hoc values. */
+  permission?: string;
+  assets?: ToolboxItem[];
+  scenes?: Scene[];
+  events?: ReplayEvent[];
+  [k: string]: unknown;
+}
+
+export interface Scene {
+  id: ObjectId;
+  payload?: string;
+  scenePreview?: boolean;
+  [k: string]: unknown;
+}
+
+export interface ReplayEvent {
+  id: ObjectId;
+  mqttTimestamp: number;
+  topic?: string;
+  payload?: unknown;
+  [k: string]: unknown;
+}
+
+export interface Speak {
+  user?: string;
+  message: string;
+  behavior?: string;
+  isPlayer?: boolean;
+  isPrivate?: boolean;
+  session?: string | null;
+  at?: number;
+  id?: string;
+  hash?: string;
+  [k: string]: unknown;
+}
+
+export interface ChatMessage {
+  id?: string;
+  user?: string;
+  message?: string;
+  behavior?: string;
+  color?: string;
+  hash?: string;
+  at?: number;
+  isPlayer?: boolean;
+  isPrivate?: boolean;
+  highlighted?: boolean;
+  session?: string | null;
+  clear?: boolean;
+  clearPlayerChat?: boolean;
+  remove?: string;
+  highlight?: string;
+  mute?: boolean;
+  avatarId?: ObjectId;
+  type?: string;
+  [k: string]: unknown;
+}
+
+export interface Drawing {
+  drawingId: string;
+  commands?: unknown;
+  [k: string]: unknown;
+}
+
+export interface TextEntity {
+  textId: string;
+  type?: string;
+  [k: string]: unknown;
+}
+
+export interface WhiteboardCommand {
+  [k: string]: unknown;
+}
+
+export interface JitsiTrack {
+  [k: string]: unknown;
+}
+
+export interface Session {
+  id: string;
+  isPlayer?: boolean;
+  nickname?: string;
+  at: number;
+  avatarId?: ObjectId | null;
+  leaving?: boolean;
+  [k: string]: unknown;
+}
+
+export interface Reaction {
+  reaction: unknown;
+  x: number;
+  y: number;
+}
+
+export interface AudioPlayer {
+  currentTime?: number;
+  [k: string]: unknown;
+}
+
+export interface StageConfig {
+  animateDuration: number;
+  reactionDuration: number;
+  ratio: number;
+  defaultcolor?: string;
+  enabledLiveStreaming?: boolean;
+  [k: string]: unknown;
+}
+
+export interface StageSettings {
+  chatVisibility: boolean;
+  chatDarkMode: boolean;
+  reactionVisibility: boolean;
+  [k: string]: unknown;
+}
+
+export interface Preferences {
+  isDrawing: boolean;
+  isWriting?: boolean;
+  text: { fontSize: string; fontFamily: string };
+  [k: string]: unknown;
+}
+
+/**
+ * `color` carries a foreground/background pair when initialised
+ * (`randomMessageColor()`), but `CLEAN_STAGE` historically reset it to
+ * a bare hex string (`randomColor()`). Consumers tolerate both shapes,
+ * so the type stays a union to preserve that legacy behaviour without
+ * losing the rich object at init time.
+ */
+export type ChatColor = string | { text: string; bg: string };
+
+export interface ChatState {
+  messages: ChatMessage[];
+  privateMessages: ChatMessage[];
+  privateMessage: string;
+  color: ChatColor;
+  opacity: number;
+  fontSize: string;
+  playerFontSize: string;
+  [k: string]: unknown;
+}
+
+export interface BoardState {
+  objects: BoardObject[];
+  drawings: Drawing[];
+  texts: TextEntity[];
+  whiteboard: WhiteboardCommand[];
+  tracks: JitsiTrack[];
+}
+
+export interface ToolsState {
+  avatars: ToolboxItem[];
+  props: ToolboxItem[];
+  backdrops: ToolboxItem[];
+  audios: ToolboxItem[];
+  streams: ToolboxItem[];
+  meetings: ToolboxItem[];
+  curtains: ToolboxItem[];
+  [k: string]: ToolboxItem[];
+}
+
+export interface SettingPopup {
+  isActive: boolean;
+  [k: string]: unknown;
+}
+
+export interface PurchasePopup {
+  isActive: boolean;
+  amount?: number;
+  [k: string]: unknown;
+}
+
+export interface ReceiptPopup {
+  isActive: boolean;
+  donationDetails: { amount: number; date: string; [k: string]: unknown };
+}
+
+export interface ReplayState {
+  timestamp: { begin: number; end: number; current: number };
+  timers: ReturnType<typeof setTimeout>[];
+  interval: ReturnType<typeof setInterval> | null;
+  speed: number;
+  isReplaying?: boolean;
+}
+
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
+export interface StageSize {
+  width: number;
+  height: number;
+  left: number;
+  top: number;
+}
+
 export const useStageStore = defineStore("stage", () => {
   // ====================================================================
   // STATE — 1:1 port of the Vuex `state` object (src/store/modules/stage/index.ts L34-115)
   // ====================================================================
 
-  const preloading = ref(true);
-  const model = ref(null);
-  const background = ref(null);
-  const curtain = ref(null);
-  const backdropColor = ref("gray");
-  const chatPosition = ref("right");
-  const status = ref("OFFLINE");
-  const subscribeSuccess = ref(false);
+  const preloading = ref<boolean>(true);
+  const model = ref<StageModel | null>(null);
+  const background = ref<Background | null>(null);
+  const curtain = ref<Curtain | null>(null);
+  const backdropColor = ref<string>("gray");
+  const chatPosition = ref<string>("right");
+  const status = ref<string>("OFFLINE");
+  const subscribeSuccess = ref<boolean>(false);
   // Public-facing name is the `activeMovable` computed below; the raw ref
   // is the mutation target.
-  const _activeMovable = ref(null);
+  const _activeMovable = ref<ObjectId | null>(null);
 
-  const chat = ref({
+  const chat = ref<ChatState>({
     messages: [],
     privateMessages: [],
     privateMessage: "",
@@ -104,7 +382,7 @@ export const useStageStore = defineStore("stage", () => {
     playerFontSize: "14px",
   });
 
-  const board = ref({
+  const board = ref<BoardState>({
     objects: [],
     drawings: [],
     texts: [],
@@ -112,7 +390,7 @@ export const useStageStore = defineStore("stage", () => {
     tracks: [],
   });
 
-  const tools = ref({
+  const tools = ref<ToolsState>({
     avatars: [],
     props: [],
     backdrops: [],
@@ -122,41 +400,48 @@ export const useStageStore = defineStore("stage", () => {
     curtains: [],
   });
 
-  const _config = ref(getDefaultStageConfig());
-  const settings = ref(getDefaultStageSettings());
-  const settingPopup = ref({ isActive: false });
-  const preferences = ref({
+  const _config = ref<StageConfig>(getDefaultStageConfig() as StageConfig);
+  const settings = ref<StageSettings>(getDefaultStageSettings() as StageSettings);
+  const settingPopup = ref<SettingPopup>({ isActive: false });
+  const preferences = ref<Preferences>({
     isDrawing: false,
     text: { fontSize: "20px", fontFamily: "Josefin Sans" },
   });
-  const reactions = ref([]);
+  const reactions = ref<Reaction[]>([]);
   // Static placeholder; the Wave-C port of reactiveViewport.ts will
   // start mutating this once App.vue mounts. Same TDZ-avoidance note
   // as the Vuex original — do not call getViewport() here.
-  const viewport = ref({ width: 0, height: 0 });
-  const sessions = ref([]);
-  const session = ref(null);
-  const replay = ref({
+  const viewport = ref<Viewport>({ width: 0, height: 0 });
+  const sessions = ref<Session[]>([]);
+  const session = ref<string | null>(null);
+  const replay = ref<ReplayState>({
     timestamp: { begin: 0, end: 0, current: 0 },
     timers: [],
     interval: null,
     speed: 1,
   });
-  const audioPlayers = ref([]);
-  const isSavingScene = ref(false);
-  const isLoadingScenes = ref(false);
-  const showPlayerChat = ref(false);
-  const showClearChatSetting = ref(false);
-  const showDownloadChatSetting = ref(false);
-  const lastSeenPrivateMessage = ref(localStorage.getItem("lastSeenPrivateMessage") ?? 0);
-  const masquerading = ref(false);
-  const purchasePopup = ref({ isActive: false });
-  const receiptPopup = ref({
+  const audioPlayers = ref<AudioPlayer[]>([]);
+  const isSavingScene = ref<boolean>(false);
+  const isLoadingScenes = ref<boolean>(false);
+  const showPlayerChat = ref<boolean>(false);
+  const showClearChatSetting = ref<boolean>(false);
+  const showDownloadChatSetting = ref<boolean>(false);
+  // Epoch ms of the last seen private message. localStorage returns
+  // `string | null`; coerce to a number on load so the unread-count
+  // comparator (`m.at > lastSeenPrivateMessage.value`) and the
+  // `SEEN_PRIVATE_MESSAGES` writer (which assigns `ChatMessage.at`)
+  // both type-check.
+  const lastSeenPrivateMessage = ref<number>(
+    Number(localStorage.getItem("lastSeenPrivateMessage")) || 0,
+  );
+  const masquerading = ref<boolean>(false);
+  const purchasePopup = ref<PurchasePopup>({ isActive: false });
+  const receiptPopup = ref<ReceiptPopup>({
     isActive: false,
     donationDetails: { amount: 0, date: "" },
   });
-  const _reloadStreams = ref(null);
-  const _enabledLiveStreaming = ref(true);
+  const _reloadStreams = ref<Date | null>(null);
+  const _enabledLiveStreaming = ref<boolean>(true);
 
   // ====================================================================
   // GETTERS — 1:1 port of the Vuex `getters` object (L116-228)
@@ -176,32 +461,32 @@ export const useStageStore = defineStore("stage", () => {
 
   const config = computed(() => _config.value);
 
-  const preloadableAssets = computed(() => {
-    const assets = []
-      .concat(tools.value.avatars.filter((a) => !a.multi).map((a) => a.src))
-      .concat(
-        tools.value.avatars
-          .filter((a) => a.multi)
-          .map((a) => a.frames ?? [])
-          .flat(),
-      )
-      .concat(tools.value.props.filter((a) => !a.multi).map((p) => p.src))
-      .concat(
-        tools.value.props
-          .filter((a) => a.multi)
-          .map((a) => a.frames ?? [])
-          .flat(),
-      )
-      .concat(tools.value.backdrops.filter((a) => !a.multi).map((b) => b.src))
-      .concat(
-        tools.value.backdrops
-          .filter((a) => a.multi)
-          .map((a) => a.frames ?? [])
-          .flat(),
-      )
-      .concat(tools.value.curtains.map((b) => b.src));
+  const preloadableAssets = computed<string[]>(() => {
+    const assets: (string | undefined)[] = [];
+    assets.push(...tools.value.avatars.filter((a) => !a.multi).map((a) => a.src));
+    assets.push(
+      ...tools.value.avatars
+        .filter((a) => a.multi)
+        .map((a) => a.frames ?? [])
+        .flat(),
+    );
+    assets.push(...tools.value.props.filter((a) => !a.multi).map((p) => p.src));
+    assets.push(
+      ...tools.value.props
+        .filter((a) => a.multi)
+        .map((a) => a.frames ?? [])
+        .flat(),
+    );
+    assets.push(...tools.value.backdrops.filter((a) => !a.multi).map((b) => b.src));
+    assets.push(
+      ...tools.value.backdrops
+        .filter((a) => a.multi)
+        .map((a) => a.frames ?? [])
+        .flat(),
+    );
+    assets.push(...tools.value.curtains.map((b) => b.src));
     // Drop falsy so we never block on a slot that will never @load
-    return assets.filter((src) => Boolean(src));
+    return assets.filter((src): src is string => Boolean(src));
   });
 
   const audios = computed(() => tools.value.audios);
@@ -257,7 +542,8 @@ export const useStageStore = defineStore("stage", () => {
   const audiences = computed(() => sessions.value.filter((s) => !s.isPlayer));
 
   const unreadPrivateMessageCount = computed(
-    () => chat.value.privateMessages.filter((m) => m.at > lastSeenPrivateMessage.value).length,
+    () =>
+      chat.value.privateMessages.filter((m) => (m.at ?? 0) > lastSeenPrivateMessage.value).length,
   );
 
   const whiteboard = computed(() => board.value.whiteboard);
@@ -283,26 +569,26 @@ export const useStageStore = defineStore("stage", () => {
   // object at the bottom of this file.
   // ====================================================================
 
-  function SET_MODEL(newModel) {
+  function SET_MODEL(newModel: StageModel | null) {
     model.value = newModel;
     if (newModel) {
       const media = newModel.assets;
       if (media && media.length) {
         media.forEach((item) => {
           if (item.assetType?.name === "video") {
-            item.url = absolutePath(item.fileLocation);
+            item.url = absolutePath(item.fileLocation ?? "");
           } else {
             if (item.description) {
               const meta = JSON.parse(item.description);
               delete item.description;
               Object.assign(item, meta);
             }
-            item.src = absolutePath(item.fileLocation);
+            item.src = absolutePath(item.fileLocation ?? "");
           }
-          if (item.multi) {
-            item.frames = item.frames.map((src) => absolutePath(src));
+          if (item.multi && item.frames) {
+            item.frames = item.frames.map((src: string) => absolutePath(src));
           }
-          const key = item.assetType?.name + "s";
+          const key = (item.assetType?.name ?? "") + "s";
           if (!tools.value[key]) {
             tools.value[key] = [];
           }
@@ -311,22 +597,34 @@ export const useStageStore = defineStore("stage", () => {
       } else {
         preloading.value = false;
       }
-      const cfg = useAttribute({ value: newModel }, "config", true).value;
+      // The persisted `config` attribute stores `ratio` as `{ width, height }`
+      // (so authors can tweak the dimensions independently); the runtime
+      // `_config.ratio` is the precomputed scalar. Type as `Record` to
+      // sidestep the resulting shape mismatch with `Partial<StageConfig>`.
+      const cfg = useAttribute({ value: newModel }, "config", true).value as
+        | (Record<string, unknown> & {
+            ratio?: { width: number; height: number };
+            enabledLiveStreaming?: boolean;
+            defaultcolor?: string;
+          })
+        | null;
       if (cfg) {
         Object.assign(_config.value, cfg);
-        _config.value.ratio = cfg.ratio.width / cfg.ratio.height;
+        if (cfg.ratio && typeof cfg.ratio === "object") {
+          _config.value.ratio = cfg.ratio.width / cfg.ratio.height;
+        }
         _enabledLiveStreaming.value =
-          typeof cfg?.enabledLiveStreaming === "boolean" ? cfg?.enabledLiveStreaming : true;
+          typeof cfg?.enabledLiveStreaming === "boolean" ? cfg.enabledLiveStreaming : true;
       }
       // Match Stage Management default (#30AC45): new stages often have no
       // saved config yet, so do not leave backdropColor on CLEAN_STAGE's "gray".
       backdropColor.value = cfg?.defaultcolor || COLORS.DEFAULT_BACKDROP;
-      const cover = useAttribute({ value: newModel }, "cover", false).value;
-      model.value.cover = cover && absolutePath(cover);
+      const cover = useAttribute({ value: newModel }, "cover", false).value as string | undefined;
+      newModel.cover = cover ? absolutePath(cover) : null;
     }
   }
 
-  function CLEAN_STAGE(cleanModel) {
+  function CLEAN_STAGE(cleanModel?: boolean) {
     if (cleanModel) {
       model.value = null;
       tools.value.audios = [];
@@ -341,8 +639,8 @@ export const useStageStore = defineStore("stage", () => {
     tools.value.backdrops = [];
     tools.value.streams = [];
     tools.value.curtains = [];
-    _config.value = getDefaultStageConfig();
-    settings.value = getDefaultStageSettings();
+    _config.value = getDefaultStageConfig() as StageConfig;
+    settings.value = getDefaultStageSettings() as StageSettings;
     board.value.objects = [];
     board.value.drawings = [];
     board.value.texts = [];
@@ -352,9 +650,9 @@ export const useStageStore = defineStore("stage", () => {
     chat.value.color = randomColor();
   }
 
-  function SET_BACKGROUND(bg) {
+  function SET_BACKGROUND(bg: Background | null) {
     if (bg) {
-      if (!background.value || !background.value.at || background.value.at < bg.at) {
+      if (!background.value || !background.value.at || (background.value.at ?? 0) < (bg.at ?? 0)) {
         if (!background.value || background.value.id !== bg.id) {
           // Not playing animation if only opacity change
           animate("#board", { opacity: [0, 1], duration: 5000 });
@@ -364,16 +662,16 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function SET_STATUS(newStatus) {
+  function SET_STATUS(newStatus: string) {
     status.value = newStatus;
   }
 
-  function SET_SUBSCRIBE_STATUS(s) {
+  function SET_SUBSCRIBE_STATUS(s: boolean) {
     subscribeSuccess.value = s;
   }
 
-  function PUSH_CHAT_MESSAGE(message) {
-    message.hash = hash(message);
+  function PUSH_CHAT_MESSAGE(message: ChatMessage) {
+    message.hash = hash(message as Record<string, unknown>);
     const lastMessage = chat.value.messages[chat.value.messages.length - 1];
     if (lastMessage && lastMessage.hash === message.hash) {
       return;
@@ -381,8 +679,8 @@ export const useStageStore = defineStore("stage", () => {
     chat.value.messages.push(message);
   }
 
-  function PUSH_PLAYER_CHAT_MESSAGE(message) {
-    message.hash = hash(message);
+  function PUSH_PLAYER_CHAT_MESSAGE(message: ChatMessage) {
+    message.hash = hash(message as Record<string, unknown>);
     const lastMessage = chat.value.privateMessages[chat.value.privateMessages.length - 1];
     if (lastMessage && lastMessage.hash === message.hash) {
       return;
@@ -398,18 +696,18 @@ export const useStageStore = defineStore("stage", () => {
     chat.value.privateMessages.length = 0;
   }
 
-  function REMOVE_MESSAGE(id) {
+  function REMOVE_MESSAGE(id: string) {
     chat.value.messages = chat.value.messages.filter((m) => m.id !== id);
   }
 
-  function HIGHLIGHT_MESSAGE(id) {
+  function HIGHLIGHT_MESSAGE(id: string) {
     const message = chat.value.messages.find((m) => m.id === id);
     if (message) {
       message.highlighted = !message.highlighted;
     }
   }
 
-  function PUSH_OBJECT(object) {
+  function PUSH_OBJECT(object: BoardObject) {
     const { id } = object;
     deserializeObject(object);
     const m = board.value.objects.find((o) => o.id === id);
@@ -420,7 +718,7 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function UPDATE_OBJECT(object) {
+  function UPDATE_OBJECT(object: BoardObject) {
     const { id } = object;
     deserializeObject(object);
     const m = board.value.objects.find((o) => o.id === id);
@@ -449,7 +747,7 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function DELETE_OBJECT(object) {
+  function DELETE_OBJECT(object: BoardObject) {
     const { id } = object;
     board.value.objects = board.value.objects.filter((o) => o.id !== id);
     board.value.objects
@@ -459,11 +757,19 @@ export const useStageStore = defineStore("stage", () => {
       });
   }
 
-  function SET_OBJECT_SPEAK({ avatar, speak, mute }) {
+  function SET_OBJECT_SPEAK({
+    avatar,
+    speak,
+    mute,
+  }: {
+    avatar: BoardObject;
+    speak: Speak;
+    mute?: boolean;
+  }) {
     const { id } = avatar;
     const m = board.value.objects.find((o) => o.id === id);
     if (m) {
-      speak.hash = hash(speak);
+      speak.hash = hash(speak as Record<string, unknown>);
       if (m.speak?.hash !== speak.hash) {
         m.speak = speak;
         if (!mute && (status.value === "LIVE" || replay.value.isReplaying)) {
@@ -481,11 +787,11 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function SET_PRELOADING_STATUS(s) {
+  function SET_PRELOADING_STATUS(s: boolean) {
     preloading.value = s;
   }
 
-  function UPDATE_AUDIO(audio) {
+  function UPDATE_AUDIO(audio: ToolboxItem) {
     const m = tools.value.audios.find((a) => a.src === audio.src);
     if (m) {
       audio.changed = true;
@@ -493,25 +799,25 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function SET_SETTING_POPUP(setting) {
+  function SET_SETTING_POPUP(setting: SettingPopup) {
     settingPopup.value = setting;
   }
 
-  function SEND_TO_BACK(object) {
+  function SEND_TO_BACK(object: BoardObject) {
     const index = board.value.objects.findIndex((avatar) => avatar.id === object.id);
     if (index > -1) {
       board.value.objects.unshift(board.value.objects.splice(index, 1)[0]);
     }
   }
 
-  function BRING_TO_FRONT(object) {
+  function BRING_TO_FRONT(object: BoardObject) {
     const index = board.value.objects.findIndex((avatar) => avatar.id === object.id);
     if (index > -1) {
       board.value.objects.push(board.value.objects.splice(index, 1)[0]);
     }
   }
 
-  function BRING_TO_FRONT_OF({ front, back }) {
+  function BRING_TO_FRONT_OF({ front, back }: { front: ObjectId; back: ObjectId }) {
     const frontIndex = board.value.objects.findIndex((avatar) => avatar.id === front);
     const backIndex = board.value.objects.findIndex((avatar) => avatar.id === back);
     if (frontIndex > -1 && backIndex > -1) {
@@ -519,39 +825,39 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function SET_PREFERENCES(prefs) {
+  function SET_PREFERENCES(prefs: Partial<Preferences>) {
     Object.assign(preferences.value, prefs);
   }
 
-  function PUSH_DRAWING(drawing) {
+  function PUSH_DRAWING(drawing: Drawing) {
     board.value.drawings.push(cloneDeep(drawing));
   }
 
-  function POP_DRAWING(drawingId) {
+  function POP_DRAWING(drawingId: string) {
     board.value.drawings = board.value.drawings.filter((d) => d.drawingId !== drawingId);
   }
 
-  function PUSH_TEXT(text) {
+  function PUSH_TEXT(text: TextEntity) {
     board.value.texts.push(text);
   }
 
-  function POP_TEXT(textId) {
+  function POP_TEXT(textId: string) {
     board.value.texts = board.value.texts.filter((d) => d.textId !== textId);
   }
 
-  function UPDATE_IS_DRAWING(isDrawing) {
+  function UPDATE_IS_DRAWING(isDrawing: boolean) {
     preferences.value.isDrawing = isDrawing;
   }
 
-  function UPDATE_IS_WRITING(isWriting) {
+  function UPDATE_IS_WRITING(isWriting: boolean) {
     preferences.value.isWriting = isWriting;
   }
 
-  function UPDATE_TEXT_OPTIONS(options) {
+  function UPDATE_TEXT_OPTIONS(options: Partial<Preferences["text"]>) {
     Object.assign(preferences.value.text, options);
   }
 
-  function PUSH_REACTION(reaction) {
+  function PUSH_REACTION(reaction: unknown) {
     reactions.value.push({
       reaction,
       x: randomRange(150, window.innerWidth) - 300,
@@ -562,30 +868,30 @@ export const useStageStore = defineStore("stage", () => {
     }, _config.value.reactionDuration);
   }
 
-  function UPDATE_VIEWPORT(v) {
+  function UPDATE_VIEWPORT(v: Viewport) {
     viewport.value = v;
   }
 
-  function RESCALE_OBJECTS(ratio) {
+  function RESCALE_OBJECTS(ratio: number) {
     board.value.objects.forEach((object) => {
       object.x = object.x * ratio;
       object.y = object.y * ratio;
       object.w = object.w * ratio;
       object.h = object.h * ratio;
-      recalcFontSize(object, (s) => s * ratio);
+      recalcFontSize(object, (s: number) => s * ratio);
     });
   }
 
-  function SET_CHAT_PARAMETERS({ opacity, fontSize }) {
+  function SET_CHAT_PARAMETERS({ opacity, fontSize }: { opacity: number; fontSize: string }) {
     chat.value.opacity = opacity;
     chat.value.fontSize = fontSize;
   }
 
-  function SET_PLAYER_CHAT_PARAMETERS({ playerFontSize }) {
+  function SET_PLAYER_CHAT_PARAMETERS({ playerFontSize }: { playerFontSize: string }) {
     chat.value.playerFontSize = playerFontSize;
   }
 
-  function UPDATE_SESSIONS_COUNTER(s) {
+  function UPDATE_SESSIONS_COUNTER(s: Session) {
     const index = sessions.value.findIndex((x) => x.id === s.id);
     if (index > -1) {
       if (s.leaving) {
@@ -602,42 +908,45 @@ export const useStageStore = defineStore("stage", () => {
     sessions.value.sort((a, b) => b.at - a.at);
   }
 
-  function SET_CHAT_VISIBILITY(visible) {
+  function SET_CHAT_VISIBILITY(visible: boolean) {
     settings.value.chatVisibility = visible;
   }
 
-  function SET_DARK_MODE_CHAT(enabled) {
+  function SET_DARK_MODE_CHAT(enabled: boolean) {
     settings.value.chatDarkMode = enabled;
   }
 
-  function SET_REACTION_VISIBILITY(visible) {
+  function SET_REACTION_VISIBILITY(visible: boolean) {
     settings.value.reactionVisibility = visible;
   }
 
-  function SET_CHAT_POSITION(position) {
+  function SET_CHAT_POSITION(position: string) {
     chatPosition.value = position;
   }
 
-  function SET_BACKDROP_COLOR(color) {
+  function SET_BACKDROP_COLOR(color: string) {
     backdropColor.value = color;
   }
 
-  function SET_REPLAY(r) {
+  function SET_REPLAY(r: Partial<ReplayState>) {
     Object.assign(replay.value, r);
   }
 
-  function SET_ACTIVE_MOVABLE(id) {
+  function SET_ACTIVE_MOVABLE(id: ObjectId | null) {
     _activeMovable.value = id;
   }
 
-  function UPDATE_AUDIO_PLAYER_STATUS({ index, ...statusUpdate }) {
+  function UPDATE_AUDIO_PLAYER_STATUS({
+    index,
+    ...statusUpdate
+  }: { index: number } & Record<string, unknown>) {
     if (!audioPlayers.value[index]) {
       audioPlayers.value[index] = {};
     }
     Object.assign(audioPlayers.value[index], statusUpdate);
   }
 
-  function SET_CURTAIN(c) {
+  function SET_CURTAIN(c: Curtain | null) {
     curtain.value = c;
   }
 
@@ -652,7 +961,22 @@ export const useStageStore = defineStore("stage", () => {
    * known key explicitly. The snapshot's `audios` maps to
    * `tools.audios` (the only place that field is read).
    */
-  function REPLACE_SCENE({ payload }) {
+  /**
+   * Scene snapshot shape. Snapshots are produced by
+   * `takeSnapshotFromStage` (see reusable.ts) and stored as JSON strings
+   * inside `Scene.payload`. The `audios` key on the snapshot maps to
+   * `tools.audios`, not a top-level state ref.
+   */
+  interface SceneSnapshot {
+    background?: Background | null;
+    backdropColor?: string;
+    board?: BoardState;
+    settings?: StageSettings;
+    audioPlayers?: AudioPlayer[];
+    audios?: ToolboxItem[];
+  }
+
+  function REPLACE_SCENE({ payload }: { payload?: string | null }) {
     animate("#live-stage", {
       filter: ["brightness(0)", "brightness(1)"],
       ease: "linear",
@@ -660,9 +984,11 @@ export const useStageStore = defineStore("stage", () => {
     });
     _activeMovable.value = null;
     if (payload) {
-      const snapshot = JSON.parse(payload);
-      snapshot.board.objects.forEach(deserializeObject);
-      snapshot.board.tracks = board.value.tracks;
+      const snapshot: SceneSnapshot = JSON.parse(payload);
+      if (snapshot.board) {
+        snapshot.board.objects.forEach(deserializeObject);
+        snapshot.board.tracks = board.value.tracks;
+      }
       if (snapshot.background !== undefined) background.value = snapshot.background;
       if (snapshot.backdropColor !== undefined) backdropColor.value = snapshot.backdropColor;
       if (snapshot.board !== undefined) board.value = snapshot.board;
@@ -682,44 +1008,56 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function SET_SAVING_SCENE(v) {
+  function SET_SAVING_SCENE(v: boolean) {
     isSavingScene.value = v;
   }
 
-  function SET_SHOW_PLAYER_CHAT(v) {
+  function SET_SHOW_PLAYER_CHAT(v: boolean) {
     showPlayerChat.value = v;
   }
 
-  function SET_SHOW_CLEAR_CHAT_SETTINGS(v) {
+  function SET_SHOW_CLEAR_CHAT_SETTINGS(v: boolean) {
     showClearChatSetting.value = v;
   }
 
-  function SET_SHOW_DOWNLOAD_CHAT_SETTINGS(v) {
+  function SET_SHOW_DOWNLOAD_CHAT_SETTINGS(v: boolean) {
     showDownloadChatSetting.value = v;
   }
 
-  function TAG_PLAYER(player) {
+  function TAG_PLAYER(player: { nickname: string }) {
     chat.value.privateMessage += `@${player.nickname.trim()}`;
   }
 
   function SEEN_PRIVATE_MESSAGES() {
     const length = chat.value.privateMessages.length;
     if (length > 0) {
-      lastSeenPrivateMessage.value = chat.value.privateMessages[length - 1].at;
-      localStorage.setItem("lastSeenPrivateMessage", lastSeenPrivateMessage.value);
+      lastSeenPrivateMessage.value = chat.value.privateMessages[length - 1].at ?? 0;
+      localStorage.setItem("lastSeenPrivateMessage", String(lastSeenPrivateMessage.value));
     }
   }
 
-  function UPDATE_WHITEBOARD(message) {
+  /**
+   * Whiteboard draw message envelope. `command` is a single segment for
+   * NEW_LINE and unused for UNDO/CLEAR; `index` is required for UNDO.
+   */
+  interface DrawMessage {
+    type: string;
+    command?: WhiteboardCommand;
+    index?: number;
+  }
+
+  function UPDATE_WHITEBOARD(message: DrawMessage) {
     if (!board.value.whiteboard) {
       board.value.whiteboard = [];
     }
     switch (message.type) {
       case DRAW_ACTIONS.NEW_LINE:
-        board.value.whiteboard = board.value.whiteboard.concat(message.command);
+        if (message.command) {
+          board.value.whiteboard = board.value.whiteboard.concat(message.command);
+        }
         break;
       case DRAW_ACTIONS.UNDO:
-        board.value.whiteboard = board.value.whiteboard.filter((e, i) => i !== message.index);
+        board.value.whiteboard = board.value.whiteboard.filter((_e, i) => i !== message.index);
         break;
       case DRAW_ACTIONS.CLEAR:
         board.value.whiteboard = [];
@@ -733,23 +1071,37 @@ export const useStageStore = defineStore("stage", () => {
     masquerading.value = !masquerading.value;
   }
 
-  function CREATE_ROOM(room) {
+  function CREATE_ROOM(room: ToolboxItem) {
     tools.value.meetings.push(room);
   }
 
-  function CREATE_STREAM(room) {
+  function CREATE_STREAM(room: ToolboxItem) {
     tools.value.streams.push(room);
   }
 
-  function REORDER_TOOLBOX({ from, to }) {
+  /**
+   * Reorder shape: `from`/`to` are either a Scene, Drawing, TextEntity,
+   * or a ToolboxItem (in which case `from.type` names the tool group).
+   */
+  interface ReorderItem {
+    id?: ObjectId;
+    scenePreview?: boolean;
+    drawingId?: string;
+    textId?: string;
+    type?: string;
+  }
+
+  function REORDER_TOOLBOX({ from, to }: { from: ReorderItem; to: ReorderItem }) {
     console.log(from, to);
     if (from.scenePreview) {
       // is scene
-      const fromIndex = model.value.scenes.findIndex((t) => t.id === from.id);
-      const toIndex = model.value.scenes.findIndex((t) => t.id === to.id);
+      const scenes = model.value?.scenes;
+      if (!scenes) return;
+      const fromIndex = scenes.findIndex((t) => t.id === from.id);
+      const toIndex = scenes.findIndex((t) => t.id === to.id);
       if (fromIndex > -1 && toIndex > -1) {
-        const tool = model.value.scenes.splice(fromIndex, 1)[0];
-        model.value.scenes.splice(toIndex, 0, tool);
+        const tool = scenes.splice(fromIndex, 1)[0];
+        scenes.splice(toIndex, 0, tool);
       }
     } else if (from.drawingId) {
       // is drawing
@@ -768,7 +1120,7 @@ export const useStageStore = defineStore("stage", () => {
         board.value.texts.splice(toIndex, 0, tool);
       }
     } else {
-      const toolName = from.type + "s";
+      const toolName = (from.type ?? "") + "s";
       if (tools.value[toolName]) {
         const fromIndex = tools.value[toolName].findIndex((t) => t.id === from.id);
         const toIndex = tools.value[toolName].findIndex((t) => t.id === to.id);
@@ -780,17 +1132,18 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function SET_PURCHASE_POPUP(purchase) {
+  function SET_PURCHASE_POPUP(purchase: PurchasePopup) {
     purchasePopup.value = purchase;
     if (purchase.isActive) {
       receiptPopup.value.donationDetails = {
         ...purchase,
+        amount: purchase.amount ?? 0,
         date: new Date().toLocaleDateString(),
       };
     }
   }
 
-  function ADD_TRACK(track) {
+  function ADD_TRACK(track: JitsiTrack) {
     board.value.tracks = [...board.value.tracks, track];
   }
 
@@ -798,7 +1151,7 @@ export const useStageStore = defineStore("stage", () => {
     _reloadStreams.value = new Date();
   }
 
-  function OPEN_RECEIPT_POPUP(_payload) {
+  function OPEN_RECEIPT_POPUP(_payload?: unknown) {
     receiptPopup.value.isActive = true;
   }
 
@@ -830,9 +1183,22 @@ export const useStageStore = defineStore("stage", () => {
   // `subscribe` which is defined later) work without ordering pain.
   // ====================================================================
 
+  /**
+   * Minimal contract for the broker client returned by `buildClient()`.
+   * `src/services/mqtt.ts` is `@ts-nocheck` and infers `.client = null`
+   * at construction, so without an assertion here every `client.on(...)`
+   * trips up on `never`. Only the listener channels we actually wire are
+   * declared.
+   */
+  type MqttClient = {
+    on(event: "connect" | "reconnect" | "close" | "disconnect" | "offline", cb: () => void): void;
+    on(event: "error", cb: (err: { message?: string } | undefined) => void): void;
+  };
+
   function connect() {
     SET_STATUS("CONNECTING");
-    const client = mqtt.connect();
+    const client = mqtt.connect() as MqttClient | null;
+    if (!client) return;
     client.on("connect", () => {
       SET_STATUS("LIVE");
       void reloadMissingEvents();
@@ -847,7 +1213,7 @@ export const useStageStore = defineStore("stage", () => {
     client.on("close", () => SET_STATUS("OFFLINE"));
     client.on("disconnect", () => SET_STATUS("OFFLINE"));
     client.on("offline", () => SET_STATUS("OFFLINE"));
-    mqtt.receiveMessage((payload) => handleMessage(payload));
+    mqtt.receiveMessage((payload: { topic: string; message: unknown }) => handleMessage(payload));
   }
 
   function subscribe() {
@@ -874,38 +1240,47 @@ export const useStageStore = defineStore("stage", () => {
     mqtt.disconnect();
   }
 
-  function handleMessage({ topic, message }) {
+  /**
+   * Generic broker envelope. The dispatch table below narrows `message`
+   * to a more specific shape per `topic`.
+   */
+  interface MqttEnvelope {
+    topic: string;
+    message: unknown;
+  }
+
+  function handleMessage({ topic, message }: MqttEnvelope) {
     switch (topic) {
       case TOPICS.CHAT:
-        handleChatMessage({ message });
+        handleChatMessage({ message: message as ChatMessage });
         break;
       case TOPICS.BOARD:
-        handleBoardMessage({ message });
+        handleBoardMessage({ message: message as BoardMessage });
         break;
       case TOPICS.BACKGROUND:
-        handleBackgroundMessage({ message });
+        handleBackgroundMessage({ message: message as BackgroundMessage });
         break;
       case TOPICS.AUDIO:
-        handleAudioMessage({ message });
+        handleAudioMessage({ message: message as ToolboxItem });
         break;
       case TOPICS.REACTION:
         handleReactionMessage({ message });
         break;
       case TOPICS.COUNTER:
-        handleCounterMessage({ message });
+        handleCounterMessage({ message: message as Session });
         break;
       case TOPICS.DRAW:
-        handleDrawMessage({ message });
+        handleDrawMessage({ message: message as DrawMessage });
         break;
       default:
         break;
     }
   }
 
-  function sendChat({ message, isPrivate }) {
+  function sendChat({ message, isPrivate }: { message: string; isPrivate?: boolean }) {
     if (!message) return;
     let user = useUserStore().chatname;
-    let isPlayer = canPlay.value;
+    let isPlayer: boolean = !!canPlay.value;
     let behavior = "speak";
     const currentSession = session.value;
     if (message.startsWith(":")) {
@@ -925,7 +1300,7 @@ export const useStageStore = defineStore("stage", () => {
       }
       isPlayer = false;
     }
-    const payload = {
+    const payload: Speak = {
       user,
       message: message,
       behavior,
@@ -951,7 +1326,7 @@ export const useStageStore = defineStore("stage", () => {
    * public chat log. Mirrors the SPEAK side of `sendChat` — same payload
    * shape, same topic — but skips `TOPICS.CHAT` entirely.
    */
-  function speakAsAvatar({ message, behavior }) {
+  function speakAsAvatar({ message, behavior }: { message: string; behavior?: string }) {
     if (!message) return;
     const avatar = currentAvatar.value;
     if (!avatar) return;
@@ -959,7 +1334,7 @@ export const useStageStore = defineStore("stage", () => {
     if (!isPlayer) return;
     const finalBehavior = behavior === "shout" || behavior === "think" ? behavior : "speak";
     const finalMessage = finalBehavior === "shout" ? String(message).toUpperCase() : message;
-    const speak = {
+    const speak: Speak = {
       user: useUserStore().chatname,
       message: finalMessage,
       behavior: finalBehavior,
@@ -976,7 +1351,17 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
-  function handleChatMessage({ message }) {
+  function handleChatMessage({ message }: { message: ChatMessage | string }) {
+    // String fall-through for legacy plain-text MQTT chat publishers.
+    if (typeof message !== "object" || message === null) {
+      const stringMessage: ChatMessage = {
+        user: "Anonymous",
+        color: "#000000",
+        message: String(message),
+      };
+      PUSH_CHAT_MESSAGE(stringMessage);
+      return;
+    }
     if (message.clear) {
       CLEAR_CHAT();
       return;
@@ -993,23 +1378,19 @@ export const useStageStore = defineStore("stage", () => {
       HIGHLIGHT_MESSAGE(message.highlight);
       return;
     }
-    const m = {
+    const m: ChatMessage = {
       user: "Anonymous",
       color: "#000000",
+      ...message,
     };
-    if (typeof message === "object") {
-      Object.assign(m, message);
-    } else {
-      m.message = message;
-    }
     if (message.isPrivate) {
       PUSH_PLAYER_CHAT_MESSAGE(m);
-      if (message.at > lastSeenPrivateMessage.value) {
+      if ((message.at ?? 0) > lastSeenPrivateMessage.value) {
         if (showPlayerChat.value) {
           SEEN_PRIVATE_MESSAGES();
         } else {
           const nickname = useUserStore().nickname ?? "";
-          if (message.message.toLowerCase().includes(`@${nickname.trim().toLowerCase()}`)) {
+          if (message.message?.toLowerCase().includes(`@${nickname.trim().toLowerCase()}`)) {
             setShowPlayerChat(true);
           }
         }
@@ -1019,8 +1400,14 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function placeObjectOnStage(data) {
-    const object = {
+  function placeObjectOnStage(
+    data: Partial<BoardObject> & {
+      assetType?: { name?: string };
+      type?: string;
+      description?: string;
+    },
+  ): BoardObject {
+    const object: BoardObject = {
       w: 100,
       h: 100,
       opacity: 1,
@@ -1028,6 +1415,8 @@ export const useStageStore = defineStore("stage", () => {
       voice: {},
       volume: 100,
       rotate: 0,
+      x: 0,
+      y: 0,
       ...data,
       id: uuidv4(),
       type: data.assetType?.name || data.type,
@@ -1035,7 +1424,7 @@ export const useStageStore = defineStore("stage", () => {
     if (object.type === "video") {
       object.hostId = session.value;
       try {
-        const description = JSON.parse(data.description);
+        const description = JSON.parse(data.description ?? "");
         if (description.w && description.h) object.h = (description.h * 100) / description.w;
       } catch {
         // description is optional / may not be JSON; fall back to defaults.
@@ -1049,7 +1438,7 @@ export const useStageStore = defineStore("stage", () => {
     return object;
   }
 
-  function shapeObject(object) {
+  function shapeObject(object: BoardObject) {
     if (object.liveAction) {
       if (object.published) {
         mqtt.sendMessage(TOPICS.BOARD, {
@@ -1080,7 +1469,7 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function deleteObject(object) {
+  function deleteObject(object: BoardObject) {
     object = serializeObject(object);
     if (object.drawingId) {
       // is drawing
@@ -1092,28 +1481,28 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
-  function switchFrame(object) {
+  function switchFrame(object: BoardObject) {
     mqtt.sendMessage(TOPICS.BOARD, {
       type: BOARD_ACTIONS.SWITCH_FRAME,
       object: serializeObject(object),
     });
   }
 
-  function sendToBack(object) {
+  function sendToBack(object: BoardObject) {
     mqtt.sendMessage(TOPICS.BOARD, {
       type: BOARD_ACTIONS.SEND_TO_BACK,
       object: serializeObject(object),
     });
   }
 
-  function bringToFront(object) {
+  function bringToFront(object: BoardObject) {
     mqtt.sendMessage(TOPICS.BOARD, {
       type: BOARD_ACTIONS.BRING_TO_FRONT,
       object: serializeObject(object),
     });
   }
 
-  function bringToFrontOf({ front, back }) {
+  function bringToFrontOf({ front, back }: { front: ObjectId; back: ObjectId }) {
     mqtt.sendMessage(TOPICS.BOARD, {
       type: BOARD_ACTIONS.BRING_TO_FRONT_OF,
       front,
@@ -1121,48 +1510,67 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
-  function toggleAutoplayFrames(object) {
+  function toggleAutoplayFrames(object: BoardObject) {
     mqtt.sendMessage(TOPICS.BOARD, {
       type: BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES,
       object: serializeObject(object),
     });
   }
 
-  function handleBoardMessage({ message }) {
+  /**
+   * Board topic envelope. Different `type` values carry different
+   * payloads (object/avatar+speak/front+back); express the union loosely
+   * and narrow at each case site.
+   */
+  interface BoardMessage {
+    type: string;
+    object?: BoardObject;
+    avatar?: BoardObject;
+    speak?: Speak;
+    mute?: boolean;
+    front?: ObjectId;
+    back?: ObjectId;
+  }
+
+  function handleBoardMessage({ message }: { message: BoardMessage }) {
     switch (message.type) {
       case BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE:
-        PUSH_OBJECT(message.object);
+        if (message.object) PUSH_OBJECT(message.object);
         break;
       case BOARD_ACTIONS.MOVE_TO:
-        UPDATE_OBJECT(message.object);
+        if (message.object) UPDATE_OBJECT(message.object);
         break;
       case BOARD_ACTIONS.DESTROY:
-        DELETE_OBJECT(message.object);
+        if (message.object) DELETE_OBJECT(message.object);
         break;
       case BOARD_ACTIONS.SWITCH_FRAME:
-        UPDATE_OBJECT(message.object);
+        if (message.object) UPDATE_OBJECT(message.object);
         break;
       case BOARD_ACTIONS.SPEAK:
-        SET_OBJECT_SPEAK(message);
+        if (message.avatar && message.speak) {
+          SET_OBJECT_SPEAK({ avatar: message.avatar, speak: message.speak, mute: message.mute });
+        }
         break;
       case BOARD_ACTIONS.SEND_TO_BACK:
-        SEND_TO_BACK(message.object);
+        if (message.object) SEND_TO_BACK(message.object);
         break;
       case BOARD_ACTIONS.BRING_TO_FRONT:
-        BRING_TO_FRONT(message.object);
+        if (message.object) BRING_TO_FRONT(message.object);
         break;
       case BOARD_ACTIONS.BRING_TO_FRONT_OF:
-        BRING_TO_FRONT_OF(message);
+        if (message.front !== undefined && message.back !== undefined) {
+          BRING_TO_FRONT_OF({ front: message.front, back: message.back });
+        }
         break;
       case BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES:
-        UPDATE_OBJECT(message.object);
+        if (message.object) UPDATE_OBJECT(message.object);
         break;
       default:
         break;
     }
   }
 
-  function setBackground(bg) {
+  function setBackground(bg: Background) {
     bg.at = +new Date();
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.CHANGE_BACKGROUND,
@@ -1170,35 +1578,35 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
-  function showChatBox(visible) {
+  function showChatBox(visible: boolean) {
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.SET_CHAT_VISIBILITY,
       visible,
     });
   }
 
-  function enableDarkModeChat(enabled) {
+  function enableDarkModeChat(enabled: boolean) {
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.SET_DARK_MODE_CHAT,
       enabled,
     });
   }
 
-  function showReactionsBar(visible) {
+  function showReactionsBar(visible: boolean) {
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.SET_REACTION_VISIBILITY,
       visible,
     });
   }
 
-  function setChatPosition(position) {
+  function setChatPosition(position: string) {
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.SET_CHAT_POSITION,
       position,
     });
   }
 
-  function setBackdropColor(color) {
+  function setBackdropColor(color: string) {
     console.log("SET_BACKDROP_COLOR", color);
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.SET_BACKDROP_COLOR,
@@ -1206,7 +1614,7 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
-  function drawCurtain(c) {
+  function drawCurtain(c: Curtain | null) {
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.DRAW_CURTAIN,
       curtain: c,
@@ -1219,7 +1627,7 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
-  function switchScene(scene) {
+  function switchScene(scene: ObjectId) {
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.SWITCH_SCENE,
       scene,
@@ -1232,34 +1640,50 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
-  function handleBackgroundMessage({ message }) {
+  /**
+   * Background topic envelope. Each `type` carries a small distinct
+   * payload (visible/enabled/color/etc.); fields are all optional, and
+   * each case site reads only the ones it expects.
+   */
+  interface BackgroundMessage {
+    type: string;
+    background?: Background | null;
+    visible?: boolean;
+    enabled?: boolean;
+    position?: string;
+    color?: string;
+    curtain?: Curtain | null;
+    scene?: ObjectId;
+  }
+
+  function handleBackgroundMessage({ message }: { message: BackgroundMessage }) {
     switch (message.type) {
       case BACKGROUND_ACTIONS.CHANGE_BACKGROUND:
-        SET_BACKGROUND(message.background);
+        SET_BACKGROUND(message.background ?? null);
         break;
       case BACKGROUND_ACTIONS.SET_CHAT_VISIBILITY:
-        SET_CHAT_VISIBILITY(message.visible);
+        if (message.visible !== undefined) SET_CHAT_VISIBILITY(message.visible);
         break;
       case BACKGROUND_ACTIONS.SET_DARK_MODE_CHAT:
-        SET_DARK_MODE_CHAT(message.enabled);
+        if (message.enabled !== undefined) SET_DARK_MODE_CHAT(message.enabled);
         break;
       case BACKGROUND_ACTIONS.SET_REACTION_VISIBILITY:
-        SET_REACTION_VISIBILITY(message.visible);
+        if (message.visible !== undefined) SET_REACTION_VISIBILITY(message.visible);
         break;
       case BACKGROUND_ACTIONS.SET_CHAT_POSITION:
-        SET_CHAT_POSITION(message.position);
+        if (message.position !== undefined) SET_CHAT_POSITION(message.position);
         break;
       case BACKGROUND_ACTIONS.SET_BACKDROP_COLOR:
-        SET_BACKDROP_COLOR(message.color);
+        if (message.color !== undefined) SET_BACKDROP_COLOR(message.color);
         break;
       case BACKGROUND_ACTIONS.DRAW_CURTAIN:
-        SET_CURTAIN(message.curtain);
+        SET_CURTAIN(message.curtain ?? null);
         break;
       case BACKGROUND_ACTIONS.LOAD_SCENES:
         void reloadScenes();
         break;
       case BACKGROUND_ACTIONS.SWITCH_SCENE:
-        replaceScene(message.scene);
+        if (message.scene !== undefined) replaceScene(message.scene);
         break;
       case BACKGROUND_ACTIONS.BLANK_SCENE: {
         const blankBackdrop =
@@ -1284,11 +1708,11 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function updateAudioStatus(audio) {
+  function updateAudioStatus(audio: ToolboxItem) {
     mqtt.sendMessage(TOPICS.AUDIO, audio);
   }
 
-  function handleAudioMessage({ message }) {
+  function handleAudioMessage({ message }: { message: ToolboxItem }) {
     UPDATE_AUDIO(message);
   }
 
@@ -1296,39 +1720,39 @@ export const useStageStore = defineStore("stage", () => {
     SET_SETTING_POPUP({ isActive: false });
   }
 
-  function openSettingPopup(setting) {
+  function openSettingPopup(setting: SettingPopup) {
     setting.isActive = true;
     SET_SETTING_POPUP(setting);
   }
 
-  function addDrawing(drawing) {
+  function addDrawing(drawing: Drawing) {
     PUSH_DRAWING(drawing);
-    placeObjectOnStage(drawing);
+    placeObjectOnStage(drawing as Partial<BoardObject>);
   }
 
-  function addText(text) {
+  function addText(text: TextEntity) {
     text.type = "text";
     PUSH_TEXT(text);
-    placeObjectOnStage(text);
+    placeObjectOnStage(text as Partial<BoardObject>);
   }
 
-  function handleReactionMessage({ message }) {
+  function handleReactionMessage({ message }: { message: unknown }) {
     PUSH_REACTION(message);
   }
 
-  function sendReaction(reaction) {
+  function sendReaction(reaction: unknown) {
     mqtt.sendMessage(TOPICS.REACTION, reaction);
   }
 
-  async function loadStage({ url, recordId }) {
+  async function loadStage({ url, recordId }: { url: string; recordId?: string }) {
     CLEAN_STAGE(true);
     SET_PRELOADING_STATUS(true);
     try {
       const { stage } = await stageGraph.loadStage(url, recordId);
       if (stage) {
         SET_MODEL(stage);
-        const { events } = stage;
-        if (recordId && events) {
+        const { events } = stage as StageModel;
+        if (recordId && events && events.length > 0) {
           SET_REPLAY({
             timestamp: {
               begin: events[0].mqttTimestamp,
@@ -1337,7 +1761,7 @@ export const useStageStore = defineStore("stage", () => {
             },
           });
         } else {
-          (events || []).forEach((event) => replayEvent(event));
+          (events ?? []).forEach((event: ReplayEvent) => replayEvent(event));
         }
         await stageGraph.updateLastAccess(stage.id);
       } else {
@@ -1350,14 +1774,15 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   async function reloadPermission() {
+    if (!model.value?.fileLocation) return;
     const { stage } = await stageGraph.loadStage(model.value.fileLocation);
-    if (stage) {
+    if (stage && model.value) {
       model.value.permission = stage.permission;
     }
   }
 
   async function loadPermission() {
-    const permission = model.value.permission;
+    const permission = model.value?.permission;
     if (permission == "owner" || permission == "editor" || permission == "player") {
       SET_SHOW_CLEAR_CHAT_SETTINGS(true);
       SET_SHOW_DOWNLOAD_CHAT_SETTINGS(true);
@@ -1368,32 +1793,32 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   async function reloadScenes() {
+    if (!model.value?.fileLocation) return;
     isLoadingScenes.value = true;
     const scenes = await stageGraph.loadScenes(model.value.fileLocation);
-    if (scenes) {
+    if (scenes && model.value) {
       model.value.scenes = scenes;
     }
     isLoadingScenes.value = false;
   }
 
   async function reloadMissingEvents() {
-    if (model.value.events) {
-      const lastEventId = model.value.events[model.value.events.length - 1]?.id ?? 0;
-      const events = await stageGraph.loadEvents(model.value.fileLocation, lastEventId);
-      if (events) {
-        events.forEach((event) => replicateEvent(event));
-        model.value.events = model.value.events.concat(events);
-      }
+    if (!model.value?.fileLocation || !model.value.events) return;
+    const lastEventId = model.value.events[model.value.events.length - 1]?.id ?? 0;
+    const events = await stageGraph.loadEvents(model.value.fileLocation, lastEventId);
+    if (events && model.value.events) {
+      events.forEach((event: ReplayEvent) => replicateEvent(event));
+      model.value.events = model.value.events.concat(events);
     }
   }
 
-  function replaceScene(sceneId) {
+  function replaceScene(sceneId: ObjectId) {
     animate("#live-stage", {
       filter: "brightness(0)",
     });
-    const scene = model.value.scenes.find((s) => s.id == sceneId);
+    const scene = model.value?.scenes?.find((s) => s.id == sceneId);
     if (scene) {
-      REPLACE_SCENE(scene);
+      REPLACE_SCENE({ payload: scene.payload ?? null });
     } else {
       if (isLoadingScenes.value) {
         setTimeout(() => replaceScene(sceneId), 1000); // retry after scenes load
@@ -1414,28 +1839,31 @@ export const useStageStore = defineStore("stage", () => {
    * off-screen and the stage looks blank even though the replay timer
    * keeps ticking. Cloning here scopes that mutation to one playback only.
    */
-  function replayEvent({ topic, payload }) {
+  function replayEvent({ topic, payload }: ReplayEvent) {
     const clone = JSON.parse(JSON.stringify(payload));
     handleMessage({
-      topic: unnamespaceTopic(topic),
+      topic: unnamespaceTopic(topic ?? ""),
       message: clone,
     });
   }
 
-  function replicateEvent({ topic, payload }) {
+  function replicateEvent({ topic, payload }: ReplayEvent) {
     // Same shared-reference hazard as `replayEvent` — see comment there.
     const message = JSON.parse(JSON.stringify(payload));
     message.mute = true;
     handleMessage({
-      topic: unnamespaceTopic(topic),
+      topic: unnamespaceTopic(topic ?? ""),
       message,
     });
   }
 
-  async function replayRecording(timestamp) {
+  async function replayRecording(timestamp?: number | string) {
     stopSpeaking();
     pauseReplay();
-    const current = timestamp ? Number(timestamp) : replay.value.timestamp.begin;
+    const current =
+      timestamp !== undefined && timestamp !== null
+        ? Number(timestamp)
+        : replay.value.timestamp.begin;
     replay.value.timestamp.current = current;
     // Preserve persistent stage-config values across CLEAN_STAGE. Backdrop
     // color and config live on stage attributes (not in the MQTT event
@@ -1447,7 +1875,7 @@ export const useStageStore = defineStore("stage", () => {
     backdropColor.value = preservedBackdropColor;
     _config.value = preservedConfig;
     replay.value.isReplaying = true;
-    const events = model.value.events;
+    const events = model.value?.events ?? [];
     const speed = replay.value.speed;
     replay.value.interval = setInterval(() => {
       replay.value.timestamp.current += 1;
@@ -1456,7 +1884,7 @@ export const useStageStore = defineStore("stage", () => {
         pauseReplay();
       }
     }, 1000 / speed);
-    events.forEach((event) => {
+    events.forEach((event: ReplayEvent) => {
       if (event.mqttTimestamp - current >= 0) {
         const timer = setTimeout(
           () => {
@@ -1472,7 +1900,9 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   function pauseReplay() {
-    clearInterval(replay.value.interval);
+    if (replay.value.interval !== null) {
+      clearInterval(replay.value.interval);
+    }
     replay.value.interval = null;
     replay.value.timers.forEach((timer) => clearTimeout(timer));
     replay.value.timers = [];
@@ -1484,7 +1914,7 @@ export const useStageStore = defineStore("stage", () => {
 
   function seekForwardReplay() {
     const current = replay.value.timestamp.current + 10000;
-    const nextEvent = model.value.events.find((e) => e.mqttTimestamp > current);
+    const nextEvent = model.value?.events?.find((e) => e.mqttTimestamp > current);
     if (nextEvent) {
       void replayRecording(nextEvent.mqttTimestamp);
     }
@@ -1492,9 +1922,10 @@ export const useStageStore = defineStore("stage", () => {
 
   function seekBackwardReplay() {
     const current = replay.value.timestamp.current - 10000;
-    let event = null;
-    for (let i = model.value.events.length - 1; i >= 0; i--) {
-      event = model.value.events[i];
+    const events = model.value?.events ?? [];
+    let event: ReplayEvent | null = null;
+    for (let i = events.length - 1; i >= 0; i--) {
+      event = events[i];
       if (event.mqttTimestamp < current) {
         break;
       }
@@ -1504,7 +1935,7 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
-  function handleCounterMessage({ message }) {
+  function handleCounterMessage({ message }: { message: Session }) {
     UPDATE_SESSIONS_COUNTER(message);
     if (message.id === session.value && message.avatarId) {
       useUserStore().avatarId = message.avatarId;
@@ -1514,7 +1945,7 @@ export const useStageStore = defineStore("stage", () => {
   async function joinStage() {
     const userStore = useUserStore();
     if (!session.value) {
-      session.value = userStore.user?.id ?? uuidv4();
+      session.value = (userStore.user?.id as string | undefined) ?? uuidv4();
     }
     const id = session.value;
     const isPlayer = useAuthStore().loggedIn;
@@ -1577,11 +2008,11 @@ export const useStageStore = defineStore("stage", () => {
     mqtt.sendMessage(TOPICS.CHAT, { clearPlayerChat: true });
   }
 
-  function removeChat(messageId) {
+  function removeChat(messageId: string) {
     mqtt.sendMessage(TOPICS.CHAT, { remove: messageId });
   }
 
-  function highlightChat(messageId) {
+  function highlightChat(messageId: string) {
     mqtt.sendMessage(TOPICS.CHAT, { highlight: messageId });
   }
 
@@ -1591,24 +2022,24 @@ export const useStageStore = defineStore("stage", () => {
    * name already lives on the return object (Pinia setup stores can't
    * have two keys with the same name). See file-header note.
    */
-  function setShowPlayerChat(visible) {
+  function setShowPlayerChat(visible: boolean) {
     SET_SHOW_PLAYER_CHAT(visible);
     if (visible) {
       SEEN_PRIVATE_MESSAGES();
     }
   }
 
-  function autoFocusMoveable(id) {
+  function autoFocusMoveable(id: ObjectId | null) {
     if (canPlay.value && !preferences.value.isDrawing && !replay.value.isReplaying) {
       SET_ACTIVE_MOVABLE(id);
     }
   }
 
-  function handleDrawMessage({ message }) {
+  function handleDrawMessage({ message }: { message: DrawMessage }) {
     UPDATE_WHITEBOARD(message);
   }
 
-  function sendDrawWhiteboard(command) {
+  function sendDrawWhiteboard(command: WhiteboardCommand) {
     mqtt.sendMessage(TOPICS.DRAW, { type: DRAW_ACTIONS.NEW_LINE, command });
   }
 
@@ -1627,12 +2058,12 @@ export const useStageStore = defineStore("stage", () => {
     SET_PURCHASE_POPUP({ isActive: false });
   }
 
-  function openPurchasePopup(setting) {
+  function openPurchasePopup(setting: PurchasePopup) {
     setting.isActive = true;
     SET_PURCHASE_POPUP(setting);
   }
 
-  function openReceiptPopup(setting) {
+  function openReceiptPopup(setting?: unknown) {
     OPEN_RECEIPT_POPUP(setting);
   }
 
@@ -1640,7 +2071,7 @@ export const useStageStore = defineStore("stage", () => {
     CLOSE_RECEIPT_POPUP();
   }
 
-  function addTrack(track) {
+  function addTrack(track: JitsiTrack) {
     ADD_TRACK(track);
   }
 

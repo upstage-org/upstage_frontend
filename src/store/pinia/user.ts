@@ -5,7 +5,7 @@ import { displayName, logout as logoutHelper } from "@utils/auth";
 import { ROLES } from "@utils/constants";
 import { userGraph } from "@services/graphql";
 import { useAuthStore } from "@stores/pinia/auth";
-import { useStageStore } from "@stores/pinia/stage";
+import { useStageStore, type BoardObject as StageBoardObject } from "@stores/pinia/stage";
 
 interface UserData {
   id?: string | number;
@@ -151,7 +151,12 @@ export const useUserStore = defineStore("user", () => {
     const av = avatar.value;
     const stage = useStageStore();
     if (av) {
-      void Promise.resolve(stage.shapeObject({ ...av, name }));
+      // `avatar.value` is typed locally as the narrow `{ id, name }` view
+      // we use in this store, but `stage.shapeObject` expects the full
+      // `StageBoardObject` (x/y/w/h/rotate required). Spreading from `av`
+      // is safe because the underlying object IS a `StageBoardObject` —
+      // we just don't surface those fields here.
+      void Promise.resolve(stage.shapeObject({ ...(av as unknown as StageBoardObject), name }));
     } else {
       nicknameOverride.value = name;
       void Promise.resolve(stage.joinStage());

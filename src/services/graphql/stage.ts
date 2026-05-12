@@ -231,7 +231,7 @@ const stageOps = {
       `,
       { id },
     ),
-  loadStage: (fileLocation, performanceId) =>
+  loadStage: (fileLocation, performanceId?) =>
     studioClient
       .request(
         gql`

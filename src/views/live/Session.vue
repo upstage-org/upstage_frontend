@@ -16,8 +16,8 @@ const joinedAt = computed(() => dayjs(new Date(props.session.at)));
 const isOnline = computed(() => dayjs().diff(joinedAt.value, "minutes") < 60);
 
 const tagPlayer = () => {
-  if (props.session.isPlayer) {
-    stageStore.TAG_PLAYER(props.session);
+  if (props.session.isPlayer && props.session.nickname) {
+    stageStore.TAG_PLAYER({ nickname: props.session.nickname });
     // Pinia rename: Vuex `dispatch("stage/showPlayerChat", v)` →
     // Pinia `setShowPlayerChat(v)` (the original action name collided
     // with the same-named state ref in Pinia setup-store syntax).

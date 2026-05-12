@@ -1,30 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useStageStore } from "@stores/pinia/stage";
-
-interface ReplayEvent {
-  id: string | number;
-  mqttTimestamp: string | number;
-}
-
-interface StageModelShape {
-  events?: ReplayEvent[];
-}
+import { useStageStore, type ReplayEvent } from "@stores/pinia/stage";
 
 const stageStore = useStageStore();
-// `stageStore.model` is inferred as `null` by TS because the Pinia
-// stage store declares `model = ref(null)` (the store file itself has
-// `// @ts-nocheck`, so the wider model shape never escaped it). A
-// local cast is the smallest fix; tightening the store's exported
-// types is tracked as a follow-up.
-const model = computed(() => stageStore.model as unknown as StageModelShape | null);
-const events = computed<ReplayEvent[]>(() => model.value?.events ?? []);
-const begin = computed<number>(() => Number(stageStore.replay.timestamp.begin));
-const end = computed<number>(() => Number(stageStore.replay.timestamp.end));
+const events = computed<ReplayEvent[]>(() => stageStore.model?.events ?? []);
+const begin = computed<number>(() => stageStore.replay.timestamp.begin);
+const end = computed<number>(() => stageStore.replay.timestamp.end);
 const duration = computed<number>(() => end.value - begin.value);
 
 const position = (event: ReplayEvent): number =>
-  ((Number(event.mqttTimestamp) - begin.value) * 100) / duration.value;
+  ((event.mqttTimestamp - begin.value) * 100) / duration.value;
 </script>
 
 <template>

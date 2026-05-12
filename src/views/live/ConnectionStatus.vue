@@ -77,8 +77,8 @@ onMounted(() => {
         </span>
       </template>
       <div style="max-height: 50vh; overflow-y: auto">
-        <Session v-for="player in players" :key="player" :session="player" />
-        <Session v-for="audience in audiences" :key="audience" :session="audience" />
+        <Session v-for="player in players" :key="player.id" :session="player" />
+        <Session v-for="audience in audiences" :key="audience.id" :session="audience" />
       </div>
     </Popover>
   </div>

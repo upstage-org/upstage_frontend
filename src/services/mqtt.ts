@@ -83,7 +83,7 @@ export default function buildClient() {
         this.client.end(false, {}, resolve);
       });
     },
-    subscribe(topics, stageUrl) {
+    subscribe(topics, stageUrl?) {
       if (!this.client) {
         return Promise.reject(new Error("[MQTT] Not connected. Call connect() first."));
       }
@@ -101,7 +101,7 @@ export default function buildClient() {
         });
       });
     },
-    sendMessage(topic, payload, namespaced, retain = false) {
+    sendMessage(topic, payload, namespaced = false, retain = false) {
       if (!this.client) {
         return Promise.reject(
           new Error("[MQTT] Not connected. Call connect() first or check MQTT connection."),
