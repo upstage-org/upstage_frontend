@@ -15,34 +15,23 @@ const {
 // Fallback when env was not set at build time (e.g. wrong .env path or CI build)
 const ensureTrailingSlash = (url: string) => (url.endsWith("/") ? url : `${url}/`);
 
-const graphqlFromEnv =
+/**
+ * Source of truth is the `.env`'s `VITE_GRAPHQL_ENDPOINT` (or the matching
+ * env_backup_<site> file copied into `.env` by run_front_end_*.sh). The SPA
+ * makes whichever absolute origin/path is configured there — same-origin
+ * (e.g. `/api/` behind a reverse proxy on remote) or cross-origin
+ * (e.g. `http://localhost:9090/api/` when running `--serve` against a
+ * backend container that publishes APP_PORT on the host). Backend CORS in
+ * dev is `*` (see upstage_backend/main.py), so cross-origin POSTs work.
+ *
+ * If the env var is not set at build time (wrong .env path, CI build with
+ * no env, etc.) we fall back to same-origin `/api/` so the page at least
+ * tries something deterministic.
+ */
+const graphqlEndpoint =
   typeof VITE_GRAPHQL_ENDPOINT === "string" && VITE_GRAPHQL_ENDPOINT
     ? ensureTrailingSlash(VITE_GRAPHQL_ENDPOINT)
     : ensureTrailingSlash(`${window.location.origin}/api/`);
-
-/**
- * In dev, `VITE_GRAPHQL_ENDPOINT=http://localhost:3001/api/` breaks the SPA: the
- * browser would POST cross-origin to :3001 (no Vite `server.proxy`). Studio is on
- * 3001, but the page is on 3000 — use the same origin + `/api/` so the proxy works.
- * Node/e2e should keep calling 3001 directly (see `tests/e2e/graphql.ts`).
- */
-function resolveGraphqlEndpoint(): string {
-  if (!import.meta.env.DEV) {
-    return graphqlFromEnv;
-  }
-  try {
-    const apiUrl = new URL(graphqlFromEnv, window.location.origin);
-    const isLocal = ["localhost", "127.0.0.1"].includes(apiUrl.hostname);
-    if (isLocal && apiUrl.origin !== window.location.origin) {
-      return ensureTrailingSlash(`${window.location.origin}/api/`);
-    }
-  } catch {
-    // keep graphqlFromEnv
-  }
-  return graphqlFromEnv;
-}
-
-const graphqlEndpoint = resolveGraphqlEndpoint();
 const staticAssetsEndpoint =
   typeof VITE_STATIC_ASSETS_ENDPOINT === "string" && VITE_STATIC_ASSETS_ENDPOINT
     ? ensureTrailingSlash(VITE_STATIC_ASSETS_ENDPOINT)
