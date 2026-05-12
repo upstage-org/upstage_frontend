@@ -2,6 +2,7 @@
 import Skeleton from "components/stage/Toolboxs/Skeleton.vue";
 import { computed, inject, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useUserStore } from "@stores/pinia/user";
+import { useStageStore } from "@stores/pinia/stage";
 import { useLowLevelAPI } from "./composable";
 
 // Map a `getUserMedia` DOMException name to a short, performer-facing
@@ -58,6 +59,7 @@ export default {
     const jitsi = inject("jitsi");
     const joined = inject("joined");
     const JitsiMeetJS = useLowLevelAPI();
+    const stageStore = useStageStore();
 
     const setBlocked = (message) => {
       blocked.value = true;
@@ -189,6 +191,19 @@ export default {
       if (joined.value) {
         for (const t of tracks) {
           jitsi.room.addTrack(t);
+          // Local conferences in lib-jitsi-meet do not reliably emit
+          // TRACK_ADDED for tracks the local user added themselves —
+          // the event fires on remote peers' conferences as the SSRC
+          // propagates over RTC, but not on this conference. Without
+          // this line, the performer's own on-stage <Jitsi> tile
+          // filters stageStore.jitsiTracks by their own participantId
+          // and gets [], dropping the tile into the loading state
+          // (the camera-with-slash videoloading.gif) forever, even
+          // though every other client sees the stream fine.
+          // ADD_TRACK dedupes by JitsiTrack.getId(), so this is safe
+          // if a future lib-jitsi-meet does also emit TRACK_ADDED
+          // for the local conference.
+          stageStore.addTrack(t);
         }
       }
     };

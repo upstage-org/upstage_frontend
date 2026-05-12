@@ -80,7 +80,6 @@ declare module 'vue' {
     Copy: typeof import('./src/components/Copy.vue')['default']
     CopyOutlined: typeof import('@ant-design/icons-vue')['CopyOutlined']
     CreateRoom: typeof import('./src/components/stage/SettingPopup/settings/CreateRoom.vue')['default']
-    CreateStream: typeof import('./src/components/stage/SettingPopup/settings/CreateStream.vue')['default']
     Curtain: typeof import('./src/components/stage/Curtain.vue')['default']
     CurtainTool: typeof import('./src/components/stage/Toolboxs/tools/CurtainTool.vue')['default']
     CustomConfirm: typeof import('./src/components/CustomConfirm.vue')['default']

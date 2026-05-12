@@ -298,7 +298,6 @@ export interface ToolsState {
   props: ToolboxItem[];
   backdrops: ToolboxItem[];
   audios: ToolboxItem[];
-  streams: ToolboxItem[];
   meetings: ToolboxItem[];
   curtains: ToolboxItem[];
   [k: string]: ToolboxItem[];
@@ -380,7 +379,6 @@ export const useStageStore = defineStore("stage", () => {
     props: [],
     backdrops: [],
     audios: [],
-    streams: [],
     meetings: [],
     curtains: [],
   });
@@ -622,7 +620,6 @@ export const useStageStore = defineStore("stage", () => {
     tools.value.avatars = [];
     tools.value.props = [];
     tools.value.backdrops = [];
-    tools.value.streams = [];
     tools.value.curtains = [];
     _config.value = getDefaultStageConfig() as StageConfig;
     settings.value = getDefaultStageSettings() as StageSettings;
@@ -1050,10 +1047,6 @@ export const useStageStore = defineStore("stage", () => {
     tools.value.meetings.push(room);
   }
 
-  function CREATE_STREAM(room: ToolboxItem) {
-    tools.value.streams.push(room);
-  }
-
   /**
    * Reorder shape: `from`/`to` are either a Scene, Drawing, TextEntity,
    * or a ToolboxItem (in which case `from.type` names the tool group).
@@ -1119,6 +1112,19 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   function ADD_TRACK(track: JitsiTrack) {
+    // Dedupe by JitsiTrack id. The local-track path (Yourself.vue.join)
+    // pushes tracks here directly because lib-jitsi-meet's local
+    // conference does not reliably emit TRACK_ADDED for tracks the
+    // local user added themselves; if a future version starts firing
+    // it (or join() is invoked twice before the conference is torn
+    // down), we must not end up with the same JitsiTrack in
+    // board.value.tracks twice — the per-participantId filter in
+    // Jitsi.vue would then attach the same MediaStream to the same
+    // <video> element repeatedly.
+    const id = track.getId?.();
+    if (id !== undefined && board.value.tracks.some((t) => t.getId?.() === id)) {
+      return;
+    }
     board.value.tracks = [...board.value.tracks, track];
   }
 
@@ -2182,7 +2188,6 @@ export const useStageStore = defineStore("stage", () => {
     UPDATE_WHITEBOARD,
     TOGGLE_MASQUERADING,
     CREATE_ROOM,
-    CREATE_STREAM,
     REORDER_TOOLBOX,
     SET_PURCHASE_POPUP,
     ADD_TRACK,
