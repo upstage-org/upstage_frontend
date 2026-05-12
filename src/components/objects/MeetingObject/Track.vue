@@ -8,6 +8,16 @@ export default {
   setup(props) {
     const el = ref();
     onMounted(() => {
+      // Vue 3 routes `muted` through patchDOMProp (because it's a member
+      // of HTMLMediaElement.prototype), which sets only the IDL property
+      // and never calls setAttribute. Safari (desktop + iOS) and several
+      // ad/content blockers gate autoplay on the *attribute* being
+      // present in the rendered HTML, not on the IDL property — so we
+      // mirror it by hand here, the JSX equivalent of the
+      // `:muted.attr="true"` modifier used in the .vue templates.
+      if (props.track.getType() === "video" && el.value) {
+        el.value.setAttribute("muted", "");
+      }
       props.track.attach(el.value);
     });
     onUnmounted(() => {
@@ -22,6 +32,8 @@ export default {
       //    `playsinline`, breaking any in-page video tile.
       // Audio for these tracks is rendered via a sibling <audio> element
       // pattern (see Jitsi.vue), so muting the <video> is correct.
+      // (The `muted` HTML attribute is also force-mirrored in onMounted
+      // above; see comment there for the Vue 3 quirk this works around.)
       return () => <video autoplay muted playsinline ref={el}></video>;
     } else {
       return () => <audio autoplay ref={el}></audio>;

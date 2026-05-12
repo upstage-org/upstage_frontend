@@ -264,7 +264,7 @@ export default {
         :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"
         :onClick="join"
         autoplay
-        muted
+        :muted.attr="true"
         playsinline
         disablePictureInPicture
         controlslist="nodownload nofullscreen noremoteplayback"

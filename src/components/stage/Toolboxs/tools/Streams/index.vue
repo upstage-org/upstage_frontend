@@ -42,7 +42,7 @@ export default {
         -->
         <video
           :src="video.url"
-          muted
+          :muted.attr="true"
           playsinline
           preload="metadata"
           controls

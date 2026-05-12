@@ -218,7 +218,7 @@ export default {
         <video
           ref="videoEl"
           autoplay
-          muted
+          :muted.attr="true"
           playsinline
           :style="{
             'border-radius': object.shape === 'circle' ? '100%' : '12px',
