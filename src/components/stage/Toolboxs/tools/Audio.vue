@@ -211,7 +211,17 @@ export default {
         transform-origin: left top;
       }
 
+      // The slider thumb pseudo-element is vendor-prefixed: target each so
+      // Firefox (-moz) and IE (-ms) get the same green theming as Chromium.
       .slider::-webkit-slider-thumb {
+        background-color: #007011;
+        border-color: #f5f5f5;
+      }
+      .slider::-moz-range-thumb {
+        background-color: #007011;
+        border-color: #f5f5f5;
+      }
+      .slider::-ms-thumb {
         background-color: #007011;
         border-color: #f5f5f5;
       }

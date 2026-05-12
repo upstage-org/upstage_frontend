@@ -81,7 +81,9 @@ const seekBackward = () => stageStore.seekBackwardReplay();
 const collapsed = ref<boolean>(false);
 
 useShortcut((e: KeyboardEvent) => {
-  if (e.keyCode == 27) {
+  // Use `key` rather than the deprecated `keyCode`. Behaviour matches
+  // across Chromium (Chrome/Edge/Brave), Firefox and Safari.
+  if (e.key === "Escape") {
     collapsed.value = !collapsed.value;
   }
 });
@@ -238,7 +240,18 @@ useShortcut((e: KeyboardEvent) => {
     flex-wrap: wrap;
   }
   input[type="range"] {
+    // Lift the thumb above the EventIndicator overlay. Browsers expose
+    // the thumb under different vendor pseudo-elements, so target each.
+    // Without the Firefox / IE rules the thumb sat behind event markers.
     &::-webkit-slider-thumb {
+      position: relative;
+      z-index: 100;
+    }
+    &::-moz-range-thumb {
+      position: relative;
+      z-index: 100;
+    }
+    &::-ms-thumb {
       position: relative;
       z-index: 100;
     }

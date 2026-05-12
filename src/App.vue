@@ -159,6 +159,18 @@ body.waiting * {
   }
 }
 
+/* Required by the mobile-drag-drop polyfill (initialised in main.ts) so
+ * iOS Safari recognises [draggable=true] elements. Without these two
+ * declarations, Safari either ignores the touch entirely or treats it as
+ * a text selection / image hold instead of a drag. Desktop browsers are
+ * unaffected. */
+[draggable="true"] {
+  -webkit-user-drag: element;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .root {
   padding: 0px !important;
 }

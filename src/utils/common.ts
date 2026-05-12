@@ -237,6 +237,49 @@ export function throttle(callback, limit) {
   };
 }
 
+/**
+ * Cross-browser number-input coercion.
+ *
+ * `<input type="number">` is one of the surfaces where browsers diverge:
+ *  - Chromium silently rejects most non-numeric typed input, leaving
+ *    `event.target.value` as the empty string.
+ *  - Firefox accepts looser input (e.g. trailing letters or alternative
+ *    decimal separators in some locales) and does NOT enforce `step`
+ *    rounding on `input` / `change` events.
+ *  - Safari is somewhere in between, and on locales with `,` as decimal
+ *    separator may surface a comma in `value`.
+ *
+ * This helper normalises whatever string the browser hands us into a real
+ * number and applies the same `min` / `max` / `step` constraints the
+ * `<input>` element advertises, so downstream code sees identical values
+ * regardless of browser.
+ *
+ * Returns `null` when the input cannot be parsed (e.g. empty string, "abc")
+ * so callers can decide whether to fall back to a default.
+ */
+export function coerceNumber(
+  raw: unknown,
+  opts: { min?: number; max?: number; step?: number } = {},
+): number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  // Replace decimal comma with dot before parsing — covers Firefox / Safari
+  // on `de`, `fr`, `pt`, etc., where the user may type "1,5".
+  const str = String(raw).replace(",", ".").trim();
+  const n = Number(str);
+  if (!Number.isFinite(n)) return null;
+  let v = n;
+  if (typeof opts.min === "number" && v < opts.min) v = opts.min;
+  if (typeof opts.max === "number" && v > opts.max) v = opts.max;
+  if (typeof opts.step === "number" && opts.step > 0) {
+    const base = typeof opts.min === "number" ? opts.min : 0;
+    v = base + Math.round((v - base) / opts.step) * opts.step;
+    // Guard against FP drift from the round above ("0.30000000000000004").
+    const decimals = (String(opts.step).split(".")[1] ?? "").length;
+    if (decimals > 0) v = Number(v.toFixed(decimals));
+  }
+  return v;
+}
+
 export function handleError(e) {
   console.log("====e", e);
   if (e & e.response?.errors && e.response?.errors[0] && e.response?.errors[0].message) {

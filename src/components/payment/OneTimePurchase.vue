@@ -2,11 +2,23 @@
 import { ref } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { message } from "ant-design-vue";
+import { coerceNumber } from "utils/common";
 
 export default {
   setup: () => {
     const stageStore = useStageStore();
     const amount = ref(null);
+
+    // Cross-browser parse: Firefox accepts looser strings than Chromium
+    // here ("1,5", trailing letters), and neither browser enforces the
+    // step="0.01" constraint on `input`. coerceNumber handles all of it.
+    const onAmountInput = (e) => {
+      amount.value = coerceNumber(e.target.value, {
+        min: 0,
+        max: 999999.99,
+        step: 0.01,
+      });
+    };
 
     const openPurchasePopup = () => {
       if (amount.value && amount.value != 0) {
@@ -21,7 +33,7 @@ export default {
       }
     };
 
-    return { amount, openPurchasePopup };
+    return { amount, openPurchasePopup, onAmountInput };
   },
 };
 </script>
@@ -55,14 +67,16 @@ export default {
           <span class="input-symbol-dollar"></span>
           <input
             ref="custom_amount"
-            v-model="amount"
+            :value="amount"
             type="number"
+            inputmode="decimal"
             step="0.01"
             min="0"
             max="999999.99"
             class="button payment-button"
             placeholder="Custom"
-            @input="amount = $event.target.value"
+            @input="onAmountInput"
+            @blur="onAmountInput"
           />
         </div>
       </div>

@@ -3,6 +3,7 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { computed, inject, ref } from "vue";
 import Icon from "components/Icon.vue";
+import { coerceNumber } from "utils/common";
 
 // `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
 // `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
@@ -159,9 +160,13 @@ export default {
       return props.object.autoplayFrames || "";
     });
     const handleChangeAnimationSpeed = (e) => {
+      // Coerce so Firefox / Safari behave like Chromium: bare `e.target.value`
+      // is a string, may contain non-numeric characters in Firefox, and
+      // doesn't honour `step="0.5"` until blur.
+      const speed = coerceNumber(e.target.value, { min: 0, step: 0.5 });
       stageStore.shapeObject({
         ...props.object,
-        autoplayFrames: e.target.value,
+        autoplayFrames: speed ?? 0,
       });
     };
 
@@ -336,6 +341,7 @@ export default {
       <input
         class="input anmation-input"
         type="number"
+        inputmode="decimal"
         step="0.5"
         min="0"
         :value="animationSpeed"

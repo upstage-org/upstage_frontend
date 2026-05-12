@@ -14,6 +14,7 @@ import ColorPicker from "components/form/ColorPicker.vue";
 import buildClient from "services/mqtt";
 import { namespaceTopic } from "store/modules/stage/reusable";
 import { TOPICS } from "utils/constants";
+import { coerceNumber } from "utils/common";
 
 export default {
   components: { Selectable, SaveButton, HorizontalField, Dropdown, AppSwitch, ColorPicker },
@@ -80,6 +81,18 @@ export default {
       defaultcolor.value = color;
     };
 
+    // Custom-ratio number inputs need cross-browser coercion: Firefox lets
+    // the user type non-integer / negative values that Chromium rejects.
+    // Fall back to 1 (the smallest sensible ratio component) when the
+    // input is empty or unparseable so the SaveButton's disabled-guard
+    // (`!selectedRatio.width || !selectedRatio.height`) stays meaningful.
+    const setRatioWidth = (e) => {
+      selectedRatio.width = coerceNumber(e.target.value, { min: 1, step: 1 }) ?? 1;
+    };
+    const setRatioHeight = (e) => {
+      selectedRatio.height = coerceNumber(e.target.value, { min: 1, step: 1 }) ?? 1;
+    };
+
     return {
       selectedRatio,
       saving,
@@ -89,6 +102,8 @@ export default {
       defaultcolor,
       sendBackdropColor,
       enabledLiveStreaming,
+      setRatioWidth,
+      setRatioHeight,
     };
   },
 };
@@ -241,9 +256,25 @@ export default {
                 <div>
                   <div>Custom ratio:</div>
                   <div class="custom-ratio">
-                    <input v-model="selectedRatio.width" type="number" />
+                    <input
+                      :value="selectedRatio.width"
+                      type="number"
+                      inputmode="numeric"
+                      min="1"
+                      step="1"
+                      @input="setRatioWidth"
+                      @blur="setRatioWidth"
+                    />
                     /
-                    <input v-model="selectedRatio.height" type="number" />
+                    <input
+                      :value="selectedRatio.height"
+                      type="number"
+                      inputmode="numeric"
+                      min="1"
+                      step="1"
+                      @input="setRatioHeight"
+                      @blur="setRatioHeight"
+                    />
                   </div>
                 </div>
               </div>

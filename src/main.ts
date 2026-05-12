@@ -12,6 +12,21 @@ import "@fortawesome/fontawesome-free/css/all.css";
 import ClickOutside from "./directives/ClickOutside";
 import { installApolloClient } from "./apollo";
 
+// HTML5 drag-and-drop has no native support on iOS Safari and is patchy on
+// Android Chrome. The polyfill synthesises the standard `dragstart` /
+// `dragover` / `drop` events from touch events on `[draggable=true]`
+// elements, so the existing handlers in Skeleton.vue, Reorder.vue, Board.vue
+// and Dropzone.vue work uniformly across desktop Chromium / Firefox / Safari
+// and iPad / iPhone Safari without any per-call-site changes. `holdToDrag`
+// keeps page scrolling responsive: a quick swipe scrolls the page; a
+// 300ms press starts the drag.
+import { polyfill as mobileDragDropPolyfill } from "mobile-drag-drop";
+import "mobile-drag-drop/default.css";
+
+mobileDragDropPolyfill({
+  holdToDrag: 300,
+});
+
 installApolloClient();
 const app = createApp(App)
   .use(pinia)

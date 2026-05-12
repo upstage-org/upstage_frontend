@@ -1,7 +1,7 @@
 <script>
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
-import { computed, reactive, ref } from "vue";
+import { computed, ref } from "vue";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import Icon from "components/Icon.vue";
@@ -30,10 +30,6 @@ export default {
   emits: ["dragstart"],
   setup: (props, { emit }) => {
     const stageStore = useStageStore();
-    const position = reactive({
-      isDragging: false,
-    });
-    const topbarPosition = ref({});
 
     const dragstart = (e) => {
       e.dataTransfer.setData(
@@ -55,29 +51,14 @@ export default {
       }
     };
 
-    const touchmove = (e) => {
-      position.isDragging = true;
-      position.x = e.changedTouches[0]?.clientX - 50;
-      position.y = e.changedTouches[0]?.clientY - 50;
-      const topbar = document.getElementById("topbar");
-      if (topbar) {
-        topbarPosition.value = topbar.getBoundingClientRect();
-      }
-    };
-
-    const touchend = () => {
-      position.isDragging = false;
-      const payload = {
-        ...props.data,
-        x: position.x,
-        y: position.y,
-      };
-      if (props.real) {
-        stageStore.shapeObject(payload);
-      } else {
-        stageStore.placeObjectOnStage(payload);
-      }
-    };
+    // Touch drag is handled globally by the `mobile-drag-drop` polyfill
+    // initialised in main.ts: it synthesises the same `dragstart` / `drop`
+    // events from `touchstart` / `touchmove` / `touchend` on
+    // `[draggable=true]` elements, so iOS / Android Safari behaves the
+    // same as desktop Chromium / Firefox without a per-component
+    // `touchmove` handler. The previous half-implemented `touchmove` /
+    // `touchend` here was missing `touchstart` (so position was NaN on
+    // first move) and bypassed the actual drop target.
 
     const holdable = computed(() => ["avatar"].includes(props.data.type));
     const hold = () => {
@@ -113,15 +94,9 @@ export default {
 
     const dropzone = ref(false);
 
-    console.log(props.data);
-
     return {
       dragstart,
       dragend,
-      touchmove,
-      touchend,
-      position,
-      topbarPosition,
       hold,
       showMovable,
       drop,
@@ -135,13 +110,6 @@ export default {
   <div
     class="is-flex is-align-items-center is-justify-content-center skeleton"
     :class="{ dropzone }"
-    :style="{
-      position: position.isDragging ? 'fixed' : 'static',
-      width: position.isDragging ? '100px' : '100%',
-      height: position.isDragging ? '100px' : '100%',
-      top: position.y - topbarPosition.top + 'px',
-      left: position.x - topbarPosition.left + 'px',
-    }"
     :title="data.name"
     draggable="true"
     @dragstart="dragstart"
@@ -150,8 +118,6 @@ export default {
     @dragover.prevent="dropzone = true"
     @dragleave.prevent="dropzone = false"
     @drop.prevent="drop"
-    @touchmove="touchmove"
-    @touchend="touchend"
     @dblclick="hold"
     @mouseenter="showMovable"
   >

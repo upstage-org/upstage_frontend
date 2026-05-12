@@ -5,7 +5,7 @@ import { computed } from "vue";
 import AppImage from "components/Image.vue";
 import Icon from "components/Icon.vue";
 import ContextMenu from "components/ContextMenu.vue";
-import { throttle } from "utils/common";
+import { coerceNumber, throttle } from "utils/common";
 import Skeleton from "../Skeleton.vue";
 
 export default {
@@ -21,9 +21,12 @@ export default {
     };
 
     const changeBackdropSpeed = (e) => {
+      // `<input type="number">` returns a raw string and Firefox does not
+      // round to `step`; coerce to a number with the input's constraints.
+      const speed = coerceNumber(e.target.value, { min: 0, step: 0.5 });
       stageStore.setBackground({
         ...currentBackground.value,
-        speed: e.target.value,
+        speed: speed ?? 0,
       });
     };
 
@@ -155,6 +158,7 @@ export default {
             :value="currentBackground.speed"
             placeholder="seconds"
             type="number"
+            inputmode="decimal"
             @input="changeBackdropSpeed"
           />
         </p>
