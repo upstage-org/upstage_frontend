@@ -1,7 +1,6 @@
 <script>
 // Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppObject from "../Object.vue";
-import Loading from "components/Loading.vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
@@ -39,7 +38,7 @@ const TIMEOUT_MS = 15000;
 const encodeConfigValue = (v) => encodeURIComponent(JSON.stringify(v));
 
 export default {
-  components: { AppObject, Loading },
+  components: { AppObject },
   props: { object: Object },
   setup: (props) => {
     const stageStore = useStageStore();
@@ -178,7 +177,14 @@ export default {
           :style="{ width: object.w + 'px', height: object.h + 'px' }"
           :class="activeMovable ? 'disable-pointer' : ''"
         >
-          <Loading v-if="loading" height="100%" />
+          <!--
+            Use the same small spinner GIF as the individual-stream tile
+            (Yourself.vue / Jitsi.vue). The previous `<Loading />` here
+            rendered `/img/loading.svg` at `height: 100%`, which briefly
+            painted a giant orange/cream striped square over the whole
+            meeting before the iframe finished loading.
+          -->
+          <img v-if="loading" class="overlay" src="/img/videoloading.gif" />
           <div v-if="failed" class="failed">
             <p><strong>Embedded meeting service is unavailable.</strong></p>
             <p class="hint">
@@ -205,6 +211,7 @@ export default {
 
 <style lang="scss" scoped>
 .frame {
+  position: relative;
   border: 2px solid black;
   border-top: 10px solid #007011;
   border-radius: 8px;
@@ -220,6 +227,19 @@ export default {
 }
 
 .disable-pointer {
+  pointer-events: none;
+}
+
+// Mirrors the overlay rule in Yourself.vue / Jitsi.vue so the
+// buffering animation lands in the centre of the tile rather than
+// covering the whole iframe.
+.overlay {
+  position: absolute;
+  width: 40%;
+  left: 30%;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
   pointer-events: none;
 }
 

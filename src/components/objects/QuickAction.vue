@@ -44,6 +44,17 @@ export default {
       () => (isHolding.value || !holdable.value) && activeMovable.value === props.object.id,
     );
 
+    // Tooltip text for the lightbulb's three states. The wording matches
+    // what the click does next:
+    //   white  -> click to show on stage (first publish)
+    //   green  -> click to pause broadcast (changes won't be sent)
+    //   red    -> click to resume broadcast (audience catches up)
+    const bulbTitle = computed(() => {
+      if (props.object.liveAction) return "Pause broadcast";
+      if (props.object.published) return "Resume broadcast";
+      return "Show on stage";
+    });
+
     return {
       deleteObject,
       keepActive,
@@ -51,6 +62,7 @@ export default {
       isHolding,
       showQuickActions,
       editText,
+      bulbTitle,
     };
   },
 };
@@ -67,8 +79,9 @@ export default {
       class="button is-rounded is-small"
       :class="{
         'is-primary': object.liveAction,
-        'is-danger': object.liveAction === false,
+        'is-danger': !object.liveAction && object.published,
       }"
+      :title="bulbTitle"
       @click="toggleLiveAction"
     >
       <i class="fas fa-lightbulb"></i>

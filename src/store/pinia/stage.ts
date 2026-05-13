@@ -1463,10 +1463,14 @@ export const useStageStore = defineStore("stage", () => {
       voice: {},
       volume: 100,
       rotate: 0,
-      // Fresh objects default to "bulb on" so they broadcast on first
-      // drag and render in full color on the performer (Moveable.vue
-      // grayscale rule only matches `liveAction === false`).
-      liveAction: true,
+      // Fresh objects start in the "white" lightbulb state: not
+      // broadcast yet, grayscale on the performer's view, invisible to
+      // everyone else. The performer publishes by clicking the bulb,
+      // which flips `liveAction` to `true` and triggers shapeObject's
+      // first PLACE_OBJECT_ON_STAGE. (Previously this defaulted to
+      // `true`, which auto-broadcast on the next drag — see
+      // QuickAction.vue tri-state classes for the visual mapping.)
+      liveAction: false,
       x: 0,
       y: 0,
       ...data,
@@ -1525,6 +1529,12 @@ export const useStageStore = defineStore("stage", () => {
         .forEach((costume) => {
           if (!costume.published) {
             costume.published = true;
+            // Flip the child's local lightbulb to green at the same
+            // time we publish it. Without this the child would stay
+            // `liveAction:false, published:true` (the "red" state) even
+            // though it's actively broadcasting with its parent, which
+            // would mislead the performer about its live status.
+            costume.liveAction = true;
             mqtt.sendMessage(TOPICS.BOARD, {
               type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
               object: serializeForBroadcast(costume),
@@ -1635,7 +1645,18 @@ export const useStageStore = defineStore("stage", () => {
   function handleBoardMessage({ message }: { message: BoardMessage }) {
     switch (message.type) {
       case BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE:
-        if (message.object) PUSH_OBJECT(message.object);
+        if (message.object) {
+          // The broadcast strips `liveAction` (serializeForBroadcast),
+          // so incoming objects arrive without it. From the receiver's
+          // point of view the object IS live — someone just published
+          // it — so treat it as `liveAction:true, published:true` even
+          // though those fields weren't on the wire. This keeps the
+          // performer-side lightbulb green (rather than the initial
+          // "never published" white) for objects placed by collaborators,
+          // and keeps the moveable in full color (Moveable.vue grayscale
+          // matches `liveAction === false`).
+          PUSH_OBJECT({ ...message.object, liveAction: true, published: true });
+        }
         break;
       case BOARD_ACTIONS.MOVE_TO:
         if (message.object) UPDATE_OBJECT(message.object);
