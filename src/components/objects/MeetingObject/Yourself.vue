@@ -295,14 +295,21 @@ video {
 }
 
 /*
- * `disablePictureInPicture` is the JS attribute path; the matching
- * vendor-prefixed pseudo-element only exists in Chromium. Firefox does
- * NOT expose its PiP toggle via `::-moz-media-controls-...` — Firefox's
- * PiP button is a chrome-injected overlay outside the video's pseudo
- * tree, and there is no per-element web API to suppress it. The
- * previously-included `::-moz-media-controls-picture-in-picture-button`
- * rule was dead code and has been removed; if/when Firefox exposes a
- * suppression API we can revisit.
+ * Two complementary defences against the in-page PiP toggle:
+ *   1. `disablePictureInPicture` HTML attribute (set in the
+ *      template and force-mirrored as an IDL property by the
+ *      watcher in setup()). Honoured by Firefox 71+ for both the
+ *      `requestPictureInPicture()` API AND its hover-rendered
+ *      chrome-injected toggle; also honoured by Chromium.
+ *   2. This `::-webkit-media-controls-picture-in-picture-button`
+ *      rule hides Chromium's pseudo-element-rendered toggle in
+ *      case (1) is bypassed by a future browser change. Firefox
+ *      does NOT expose its toggle via a pseudo-element, so there
+ *      is no Firefox equivalent rule — but Firefox listens to (1)
+ *      directly, so that's covered.
+ * The earlier version of this comment claimed Firefox had no
+ * per-element suppression API; that was true pre-71 and is no
+ * longer the case.
  */
 video::-webkit-media-controls-picture-in-picture-button {
   display: none !important;

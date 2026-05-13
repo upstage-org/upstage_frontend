@@ -94,6 +94,17 @@ export default {
         try {
           if (videoTrack.value && videoEl.value) {
             videoTrack.value.attach(videoEl.value);
+            // Mirror the `disablePictureInPicture` HTML attribute as
+            // an IDL property. Vue 3 patches some HTMLMediaElement
+            // attributes via setAttribute and others via property
+            // assignment, and `disablePictureInPicture` falls into
+            // the property-only path on some patch versions — which
+            // means the attribute appears in the DOM but Firefox /
+            // Chromium read the IDL property and ignore it. Setting
+            // it explicitly here closes that window. Same pattern as
+            // Yourself.vue's `el.value.disablePictureInPicture = true`
+            // and its watcher.
+            videoEl.value.disablePictureInPicture = true;
             console.log("[diag] Jitsi.vue loadTrack attached video to <video ref=videoEl>");
           }
           if (audioTrack.value && !audioTrack.value.isLocal() && audioEl.value) {
@@ -154,6 +165,19 @@ export default {
     // has applied the conditional swap before we read `videoEl.value`.
     onMounted(loadTrack);
     watch(tracks, loadTrack, { flush: "post" });
+
+    // Independent of track attach: any time the <video> ref settles on
+    // a new element (initial mount or after the no-track / has-track
+    // template branch flips back and forth), force-set the IDL
+    // property. Belt-and-braces against the loadTrack path racing the
+    // DOM swap; see the matching comment inside loadTrack above.
+    watch(
+      videoEl,
+      (el) => {
+        if (el) el.disablePictureInPicture = true;
+      },
+      { immediate: true },
+    );
 
     const clip = (shape) => {
       stageStore.shapeObject({
@@ -248,11 +272,35 @@ export default {
         <Loading width="auto" height="22px" src="img/videoloading.gif" />
       </div>
       <template v-else>
+        <!--
+          Audience-facing remote-peer stream. Suppress browser PiP and
+          related media controls so the bottom-right black PiP toggle
+          that Firefox / Chromium overlay on hover doesn't (a) cover
+          the chat and (b) let the audience pop the stream into a
+          floating window and leave a black rectangle on stage.
+
+            - `disablePictureInPicture` HTML attribute: honoured by
+              Firefox 71+ and by Chromium for both the
+              `requestPictureInPicture()` API and the hover toggle.
+              Also mirrored via JS in `attachPipGuards()` below to
+              defeat Vue 3's property-only patching of HTMLMediaElement
+              attributes (same workaround Yourself.vue uses).
+            - `controlslist="nodownload nofullscreen noremoteplayback"`:
+              suppresses the matching items from Chromium's overflow
+              menu in case `controls` is ever flipped on by a future
+              edit. Firefox ignores this list but doesn't expose those
+              actions for muted controls-less video anyway.
+            - The scoped CSS rule on `video::-webkit-media-controls-
+              picture-in-picture-button` hides the Chromium toggle in
+              the unlikely case the attribute is bypassed.
+        -->
         <video
           ref="videoEl"
           autoplay
           :muted.attr="true"
           playsinline
+          disablePictureInPicture
+          controlslist="nodownload nofullscreen noremoteplayback"
           :style="{
             'border-radius': object.shape === 'circle' ? '100%' : '12px',
           }"
@@ -376,5 +424,17 @@ video {
   -ms-transform: translateY(-50%);
   transform: translateY(-50%);
   z-index: -1;
+}
+
+/*
+  Belt-and-braces suppression of the Chromium picture-in-picture
+  toggle. The `disablePictureInPicture` attribute on the <video> is
+  the primary defence (and the only thing Firefox listens to); this
+  rule hides Chromium's hover-rendered button in the pseudo-element
+  tree as a fallback. See the matching CSS comment in
+  Yourself.vue / Streams/index.vue for the per-engine rationale.
+*/
+video::-webkit-media-controls-picture-in-picture-button {
+  display: none !important;
 }
 </style>

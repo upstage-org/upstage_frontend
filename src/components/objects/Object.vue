@@ -137,6 +137,21 @@ export default {
     const loadeddata = () => {
       synchronize();
     };
+
+    // IDL-property mirror of the `disablePictureInPicture` attribute
+    // set in the template. Closes the Vue-3-property-patching window
+    // where the attribute is reflected in markup but not in the
+    // element's IDL property. Same belt-and-braces pattern as
+    // Yourself.vue / Jitsi.vue. See those files for the
+    // per-browser rationale.
+    watch(
+      video,
+      (el) => {
+        if (el) el.disablePictureInPicture = true;
+      },
+      { immediate: true },
+    );
+
     return {
       el,
       print,
@@ -228,6 +243,16 @@ export default {
               into a store action is a separate, behaviour-affecting
               change; suppress the rule on this template line for now.
             -->
+            <!--
+              Audience-facing video asset (mp4/webm dropped onto the
+              stage as a media item). Same PiP / controls hardening
+              as Jitsi.vue's remote-peer <video>: see the comment
+              block there for the per-browser rationale. We mirror
+              `disablePictureInPicture` as an IDL property via the
+              `video` ref watcher below so Vue 3's property-only
+              patching of HTMLMediaElement doesn't leave the
+              attribute set in the DOM but unread by the engine.
+            -->
             <!-- eslint-disable-next-line vue/no-mutating-props -->
             <video
               v-if="object.assetType?.name == 'video'"
@@ -238,6 +263,8 @@ export default {
               preload="auto"
               :loop="object.loop"
               playsinline
+              disablePictureInPicture
+              controlslist="nodownload nofullscreen noremoteplayback"
               @ended="
                 /* eslint-disable-next-line vue/no-mutating-props -- intentional: object.isPlaying is a load-bearing signal mutated in-place by parent contract */
                 object.isPlaying = false
@@ -284,5 +311,15 @@ div[tabindex] {
 .the-object-video {
   width: 100%;
   height: 100%;
+}
+
+/*
+  Hide Chromium's hover-rendered picture-in-picture toggle button.
+  See Jitsi.vue / Yourself.vue for the per-engine rationale; Firefox
+  reads the `disablePictureInPicture` attribute (mirrored via JS in
+  the watcher above) and Chromium reads this CSS rule.
+*/
+.the-object-video::-webkit-media-controls-picture-in-picture-button {
+  display: none !important;
 }
 </style>

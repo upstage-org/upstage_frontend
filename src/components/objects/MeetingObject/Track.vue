@@ -17,6 +17,12 @@ export default {
       // `:muted.attr="true"` modifier used in the .vue templates.
       if (props.track.getType() === "video" && el.value) {
         el.value.setAttribute("muted", "");
+        // IDL-property mirror for `disablePictureInPicture` — same
+        // Vue-3-property-patching concern as for `muted` above. The
+        // HTML attribute is set in the rendered JSX, but the IDL
+        // property is what Firefox / Chromium actually read when
+        // deciding whether to overlay the PiP toggle on hover.
+        el.value.disablePictureInPicture = true;
       }
       props.track.attach(el.value);
     });
@@ -34,7 +40,24 @@ export default {
       // pattern (see Jitsi.vue), so muting the <video> is correct.
       // (The `muted` HTML attribute is also force-mirrored in onMounted
       // above; see comment there for the Vue 3 quirk this works around.)
-      return () => <video autoplay muted playsinline ref={el}></video>;
+      //
+      // `disablePictureInPicture` + `controlslist` mirror the
+      // hardening in Jitsi.vue / Object.vue / Yourself.vue: the
+      // audience must not be able to pop this stream into Firefox's
+      // floating window and leave a black rectangle behind on stage.
+      // The IDL property is also force-mirrored alongside `muted` in
+      // onMounted so Vue's property-only patching can't leave the
+      // attribute reflected in markup but ignored by the engine.
+      return () => (
+        <video
+          autoplay
+          muted
+          playsinline
+          disablePictureInPicture
+          controlslist="nodownload nofullscreen noremoteplayback"
+          ref={el}
+        ></video>
+      );
     } else {
       return () => <audio autoplay ref={el}></audio>;
     }
@@ -46,5 +69,11 @@ export default {
 video {
   width: 200px;
   border-radius: 12px;
+}
+
+/* Chromium PiP-toggle suppression; Firefox honours the
+   `disablePictureInPicture` attribute set in the JSX above. */
+video::-webkit-media-controls-picture-in-picture-button {
+  display: none !important;
 }
 </style>
