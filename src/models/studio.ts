@@ -135,7 +135,6 @@ export interface Permission {
   approved: boolean;
   userId: number;
   assetId: number;
-  seen: boolean;
   createdOn: string;
   note: null;
   user: User;

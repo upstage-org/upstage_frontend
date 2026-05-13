@@ -6,7 +6,6 @@ export const permissionFragment = gql`
     userId
     assetId
     approved
-    seen
     createdOn
     note
     user {

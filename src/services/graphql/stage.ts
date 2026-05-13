@@ -62,7 +62,6 @@ export const assetFragment = gql`
       userId
       assetId
       approved
-      seen
       note
       user {
         username

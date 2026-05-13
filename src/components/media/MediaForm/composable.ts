@@ -122,29 +122,64 @@ export const useConfirmPermission = () => {
       };
     },
     { id: string; approved: boolean }
-  >(gql`
-    mutation ConfirmPermission($id: ID!, $approved: Boolean) {
-      confirmPermission(id: $id, approved: $approved) {
-        success
-        message
-        permissions {
-          ...permissionFragment
+  >(
+    gql`
+      mutation ConfirmPermission($id: ID!, $approved: Boolean) {
+        confirmPermission(id: $id, approved: $approved) {
+          success
+          message
+          permissions {
+            ...permissionFragment
+          }
         }
       }
-    }
-    ${permissionFragment}
-  `);
+      ${permissionFragment}
+    `,
+    // The Notifications bell shows pending strict requests on the
+    // owner side and approval results on the requester side; both
+    // change shape when a confirm runs. The component already does a
+    // manual `refetch()` after this mutation, but other consumers
+    // (e.g. MediaPermissions in MediaForm) don't — so refetch
+    // here too, so the bell stays in sync no matter where the
+    // approve/reject button was pressed.
+    { refetchQueries: ["Notifications"] },
+  );
 };
 
 export const useRequestPermission = () => {
   return useMutation<
     { requestPermission: { success: boolean; message: string } },
     { assetId: string; note?: string }
-  >(gql`
-    mutation RequestPermission($assetId: ID!, $note: String) {
-      requestPermission(assetId: $assetId, note: $note) {
-        success
+  >(
+    gql`
+      mutation RequestPermission($assetId: ID!, $note: String) {
+        requestPermission(assetId: $assetId, note: $note) {
+          success
+        }
       }
-    }
-  `);
+    `,
+    // Strict requests don't change the *requester's* bell (they
+    // initiated the request, so requester_seen is set True by the
+    // backend), but acknowledgement requests on non-strict media
+    // intentionally do not create a requester-side bell entry
+    // either. The refetch here is the polite local-tab refresh so
+    // any prior-state bell rows clear immediately instead of
+    // lingering for up to 30s until the next poll.
+    { refetchQueries: ["Notifications"] },
+  );
+};
+
+export const useDismissNotification = () => {
+  return useMutation<{ dismissNotification: { id: string } }, { id: string }>(
+    gql`
+      mutation DismissNotification($id: ID!) {
+        dismissNotification(id: $id) {
+          id
+        }
+      }
+    `,
+    // Refetch the bell so the dismissed row leaves the popover
+    // without waiting for the 30s poll.
+    { refetchQueries: ["Notifications"] },
+  );
 };
