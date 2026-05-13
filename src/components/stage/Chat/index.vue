@@ -1,5 +1,5 @@
 <script>
-import { computed, onMounted, ref, watch, watchEffect } from "vue";
+import { computed, inject, onMounted, ref, watch, watchEffect } from "vue";
 import { animate } from "animejs";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
@@ -15,8 +15,35 @@ export default {
     const theContent = ref();
     const stageStore = useStageStore();
     const userStore = useUserStore();
-    const chatVisibility = computed(() => stageStore.settings.chatVisibility);
+    // Set by views/chat/Layout.vue when this component is mounted
+    // inside the standalone /chat/<stage> view. We use it to:
+    //   * hide the "Pop out" button (we're already popped out),
+    //   * force `chatVisibility` to true so the audience-side toggle
+    //     that hides this card on the main stage doesn't also hide
+    //     it in the standalone view (where it IS the whole UI),
+    //   * skip the collapse / minimise affordance (no reason to
+    //     collapse a window that is dedicated to chat).
+    const isStandalone = inject("isChatStandalone", false);
+    const chatVisibility = computed(
+      () => isStandalone || stageStore.settings.chatVisibility,
+    );
     const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
+
+    const popOut = () => {
+      // Reuse the same named window per stage so a second click
+      // focuses the existing pop-out instead of opening a duplicate.
+      // We deliberately do not pass `noopener` because the parent
+      // tab benefits from being able to reach the popped-out window
+      // (e.g., a future "close pop-out" affordance); the cookie /
+      // auth session is shared regardless.
+      const stageUrl = stageStore.url;
+      if (!stageUrl) return;
+      window.open(
+        `/chat/${stageUrl}`,
+        `upstage-chat-${stageUrl}`,
+        "width=420,height=720,resizable=yes,scrollbars=yes",
+      );
+    };
 
     stageStore.loadPermission();
 
@@ -136,6 +163,8 @@ export default {
       stageSize,
       unreadMessages,
       bounceUnread,
+      isStandalone,
+      popOut,
     };
   },
 };
@@ -171,7 +200,10 @@ export default {
       </transition>
       <div class="actions">
         <Reaction v-if="collapsed" />
-        <a-tooltip :title="collapsed ? 'Maximise' : 'Minimise'">
+        <a-tooltip
+          v-if="!isStandalone"
+          :title="collapsed ? 'Maximise' : 'Minimise'"
+        >
           <button
             :key="collapsed"
             class="chat-setting button is-rounded is-outlined"
@@ -183,7 +215,24 @@ export default {
             </span>
           </button>
         </a-tooltip>
-        <a-tooltip title="Settings">
+        <!--
+          Pop-out into the standalone /chat/<stage> window. Only
+          rendered in the main-stage instance of this component;
+          the standalone view sets isStandalone=true via provide()
+          so the popped-out window doesn't show its own pop-out
+          button.
+        -->
+        <a-tooltip
+          v-if="!isStandalone"
+          :title="$t('pop_out_chat') || 'Pop out chat'"
+        >
+          <button class="chat-setting button is-rounded is-outlined" @click="popOut">
+            <span class="icon">
+              <Icon src="bring-to-front.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
+        <a-tooltip v-if="!isStandalone" title="Settings">
           <button class="chat-setting button is-rounded is-outlined" @click="openChatSetting">
             <span class="icon">
               <Icon src="setting.svg" size="32" />

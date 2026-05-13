@@ -1,5 +1,5 @@
 <script>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
 import { animate } from "animejs";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
@@ -16,6 +16,16 @@ export default {
     const theContent = ref();
     const stageStore = useStageStore();
     const userStore = useUserStore();
+    // Set by views/chat/Layout.vue. When true:
+    //   * the Moveable.js draggable handle is not bound (no on-stage
+    //     dragging makes sense — the host browser window is the
+    //     drag target instead),
+    //   * the click-and-drag fallback (`startDrag`) is also skipped,
+    //   * the minimise / move-to-toolbox / pop-out buttons in the
+    //     actions row are hidden (this view IS the whole UI),
+    //   * the floating-card positioning is replaced via :deep CSS
+    //     in the parent Layout.vue so the chat fills its pane.
+    const isStandalone = inject("isChatStandalone", false);
 
     const messages = computed(() => stageStore.chat.privateMessages);
     // `store.state.user.loadingUser` was a broken read after the user
@@ -65,13 +75,19 @@ export default {
       });
     };
 
-    const moveable = new Moveable(document.body, {
-      draggable: true,
-      resizable: true,
-      origin: false,
-    });
+    // Moveable.js instance is created lazily so the standalone view
+    // (no on-stage dragging) doesn't pay the cost of instantiating
+    // it. `null` sentinel means "no draggable available" — the
+    // toggle / minimise handlers below short-circuit accordingly.
+    let moveable = null;
 
     onMounted(() => {
+      if (isStandalone) return;
+      moveable = new Moveable(document.body, {
+        draggable: true,
+        resizable: true,
+        origin: false,
+      });
       moveable.on("drag", ({ target, left, top, height }) => {
         target.style.left = `${left}px`;
         if (top + height + 8 < (window.innerHeight || document.documentElement.clientHeight)) {
@@ -95,19 +111,40 @@ export default {
     const isMovingable = ref(false);
 
     const toggleMoveable = () => {
+      if (!moveable) return;
       moveable.setState({
         target: isMovingable.value ? null : theChatbox.value,
       });
       isMovingable.value = !isMovingable.value;
     };
 
-    const playerChatVisibility = computed(() => stageStore.showPlayerChat);
+    // In the standalone view the player chat is always rendered (the
+    // tab bar in views/chat/Layout.vue gates visibility instead);
+    // forcing the computed to `true` there bypasses the on-stage
+    // toolbox-toggle state that would otherwise leave the player
+    // chat hidden in the popped-out window.
+    const playerChatVisibility = computed(
+      () => isStandalone || stageStore.showPlayerChat,
+    );
     const minimiseToToolbox = () => {
       // Pinia rename: action `showPlayerChat` → `setShowPlayerChat`
       // (collided with same-named state ref in Pinia setup store).
       stageStore.setShowPlayerChat(false);
-      moveable.setState({ target: null });
+      if (moveable) moveable.setState({ target: null });
       isMovingable.value = false;
+    };
+
+    const popOut = () => {
+      const stageUrl = stageStore.url;
+      if (!stageUrl) return;
+      // Same target name as the public Chat pop-out so clicking
+      // either button reuses one window per stage. The popped-out
+      // view itself decides which pane to show via its tab bar.
+      window.open(
+        `/chat/${stageUrl}`,
+        `upstage-chat-${stageUrl}`,
+        "width=420,height=720,resizable=yes,scrollbars=yes",
+      );
     };
 
     const increateFontSize = () => {
@@ -131,6 +168,7 @@ export default {
 
     // Click and drag functionality
     const startDrag = (e) => {
+      if (isStandalone) return;
       e.preventDefault();
 
       const chatbox = theChatbox.value;
@@ -185,6 +223,8 @@ export default {
       decreaseFontSize,
       startDrag,
       collapsed,
+      isStandalone,
+      popOut,
     };
   },
 };
@@ -204,13 +244,25 @@ export default {
       }"
     >
       <div class="actions">
-        <button class="chat-setting button is-rounded is-outlined" @click="minimiseToToolbox">
+        <!--
+          On-stage chrome (minimise to toolbox, Moveable.js toggle,
+          custom drag handle) only makes sense in the in-stage
+          floating-card view. The standalone /chat/<stage> window
+          uses the host OS window manager for positioning, so we
+          drop all three buttons there.
+        -->
+        <button
+          v-if="!isStandalone"
+          class="chat-setting button is-rounded is-outlined"
+          @click="minimiseToToolbox"
+        >
           <span class="icon">
             <Icon v-if="collapsed" src="maximise.svg" size="20" />
             <Icon v-else src="minimise.svg" size="24" class="mt-4" />
           </span>
         </button>
         <button
+          v-if="!isStandalone"
           class="chat-setting button is-rounded is-outlined"
           :class="{ 'has-background-primary-light': isMovingable }"
           @click="toggleMoveable"
@@ -220,6 +272,7 @@ export default {
           </span>
         </button>
         <button
+          v-if="!isStandalone"
           class="chat-setting button is-rounded is-outlined drag-icon-button"
           @mousedown.prevent="startDrag"
         >
@@ -227,6 +280,22 @@ export default {
             <Icon src="movement-slider.svg" size="20" />
           </span>
         </button>
+        <!--
+          Pop the player chat out into the standalone /chat/<stage>
+          window for a multi-screen setup. Shares the same target
+          window name as the public Chat pop-out so we never have
+          two duplicate windows per stage.
+        -->
+        <a-tooltip
+          v-if="!isStandalone"
+          :title="$t('pop_out_chat') || 'Pop out chat'"
+        >
+          <button class="chat-setting button is-rounded is-outlined" @click="popOut">
+            <span class="icon">
+              <Icon src="bring-to-front.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
         <ClearChat option="player-chat" />
       </div>
       <div ref="theContent" class="card-content">

@@ -55,6 +55,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import("views/Playground.vue"),
   },
   {
+    // Standalone chat view: same MQTT topic as the main stage, but
+    // renders only the chat panes so mobile audience members (and
+    // multi-screen performers via window.open) can participate
+    // without loading the full stage UI. Must be registered BEFORE
+    // the catch-all `/:url` Live route so vue-router matches
+    // "/chat/<stage>" against this entry first; otherwise "chat"
+    // would be interpreted as a stage slug.
+    path: "/chat/:url",
+    name: "ChatStandalone",
+    component: () => import("views/chat/Layout.vue"),
+  },
+  {
     // Keep this last so static routes win.
     path: "/:url",
     name: "Live",
@@ -169,6 +181,10 @@ router.beforeEach(
       return next("/stages");
     }
 
+    // Clear the viewport meta only for the desktop-only Live stage,
+    // which has its own zoom/pan handling. Every other route —
+    // including the new ChatStandalone — gets the mobile-friendly
+    // viewport so phones render at sensible scale.
     setViewportMeta(to.name === "Live" ? "" : "width=device-width,initial-scale=1.0");
 
     if (to.fullPath.includes("admin") && loggedIn) {

@@ -224,4 +224,7 @@ export default {
   new_object: "Nouveau {0}",
   new_stream: "My Stream",
   default_backgroundcolor: "Default Background Colour",
+  pop_out_chat: "Pop out chat",
+  public_chat: "Public",
+  player_chat: "Player",
 };

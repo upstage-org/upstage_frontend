@@ -65,4 +65,7 @@ export default {
     "Ihr Upload-Limit beträgt {limit}. Die Datei, die Sie hochladen möchten ({name}), ist zu groß ({size}). Bitte wählen Sie eine kleinere Datei.",
   new_stream: "My Stream",
   default_backgroundcolor: "Default Background Colour",
+  pop_out_chat: "Pop out chat",
+  public_chat: "Public",
+  player_chat: "Player",
 };
