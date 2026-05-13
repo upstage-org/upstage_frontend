@@ -65,6 +65,18 @@ export default {
     // first interval tick).
     const displaySrc = computed(() => frameAnimation.currentFrame ?? curtain.value?.src ?? null);
 
+    // Crossfade duration for multi-frame swaps. Mirrors Backdrop.vue,
+    // which threads `background.speed * 1000` through to AppImage's
+    // `transition` prop — making each fade complete just as the next
+    // interval tick fires, so the audience sees a continuous crossfade
+    // rather than a hard cut. Falls back to 0 (no transition) for
+    // single-image curtains where `speed` is meaningless.
+    const frameFadeMs = computed(() => {
+      const s = parseFloat(String(curtain.value?.speed ?? 0));
+      return Number.isFinite(s) && s > 0 ? s * 1000 : 0;
+    });
+    const frameFadeDuration = computed(() => `${frameFadeMs.value / 1000}s`);
+
     const curtainEnter = (el, complete) => {
       const duration = curtainSpeed.value;
       switch (config.value?.animations?.curtain) {
@@ -144,6 +156,7 @@ export default {
       canPlay,
       curtain,
       displaySrc,
+      frameFadeDuration,
       curtainEnter,
       curtainLeave,
       dualCurtain,
@@ -154,25 +167,34 @@ export default {
 };
 </script>
 
+<!--
+  Two layers of transitions per curtain panel:
+    * Outer <transition> (animejs): controls curtain show/hide
+      (scale/fade/slide). Operates on the wrapping <div>.
+    * Inner <transition name="frame-fade">: keyed on `displaySrc`, so
+      each frame swap of a multi-frame curtain runs a CSS opacity
+      crossfade rather than a hard cut. Mirrors Backdrop.vue, which
+      gets the same effect for free from AppImage's internal fade.
+-->
 <template>
   <div :style="{ opacity: canPlay ? 0.5 : 1 }">
     <transition @enter="curtainEnter" @leave="curtainLeave">
-      <img
+      <div
         v-if="curtain && displaySrc"
-        :key="curtain.src ?? curtain.id ?? ''"
-        :src="displaySrc"
         class="curtain"
         :class="{ 'dual-left': dualCurtain }"
-      />
+      >
+        <transition name="frame-fade">
+          <img :key="displaySrc" :src="displaySrc" class="curtain-img" />
+        </transition>
+      </div>
     </transition>
     <transition @enter="dualCurtainEnter" @leave="dualCurtainLeave">
-      <img
-        v-if="dualCurtain && curtain && displaySrc"
-        :key="curtain.src ?? curtain.id ?? ''"
-        :src="displaySrc"
-        class="curtain"
-        :class="{ 'dual-right': dualCurtain }"
-      />
+      <div v-if="dualCurtain && curtain && displaySrc" class="curtain dual-right">
+        <transition name="frame-fade">
+          <img :key="displaySrc" :src="displaySrc" class="curtain-img" />
+        </transition>
+      </div>
     </transition>
   </div>
 </template>
@@ -186,6 +208,13 @@ export default {
   width: 100vw;
   height: 100vh;
   transform-origin: top;
+  overflow: hidden;
+}
+.curtain-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 .dual-left {
   width: 50vw;
@@ -193,5 +222,21 @@ export default {
 .dual-right {
   width: 50vw;
   left: 50vw;
+}
+
+/*
+  Frame-to-frame crossfade for multi-frame curtains. The leaving image
+  stays positioned (absolute/inset) underneath the new one as both
+  fade — matches the behaviour AppImage gives Backdrop for free.
+  Duration is driven from the curtain's per-frame `speed` so the fade
+  finishes exactly when the next setInterval tick fires.
+*/
+.frame-fade-enter-active,
+.frame-fade-leave-active {
+  transition: opacity v-bind(frameFadeDuration);
+}
+.frame-fade-enter-from,
+.frame-fade-leave-to {
+  opacity: 0;
 }
 </style>
