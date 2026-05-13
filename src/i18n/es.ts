@@ -225,4 +225,9 @@ export default {
   default_backgroundcolor: "Default Background Colour",
   pop_out_chat: "Pop out chat",
   public_chat: "Public",
+  drag_panel: "Drag panel",
+  collapse_panel: "Collapse panel",
+  expand_panel: "Expand panel",
+  reset_panel_position: "Reset position",
+  close_panel: "Close panel",
 };

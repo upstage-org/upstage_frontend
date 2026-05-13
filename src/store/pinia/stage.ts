@@ -445,6 +445,16 @@ export const useStageStore = defineStore("stage", () => {
   const showPlayerChat = ref<boolean>(false);
   const showClearChatSetting = ref<boolean>(false);
   const showDownloadChatSetting = ref<boolean>(false);
+  // Per-session palette layout for logged-in players. Both are
+  // intentionally not persisted to MQTT / localStorage / server: each
+  // player customizes their own UI within a single stage session, and
+  // CLEAN_STAGE below resets them on stage re-entry to match Vicki's
+  // "restore to default at each stage re-entry" expectation. `null`
+  // position means "use the component's CSS-default layout"; a
+  // concrete {x,y} overrides it.
+  const topbarPosition = ref<{ x: number; y: number } | null>(null);
+  const topbarCollapsed = ref<boolean>(false);
+  const publicChatPosition = ref<{ x: number; y: number } | null>(null);
   // Epoch ms of the last seen private message. localStorage returns
   // `string | null`; coerce to a number on load so the unread-count
   // comparator (`m.at > lastSeenPrivateMessage.value`) and the
@@ -671,6 +681,9 @@ export const useStageStore = defineStore("stage", () => {
     chat.value.messages = [];
     chat.value.privateMessages = [];
     chat.value.color = randomColor();
+    topbarPosition.value = null;
+    topbarCollapsed.value = false;
+    publicChatPosition.value = null;
   }
 
   function SET_BACKGROUND(bg: Background | null) {
@@ -2268,6 +2281,24 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
+  function setTopbarPosition(pos: { x: number; y: number } | null) {
+    topbarPosition.value = pos;
+  }
+
+  function setTopbarCollapsed(v: boolean) {
+    topbarCollapsed.value = v;
+  }
+
+  function setPublicChatPosition(pos: { x: number; y: number } | null) {
+    publicChatPosition.value = pos;
+  }
+
+  function resetPaletteLayout() {
+    topbarPosition.value = null;
+    topbarCollapsed.value = false;
+    publicChatPosition.value = null;
+  }
+
   function autoFocusMoveable(id: ObjectId | null) {
     if (canPlay.value && !preferences.value.isDrawing && !replay.value.isReplaying) {
       SET_ACTIVE_MOVABLE(id);
@@ -2357,6 +2388,9 @@ export const useStageStore = defineStore("stage", () => {
     showPlayerChat,
     showClearChatSetting,
     showDownloadChatSetting,
+    topbarPosition,
+    topbarCollapsed,
+    publicChatPosition,
     lastSeenPrivateMessage,
     masquerading,
     purchasePopup,
@@ -2508,6 +2542,10 @@ export const useStageStore = defineStore("stage", () => {
     removeChat,
     highlightChat,
     setShowPlayerChat,
+    setTopbarPosition,
+    setTopbarCollapsed,
+    setPublicChatPosition,
+    resetPaletteLayout,
     autoFocusMoveable,
     handleDrawMessage,
     sendDrawWhiteboard,

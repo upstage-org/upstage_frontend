@@ -3,6 +3,7 @@ import { computed, inject, onMounted, ref, watch, watchEffect } from "vue";
 import { animate } from "animejs";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
+import { useDraggablePanel } from "composables/index";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
 import Reaction from "./Reaction.vue";
@@ -13,6 +14,7 @@ export default {
   components: { ChatInput, Reaction, Icon, Messages, ClearChat },
   setup: () => {
     const theContent = ref();
+    const theChatbox = ref();
     const stageStore = useStageStore();
     const userStore = useUserStore();
     // Set by views/chat/Layout.vue when this component is mounted
@@ -44,6 +46,22 @@ export default {
         "width=420,height=720,resizable=yes,scrollbars=yes",
       );
     };
+
+    // Free-form chat drag (session-scoped, per player). Position is
+    // stored in the Pinia stage store so it survives toggling
+    // collapse / settings but resets on stage re-entry via
+    // CLEAN_STAGE. When `chatDragPosition` is null we fall through
+    // to the existing left/right `chatPosition` toggle behaviour.
+    // Suppressed inside the standalone /chat/<stage> window because
+    // there the chat IS the whole viewport — host OS window
+    // manager handles positioning instead.
+    const chatDragPosition = computed(() => stageStore.publicChatPosition);
+    const { startDrag: startChatDrag } = useDraggablePanel({
+      panelEl: theChatbox,
+      setPosition: (pos) => stageStore.setPublicChatPosition(pos),
+      disabled: () => !!isStandalone,
+    });
+    const resetChatPosition = () => stageStore.setPublicChatPosition(null);
 
     stageStore.loadPermission();
 
@@ -147,6 +165,7 @@ export default {
       message,
       sendChat,
       theContent,
+      theChatbox,
       loadingUser,
       openChatSetting,
       collapsed,
@@ -159,6 +178,9 @@ export default {
       increateFontSize,
       decreaseFontSize,
       chatPosition,
+      chatDragPosition,
+      startChatDrag,
+      resetChatPosition,
       canPlay,
       stageSize,
       unreadMessages,
@@ -175,15 +197,25 @@ export default {
     <div
       v-show="chatVisibility"
       id="chatbox"
+      ref="theChatbox"
       :key="chatPosition"
       class="card is-light"
-      :class="{ collapsed, dark: chatDarkMode }"
+      :class="{ collapsed, dark: chatDarkMode, 'is-positioned': chatDragPosition }"
       :style="{
         opacity,
         fontSize,
         width: `calc(20% + 3*${fontSize}`,
         height: `calc(100vh - ${stageSize.height}px - 64px)`,
-        left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
+        ...(chatDragPosition
+          ? {
+              left: chatDragPosition.x + 'px',
+              top: chatDragPosition.y + 'px',
+              right: 'auto',
+              bottom: 'auto',
+            }
+          : {
+              left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
+            }),
       }"
     >
       <transition @enter="bounceUnread">
@@ -212,6 +244,46 @@ export default {
             <span class="icon">
               <Icon v-if="collapsed" src="maximise.svg" size="20" />
               <Icon v-else src="minimise.svg" size="24" class="mt-4" />
+            </span>
+          </button>
+        </a-tooltip>
+        <!--
+          Drag handle (mouse + touch) for free-form repositioning.
+          Position is stored in the Pinia stage store and resets on
+          stage re-entry via CLEAN_STAGE. Suppressed in the standalone
+          /chat/<stage> window where the chat fills its own host
+          browser window.
+        -->
+        <a-tooltip
+          v-if="!isStandalone"
+          :title="$t('drag_panel') || 'Drag panel'"
+        >
+          <button
+            class="chat-setting button is-rounded is-outlined drag-icon-button"
+            @mousedown.prevent="startChatDrag"
+            @touchstart.prevent="startChatDrag"
+          >
+            <span class="icon">
+              <Icon src="movement-slider.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
+        <!--
+          Reset to the default left/right (chatPosition toggle)
+          layout. Only shown after the player has actually dragged
+          the chat, so the button doesn't sit dead in the UI for
+          players who never use the drag affordance.
+        -->
+        <a-tooltip
+          v-if="!isStandalone && chatDragPosition"
+          :title="$t('reset_panel_position') || 'Reset position'"
+        >
+          <button
+            class="chat-setting button is-rounded is-outlined"
+            @click="resetChatPosition"
+          >
+            <span class="icon">
+              <Icon src="refresh.svg" size="20" />
             </span>
           </button>
         </a-tooltip>
@@ -417,6 +489,14 @@ export default {
     .button.is-rounded {
       width: 16px;
     }
+  }
+}
+
+.drag-icon-button {
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
   }
 }
 </style>

@@ -1,5 +1,34 @@
 <script>
-import { onUnmounted, ref } from "vue";
+/*
+ * Top tool panel that opens when a player clicks an icon in the left
+ * #toolbox strip. As of this change the panel is:
+ *
+ *   * Draggable via a small drag-handle in a new header strip. Position
+ *     is stored in the Pinia stage store (`topbarPosition`) so it
+ *     survives switching between tools within a single stage session,
+ *     and is wiped by CLEAN_STAGE on stage re-entry. No persistence to
+ *     localStorage / server / MQTT - matches Vicki's "default at each
+ *     stage re-entry" expectation and keeps every player's layout local
+ *     to their own browser tab.
+ *
+ *   * Collapsible via a chevron in the header. Collapsed = only the
+ *     header strip is shown; expanding restores the same tool because
+ *     the injected `tool` ref is untouched.
+ *
+ *   * Resettable (header `reset` button) - clears `topbarPosition` and
+ *     `topbarCollapsed` so the panel snaps back to the centred default.
+ *
+ *   * Closable (header `X`) - calls injected `changeTool(null)` which
+ *     un-toggles the active tool icon in the left strip (same effect
+ *     as clicking the active tool icon again).
+ *
+ * The audience never sees this; it only mounts behind `canPlay` in
+ * [views/live/Layout.vue].
+ */
+import { computed, inject, onUnmounted, ref } from "vue";
+import { useStageStore } from "@stores/pinia/stage";
+import { useDraggablePanel } from "composables/index";
+import Icon from "components/Icon.vue";
 import Avatars from "./tools/Avatars.vue";
 import Backdrops from "./tools/Backdrops.vue";
 import Props from "./tools/Props.vue";
@@ -20,6 +49,7 @@ import Scenes from "./tools/Scenes/index.vue";
 
 export default {
   components: {
+    Icon,
     Avatars,
     Backdrops,
     Props,
@@ -37,6 +67,10 @@ export default {
   props: { tool: String },
   setup: () => {
     const bar = ref();
+    const panel = ref();
+    const stageStore = useStageStore();
+    const changeTool = inject("changeTool");
+
     const horizontalScroll = (e) => {
       bar.value.scrollLeft += e.deltaY * 10;
       bar.value.scrollLeft += e.deltaX;
@@ -60,14 +94,105 @@ export default {
       window.removeEventListener("keyup", toggleCompact);
     });
 
-    return { horizontalScroll, bar, compact };
+    const position = computed(() => stageStore.topbarPosition);
+    const collapsed = computed(() => stageStore.topbarCollapsed);
+
+    const { startDrag } = useDraggablePanel({
+      panelEl: panel,
+      setPosition: (pos) => stageStore.setTopbarPosition(pos),
+    });
+
+    const toggleCollapsed = () => stageStore.setTopbarCollapsed(!collapsed.value);
+    const resetLayout = () => {
+      stageStore.setTopbarPosition(null);
+      stageStore.setTopbarCollapsed(false);
+    };
+    const closePanel = () => {
+      if (typeof changeTool === "function") changeTool(null);
+    };
+
+    // When a position has been set we drop the default centred CSS
+    // (top: -12px; left/right: 0; margin: auto) by forcing
+    // `right: auto; margin: 0`. The :style binding then takes over.
+    const dynamicStyle = computed(() => {
+      if (!position.value) return {};
+      return {
+        left: `${position.value.x}px`,
+        top: `${position.value.y}px`,
+        right: "auto",
+        margin: 0,
+      };
+    });
+
+    return {
+      horizontalScroll,
+      bar,
+      panel,
+      compact,
+      position,
+      collapsed,
+      dynamicStyle,
+      startDrag,
+      toggleCollapsed,
+      resetLayout,
+      closePanel,
+    };
   },
 };
 </script>
 
 <template>
-  <div v-if="tool" id="topbar" class="card is-light">
+  <div
+    v-if="tool"
+    id="topbar"
+    ref="panel"
+    class="card is-light"
+    :class="{ 'is-positioned': position, 'is-collapsed': collapsed }"
+    :style="dynamicStyle"
+  >
+    <!--
+      Header strip with the four drag / collapse / reset / close
+      buttons. Always rendered (even when collapsed) so the player
+      can still drag a collapsed panel and re-expand it.
+    -->
+    <div class="topbar-header">
+      <a-tooltip :title="$t('drag_panel') || 'Drag panel'">
+        <button
+          type="button"
+          class="topbar-btn drag-handle"
+          @mousedown.prevent="startDrag"
+          @touchstart.prevent="startDrag"
+        >
+          <Icon src="movement-slider.svg" size="16" />
+        </button>
+      </a-tooltip>
+      <span class="topbar-title">{{ tool }}</span>
+      <div class="topbar-actions">
+        <a-tooltip
+          :title="
+            collapsed
+              ? $t('expand_panel') || 'Expand panel'
+              : $t('collapse_panel') || 'Collapse panel'
+          "
+        >
+          <button type="button" class="topbar-btn" @click="toggleCollapsed">
+            <Icon :src="collapsed ? 'maximise.svg' : 'minimise.svg'" size="16" />
+          </button>
+        </a-tooltip>
+        <a-tooltip :title="$t('reset_panel_position') || 'Reset position'">
+          <button type="button" class="topbar-btn" @click="resetLayout">
+            <Icon src="refresh.svg" size="14" />
+          </button>
+        </a-tooltip>
+        <a-tooltip :title="$t('close_panel') || 'Close panel'">
+          <button type="button" class="topbar-btn topbar-close" @click="closePanel">
+            <Icon src="close.svg" size="14" />
+          </button>
+        </a-tooltip>
+      </div>
+    </div>
     <div
+      v-show="!collapsed"
       :id="tool + 'tool'"
       ref="bar"
       class="card-content"
@@ -82,7 +207,7 @@ export default {
 <style lang="scss">
 #topbar {
   display: flex;
-  flex: 1;
+  flex-direction: column;
   position: fixed;
   max-width: 80vw;
   height: 100px;
@@ -95,8 +220,74 @@ export default {
   overflow: hidden;
   z-index: 5;
 
+  /* When the player has dragged the panel, height grows to fit
+     header + content (no fixed 100px). The dynamic :style provides
+     the new left/top and clears `right: auto; margin: 0`. */
+  &.is-positioned {
+    height: auto;
+    margin: 0;
+  }
+
+  &.is-collapsed {
+    height: auto;
+    overflow: visible;
+  }
+
   &:hover {
     overflow-x: auto;
+  }
+
+  .topbar-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background-color: #ececec;
+    border-bottom: 1px solid #d0d0d0;
+    user-select: none;
+    /* Ensure the header always stays above the inner card-content
+       horizontal scroller and any tool's own content. */
+    position: relative;
+    z-index: 1;
+  }
+
+  .topbar-title {
+    flex: 1 1 auto;
+    font-size: 12px;
+    font-weight: 600;
+    color: #444;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-actions {
+    display: flex;
+    gap: 2px;
+  }
+
+  .topbar-btn {
+    background: transparent;
+    border: none;
+    padding: 2px 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.08);
+    }
+  }
+
+  .drag-handle {
+    cursor: grab;
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .card-content {
