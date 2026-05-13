@@ -15,49 +15,57 @@ export default {
       return res;
     });
 
-    return { videos };
+    // Poster URLs are derived by string-append of `.poster.jpg` to the
+    // video URL. The backend's `upstage_backend.files.video_poster`
+    // module writes posters next to the source video using the same
+    // convention, so we don't need a separate GraphQL field — keeping
+    // the schema unchanged. If the poster file is missing on disk
+    // (extractor failed or operator hasn't run the backfill script
+    // yet) the browser silently falls back to rendering nothing, which
+    // looks bad but doesn't break anything. The cure for that is the
+    // `scripts/backfill_video_posters.py` one-shot.
+    const posterUrl = (videoUrl) => (videoUrl ? `${videoUrl}.poster.jpg` : "");
+
+    return { videos, posterUrl };
   },
 };
 </script>
 
 <template>
   <div v-for="video in videos" :key="video">
-    <img class="overlay" src="/img/videoloading.gif" />
-    <div style="z-index: 1">
-      <Skeleton :data="video">
-        <!--
-          Performer-side stream thumbnail. Earlier iterations tried to
-          rely on the browser's "poster frame" behaviour (showing the
-          first decoded frame of a `preload="metadata"` video), but that
-          is unreliable: Firefox renders black until clicked, and recent
-          Brave / Chromium media-policy tightening shows the same black
-          rectangle plus the `controls` play-bar overlay. The current
-          approach plays the video itself, silently and in a loop, so
-          the toolbox always shows actual moving content rather than a
-          dead-looking placeholder.
-            - `muted` + `playsinline` + `autoplay` + `loop` is the
-              cross-browser autoplay-allowed combination on every major
-              engine, including iOS Safari (no fullscreen takeover).
-            - No `controls` so the thumbnail doesn't sport a player
-              UI; this is a preview, not a media player.
-            - `preload="auto"` because the loop needs the full file
-              anyway; metadata-only preload combined with autoplay
-              triggers re-fetch when the first loop completes.
-            - `disablePictureInPicture` keeps Chromium from offering
-              its PiP button on hover; the toolbox is too small for it
-              to be useful.
-        -->
-        <video
-          :src="video.url"
-          :muted.attr="true"
-          playsinline
-          autoplay
-          loop
-          preload="auto"
-          disablePictureInPicture
-        ></video>
-      </Skeleton>
-    </div>
+    <Skeleton :data="video">
+      <!--
+        Performer-side video thumbnail. We use a server-extracted
+        first-frame JPG (`<video>.poster.jpg`, written by
+        upstage_backend.files.video_poster at upload time and by the
+        backfill script for legacy uploads). With a real poster in
+        place the browser shows a true static thumbnail in every
+        engine — no more silent autoplay loop, no Firefox/Chromium
+        black-rectangle quirks.
+
+          - `preload="none"`  : we never actually want the toolbox to
+                                stream the video; we only need the
+                                poster. This keeps the toolbox cheap
+                                no matter how many videos a stage has.
+          - `muted` + `playsinline` + `disablePictureInPicture`:
+                                future-proofs in case any browser
+                                decides to auto-render frames; we
+                                won't suddenly start playing audio or
+                                offering a PiP toggle on hover.
+          - No `autoplay`/`loop`/`controls`: this is purely a still
+                                thumbnail; clicking is handled by the
+                                surrounding Skeleton drag affordance,
+                                not by the native media UI.
+      -->
+      <video
+        :src="video.url"
+        :poster="posterUrl(video.url)"
+        :muted.attr="true"
+        playsinline
+        preload="none"
+        disablePictureInPicture
+      ></video>
+    </Skeleton>
   </div>
 </template>
 
@@ -84,15 +92,5 @@ video {
 
 .pending-stream {
   cursor: not-allowed;
-}
-.overlay {
-  position: absolute;
-  width: 40%;
-  left: 30%;
-  top: 45%;
-  -webkit-transform: translateY(-50%);
-  -moz-transform: translateY(-50%);
-  -ms-transform: translateY(-50%);
-  transform: translateY(-50%);
 }
 </style>
