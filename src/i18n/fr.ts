@@ -226,5 +226,4 @@ export default {
   default_backgroundcolor: "Default Background Colour",
   pop_out_chat: "Pop out chat",
   public_chat: "Public",
-  player_chat: "Player",
 };
