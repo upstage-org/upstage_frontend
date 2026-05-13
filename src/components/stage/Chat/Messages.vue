@@ -67,8 +67,8 @@ export default {
       <template v-else>
         <ContextMenu>
           <template #trigger>
-            <div style="position: relative">
-              <small style="font-size: 1em">
+            <div class="chat-line">
+              <small class="chat-line-author">
                 <b v-if="item.isPlayer">{{ item.user }}:</b>
                 <span v-else>{{ item.user }}:</span>
               </small>
@@ -153,9 +153,23 @@ export default {
 </template>
 
 <style lang="scss">
+.chat-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chat-line-author {
+  font-size: 1em;
+  line-height: 1;
+}
+
 .tag.message {
   white-space: break-spaces;
   height: unset;
+  line-height: 1.25;
 
   .highlight-star {
     position: absolute;

@@ -7,30 +7,38 @@ import { inquiryVar } from "apollo";
 import { Media } from "models/studio";
 import { computed, watch } from "vue";
 
-const { result, loading, refetch } = useQuery(gql`
-  query Notifications {
-    notifications {
-      type
-      mediaUsage {
-        id
-        userId
-        assetId
-        approved
-        seen
-        createdOn
-        note
-        user {
-          username
-          displayName
-        }
-        asset {
-          name
-          src
+const { result, loading, refetch } = useQuery(
+  gql`
+    query Notifications {
+      notifications {
+        type
+        mediaUsage {
+          id
+          userId
+          assetId
+          approved
+          seen
+          createdOn
+          note
+          user {
+            username
+            displayName
+          }
+          asset {
+            name
+            src
+          }
         }
       }
     }
-  }
-`);
+  `,
+  null,
+  // Poll every 30s so the bell badge reflects new pending permission
+  // requests without requiring a full page reload. The backend resolver
+  // is a single SQL select keyed on the current user, so the load cost
+  // of polling is negligible.
+  { pollInterval: 30_000 },
+);
 
 const { result: editingMediaResult } = useQuery<{ editingMedia: Media }>(gql`
   {

@@ -125,6 +125,28 @@ export default function buildClient() {
         });
       });
     },
+    // Fire-and-forget publish, used from browser-unload handlers where the
+    // page is about to die and we cannot wait for a broker ACK. QoS 0 +
+    // no callback means the message is handed to the underlying socket
+    // immediately; if the connection has already been torn down the
+    // mqtt.js client buffers it but realistically it just gets dropped.
+    // Better than the awaited sendMessage path, which would block on a
+    // Promise that never resolves before the browser kills the JS VM.
+    sendMessageSync(topic, payload, namespaced = false, retain = false) {
+      if (!this.client) return;
+      if (!namespaced) {
+        topic = namespaceTopic(topic);
+      }
+      let message = payload;
+      if (typeof payload === "object") {
+        message = JSON.stringify(payload);
+      }
+      try {
+        this.client.publish(topic, message, { qos: 0, retain });
+      } catch (err) {
+        console.warn("[MQTT] sendMessageSync failed:", err);
+      }
+    },
     receiveMessage(handler) {
       if (!this.client) return;
       this.client.on("message", (topic, rawMessage) => {

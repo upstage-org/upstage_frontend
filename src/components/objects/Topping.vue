@@ -224,4 +224,14 @@ export default {
 .inactive {
   filter: grayscale(1);
 }
+
+.bubble.shout {
+  color: hsl(348, 100%, 61%);
+  font-weight: 700;
+}
+
+.bubble.think {
+  color: hsl(207, 61%, 53%);
+  font-style: italic;
+}
 </style>

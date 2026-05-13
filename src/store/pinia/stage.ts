@@ -879,7 +879,11 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   function UPDATE_SESSIONS_COUNTER(s: Session) {
-    const index = sessions.value.findIndex((x) => x.id === s.id);
+    // Session ids can arrive as either string (anonymous uuidv4) or as a
+    // numeric DB user id depending on whether the publisher is logged in;
+    // dedupe by stringified value so the same human never doubles up.
+    const sid = s.id != null ? String(s.id) : s.id;
+    const index = sessions.value.findIndex((x) => (x.id != null ? String(x.id) : x.id) === sid);
     if (index > -1) {
       if (s.leaving) {
         return sessions.value.splice(index, 1);
@@ -1193,7 +1197,20 @@ export const useStageStore = defineStore("stage", () => {
       SET_STATUS("LIVE");
       void reloadMissingEvents();
       subscribe();
-      void joinStage();
+      // Hydrate the current user before announcing presence so joinStage()
+      // can use the canonical DB user id rather than a placeholder uuid
+      // (which would change on every refresh and look like a new viewer).
+      void (async () => {
+        const userStore = useUserStore();
+        if (useAuthStore().loggedIn && userStore.user?.id == null) {
+          try {
+            await userStore.fetchCurrent();
+          } catch (err) {
+            console.warn("[stage] fetchCurrent before joinStage failed:", err);
+          }
+        }
+        await joinStage();
+      })();
     });
     client.on("error", (err) => {
       console.error("[MQTT] Stage client error:", err?.message ?? err);
@@ -1947,11 +1964,19 @@ export const useStageStore = defineStore("stage", () => {
 
   async function joinStage() {
     const userStore = useUserStore();
-    if (!session.value) {
-      session.value = (userStore.user?.id as string | undefined) ?? uuidv4();
+    const isPlayer = useAuthStore().loggedIn;
+    // Derive a stable session id every join: for logged-in performers the
+    // canonical DB user id (stringified), reserving uuidv4() only for true
+    // anonymous audience. Without this, an MQTT connect that fires before
+    // userStore.fetchCurrent() returns would mint a uuid and stick with it
+    // across the session, causing a fresh "viewer" on every page refresh
+    // (the previous uuid lingers in other clients' sessions lists).
+    if (isPlayer && userStore.user?.id != null) {
+      session.value = String(userStore.user.id);
+    } else if (!session.value) {
+      session.value = uuidv4();
     }
     const id = session.value;
-    const isPlayer = useAuthStore().loggedIn;
     const nickname = userStore.nickname;
     const avatarId = userStore.avatarId;
     SET_ACTIVE_MOVABLE(avatarId);
@@ -1986,7 +2011,24 @@ export const useStageStore = defineStore("stage", () => {
     const id = session.value;
     session.value = null;
     CLEAN_STAGE();
-    await mqtt.sendMessage(TOPICS.COUNTER, { id, leaving: true });
+    // Use fire-and-forget so this works from browser-unload handlers
+    // (beforeunload / pagehide), where awaiting the broker ACK would
+    // race the page tear-down and the leave message would never reach
+    // the wire. The fallback to retry on dropped sockets is the 60-min
+    // client-side trim in UPDATE_SESSIONS_COUNTER.
+    mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
+  }
+
+  // Synchronous unload path used from beforeunload / pagehide. Skips the
+  // awaited statistics-rebroadcast (which would never finish) and just
+  // emits the leave message + clears local state.
+  function disconnectSync() {
+    const id = session.value;
+    if (id != null) {
+      mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
+    }
+    session.value = null;
+    CLEAN_STAGE();
   }
 
   async function sendStatistics() {
@@ -2212,6 +2254,7 @@ export const useStageStore = defineStore("stage", () => {
     connect,
     subscribe,
     disconnect,
+    disconnectSync,
     handleMessage,
     sendChat,
     speakAsAvatar,

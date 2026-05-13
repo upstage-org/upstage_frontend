@@ -44,8 +44,22 @@ export default {
       stageStore.disconnect();
     });
 
-    window.addEventListener("beforeunload", () => {
-      stageStore.disconnect();
+    // `beforeunload` is the historical hook but Firefox in particular often
+    // tears the page down before the awaited disconnect publishes its
+    // counter-leave, leaving zombie viewers in everyone else's session list
+    // and inflating the LIVE counts. Use disconnectSync (fire-and-forget
+    // MQTT publish) and also listen on `pagehide`, which fires even when
+    // bfcache or background-tab eviction kicks in. The !event.persisted
+    // guard avoids false-leaves when the page is going into bfcache and
+    // may be restored without a reload.
+    const onUnload = () => {
+      stageStore.disconnectSync();
+    };
+    window.addEventListener("beforeunload", onUnload);
+    window.addEventListener("pagehide", (event) => {
+      if (!event.persisted) {
+        onUnload();
+      }
     });
 
     const canPlay = computed(() => stageStore.canPlay);
@@ -100,6 +114,17 @@ export default {
   right: 0px;
   max-width: 200px;
   z-index: 1;
+
+  // The Logo component renders inside a Bulma .navbar-item, which is
+  // transparent at rest and only gains a light hover-background. On a
+  // dark backdrop/curtain the dark UpStage mark is invisible until the
+  // mouse hovers it. Force the hover-style background to be the default
+  // here so the mark is always legible regardless of the stage colour.
+  .navbar-item {
+    background-color: rgba(255, 255, 255, 0.92);
+    border-bottom-left-radius: 8px;
+    padding: 4px 8px;
+  }
 
   &.preloader {
     z-index: 20001;

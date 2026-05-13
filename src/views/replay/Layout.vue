@@ -57,6 +57,16 @@ provide("replaying", true);
   z-index: 1;
   max-width: 200px;
 
+  // Give the logo a solid plaque-style background so it stays legible
+  // over dark backdrops/curtains. Without this the .navbar-item that
+  // wraps the Logo image is transparent at rest and only becomes
+  // visible on hover (Bulma's default).
+  .navbar-item {
+    background-color: rgba(255, 255, 255, 0.92);
+    border-bottom-left-radius: 8px;
+    padding: 4px 8px;
+  }
+
   @media screen and (min-width: 1024px) {
     img {
       max-height: unset;
