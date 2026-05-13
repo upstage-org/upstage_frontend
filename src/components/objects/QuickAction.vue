@@ -1,7 +1,6 @@
 <script>
 import { computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { useUserStore } from "@stores/pinia/user";
 export default {
   props: {
     object: Object,
@@ -10,11 +9,14 @@ export default {
   emits: ["update:active"],
   setup: (props, { emit }) => {
     const stageStore = useStageStore();
-    const userStore = useUserStore();
-    // `store.state.user.avatarId` was a broken read after the user
-    // module moved to Pinia in Phase 5; Pinia user store is the
-    // correct source.
-    const isHolding = computed(() => props.object.id === userStore.avatarId);
+    // Compare the object's MQTT-derived holder session to the local
+    // session, NOT to `userStore.avatarId`. The local user store's
+    // `avatarId` ref drifts out of sync in normal flows (multi-avatar
+    // placement, page refresh, echoed counter messages), which made
+    // the QuickAction toolbar render for the wrong performer. See the
+    // matching comment in Topping.vue and the canonical check already
+    // used by Object.vue / ContextMenuAvatar.vue.
+    const isHolding = computed(() => props.object.holder?.id === stageStore.session);
 
     const keepActive = () => {
       emit("update:active", true);

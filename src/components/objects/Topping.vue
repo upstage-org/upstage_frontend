@@ -1,7 +1,6 @@
 <script>
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { useUserStore } from "@stores/pinia/user";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Linkify from "components/Linkify.vue";
@@ -15,8 +14,22 @@ export default {
   },
   setup: (props) => {
     const stageStore = useStageStore();
-    const userStore = useUserStore();
-    const isHolding = computed(() => props.object.id === userStore.avatarId);
+    // Use the canonical "holder.id === local session" check rather
+    // than `userStore.avatarId`. The local user store's `avatarId`
+    // ref drifts out of sync in several normal flows:
+    //   * placeObjectOnStage sets it to whichever avatar was last
+    //     dropped on stage, so dropping multiple avatars leaves the
+    //     ref pointing at the most recent one, not the one currently
+    //     being held.
+    //   * a page refresh resets it to null, so the holder marker
+    //     stays grey on the holder's own screen until they re-grab.
+    //   * handleCounterMessage overwrites it from echoed presence
+    //     payloads, which can stomp on the locally-set value.
+    // `object.holder` is derived from the MQTT-broadcast sessions
+    // list (see `objects` getter in stage.ts) and `stageStore.session`
+    // is the stable per-browser session id, so this comparison is
+    // the same one Object.vue and ContextMenuAvatar.vue already use.
+    const isHolding = computed(() => props.object.holder?.id === stageStore.session);
     const canPlay = computed(() => stageStore.canPlay);
 
     const config = computed(() => stageStore.config);
