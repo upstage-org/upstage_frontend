@@ -434,137 +434,129 @@ const getUserDisplayName = (user: User) => {
     @cancel="handleClose"
   >
     <template #title>
-      <a-space>
-        <a-input-group compact>
-          <a-select
-            v-model:value="type"
-            data-testid="media-form-type"
-            :options="mediaTypes"
-            style="min-width: 110px"
-          ></a-select>
-          <a-input
-            v-model:value="name"
-            data-testid="media-form-name"
-            :placeholder="mediaName"
-          ></a-input>
-        </a-input-group>
-        <template v-if="!['video', 'audio'].includes(type)">
-          <a-button type="primary" @click="visibleDropzone = true">
-            <UploadOutlined />
-            Upload frame
-          </a-button>
-          <a-button type="primary" @click="addExistingFrame">
-            <PlusCircleOutlined />
-            Add existing frame
-          </a-button>
-          <a-button
-            v-if="files!.length > 1"
-            :type="clearMode ? 'primary' : 'dashed'"
-            danger
-            @click="clearMode = !clearMode"
-          >
-            <ClearOutlined />
-            Clear frames
-          </a-button>
-        </template>
+      <a-input-group compact>
+        <a-select
+          v-model:value="type"
+          data-testid="media-form-type"
+          :options="mediaTypes"
+          style="min-width: 110px"
+        ></a-select>
         <a-input
-          v-else-if="type === 'video' && files && files.length"
-          v-model:value="files![0].url"
-          placeholder="Unique key"
-          @focus="clearSign"
+          v-model:value="name"
+          data-testid="media-form-name"
+          :placeholder="mediaName"
         ></a-input>
-        <template v-if="editingMediaResult?.editingMedia?.id">
-          <a-button
-            v-if="files?.length == 1"
-            type="primary"
-            style="background-color: #1677ff; border-color: #1677ff"
-            @click="handleReplace"
-          >
-            <Icon
-              src="replace.webp"
-              style="width: 14px; height: 14px; margin-right: 8px; margin-bottom: 3px"
-            />
-            Replace
-          </a-button>
-          <template v-if="editingMediaResult?.editingMedia.dormant">
-            <a-popconfirm
-              placement="bottom"
-              ok-text="Yes"
-              cancel-text="No"
-              :ok-button-props="{ danger: true }"
-              @confirm="onUpdateStatus()"
-            >
-              <template #title>
-                <div>Are you sure you want to make this media as active?</div>
-              </template>
-
-              <a-button
-                type="primary"
-                style="background-color: #faad14; border-color: #faad14"
-                :loading="dormanting"
-              >
-                <Icon
-                  src="icons8-sun.svg"
-                  style="width: 14px; height: 14px; margin-right: 8px; margin-bottom: 3px"
-                />
-                Active
-              </a-button>
-            </a-popconfirm>
-          </template>
-
-          <template v-else>
-            <a-popconfirm
-              placement="bottom"
-              ok-text="Yes"
-              cancel-text="No"
-              :ok-button-props="{ danger: true }"
-              @confirm="onUpdateStatus()"
-            >
-              <template #title>
-                <div>
-                  <p>Are you sure you want to make this media as dormant?</p>
-                  <p>It will be available for any replay recordings that require it,</p>
-                  <p>but you will not see it in your Media list.</p>
-                  <p>Only an Admin can see it and reactivate it.</p>
-                  <p>If it isn't needed, please delete it rather than making it dormant.</p>
-                </div>
-              </template>
-
-              <a-button
-                type="primary"
-                style="background-color: #faad14; border-color: #faad14"
-                :loading="dormanting"
-              >
-                <Icon
-                  src="icons8-sun.svg"
-                  style="width: 14px; height: 14px; margin-right: 8px; margin-bottom: 3px"
-                />
-                Dormant
-              </a-button>
-            </a-popconfirm>
-          </template>
-
+      </a-input-group>
+    </template>
+    <div class="media-form-actions flex flex-wrap items-center gap-2 px-4 py-3 border-b">
+      <template v-if="!['video', 'audio'].includes(type)">
+        <a-button type="primary" @click="visibleDropzone = true">
+          <UploadOutlined />
+          Upload frame
+        </a-button>
+        <a-button type="primary" @click="addExistingFrame">
+          <PlusCircleOutlined />
+          Add existing frame
+        </a-button>
+        <a-button
+          v-if="files!.length > 1"
+          :type="clearMode ? 'primary' : 'dashed'"
+          danger
+          @click="clearMode = !clearMode"
+        >
+          <ClearOutlined />
+          Clear frames
+        </a-button>
+      </template>
+      <a-input
+        v-else-if="type === 'video' && files && files.length"
+        v-model:value="files![0].url"
+        placeholder="Unique key"
+        style="max-width: 240px"
+        @focus="clearSign"
+      ></a-input>
+      <template v-if="editingMediaResult?.editingMedia?.id">
+        <a-button
+          v-if="files?.length == 1"
+          type="primary"
+          style="background-color: #1677ff; border-color: #1677ff"
+          @click="handleReplace"
+        >
+          <Icon src="replace.webp" class="media-form-action-icon" />
+          Replace
+        </a-button>
+        <template v-if="editingMediaResult?.editingMedia.dormant">
           <a-popconfirm
-            title="Are you sure you want to delete this media?"
+            placement="bottom"
             ok-text="Yes"
             cancel-text="No"
-            placement="bottom"
             :ok-button-props="{ danger: true }"
-            loading="deleting"
-            @confirm="onDelete()"
+            @confirm="onUpdateStatus()"
           >
+            <template #title>
+              <div>Are you sure you want to make this media as active?</div>
+            </template>
+
             <a-button
               type="primary"
-              style="background-color: #ff4d4f; border-color: #ff4d4f"
-              :loading="deleting"
+              style="background-color: #faad14; border-color: #faad14"
+              :loading="dormanting"
             >
-              <DeleteOutlined />
-              Delete
+              <Icon src="icons8-sun.svg" class="media-form-action-icon" />
+              Active
             </a-button>
           </a-popconfirm>
         </template>
-      </a-space>
-    </template>
+
+        <template v-else>
+          <a-popconfirm
+            placement="bottom"
+            ok-text="Yes"
+            cancel-text="No"
+            :ok-button-props="{ danger: true }"
+            @confirm="onUpdateStatus()"
+          >
+            <template #title>
+              <div>
+                <p>Are you sure you want to make this media as dormant?</p>
+                <p>It will be available for any replay recordings that require it,</p>
+                <p>but you will not see it in your Media list.</p>
+                <p>Only an Admin can see it and reactivate it.</p>
+                <p>If it isn't needed, please delete it rather than making it dormant.</p>
+              </div>
+            </template>
+
+            <a-button
+              type="primary"
+              style="background-color: #faad14; border-color: #faad14"
+              :loading="dormanting"
+            >
+              <Icon src="icons8-sun.svg" class="media-form-action-icon" />
+              Dormant
+            </a-button>
+          </a-popconfirm>
+        </template>
+
+        <a-popconfirm
+          title="Are you sure you want to delete this media?"
+          ok-text="Yes"
+          cancel-text="No"
+          placement="bottom"
+          :ok-button-props="{ danger: true }"
+          loading="deleting"
+          @confirm="onDelete()"
+        >
+          <a-button
+            type="primary"
+            style="background-color: #ff4d4f; border-color: #ff4d4f"
+            :loading="deleting"
+          >
+            <DeleteOutlined />
+            Delete
+          </a-button>
+        </a-popconfirm>
+      </template>
+    </div>
     <a-row :gutter="12">
       <a-col :span="6">
         <div class="bg-gray-200 flex items-center justify-center h-full" style="max-height: 600px">
@@ -718,5 +710,13 @@ const getUserDisplayName = (user: User) => {
 <style>
 :deep(.ant-progress-outer) {
   padding-right: 0;
+}
+
+.media-form-action-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
 }
 </style>

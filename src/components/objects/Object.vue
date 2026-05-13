@@ -256,6 +256,7 @@ div[tabindex] {
 
 .object {
   z-index: 10;
+  overflow: hidden;
 
   &.link-hover-effect {
     transition: transform v-bind(transition);

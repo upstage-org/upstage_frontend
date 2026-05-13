@@ -169,7 +169,9 @@ const onVisibleDropzone = () => {
 
 <template>
   <a-affix :offset-top="0">
-    <a-space class="shadow rounded-xl px-4 py-2 bg-white flex justify-between">
+    <div
+      class="shadow rounded-xl px-4 py-2 bg-white flex justify-between items-center w-full"
+    >
       <a-space class="flex-wrap">
         <a-button v-if="composingMode" type="primary" danger @click="composingMode = false">
           <template #icon>
@@ -290,6 +292,6 @@ const onVisibleDropzone = () => {
         </a-button>
       </a-space>
       <Navbar />
-    </a-space>
+    </div>
   </a-affix>
 </template>

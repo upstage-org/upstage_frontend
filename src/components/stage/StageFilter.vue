@@ -160,7 +160,9 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
 
 <template>
   <a-affix :offset-top="0">
-    <a-space class="shadow rounded-xl px-4 py-2 bg-white flex justify-between">
+    <div
+      class="shadow rounded-xl px-4 py-2 bg-white flex justify-between items-center w-full"
+    >
       <a-space class="flex-wrap">
         <RouterLink to="/stages/new-stage">
           <a-button type="primary"> <PlusOutlined /> {{ $t("new") }} {{ $t("stage") }} </a-button>
@@ -227,6 +229,6 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
         </a-button>
       </a-space>
       <Navbar />
-    </a-space>
+    </div>
   </a-affix>
 </template>
