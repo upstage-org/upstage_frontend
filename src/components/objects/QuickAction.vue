@@ -65,7 +65,10 @@ export default {
   >
     <button
       class="button is-rounded is-small"
-      :class="{ 'is-primary': object.liveAction }"
+      :class="{
+        'is-primary': object.liveAction,
+        'is-danger': object.liveAction === false,
+      }"
       @click="toggleLiveAction"
     >
       <i class="fas fa-lightbulb"></i>

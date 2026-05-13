@@ -3,7 +3,7 @@ import { computed, reactive, ref } from "vue";
 import SaveButton from "components/form/SaveButton.vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { avatarSpeak } from "services/speech";
-import { getDefaultVariant, getVariantList, getVoiceList } from "services/speech/voice";
+import { getDefaultAvatarVoice, getVariantList, getVoiceList } from "services/speech/voice";
 
 export default {
   components: {
@@ -16,10 +16,26 @@ export default {
     const currentAvatar = computed(() => stageStore.currentAvatar);
     const voices = getVoiceList();
     const variants = getVariantList();
-    const parameters = reactive(props.modelValue ? props.modelValue : currentAvatar.value?.voice);
-    if (!parameters.variant) {
-      parameters.variant = getDefaultVariant();
-    }
+    // Build a fresh reactive object from the canonical voice defaults
+    // (pitch=50, speed=175, amplitude=50, variant="f1") merged with any
+    // values already saved on the avatar. Two things matter here:
+    //
+    // 1. Without merging defaults, fields like pitch/speed/amplitude
+    //    are `undefined` and render the a-slider at 0 (far left), even
+    //    though meSpeak silently applies its own median defaults during
+    //    playback. Performers see "sliders at zero" while the voice
+    //    sounds "middle", which doesn't match. Filling in defaults makes
+    //    the sliders agree with the audio actually produced.
+    //
+    // 2. Using a new object (instead of wrapping the avatar's existing
+    //    voice ref) means slider drags don't silently mutate the live
+    //    avatar voice in the Pinia store before the performer clicks
+    //    Save. Save is the publish event; before Save, nothing changes.
+    const source = props.modelValue || currentAvatar.value?.voice || {};
+    const parameters = reactive({
+      ...getDefaultAvatarVoice(),
+      ...source,
+    });
     const test = ref("Welcome to UpStage!");
     const testVoice = () => {
       avatarSpeak({ voice: parameters }, test.value);

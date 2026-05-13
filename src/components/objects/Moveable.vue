@@ -241,7 +241,7 @@ export default {
     :style="{
       position: 'absolute',
       opacity: object.opacity * (isDragging ? 0.5 : 1),
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
+      filter: `grayscale(${object.liveAction === false ? 1 : 0})`,
       'transform-origin': transformOrigin,
     }"
     @mousedown="clickInside"
@@ -258,7 +258,7 @@ export default {
       height: object.h + 'px',
       transform: `rotate(${object.rotate}deg)`,
       opacity: object.opacity,
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
+      filter: `grayscale(${object.liveAction === false ? 1 : 0})`,
     }"
   >
     <slot />

@@ -46,6 +46,7 @@ import {
   getDefaultStageConfig,
   getDefaultStageSettings,
   recalcFontSize,
+  serializeForBroadcast,
   serializeObject,
   unnamespaceTopic,
 } from "@stores/modules/stage/reusable";
@@ -1422,6 +1423,10 @@ export const useStageStore = defineStore("stage", () => {
       voice: {},
       volume: 100,
       rotate: 0,
+      // Fresh objects default to "bulb on" so they broadcast on first
+      // drag and render in full color on the performer (Moveable.vue
+      // grayscale rule only matches `liveAction === false`).
+      liveAction: true,
       x: 0,
       y: 0,
       ...data,
@@ -1430,6 +1435,13 @@ export const useStageStore = defineStore("stage", () => {
     };
     if (object.type === "video") {
       object.hostId = session.value;
+      // Start playing as soon as the video is placed on stage so the
+      // performer doesn't have to right-click -> Play to start every
+      // newly-dragged clip. The user can still toggle pause/play via the
+      // avatar context menu (ContextMenuAvatar.vue play/pause actions).
+      if (object.isPlaying === undefined) {
+        object.isPlaying = true;
+      }
       try {
         const description = JSON.parse(data.description ?? "");
         if (description.w && description.h) object.h = (description.h * 100) / description.w;
@@ -1446,18 +1458,26 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   function shapeObject(object: BoardObject) {
+    // Sender always reflects their own change locally. This used to live
+    // only in the `else` branch and the live branch relied on the broker
+    // echo to update the sender's store. Now that `serializeForBroadcast`
+    // strips `liveAction` from outgoing payloads, the echo is no longer a
+    // safe round-trip for sender-local UI state — so apply locally first
+    // unconditionally. UPDATE_OBJECT is idempotent, so the echo from the
+    // broker is a harmless no-op for the sender.
+    UPDATE_OBJECT(serializeObject(object));
     if (object.liveAction) {
       if (object.published) {
         mqtt.sendMessage(TOPICS.BOARD, {
           type: BOARD_ACTIONS.MOVE_TO,
-          object: serializeObject(object),
+          object: serializeForBroadcast(object),
         });
       } else {
         object.published = true;
         object.displayName = useUserStore().nickname ?? "";
         mqtt.sendMessage(TOPICS.BOARD, {
           type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
-          object: serializeObject(object),
+          object: serializeForBroadcast(object),
         });
       }
       board.value.objects
@@ -1467,61 +1487,94 @@ export const useStageStore = defineStore("stage", () => {
             costume.published = true;
             mqtt.sendMessage(TOPICS.BOARD, {
               type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
-              object: serializeObject(costume),
+              object: serializeForBroadcast(costume),
             });
           }
         });
-    } else {
-      UPDATE_OBJECT(serializeObject(object));
     }
   }
 
+  // Bypass actions (switchFrame, toggleAutoplayFrames, sendToBack,
+  // bringToFront, bringToFrontOf, deleteObject) previously published
+  // unconditionally — that's the second half of the lightbulb leak: while
+  // the bulb is off, the audience was still seeing frame switches, z-order
+  // changes, autoplay toggles, and deletes happen live. Each wrapper below
+  // now applies the change locally first (so the performer always sees
+  // their own action), and only publishes if `liveAction` is on.
   function deleteObject(object: BoardObject) {
-    object = serializeObject(object);
-    if (object.drawingId) {
+    const localPayload = serializeObject(object);
+    if (localPayload.drawingId) {
       // is drawing
-      delete object.commands;
+      delete localPayload.commands;
     }
-    mqtt.sendMessage(TOPICS.BOARD, {
-      type: BOARD_ACTIONS.DESTROY,
-      object,
-    });
+    DELETE_OBJECT(localPayload);
+    if (object.liveAction) {
+      const wirePayload = serializeForBroadcast(object);
+      if (wirePayload.drawingId) {
+        delete wirePayload.commands;
+      }
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.DESTROY,
+        object: wirePayload,
+      });
+    }
+    // Full-gate-with-delete caveat: if the bulb is off, the delete is
+    // sender-local. The object disappears from the performer's view (and
+    // so does the bulb), so this session has no way to re-broadcast the
+    // deletion to the audience. Documented intent of "full gate".
   }
 
   function switchFrame(object: BoardObject) {
-    mqtt.sendMessage(TOPICS.BOARD, {
-      type: BOARD_ACTIONS.SWITCH_FRAME,
-      object: serializeObject(object),
-    });
+    UPDATE_OBJECT(serializeObject(object));
+    if (object.liveAction) {
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.SWITCH_FRAME,
+        object: serializeForBroadcast(object),
+      });
+    }
   }
 
   function sendToBack(object: BoardObject) {
-    mqtt.sendMessage(TOPICS.BOARD, {
-      type: BOARD_ACTIONS.SEND_TO_BACK,
-      object: serializeObject(object),
-    });
+    SEND_TO_BACK(object);
+    if (object.liveAction) {
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.SEND_TO_BACK,
+        object: serializeForBroadcast(object),
+      });
+    }
   }
 
   function bringToFront(object: BoardObject) {
-    mqtt.sendMessage(TOPICS.BOARD, {
-      type: BOARD_ACTIONS.BRING_TO_FRONT,
-      object: serializeObject(object),
-    });
+    BRING_TO_FRONT(object);
+    if (object.liveAction) {
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.BRING_TO_FRONT,
+        object: serializeForBroadcast(object),
+      });
+    }
   }
 
   function bringToFrontOf({ front, back }: { front: ObjectId; back: ObjectId }) {
-    mqtt.sendMessage(TOPICS.BOARD, {
-      type: BOARD_ACTIONS.BRING_TO_FRONT_OF,
-      front,
-      back,
-    });
+    BRING_TO_FRONT_OF({ front, back });
+    // The "moved" object is `front`; gate the publish on its bulb.
+    const frontObj = board.value.objects.find((o) => o.id === front);
+    if (frontObj?.liveAction) {
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.BRING_TO_FRONT_OF,
+        front,
+        back,
+      });
+    }
   }
 
   function toggleAutoplayFrames(object: BoardObject) {
-    mqtt.sendMessage(TOPICS.BOARD, {
-      type: BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES,
-      object: serializeObject(object),
-    });
+    UPDATE_OBJECT(serializeObject(object));
+    if (object.liveAction) {
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES,
+        object: serializeForBroadcast(object),
+      });
+    }
   }
 
   /**

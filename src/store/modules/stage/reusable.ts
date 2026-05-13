@@ -37,6 +37,21 @@ export function serializeObject(object) {
   return object;
 }
 
+// Same as serializeObject but strips fields that are sender-local UI
+// state and must NOT leak onto the MQTT BOARD topic. `liveAction` in
+// particular controls whether the SENDER's drags publish; when it
+// piggybacks on every payload, audience clients end up with
+// `liveAction: false` in their local store and render the object in
+// grayscale (the "audience should never see this" bug). Use this when
+// building objects for `mqtt.sendMessage(TOPICS.BOARD, ...)`; use
+// `serializeObject` for paths that feed back into our OWN store via
+// UPDATE_OBJECT, where preserving `liveAction` is the whole point.
+export function serializeForBroadcast(object) {
+  const result = serializeObject(object);
+  delete result.liveAction;
+  return result;
+}
+
 export function deserializeObject(object) {
   if (object.type === "video") {
     delete object.src;

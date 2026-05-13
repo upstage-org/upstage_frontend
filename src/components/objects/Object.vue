@@ -103,7 +103,21 @@ export default {
 
     const synchronize = () => {
       if (props.object.isPlaying && video.value) {
-        video.value.play();
+        const playPromise = video.value.play();
+        // play() returns a Promise that the browser rejects if its
+        // autoplay policy refuses the request (typically when the
+        // gesture activation token has expired and the video has audio).
+        // Without a catch the rejection surfaces as an unhandled promise
+        // error. Log it so it's at least observable; the user can still
+        // start playback manually via the context menu's Play action.
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch((err) => {
+            console.warn(
+              "[stage] video.play() was blocked; right-click the object and choose Play to start it:",
+              err?.message ?? err,
+            );
+          });
+        }
       } else {
         video.value && video.value.pause();
       }
