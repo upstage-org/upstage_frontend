@@ -105,6 +105,8 @@ export default {
     @mousedown.stop="keepActive"
     @mouseover.stop="keepActive"
     @mouseup.stop="keepActive"
+    @touchstart.stop="keepActive"
+    @touchend.stop="keepActive"
   />
 </template>
 

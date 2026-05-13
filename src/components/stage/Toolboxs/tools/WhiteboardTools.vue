@@ -82,7 +82,6 @@ export default {
       cursor,
       top: stageSize.top + 'px',
       left: stageSize.left + 'px',
-      'pointer-events': none,
     }"
   >
     Your browser does not support the HTML5 canvas tag.
@@ -168,6 +167,12 @@ export default {
 .drawing {
   position: fixed;
   z-index: 1000;
+  /* Tells the browser this element handles its own gestures.
+     Without this, iOS Safari and Chrome on Android interpret the
+     first touchmove on the canvas as a page-pan or pinch-zoom,
+     so the pointer events never fire and the player only ever
+     gets a single dot from the initial touchstart. */
+  touch-action: none;
 }
 .drawing-tool {
   z-index: 1001;

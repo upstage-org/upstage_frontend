@@ -245,6 +245,7 @@ export default {
       'transform-origin': transformOrigin,
     }"
     @mousedown="clickInside"
+    @touchstart="clickInside"
   >
     <slot />
   </div>

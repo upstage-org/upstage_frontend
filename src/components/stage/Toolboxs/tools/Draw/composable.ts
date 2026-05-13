@@ -178,39 +178,70 @@ export const useDrawable = () => {
     }
   };
 
+  /*
+   * Pointer events unify mouse, touch, and pen input on every modern
+   * browser. The previous mouse-only listener set produced "only dots,
+   * not lines" on tablets because browsers no longer synthesize
+   * `mousemove` from `touchmove` — unhandled touch drags are eaten by
+   * the browser's scroll/pinch/pan gestures.
+   *
+   * Two pieces that have to go together:
+   *   - `touch-action: none` on the canvas via the consuming
+   *     templates (see Whiteboard / Draw / WhiteboardTools .vue)
+   *     so the browser doesn't intercept the first touchmove.
+   *   - `setPointerCapture(pointerId)` on pointerdown so the
+   *     pointermove / pointerup pair keeps firing if the finger
+   *     drifts off the canvas (replaces the old `mouseout` cleanup).
+   *
+   * Pen-pressure (`e.pressure`) is intentionally NOT consumed yet —
+   * leaving the existing fixed `size` UX in place. Easy to add later.
+   */
   const attachEventLinsteners = () => {
     const { value: canvas } = el;
-    if (canvas) {
-      history.length = 0;
-      canvas.addEventListener(
-        "mousemove",
-        (e) => {
-          findxy("move", e);
-        },
-        false,
-      );
-      canvas.addEventListener(
-        "mousedown",
-        (e) => {
-          findxy("down", e);
-        },
-        false,
-      );
-      canvas.addEventListener(
-        "mouseup",
-        (e) => {
-          findxy("up", e);
-        },
-        false,
-      );
-      canvas.addEventListener(
-        "mouseout",
-        (e) => {
-          findxy("out", e);
-        },
-        false,
-      );
-    }
+    if (!canvas) return;
+    history.length = 0;
+
+    // Belt-and-braces: ensure touch-action is set on the element
+    // itself, even if a consuming template forgot. Without this,
+    // iOS Safari's default page-pan kicks in on the very first
+    // touchmove regardless of pointer handlers.
+    canvas.style.touchAction = "none";
+
+    canvas.addEventListener("pointerdown", (e) => {
+      // Only respond to the primary contact. Multi-touch (e.g. a
+      // second finger landing mid-stroke) is ignored to avoid the
+      // stroke jumping between fingers.
+      if (!e.isPrimary) return;
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // setPointerCapture is allowed to throw if the pointer
+        // is no longer active by the time we get here (race during
+        // synthetic events). Swallow — the rest still works.
+      }
+      findxy("down", e);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!e.isPrimary) return;
+      findxy("move", e);
+    });
+
+    const endStroke = (e: PointerEvent) => {
+      if (!e.isPrimary) return;
+      if (canvas.hasPointerCapture(e.pointerId)) {
+        canvas.releasePointerCapture(e.pointerId);
+      }
+      findxy("up", e);
+    };
+
+    canvas.addEventListener("pointerup", endStroke);
+    // pointercancel fires when the OS / browser yanks the pointer
+    // (e.g. system gesture, app switch). Treat it like pointerup so
+    // we don't leave `data.flag` stuck on, which would replay the
+    // first move of the next gesture as a giant line from wherever
+    // the previous stroke ended.
+    canvas.addEventListener("pointercancel", endStroke);
   };
 
   onMounted(attachEventLinsteners);

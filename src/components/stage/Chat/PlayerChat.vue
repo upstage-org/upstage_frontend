@@ -166,7 +166,14 @@ export default {
       stageStore.SET_PLAYER_CHAT_PARAMETERS(parameters);
     };
 
-    // Click and drag functionality
+    // Click and drag functionality. Unified mouse + touch implementation
+    // so the player chat is draggable on tablets without relying on
+    // browser mouse-event synthesis (which doesn't fire during
+    // touchmove). DOM-mutation style is preserved (rather than
+    // reactive Pinia state) because Moveable.js also writes
+    // .style.left/top directly when the move-toggle button is on;
+    // sharing the same mutation channel keeps the two affordances
+    // consistent.
     const startDrag = (e) => {
       if (isStandalone) return;
       e.preventDefault();
@@ -174,33 +181,52 @@ export default {
       const chatbox = theChatbox.value;
       if (!chatbox) return;
 
-      // Get current computed styles
+      const isTouch = "touches" in e;
+      const startClientX = isTouch ? e.touches[0].clientX : e.clientX;
+      const startClientY = isTouch ? e.touches[0].clientY : e.clientY;
+
       const rect = chatbox.getBoundingClientRect();
-      let startX = e.clientX - rect.left;
-      let startY = e.clientY - rect.top;
+      const startX = startClientX - rect.left;
+      const startY = startClientY - rect.top;
 
-      const handleMouseMove = (moveEvent) => {
-        const newX = moveEvent.clientX - startX;
-        const newY = moveEvent.clientY - startY;
-
-        // Boundary checks
+      const move = (clientX, clientY) => {
+        const newX = clientX - startX;
+        const newY = clientY - startY;
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
         const clampedX = Math.max(0, Math.min(newX, windowWidth - rect.width));
         const clampedY = Math.max(0, Math.min(newY, windowHeight - rect.height));
-
         chatbox.style.left = `${clampedX}px`;
         chatbox.style.top = `${clampedY}px`;
         chatbox.style.position = "fixed";
       };
 
-      const handleMouseUp = () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
+      const handleMouseMove = (ev) => move(ev.clientX, ev.clientY);
+      const handleTouchMove = (ev) => {
+        if (!ev.touches[0]) return;
+        // `preventDefault` here keeps iOS Safari from scroll-bouncing
+        // the page while the user is dragging the chat. Skipped on
+        // mouse because mouse drag doesn't trigger page scroll.
+        ev.preventDefault();
+        move(ev.touches[0].clientX, ev.touches[0].clientY);
       };
 
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      const cleanup = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", cleanup);
+        document.removeEventListener("touchmove", handleTouchMove);
+        document.removeEventListener("touchend", cleanup);
+        document.removeEventListener("touchcancel", cleanup);
+      };
+
+      if (isTouch) {
+        document.addEventListener("touchmove", handleTouchMove, { passive: false });
+        document.addEventListener("touchend", cleanup);
+        document.addEventListener("touchcancel", cleanup);
+      } else {
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", cleanup);
+      }
     };
 
     return {
@@ -275,6 +301,7 @@ export default {
           v-if="!isStandalone"
           class="chat-setting button is-rounded is-outlined drag-icon-button"
           @mousedown.prevent="startDrag"
+          @touchstart.prevent="startDrag"
         >
           <span class="icon">
             <Icon src="movement-slider.svg" size="20" />

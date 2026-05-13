@@ -202,6 +202,12 @@ export default {
   position: fixed;
   z-index: 1000;
   background-color: hsla(142, 52%, 96%, 0.8);
+  /* Required for pointer-event drawing on touch screens — see the
+     mirror comment in stage/Toolboxs/tools/WhiteboardTools.vue and
+     the pointer-events refactor in Draw/composable.ts. Without
+     this, iOS / Android browsers swallow the first touchmove as a
+     page-pan gesture and the player only gets a dot. */
+  touch-action: none;
 }
 .drawing-tool {
   z-index: 1001;
