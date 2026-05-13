@@ -26,27 +26,35 @@ export default {
     <div style="z-index: 1">
       <Skeleton :data="video">
         <!--
-          Performer-side stream thumbnail. The previous version was just
-          `<video :src="...">` with no attributes, which gave wildly
-          different cross-browser results:
-            - Chromium: showed the poster frame (first decoded frame)
-            - Firefox: showed a black rectangle until clicked
-            - Safari (incl. iOS): nothing until clicked, and on iOS
-              would force fullscreen on play
-          Adding `muted` + `playsinline` makes the element honour the
-          autoplay-allowance window on Safari without forcing fullscreen.
-          `preload="metadata"` lets the browser fetch enough of the file
-          to display the poster frame without downloading the whole
-          video, keeping the toolbox lightweight. `controls` exposes the
-          standard play/seek UI on every browser.
+          Performer-side stream thumbnail. Earlier iterations tried to
+          rely on the browser's "poster frame" behaviour (showing the
+          first decoded frame of a `preload="metadata"` video), but that
+          is unreliable: Firefox renders black until clicked, and recent
+          Brave / Chromium media-policy tightening shows the same black
+          rectangle plus the `controls` play-bar overlay. The current
+          approach plays the video itself, silently and in a loop, so
+          the toolbox always shows actual moving content rather than a
+          dead-looking placeholder.
+            - `muted` + `playsinline` + `autoplay` + `loop` is the
+              cross-browser autoplay-allowed combination on every major
+              engine, including iOS Safari (no fullscreen takeover).
+            - No `controls` so the thumbnail doesn't sport a player
+              UI; this is a preview, not a media player.
+            - `preload="auto"` because the loop needs the full file
+              anyway; metadata-only preload combined with autoplay
+              triggers re-fetch when the first loop completes.
+            - `disablePictureInPicture` keeps Chromium from offering
+              its PiP button on hover; the toolbox is too small for it
+              to be useful.
         -->
         <video
           :src="video.url"
           :muted.attr="true"
           playsinline
-          preload="metadata"
-          controls
-          controlslist="nodownload"
+          autoplay
+          loop
+          preload="auto"
+          disablePictureInPicture
         ></video>
       </Skeleton>
     </div>
@@ -64,7 +72,10 @@ export default {
 }
 
 video {
+  width: 100%;
   height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .centered {
