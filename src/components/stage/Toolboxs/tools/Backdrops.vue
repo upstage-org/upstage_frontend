@@ -30,6 +30,16 @@ export default {
       });
     };
 
+    // Companion to changeBackdropSpeed: dwell (hold) is independent of
+    // fade. See the `Background.dwell` interface doc for the model.
+    const changeBackdropDwell = (e) => {
+      const dwell = coerceNumber(e.target.value, { min: 0, step: 0.5 });
+      stageStore.setBackground({
+        ...currentBackground.value,
+        dwell: dwell ?? 0,
+      });
+    };
+
     const toggleAutoplayFrames = () => {
       let speed = 0;
       if (!currentBackground.value.speed) {
@@ -77,6 +87,7 @@ export default {
       setBackground,
       currentBackground,
       changeBackdropSpeed,
+      changeBackdropDwell,
       toggleAutoplayFrames,
       switchBackdropFrame,
       adjustOpacity,
@@ -141,6 +152,20 @@ export default {
           </button>
         </p>
       </div>
+      <!--
+        Two independent timing knobs for multi-frame backdrops:
+          * fade  – seconds each crossfade takes (also the legacy
+                    `speed` field; kept under that name on the wire
+                    for backward compatibility).
+          * hold  – seconds each frame stays at full opacity between
+                    fades. `dwell` on the wire. Defaults to 0 so
+                    media without an explicit hold value animates
+                    exactly as it did pre-feature.
+        Same icon for both rows (animation-slider.svg) — the
+        `placeholder` on each input is what disambiguates them at a
+        glance, and the `title` tooltip carries the full explanation
+        for keyboard / hover users.
+      -->
       <div
         v-if="background.id === currentBackground.id"
         class="field has-addons menu-group px-4 my-2"
@@ -156,10 +181,34 @@ export default {
             step="0.5"
             min="0"
             :value="currentBackground.speed"
-            placeholder="seconds"
+            placeholder="fade (s)"
+            title="Crossfade duration between frames, in seconds"
             type="number"
             inputmode="decimal"
             @input="changeBackdropSpeed"
+          />
+        </p>
+      </div>
+      <div
+        v-if="background.id === currentBackground.id && background.multi"
+        class="field has-addons menu-group px-4 my-2"
+      >
+        <p class="control menu-group-title">
+          <span class="panel-icon pt-1">
+            <Icon src="animation-slider.svg" />
+          </span>
+        </p>
+        <p class="control menu-group-item is-fullwidth">
+          <input
+            class="slider is-fullwidth is-primary mt-0"
+            step="0.5"
+            min="0"
+            :value="currentBackground.dwell ?? 0"
+            placeholder="hold (s)"
+            title="How long each frame stays fully visible before the next fade, in seconds"
+            type="number"
+            inputmode="decimal"
+            @input="changeBackdropDwell"
           />
         </p>
       </div>

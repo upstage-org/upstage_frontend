@@ -36,7 +36,7 @@ export default {
           frameAnimation.currentFrame = null;
           return;
         }
-        const { src, multi, frames, speed, currentFrame } = value;
+        const { src, multi, frames, speed, dwell, currentFrame } = value;
         if (currentFrame) {
           frameAnimation.currentFrame = currentFrame;
         } else if (multi && frames && frames.length) {
@@ -45,13 +45,22 @@ export default {
           frameAnimation.currentFrame = src ?? null;
         }
         if (multi && frames && frames.length && (speed ?? 0) > 0) {
+          // Mirror Backdrop.vue: per-frame cycle is fade + dwell. The
+          // CSS `transition: opacity` on `.frame-fade-*` (bound to
+          // `frameFadeDuration` from `speed`) still runs for `speed`
+          // seconds; the `dwell` gap is the slack between the fade
+          // completing and the next setInterval tick, during which
+          // the new frame sits at full opacity.
+          const fadeSec = parseFloat(String(speed));
+          const holdSec = parseFloat(String(dwell ?? 0));
+          const cycleMs = (fadeSec + (Number.isFinite(holdSec) ? holdSec : 0)) * 1000;
           frameAnimation.interval = setInterval(
             () => {
               const idx = frames.indexOf(frameAnimation.currentFrame);
               const next = idx + 1 >= frames.length ? 0 : idx + 1;
               frameAnimation.currentFrame = frames[next];
             },
-            parseFloat(String(speed)) * 1000,
+            cycleMs,
           );
         }
       },

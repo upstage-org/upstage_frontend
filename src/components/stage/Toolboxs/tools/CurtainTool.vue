@@ -51,6 +51,14 @@ export default {
       stageStore.setCurtainSpeed(speed ?? 0);
     };
 
+    // Companion to changeSpeed: see Backdrops.vue.changeBackdropDwell
+    // and the `Curtain.dwell` interface doc for the fade-vs-hold
+    // model and why we keep them as separate parameters.
+    const changeDwell = (e) => {
+      const dwell = coerceNumber(e.target.value, { min: 0, step: 0.5 });
+      stageStore.setCurtainDwell(dwell ?? 0);
+    };
+
     const switchFrame = (frame) => {
       stageStore.setCurtainFrame(frame);
     };
@@ -62,6 +70,7 @@ export default {
       isActive,
       toggleAutoplay,
       changeSpeed,
+      changeDwell,
       switchFrame,
     };
   },
@@ -125,6 +134,14 @@ export default {
           </button>
         </p>
       </div>
+      <!--
+        Two independent timing knobs for multi-frame curtains.
+        Mirrors Backdrops.vue: see the comment there for the full
+        rationale. `speed` is the fade duration (legacy field name
+        kept for wire compatibility), `dwell` is the new hold
+        duration that defaults to 0 to preserve pre-feature
+        behaviour on existing media.
+      -->
       <div
         v-if="curtain.multi && isActive(curtain)"
         class="field has-addons menu-group px-4 my-2"
@@ -140,10 +157,34 @@ export default {
             step="0.5"
             min="0"
             :value="currentCurtain.speed ?? 0"
-            placeholder="seconds"
+            placeholder="fade (s)"
+            title="Crossfade duration between frames, in seconds"
             type="number"
             inputmode="decimal"
             @input="changeSpeed"
+          />
+        </p>
+      </div>
+      <div
+        v-if="curtain.multi && isActive(curtain)"
+        class="field has-addons menu-group px-4 my-2"
+      >
+        <p class="control menu-group-title">
+          <span class="panel-icon pt-1">
+            <Icon src="animation-slider.svg" />
+          </span>
+        </p>
+        <p class="control menu-group-item is-fullwidth">
+          <input
+            class="slider is-fullwidth is-primary mt-0"
+            step="0.5"
+            min="0"
+            :value="currentCurtain.dwell ?? 0"
+            placeholder="hold (s)"
+            title="How long each frame stays fully visible before the next fade, in seconds"
+            type="number"
+            inputmode="decimal"
+            @input="changeDwell"
           />
         </p>
       </div>

@@ -118,7 +118,20 @@ export interface Background {
   id?: ObjectId;
   at?: number;
   opacity?: number;
+  // `speed` is the FADE duration: how long each crossfade between
+  // consecutive frames takes (seconds). Set to 0 to pause the
+  // animation entirely.
   speed?: number;
+  // `dwell` is the HOLD duration: how long each frame stays at full
+  // opacity *before* the next fade starts (seconds). Default
+  // (undefined / 0) means "advance immediately when a fade
+  // completes" — the legacy behaviour, kept so vintage broadcasts
+  // and existing media animate exactly as they did before the
+  // dwell field was introduced. The full per-frame cycle is
+  // therefore `(speed + dwell)` seconds: a slideshow with `speed=1`
+  // and `dwell=10` shows each image for 10s at full opacity, then
+  // takes 1s to crossfade to the next.
+  dwell?: number;
   src?: string;
   multi?: boolean;
   frames?: string[];
@@ -130,13 +143,17 @@ export interface Curtain {
   src?: string;
   // Multi-frame curtain support (mirrors `Background`). When `multi` and
   // `frames` are present, `Curtain.vue` cycles through `frames` on a
-  // setInterval driven by `speed` (seconds per frame; 0 = paused).
-  // `currentFrame` is the last-shown frame so audience joins land on the
-  // same picture the performer sees. `at` is a timestamp used by
-  // `SET_CURTAIN` to ignore stale MQTT messages.
+  // setInterval driven by `speed` (FADE duration, seconds per
+  // crossfade; 0 = paused) and `dwell` (HOLD duration, seconds the
+  // frame stays at full opacity between fades; default 0 =
+  // immediate advance, legacy behaviour). `currentFrame` is the
+  // last-shown frame so audience joins land on the same picture the
+  // performer sees. `at` is a timestamp used by `SET_CURTAIN` to
+  // ignore stale MQTT messages.
   multi?: boolean;
   frames?: string[];
   speed?: number;
+  dwell?: number;
   lastSpeed?: number;
   currentFrame?: string;
   at?: number;
@@ -1782,6 +1799,19 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
+  // Companion to setCurtainSpeed: fade vs hold are independent knobs.
+  // See the `Curtain.dwell` doc on the interface for the full
+  // model. Threaded through drawCurtain so every client (and the
+  // sender's local view via the optimistic SET_CURTAIN call inside
+  // drawCurtain) picks up the new value on the next animation tick.
+  function setCurtainDwell(dwell: number) {
+    if (!curtain.value) return;
+    drawCurtain({
+      ...curtain.value,
+      dwell: dwell ?? 0,
+    });
+  }
+
   function setCurtainFrame(currentFrame: string) {
     if (!curtain.value) return;
     drawCurtain({
@@ -2441,6 +2471,7 @@ export const useStageStore = defineStore("stage", () => {
     drawCurtain,
     toggleCurtainAutoplay,
     setCurtainSpeed,
+    setCurtainDwell,
     setCurtainFrame,
     loadScenes,
     switchScene,

@@ -32,12 +32,21 @@ export default {
       background,
       (value) => {
         if (!value) return;
-        const { speed, frames, currentFrame } = value;
+        const { speed, dwell, frames, currentFrame } = value;
         if (currentFrame) {
           frameAnimation.currentFrame = currentFrame;
         }
         clearInterval(frameAnimation.interval);
         if (frames) {
+          // Total per-frame cycle = fade (`speed`) + hold (`dwell`).
+          // Setting the interval to just `speed` (as we used to) meant
+          // the next fade kicked off the instant the previous one
+          // finished, so the image was never visible at full opacity.
+          // `dwell` defaults to 0 / undefined to preserve the
+          // pre-dwell behaviour for media that hasn't set it.
+          const fadeSec = parseFloat(speed || 0);
+          const holdSec = parseFloat(dwell || 0);
+          const cycleMs = (fadeSec + holdSec) * 1000;
           frameAnimation.interval = setInterval(
             () => {
               let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
@@ -46,7 +55,7 @@ export default {
               }
               frameAnimation.currentFrame = frames[nextFrame];
             },
-            parseFloat(speed || 0) * 1000,
+            cycleMs,
           );
         }
       },
