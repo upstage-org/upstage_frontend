@@ -319,7 +319,15 @@ onVisibilityUpdated(handleUpdate);
           />
         </template>
         <template v-if="column.key === 'actions'">
-          <a-space class="flex" style="justify-content: flex-end">
+          <!--
+            width: 100% so the flex container spans the full cell;
+            otherwise `justify-content: flex-end` has nothing to push
+            against when only the Enter button is rendered (no Manage
+            for non-editor/non-owner players), and the lone button
+            collapses toward the start of the cell instead of staying
+            right-aligned with the multi-button rows above/below.
+          -->
+          <a-space class="flex" style="width: 100%; justify-content: flex-end">
             <router-link
               v-if="isAdmin || record.permission == 'editor' || record.permission == 'owner'"
               :to="`/stages/stage-management/${record.id}/`"
