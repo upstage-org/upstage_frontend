@@ -67,4 +67,20 @@ export default {
   position: absolute;
   right: 0;
 }
+
+/*
+  Lift this Bulma .modal above moveable.js's .moveable-control-box,
+  which the library appends directly to document.body with an inline
+  `z-index: 3000`. Without this override Bulma's default modal z-index
+  (40) lost the stacking war and the avatar's resize/rotate frame
+  drew on top of the avatar name & voice settings popups.
+
+  Kept below VoiceParameters' .ant-select-dropdown rule (5000) so the
+  Voice / Variant select dropdowns still pop above the popup itself.
+
+  Scoped: applies only to this component's .modal element.
+*/
+.modal {
+  z-index: 4000;
+}
 </style>

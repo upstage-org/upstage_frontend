@@ -73,15 +73,30 @@ export default {
         <a-select v-model:value="parameters.variant" :options="variants" />
       </a-form-item>
 
+      <!--
+        Slider ranges are chosen so that meSpeak's median defaults
+        (pitch 50, speed 175, amplitude 50 — see getDefaultAvatarVoice)
+        land at the visual midpoint of each slider. Earlier versions
+        used `:max=<default>` for pitch and rate, which pinned the
+        defaults to the right edge of the track and made the freshly
+        opened voice popup look like it had everything cranked to max.
+
+          Pitch:  meSpeak accepts 0–99; full 0–100 keeps 50 centered.
+          Rate:   meSpeak accepts 80–450 wpm; 80–270 keeps 175 centered
+                  while covering the useful performance range.
+          Volume: 0–100 keeps the default (50) centered. Above 100 the
+                  signal usually clips before it sounds louder, so the
+                  cap is intentional.
+      -->
       <a-form-item label="Pitch" :label-col="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.pitch" :max="50" />
+        <a-slider v-model:value="parameters.pitch" :min="0" :max="100" />
       </a-form-item>
 
       <a-form-item label="Rate" :label-col="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.speed" :max="175" />
+        <a-slider v-model:value="parameters.speed" :min="80" :max="270" />
       </a-form-item>
       <a-form-item label="Volume" :label-col="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.amplitude" />
+        <a-slider v-model:value="parameters.amplitude" :min="0" :max="100" />
       </a-form-item>
 
       <a-form-item label="Test voice" :label-col="{ span: 4 }" class="mb-2">
