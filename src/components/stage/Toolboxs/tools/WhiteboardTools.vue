@@ -13,7 +13,8 @@ export default {
     const isDrawing = computed(() => {
       return stageStore.preferences.isDrawing;
     });
-    const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } = useDrawable();
+    const { el, cursor, toggleErase, color, size, alpha, mode, history, clearCanvas } =
+      useDrawable();
 
     onMounted(() => {
       stageStore.UPDATE_IS_DRAWING(true);
@@ -58,6 +59,7 @@ export default {
       isDrawing,
       color,
       size,
+      alpha,
       el,
       clear,
       undo,
@@ -111,6 +113,30 @@ export default {
       max="200"
       type="range"
     />
+    <span class="tag is-light is-block">{{ $t("size") }}</span>
+  </div>
+  <div class="drawing-tool" style="width: 200px">
+    <div class="size-preview">
+      <div
+        class="dot"
+        :style="{
+          width: size + 'px',
+          height: size + 'px',
+          'background-color': color,
+          opacity: alpha,
+        }"
+        @click="mode = 'draw'"
+      />
+    </div>
+    <input
+      v-model.number="alpha"
+      class="slider is-fullwidth m-0 is-dark"
+      step="0.05"
+      min="0"
+      max="1"
+      type="range"
+    />
+    <span class="tag is-light is-block">{{ $t("opacity") }}</span>
   </div>
   <div
     class="drawing-tool"

@@ -128,6 +128,18 @@ export interface Background {
 export interface Curtain {
   id?: ObjectId;
   src?: string;
+  // Multi-frame curtain support (mirrors `Background`). When `multi` and
+  // `frames` are present, `Curtain.vue` cycles through `frames` on a
+  // setInterval driven by `speed` (seconds per frame; 0 = paused).
+  // `currentFrame` is the last-shown frame so audience joins land on the
+  // same picture the performer sees. `at` is a timestamp used by
+  // `SET_CURTAIN` to ignore stale MQTT messages.
+  multi?: boolean;
+  frames?: string[];
+  speed?: number;
+  lastSpeed?: number;
+  currentFrame?: string;
+  at?: number;
   [k: string]: unknown;
 }
 
@@ -474,7 +486,13 @@ export const useStageStore = defineStore("stage", () => {
         .map((a) => a.frames ?? [])
         .flat(),
     );
-    assets.push(...tools.value.curtains.map((b) => b.src));
+    assets.push(...tools.value.curtains.filter((a) => !a.multi).map((b) => b.src));
+    assets.push(
+      ...tools.value.curtains
+        .filter((a) => a.multi)
+        .map((a) => a.frames ?? [])
+        .flat(),
+    );
     // Drop falsy so we never block on a slot that will never @load
     return assets.filter((src): src is string => Boolean(src));
   });
@@ -938,8 +956,30 @@ export const useStageStore = defineStore("stage", () => {
     Object.assign(audioPlayers.value[index], statusUpdate);
   }
 
-  function SET_CURTAIN(c: Curtain | null) {
-    curtain.value = c;
+  function SET_CURTAIN(c: Curtain | string | null) {
+    if (c == null) {
+      curtain.value = null;
+      return;
+    }
+    // Legacy path: older clients publish DRAW_CURTAIN with `curtain: "<src>"`
+    // (a bare URL string). Normalize to the object shape so the renderer
+    // only has to deal with one type.
+    const normalized: Curtain = typeof c === "string" ? { src: c } : c;
+    // Stale-message guard, mirrors SET_BACKGROUND: only accept strictly
+    // newer messages. Same-`at` is treated as a stale echo (this is what
+    // happens for the sender's own broker echo after drawCurtain applied
+    // the change locally) and silently dropped to avoid the watch in
+    // `Curtain.vue` resetting the frame interval. Messages without `at`
+    // (older clients) bypass the guard and always win.
+    if (
+      curtain.value &&
+      curtain.value.at != null &&
+      normalized.at != null &&
+      normalized.at <= curtain.value.at
+    ) {
+      return;
+    }
+    curtain.value = normalized;
   }
 
   /**
@@ -1674,10 +1714,58 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
-  function drawCurtain(c: Curtain | null) {
+  function drawCurtain(c: Curtain | string | null) {
+    // Accept legacy `string` callers (older code paths or scenes saved
+    // before the multi-frame change) and normalize to the object shape.
+    let payload: Curtain | null;
+    if (c == null) {
+      payload = null;
+    } else if (typeof c === "string") {
+      payload = { src: c, at: +new Date() };
+    } else {
+      payload = { ...c, at: +new Date() };
+    }
+    // Apply locally first so the sender's view doesn't depend on the
+    // broker echo, mirroring how `setBackground` -> `SET_BACKGROUND` is
+    // wired plus the recent UPDATE_OBJECT-first convention. Broker echo
+    // is a harmless no-op because of the `at`-based guard.
+    SET_CURTAIN(payload);
     mqtt.sendMessage(TOPICS.BACKGROUND, {
       type: BACKGROUND_ACTIONS.DRAW_CURTAIN,
-      curtain: c,
+      curtain: payload,
+    });
+  }
+
+  // Mirrors Backdrops.vue's toggleAutoplayFrames: pause if already
+  // animating (stash current speed in lastSpeed), or resume to lastSpeed
+  // (falling back to 0.5 s/frame so users can play immediately even if
+  // they never set a speed).
+  function toggleCurtainAutoplay() {
+    if (!curtain.value) return;
+    let nextSpeed = 0;
+    if (!curtain.value.speed) {
+      nextSpeed = curtain.value.lastSpeed ?? 0.5;
+    }
+    drawCurtain({
+      ...curtain.value,
+      lastSpeed: curtain.value.speed,
+      speed: nextSpeed,
+    });
+  }
+
+  function setCurtainSpeed(speed: number) {
+    if (!curtain.value) return;
+    drawCurtain({
+      ...curtain.value,
+      speed: speed ?? 0,
+    });
+  }
+
+  function setCurtainFrame(currentFrame: string) {
+    if (!curtain.value) return;
+    drawCurtain({
+      ...curtain.value,
+      currentFrame,
     });
   }
 
@@ -1712,7 +1800,9 @@ export const useStageStore = defineStore("stage", () => {
     enabled?: boolean;
     position?: string;
     color?: string;
-    curtain?: Curtain | null;
+    // Older clients send `curtain: "<src-string>"`; SET_CURTAIN handles
+    // both via a legacy-string adapter.
+    curtain?: Curtain | string | null;
     scene?: ObjectId;
   }
 
@@ -2328,6 +2418,9 @@ export const useStageStore = defineStore("stage", () => {
     setChatPosition,
     setBackdropColor,
     drawCurtain,
+    toggleCurtainAutoplay,
+    setCurtainSpeed,
+    setCurtainFrame,
     loadScenes,
     switchScene,
     blankScene,

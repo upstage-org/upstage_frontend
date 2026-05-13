@@ -29,8 +29,8 @@ export default {
       animations: {
         bubble: "fade",
         curtain: "drop",
-        bubbleSpeed: 1000,
-        curtainSpeed: 5000,
+        bubbleSpeed: 1800,
+        curtainSpeed: 9100,
       },
       defaultcolor: "#30AC45",
       enabledLiveStreaming: true,

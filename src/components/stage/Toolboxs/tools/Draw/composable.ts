@@ -4,19 +4,34 @@ import * as canvasUtil from "utils/canvas";
 
 const eraseDot = (ctx, { x, y, size }) => {
   ctx.globalCompositeOperation = "destination-out";
+  // Erase is always full alpha (destination-out semantics): drawDot would
+  // otherwise respect the current globalAlpha and produce partial erases,
+  // which doesn't match how the eraser is supposed to behave.
+  const previousAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = 1;
   drawDot(ctx, { x, y, size, color: "white" });
+  ctx.globalAlpha = previousAlpha;
   ctx.globalCompositeOperation = "source-over";
 };
 
-const drawDot = (ctx, { x, y, size, color }) => {
+const drawDot = (ctx, { x, y, size, color, alpha }) => {
+  const previousAlpha = ctx.globalAlpha;
+  if (alpha !== undefined && alpha !== null) {
+    ctx.globalAlpha = alpha;
+  }
   ctx.beginPath();
   ctx.arc(x, y, size / 2, 0, Math.PI * 2, true);
   ctx.closePath();
   ctx.fillStyle = color;
   ctx.fill();
+  ctx.globalAlpha = previousAlpha;
 };
 
-const draw = (ctx, { fromX, fromY, x, y, size, color }) => {
+const draw = (ctx, { fromX, fromY, x, y, size, color, alpha }) => {
+  const previousAlpha = ctx.globalAlpha;
+  if (alpha !== undefined && alpha !== null) {
+    ctx.globalAlpha = alpha;
+  }
   ctx.beginPath();
   ctx.moveTo(fromX, fromY);
   ctx.lineTo(x, y);
@@ -24,7 +39,10 @@ const draw = (ctx, { fromX, fromY, x, y, size, color }) => {
   ctx.lineWidth = size;
   ctx.stroke();
   ctx.closePath();
-  drawDot(ctx, { x: fromX, y: fromY, size, color });
+  // Pass alpha through to drawDot for the rounded line cap; it manages its
+  // own save/restore of globalAlpha.
+  drawDot(ctx, { x: fromX, y: fromY, size, color, alpha });
+  ctx.globalAlpha = previousAlpha;
 };
 
 const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
@@ -34,7 +52,7 @@ const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
 const STROKE_SEGMENT_DELAY_MS = 25;
 
 const execute = async (ctx, command, animate) => {
-  const { type, size, color, lines } = command;
+  const { type, size, color, alpha, lines } = command;
   if (lines && lines.length) {
     if (type === "draw") {
       for (let i = 0; i < lines.length; i++) {
@@ -46,6 +64,7 @@ const execute = async (ctx, command, animate) => {
           y,
           size,
           color,
+          alpha,
         });
         if (animate) {
           await wait(STROKE_SEGMENT_DELAY_MS);
@@ -76,6 +95,11 @@ const execute = async (ctx, command, animate) => {
 export const useDrawable = () => {
   const color = ref("#000");
   const size = ref(10);
+  // Per-stroke alpha for live drawing. Default 1 = today's behavior. Sampled
+  // at stroke-build time the same way size/color are, so the slider only
+  // affects the NEXT stroke, not in-flight ones — matches the size/color
+  // mental model.
+  const alpha = ref(1);
   const mode = ref("draw");
   const el = ref(null);
 
@@ -113,6 +137,7 @@ export const useDrawable = () => {
         y: data.currY,
         size: size.value,
         color: color.value,
+        alpha: alpha.value,
       };
       execute(ctx, command);
     }
@@ -122,6 +147,7 @@ export const useDrawable = () => {
         type: mode.value,
         size: size.value,
         color: color.value,
+        alpha: alpha.value,
         lines: data.lines,
         x: data.currX,
         y: data.currY,
@@ -143,6 +169,7 @@ export const useDrawable = () => {
           type: mode.value,
           size: size.value,
           color: color.value,
+          alpha: alpha.value,
           ...coords,
         };
         execute(ctx, command);
@@ -236,6 +263,7 @@ export const useDrawable = () => {
     cursor,
     color,
     size,
+    alpha,
     mode,
     history,
     cropImageFromCanvas,
