@@ -50,21 +50,39 @@ export default {
     });
     if (props.object.multi) {
       watch(
-        () => props.object.autoplayFrames,
+        () => [props.object.autoplayFrames, props.object.frameLoop],
         () => {
           const { autoplayFrames, frames, src } = props.object;
           clearInterval(frameAnimation.interval);
+          frameAnimation.interval = null;
           if (autoplayFrames) {
             frameAnimation.currentFrame = src;
+            const intervalMs = parseFloat(String(autoplayFrames)) * 1000;
+            if (!(intervalMs > 0) || !frames?.length) return;
             frameAnimation.interval = setInterval(
               () => {
-                let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
-                if (nextFrame >= frames.length) {
-                  nextFrame = 0;
+                const fr = props.object.frames;
+                if (!fr?.length) return;
+                const idx = fr.indexOf(frameAnimation.currentFrame);
+                let next = idx + 1;
+                if (next >= fr.length) {
+                  if (props.object.frameLoop !== false) {
+                    next = 0;
+                  } else {
+                    clearInterval(frameAnimation.interval);
+                    frameAnimation.interval = null;
+                    stageStore.toggleAutoplayFrames({
+                      ...props.object,
+                      autoplayFrames: null,
+                      lastAutoplayFrames: props.object.autoplayFrames,
+                      src: frameAnimation.currentFrame ?? fr[fr.length - 1],
+                    });
+                    return;
+                  }
                 }
-                frameAnimation.currentFrame = frames[nextFrame];
+                frameAnimation.currentFrame = fr[next];
               },
-              parseFloat(autoplayFrames) * 1000,
+              intervalMs,
             );
           }
         },

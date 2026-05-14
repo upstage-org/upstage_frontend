@@ -84,6 +84,8 @@ export default {
   hold_this_avatar: "Hold this avatar",
   remove_from_avatar: "Remove from avatar",
   add_to_avatar: "Add to avatar",
+  multiframe_loop_tooltip:
+    "Loop: when on, frames repeat continuously. When off (dimmed), play runs through all frames once then stops.",
   volumn_setting: "Volume setting (local)",
   bring_forward: "Bring forward",
   send_back: "Send back",

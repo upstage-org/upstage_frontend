@@ -44,6 +44,10 @@ export default {
       stageStore.toggleCurtainAutoplay();
     };
 
+    const toggleFrameLoop = () => {
+      stageStore.toggleCurtainFrameLoop();
+    };
+
     const changeSpeed = (e) => {
       // Match `Backdrops.vue.changeBackdropSpeed`: `<input type="number">`
       // returns a raw string and Firefox does not round to `step`.
@@ -69,6 +73,7 @@ export default {
       currentCurtain,
       isActive,
       toggleAutoplay,
+      toggleFrameLoop,
       changeSpeed,
       changeDwell,
       switchFrame,
@@ -119,8 +124,21 @@ export default {
         class="field has-addons menu-group"
       >
         <p class="control menu-group-item" @click="toggleAutoplay()">
-          <button class="button is-light">
+          <button type="button" class="button is-light">
             <Icon :src="(currentCurtain.speed ?? 0) > 0 ? 'pause.svg' : 'play.svg'" size="24" />
+          </button>
+        </p>
+        <p class="control menu-group-item" @click="toggleFrameLoop">
+          <button type="button" class="button is-light" :title="$t('multiframe_loop_tooltip')">
+            <Icon
+              size="24"
+              src="loop.svg"
+              :style="
+                currentCurtain.frameLoop === false
+                  ? { filter: 'grayscale(1)', opacity: 0.55 }
+                  : {}
+              "
+            />
           </button>
         </p>
         <p

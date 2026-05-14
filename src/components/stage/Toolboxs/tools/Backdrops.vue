@@ -52,6 +52,14 @@ export default {
       });
     };
 
+    const toggleFrameLoop = () => {
+      const nowLoop = currentBackground.value.frameLoop !== false;
+      stageStore.setBackground({
+        ...currentBackground.value,
+        frameLoop: !nowLoop,
+      });
+    };
+
     const switchBackdropFrame = (currentFrame) => {
       stageStore.setBackground({
         ...currentBackground.value,
@@ -89,6 +97,7 @@ export default {
       changeBackdropSpeed,
       changeBackdropDwell,
       toggleAutoplayFrames,
+      toggleFrameLoop,
       switchBackdropFrame,
       adjustOpacity,
       opacity,
@@ -137,8 +146,25 @@ export default {
         class="field has-addons menu-group"
       >
         <p class="control menu-group-item" @click="toggleAutoplayFrames()">
-          <button class="button is-light">
+          <button type="button" class="button is-light">
             <Icon :src="currentBackground.speed > 0 ? 'pause.svg' : 'play.svg'" size="24" />
+          </button>
+        </p>
+        <p class="control menu-group-item" @click="toggleFrameLoop">
+          <button
+            type="button"
+            class="button is-light"
+            :title="$t('multiframe_loop_tooltip')"
+          >
+            <Icon
+              size="24"
+              src="loop.svg"
+              :style="
+                currentBackground.frameLoop === false
+                  ? { filter: 'grayscale(1)', opacity: 0.55 }
+                  : {}
+              "
+            />
           </button>
         </p>
         <p

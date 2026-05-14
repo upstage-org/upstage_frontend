@@ -81,6 +81,8 @@ export default {
   hold_this_avatar: "Giữ hình đại diện này",
   remove_from_avatar: "Xóa khỏi hình đại diện",
   add_to_avatar: "Thêm vào hình đại diện",
+  multiframe_loop_tooltip:
+    "Lặp: bật thì các khung chạy lại liên tục; tắt (biểu tượng mờ) thì chỉ phát một lần qua hết các khung rồi dừng.",
   volumn_setting: "Cài đặt cột",
   bring_forward: "Mang về phía trước",
   send_back: "Gửi lại",

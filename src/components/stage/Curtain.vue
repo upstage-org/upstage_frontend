@@ -54,11 +54,29 @@ export default {
           const fadeSec = parseFloat(String(speed));
           const holdSec = parseFloat(String(dwell ?? 0));
           const cycleMs = (fadeSec + (Number.isFinite(holdSec) ? holdSec : 0)) * 1000;
+          if (cycleMs <= 0) return;
           frameAnimation.interval = setInterval(
             () => {
-              const idx = frames.indexOf(frameAnimation.currentFrame);
-              const next = idx + 1 >= frames.length ? 0 : idx + 1;
-              frameAnimation.currentFrame = frames[next];
+              const c = stageStore.curtain;
+              if (!c?.frames?.length) return;
+              const fr = c.frames;
+              const idx = fr.indexOf(frameAnimation.currentFrame);
+              let next = idx + 1;
+              if (next >= fr.length) {
+                if (c.frameLoop !== false) {
+                  next = 0;
+                } else {
+                  clearFrameInterval();
+                  stageStore.drawCurtain({
+                    ...c,
+                    speed: 0,
+                    lastSpeed: c.lastSpeed ?? c.speed ?? 0.5,
+                    currentFrame: frameAnimation.currentFrame ?? fr[fr.length - 1],
+                  });
+                  return;
+                }
+              }
+              frameAnimation.currentFrame = fr[next];
             },
             cycleMs,
           );

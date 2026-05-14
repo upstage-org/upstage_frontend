@@ -37,7 +37,8 @@ export default {
           frameAnimation.currentFrame = currentFrame;
         }
         clearInterval(frameAnimation.interval);
-        if (frames) {
+        frameAnimation.interval = null;
+        if (frames && parseFloat(speed || 0) > 0) {
           // Total per-frame cycle = fade (`speed`) + hold (`dwell`).
           // Setting the interval to just `speed` (as we used to) meant
           // the next fade kicked off the instant the previous one
@@ -47,13 +48,30 @@ export default {
           const fadeSec = parseFloat(speed || 0);
           const holdSec = parseFloat(dwell || 0);
           const cycleMs = (fadeSec + holdSec) * 1000;
+          if (cycleMs <= 0) return;
           frameAnimation.interval = setInterval(
             () => {
-              let nextFrame = frames.indexOf(frameAnimation.currentFrame) + 1;
-              if (nextFrame >= frames.length) {
-                nextFrame = 0;
+              const bg = stageStore.background;
+              if (!bg?.frames?.length) return;
+              const fr = bg.frames;
+              const idx = fr.indexOf(frameAnimation.currentFrame);
+              let next = idx + 1;
+              if (next >= fr.length) {
+                if (bg.frameLoop !== false) {
+                  next = 0;
+                } else {
+                  clearInterval(frameAnimation.interval);
+                  frameAnimation.interval = null;
+                  stageStore.setBackground({
+                    ...bg,
+                    speed: 0,
+                    lastSpeed: bg.lastSpeed ?? bg.speed ?? 0.5,
+                    currentFrame: frameAnimation.currentFrame ?? fr[fr.length - 1],
+                  });
+                  return;
+                }
               }
-              frameAnimation.currentFrame = frames[nextFrame];
+              frameAnimation.currentFrame = fr[next];
             },
             cycleMs,
           );

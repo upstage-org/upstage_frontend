@@ -72,4 +72,6 @@ export default {
   expand_panel: "Expand panel",
   reset_panel_position: "Reset position",
   close_panel: "Close panel",
+  multiframe_loop_tooltip:
+    "Wiederholung: eingeschaltet laufen die Bilder endlos. Aus (ausgegraut): alle Bilder einmal abspielen, dann Stopp.",
 };

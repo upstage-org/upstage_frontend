@@ -78,6 +78,15 @@ export default {
       emit("update:active", true);
     };
 
+    const toggleFrameLoop = () => {
+      const nowLooping = props.object.frameLoop !== false;
+      stageStore.shapeObject({
+        ...props.object,
+        frameLoop: !nowLooping,
+      });
+      emit("update:active", true);
+    };
+
     const changeNickname = () => {
       stageStore.openSettingPopup({
         type: "ChatParameters",
@@ -218,6 +227,7 @@ export default {
       bringToFront,
       sendToBack,
       toggleAutoplayFrames,
+      toggleFrameLoop,
       changeSliderMode,
       openVoiceSetting,
       wearCostume,
@@ -473,8 +483,19 @@ export default {
     </a>
     <div v-if="object.multi" class="field has-addons menu-group">
       <p class="control menu-group-item" @click="toggleAutoplayFrames()">
-        <button class="button is-light">
+        <button type="button" class="button is-light">
           <Icon :src="object.autoplayFrames > 0 ? 'pause.svg' : 'play.svg'" size="24" />
+        </button>
+      </p>
+      <p class="control menu-group-item" @click="toggleFrameLoop">
+        <button type="button" class="button is-light" :title="$t('multiframe_loop_tooltip')">
+          <Icon
+            size="24"
+            src="loop.svg"
+            :style="
+              object.frameLoop === false ? { filter: 'grayscale(1)', opacity: 0.55 } : {}
+            "
+          />
         </button>
       </p>
       <p
@@ -483,7 +504,7 @@ export default {
         class="control menu-group-item"
         @click="switchFrame(frame)"
       >
-        <button class="button is-light">
+        <button type="button" class="button is-light">
           <img :src="frame" style="height: 100%" />
         </button>
       </p>

@@ -91,6 +91,8 @@ export interface BoardObject {
   wornBy?: ObjectId | null;
   multi?: boolean;
   frames?: string[];
+  /** When false, multiframe `autoplayFrames` stops after one cycle; true/omitted = loop. */
+  frameLoop?: boolean;
   assetType?: { name?: string };
   description?: string;
   fontSize?: string;
@@ -133,6 +135,8 @@ export interface Background {
   // and `dwell=10` shows each image for 10s at full opacity, then
   // takes 1s to crossfade to the next.
   dwell?: number;
+  /** When false, playback stops after one full pass; when true/omitted, loops (legacy). */
+  frameLoop?: boolean;
   src?: string;
   multi?: boolean;
   frames?: string[];
@@ -157,6 +161,8 @@ export interface Curtain {
   dwell?: number;
   lastSpeed?: number;
   currentFrame?: string;
+  /** Same semantics as `Background.frameLoop` for multi-frame curtains. */
+  frameLoop?: boolean;
   at?: number;
   [k: string]: unknown;
 }
@@ -1886,6 +1892,15 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
+  function toggleCurtainFrameLoop() {
+    if (!curtain.value) return;
+    const nowLoop = curtain.value.frameLoop !== false;
+    drawCurtain({
+      ...curtain.value,
+      frameLoop: !nowLoop,
+    });
+  }
+
   function setCurtainFrame(currentFrame: string) {
     if (!curtain.value) return;
     drawCurtain({
@@ -2568,6 +2583,7 @@ export const useStageStore = defineStore("stage", () => {
     setCurtainSpeed,
     setCurtainDwell,
     setCurtainFrame,
+    toggleCurtainFrameLoop,
     loadScenes,
     switchScene,
     blankScene,

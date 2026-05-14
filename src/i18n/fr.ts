@@ -109,6 +109,8 @@ export default {
   hold_this_avatar: "Tenez cet avatar",
   remove_from_avatar: "Retirer de l’avatar",
   add_to_avatar: "Ajouter à l’avatar",
+  multiframe_loop_tooltip:
+    "Boucle : activée, les images défilent en continu ; désactivée (icône grisée), la lecture parcourt toutes les images une fois puis s’arrête.",
   volume_setting: "Réglage du volume",
   bring_forward: "Faire avancer",
   send_back: "Envoyer en arrière",

@@ -106,6 +106,8 @@ export default {
   hold_this_avatar: "Håll denna avatar",
   remove_from_avatar: "Ta bort från avatar",
   add_to_avatar: "Lägg till avatar",
+  multiframe_loop_tooltip:
+    "Loop: på upprepas bildrutorna. Av (nedtonad ikon): alla bildrutor spelas en gång och spelningen stoppar.",
   volume_setting: "Volyminställning",
   bring_forward: "Föra framåt",
   send_back: "Skicka tillbak",

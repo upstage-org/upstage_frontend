@@ -106,6 +106,8 @@ export default {
   hold_this_avatar: "Mantenha este avatar",
   remove_from_avatar: "Remover o avatar",
   add_to_avatar: "Adicionar o avatar",
+  multiframe_loop_tooltip:
+    "Repetir: ligado, os quadros repetem sem parar; desligado (ícone esmaecido), percorre todos os quadros uma vez e para.",
   volume_setting: "Ajustar o volume",
   bring_forward: "Avançar",
   send_back: "Mandar de volta",
