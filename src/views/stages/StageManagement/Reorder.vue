@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import Icon from "components/Icon.vue";
 import Asset from "components/Asset.vue";
-import VideoFirstFrameThumb from "components/media/VideoFirstFrameThumb.vue";
+import VideoFirstFrameThumb from "@components/media/VideoFirstFrameThumb.vue";
 
 const props = defineProps({
   modelValue: {

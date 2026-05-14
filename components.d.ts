@@ -204,6 +204,7 @@ declare module 'vue' {
     UnlockOutlined: typeof import('@ant-design/icons-vue')['UnlockOutlined']
     Upload: typeof import('./src/components/form/Upload.vue')['default']
     UploadOutlined: typeof import('@ant-design/icons-vue')['UploadOutlined']
+    VideoFirstFrameThumb: typeof import('./src/components/media/VideoFirstFrameThumb.vue')['default']
     VoiceParameters: typeof import('./src/components/stage/SettingPopup/settings/VoiceParameters.vue')['default']
     VoicePicker: typeof import('./src/components/media/MediaForm/VoicePicker.vue')['default']
     VolumeParameters: typeof import('./src/components/stage/SettingPopup/settings/VolumeParameters.vue')['default']

@@ -2,7 +2,7 @@
 import { PropType, computed } from "vue";
 import { Media, MediaAttributes } from "models/studio";
 import { absolutePath } from "utils/common";
-import VideoFirstFrameThumb from "components/media/VideoFirstFrameThumb.vue";
+import VideoFirstFrameThumb from "./VideoFirstFrameThumb.vue";
 
 const props = defineProps({
   media: {
