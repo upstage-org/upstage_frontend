@@ -584,11 +584,12 @@ const getUserDisplayName = (user: User) => {
             @sort-start="handleFrameClick"
           >
             <SlickItem v-for="(file, i) in files" :key="file.id" :index="i" style="z-index: 99999">
-              <div class="my-2 px-8 text-center">
+              <div class="my-2 flex w-full justify-center items-center px-2">
                 <img
                   show-handle
                   :src="file.preview"
-                  class="max-w-full rounded-md max-h-24"
+                  class="max-h-24 max-w-full rounded-md object-contain"
+                  alt=""
                   @load="handleImageLoad($event, i)"
                 />
               </div>

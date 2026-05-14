@@ -421,8 +421,10 @@ export default {
       <div class="field-label is-normal">
         <label class="label">{{ $t("player_access") }}</label>
         <p class="help">
-          Click on a player's name to move them to the column to the right. Use a right-click to
-          move them back to the left.
+          Click a name to move access one column to the right in the first two lists. In &quot;Player
+          and edit access&quot;, click moves that person one column back to &quot;Player
+          access&quot;. Right-click a name in the second or third list to move them one column left.
+          The chevrons move everyone in the filtered list for that column at once.
         </p>
       </div>
       <div class="field-body" style="flex-wrap: wrap">

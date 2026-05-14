@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, provide } from "vue";
+import { computed, onUnmounted, provide } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useRoute } from "vue-router";
+import { stopSpeaking } from "@services/speech";
 import Logo from "components/Logo.vue";
 import Chat from "components/stage/Chat/index.vue";
 import Board from "components/stage/Board.vue";
@@ -25,6 +26,11 @@ stageStore.loadStage({
 });
 
 provide("replaying", true);
+
+onUnmounted(() => {
+  stopSpeaking();
+  stageStore.pauseReplay();
+});
 </script>
 
 <template>

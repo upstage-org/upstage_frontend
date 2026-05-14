@@ -45,7 +45,26 @@ export default {
     };
 
     const moveLeft = (item) => {
-      positions[item] = (positions[item] ?? 1) - 1;
+      const currentPosition = positions[item] ?? 0;
+      if (currentPosition > 0) {
+        positions[item] = currentPosition - 1;
+      }
+    };
+
+    /** Last column cannot move right; primary click moves one step left like other columns advance right. */
+    const onRowClick = (itemIndex, columnIndex) => {
+      if (columnIndex === props.columns.length - 1) {
+        moveLeft(itemIndex);
+      } else {
+        moveRight(itemIndex);
+      }
+    };
+
+    /** Right-click moves one column left; not defined in the audience-only column. */
+    const onRowContextMenu = (e, itemIndex, columnIndex) => {
+      if (columnIndex <= 0) return;
+      e.preventDefault();
+      moveLeft(itemIndex);
     };
 
     watch(positions, () => {
@@ -89,7 +108,7 @@ export default {
       }
     };
 
-    return { shouldVisible, moveRight, moveLeft, count, searchs, moveAll };
+    return { shouldVisible, moveRight, moveLeft, onRowClick, onRowContextMenu, count, searchs, moveAll };
   },
 };
 </script>
@@ -127,8 +146,8 @@ export default {
               <a
                 v-if="shouldVisible(j, i)"
                 class="panel-block"
-                @click="moveRight(j)"
-                @contextmenu.prevent="moveLeft(j)"
+                @click="onRowClick(j, i)"
+                @contextmenu="onRowContextMenu($event, j, i)"
               >
                 {{ renderLabel(item) }}
               </a>

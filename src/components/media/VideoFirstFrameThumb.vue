@@ -4,8 +4,11 @@
  * Prefer server-generated `<video-url>.poster.jpg` when present; otherwise
  * use a muted metadata preload + `#t=` seek hint (matches Streams toolbox).
  */
-import { computed, ref } from "vue";
-import { absolutePath } from "utils/common";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { absolutePath, posterJpgForVideoUrl } from "utils/common";
+
+/** Fall back to <video> when poster never finishes (hang / very slow CDN). */
+const POSTER_ATTEMPT_MS = 6000;
 
 const props = defineProps({
   media: {
@@ -23,9 +26,7 @@ const resolvedUrl = computed(() => {
   return absolutePath(s);
 });
 
-const posterJpgUrl = computed(() =>
-  resolvedUrl.value ? `${resolvedUrl.value}.poster.jpg` : "",
-);
+const posterJpgUrl = computed(() => posterJpgForVideoUrl(resolvedUrl.value));
 
 const peekSrc = computed(() => {
   const url = resolvedUrl.value;
@@ -34,9 +35,38 @@ const peekSrc = computed(() => {
   return url.includes("#") ? url : `${url}#t=0.01`;
 });
 
+let posterTimer = null;
+
+function clearPosterTimer() {
+  if (posterTimer != null) {
+    clearTimeout(posterTimer);
+    posterTimer = null;
+  }
+}
+
+function onPosterLoad() {
+  clearPosterTimer();
+}
+
 function onPosterError() {
+  clearPosterTimer();
   posterFailed.value = true;
 }
+
+onMounted(() => {
+  if (!resolvedUrl.value || !posterJpgUrl.value) {
+    posterFailed.value = true;
+    return;
+  }
+  posterTimer = window.setTimeout(() => {
+    if (!posterFailed.value) {
+      posterFailed.value = true;
+    }
+    posterTimer = null;
+  }, POSTER_ATTEMPT_MS);
+});
+
+onBeforeUnmount(clearPosterTimer);
 </script>
 
 <template>
@@ -53,6 +83,7 @@ function onPosterError() {
       decoding="async"
       :src="posterJpgUrl"
       alt=""
+      @load="onPosterLoad"
       @error="onPosterError"
     />
     <video

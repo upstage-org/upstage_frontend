@@ -36,6 +36,7 @@ import { stageGraph } from "@services/graphql";
 import {
   absolutePath,
   cloneDeep,
+  posterJpgForVideoUrl,
   randomColor,
   randomMessageColor,
   randomRange,
@@ -522,7 +523,11 @@ export const useStageStore = defineStore("stage", () => {
         .map((a) => a.frames ?? [])
         .flat(),
     );
-    assets.push(...tools.value.videos.filter((v) => v.url).map((v) => `${v.url}.poster.jpg`));
+    assets.push(
+      ...tools.value.videos
+        .filter((v): v is typeof v & { url: string } => Boolean(v.url))
+        .map((v) => posterJpgForVideoUrl(v.url)),
+    );
 
     // Drop falsy so we never block on a slot that will never @load
     return assets.filter((src): src is string => Boolean(src));
@@ -708,6 +713,11 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   function CLEAN_STAGE(cleanModel?: boolean) {
+    // Always tear down replay timers/interval first — otherwise navigating away
+    // from `/replay/...` (or calling CLEAN_STAGE while a replay was active) leaves
+    // zombie setInterval/setTimeout handlers that keep firing replayEvent (audio,
+    // board updates) after the UI unmounts.
+    pauseReplay();
     if (cleanModel) {
       model.value = null;
       tools.value.audios = [];

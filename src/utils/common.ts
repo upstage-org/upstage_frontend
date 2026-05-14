@@ -8,6 +8,24 @@ export function absolutePath(path: string) {
   return `${configs.STATIC_ASSETS_ENDPOINT}${path}`;
 }
 
+/**
+ * JPEG poster path for uploaded VoD (`file.mp4` → `file.mp4.poster.jpg`).
+ * Inserts before `?` / `#` so signed or cache-busted URLs keep the same query
+ * string (and avoids broken paths like `file.mp4?sig=x.poster.jpg`).
+ */
+export function posterJpgForVideoUrl(url: string): string {
+  if (!url || typeof url !== "string") return "";
+  const u = url.trim();
+  if (!u) return "";
+  const hashIdx = u.indexOf("#");
+  const beforeHash = hashIdx >= 0 ? u.slice(0, hashIdx) : u;
+  const frag = hashIdx >= 0 ? u.slice(hashIdx) : "";
+  const qIdx = beforeHash.indexOf("?");
+  const pathOnly = qIdx >= 0 ? beforeHash.slice(0, qIdx) : beforeHash;
+  const query = qIdx >= 0 ? beforeHash.slice(qIdx) : "";
+  return `${pathOnly}.poster.jpg${query}${frag}`;
+}
+
 // `upstage-auth` is the key written by `pinia-plugin-persistedstate` for the
 // Pinia auth store (see `src/store/pinia/auth.ts`). After the Phase 5 cutover
 // from Vuex this is the single source of truth for the persisted access /
