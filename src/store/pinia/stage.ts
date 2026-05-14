@@ -607,21 +607,56 @@ export const useStageStore = defineStore("stage", () => {
   // call sites that pattern-match on the name don't need updating.
   // ====================================================================
 
+  /**
+   * Map a stage asset GraphQL/library row into an internal toolbox bucket
+   * (singular: avatar, prop, backdrop, …). Streams/index.vue (and MQTT
+   * board code) expects `tools.videos` for every stream / VoD strip the
+   * author assigned to the stage.
+   *
+   * We accept several synonyms for "video" (some backends and older
+   * rows used `stream` / `streaming`, or lacked `assetType` while exposing
+   * only a playable URL in `src` / `fileLocation`).
+   */
+  function resolveToolboxBucketName(item: ToolboxItem): string {
+    const nested =
+      item.assetType && typeof item.assetType === "object" && "name" in item.assetType
+        ? String((item.assetType as { name?: string }).name ?? "")
+        : "";
+    const flatType = typeof item.assetType === "string" ? item.assetType : "";
+    let base = (nested || flatType || (typeof item.type === "string" ? item.type : "")).trim();
+    base = base.toLowerCase();
+
+    const videoAliases = new Set(["video", "stream", "streams", "streaming"]);
+    if (videoAliases.has(base)) {
+      base = "video";
+    }
+
+    if (!base) {
+      const hint = `${item.fileLocation ?? ""} ${item.src ?? ""}`.toLowerCase();
+      if (/\.(mp4|webm|ogg|mov)(\?|#|$)/i.test(hint)) {
+        base = "video";
+      }
+    }
+
+    return base;
+  }
+
   function SET_MODEL(newModel: StageModel | null) {
     model.value = newModel;
     if (newModel) {
       const media = newModel.assets;
       if (media && media.length) {
         media.forEach((item) => {
-          const assetName = item.assetType?.name?.toLowerCase() ?? "";
+          const assetName = resolveToolboxBucketName(item);
           // Streams/index.vue expects `stageStore.tools.videos`. GraphQL sometimes
-          // returns capitalised asset type labels ("Video"); without lowercasing we
+          // returns capitalised asset type labels ("Video"); without normalising we
           // populated `Videos` instead and the palette rendered empty (see Streams tool).
           if (assetName) {
             item.type = assetName;
           }
           if (assetName === "video") {
-            item.url = absolutePath(item.fileLocation ?? "");
+            const loc = (item.fileLocation ?? item.src ?? "") as string;
+            item.url = absolutePath(loc);
           } else {
             if (item.description) {
               const meta = JSON.parse(item.description);

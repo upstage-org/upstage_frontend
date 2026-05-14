@@ -1,5 +1,5 @@
 <script>
-import { computed } from "vue";
+import { computed, reactive } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import Skeleton from "../../Skeleton.vue";
 
@@ -15,18 +15,34 @@ export default {
       return res;
     });
 
-    // Poster URLs are derived by string-append of `.poster.jpg` to the
-    // video URL. The backend's `upstage_backend.files.video_poster`
-    // module writes posters next to the source video using the same
-    // convention, so we don't need a separate GraphQL field — keeping
-    // the schema unchanged. If the poster file is missing on disk
-    // (extractor failed or operator hasn't run the backfill script
-    // yet) the browser silently falls back to rendering nothing, which
-    // looks bad but doesn't break anything. The cure for that is the
-    // `scripts/backfill_video_posters.py` one-shot.
+    /** When server-side `.poster.jpg` exists, `<img>` is cheaper than probing the mux. */
     const posterUrl = (videoUrl) => (videoUrl ? `${videoUrl}.poster.jpg` : "");
 
-    return { videos, posterUrl };
+    const posterFailedForUrl = reactive({});
+
+    const thumbKey = (video) => String(video?.id ?? video?.url ?? "");
+
+    const posterLoadFailed = (video) =>
+      Boolean(posterFailedForUrl[thumbKey(video)]);
+
+    const onPosterImgError = (video) => {
+      posterFailedForUrl[thumbKey(video)] = true;
+    };
+
+    /** Seek hint so browsers that support media fragments paint a decoded still for metadata preload. */
+    const firstFramePeekSrc = (url) => {
+      if (!url) return "";
+      if (/#t=/i.test(url)) return url;
+      return url.includes("#") ? url : `${url}#t=0.01`;
+    };
+
+    return {
+      videos,
+      posterUrl,
+      posterLoadFailed,
+      onPosterImgError,
+      firstFramePeekSrc,
+    };
   },
 };
 </script>
@@ -35,34 +51,25 @@ export default {
   <div v-for="video in videos" :key="video.id ?? video.url">
     <Skeleton :data="video">
       <!--
-        Performer-side video thumbnail. We use a server-extracted
-        first-frame JPG (`<video>.poster.jpg`, written by
-        upstage_backend.files.video_poster at upload time and by the
-        backfill script for legacy uploads). With a real poster in
-        place the browser shows a true static thumbnail in every
-        engine — no more silent autoplay loop, no Firefox/Chromium
-        black-rectangle quirks.
-
-          - `preload="none"`  : we never actually want the toolbox to
-                                stream the video; we only need the
-                                poster. This keeps the toolbox cheap
-                                no matter how many videos a stage has.
-          - `muted` + `playsinline` + `disablePictureInPicture`:
-                                future-proofs in case any browser
-                                decides to auto-render frames; we
-                                won't suddenly start playing audio or
-                                offering a PiP toggle on hover.
-          - No `autoplay`/`loop`/`controls`: this is purely a still
-                                thumbnail; clicking is handled by the
-                                surrounding Skeleton drag affordance,
-                                not by the native media UI.
+        Primary: JPEG poster sibling (`<video>.poster.jpg`).
+        Fallback: muted metadata preload + `#t=` so a first-frame still appears
+        when the poster extractor has not run (dev upload, migration gap).
       -->
+      <img
+        v-if="!posterLoadFailed(video)"
+        class="thumb-preview"
+        loading="lazy"
+        :src="posterUrl(video.url)"
+        alt=""
+        @error="onPosterImgError(video)"
+      />
       <video
-        :src="video.url"
-        :poster="posterUrl(video.url)"
+        v-else
+        class="thumb-preview"
+        :src="firstFramePeekSrc(video.url)"
         :muted.attr="true"
         playsinline
-        preload="none"
+        preload="metadata"
         disablePictureInPicture
       ></video>
     </Skeleton>
@@ -79,7 +86,7 @@ export default {
   @include gradientText(#30ac45, #6fb1fc);
 }
 
-video {
+.thumb-preview {
   width: 100%;
   height: 100%;
   object-fit: cover;

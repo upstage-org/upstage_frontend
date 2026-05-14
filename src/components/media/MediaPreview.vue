@@ -2,6 +2,7 @@
 import { PropType, computed } from "vue";
 import { Media, MediaAttributes } from "models/studio";
 import { absolutePath } from "utils/common";
+import VideoFirstFrameThumb from "components/media/VideoFirstFrameThumb.vue";
 
 const props = defineProps({
   media: {
@@ -21,10 +22,9 @@ const attributes = computed<MediaAttributes>(() => {
     Your browser does not support the audio element.
   </audio>
   <template v-else-if="props.media.assetType.name === 'video'">
-    <video class="w-48" preload="auto">
-      <source :src="absolutePath(props.media.fileLocation)" />
-      Your browser does not support the video tag.
-    </video>
+    <div class="video-preview-frame">
+      <VideoFirstFrameThumb :media="props.media" />
+    </div>
   </template>
   <template v-else>
     <a-image :src="absolutePath(props.media.fileLocation)" class="w-24 max-h-24 object-contain" />
@@ -47,6 +47,14 @@ const attributes = computed<MediaAttributes>(() => {
 </template>
 
 <style scoped>
+.video-preview-frame {
+  width: 192px;
+  height: 96px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
 .ant-carousel :deep(.slick-dots) {
   position: relative;
   height: auto;

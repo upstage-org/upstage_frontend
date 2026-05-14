@@ -48,6 +48,7 @@ import Curtain from "./tools/CurtainTool.vue";
 import Scenes from "./tools/Scenes/index.vue";
 
 export default {
+  props: { tool: String },
   components: {
     Icon,
     Avatars,
@@ -64,8 +65,7 @@ export default {
     Scenes,
     Whiteboard,
   },
-  props: { tool: String },
-  setup: () => {
+  setup(props) {
     const bar = ref();
     const panel = ref();
     const stageStore = useStageStore();
@@ -111,6 +111,28 @@ export default {
       if (typeof changeTool === "function") changeTool(null);
     };
 
+    /** Header title mirrors the toolbox icon labels (#toolbox PanelItem labels). */
+    const toolPanelTitles = {
+      Streams: "Video",
+      AudioTool: "Audio",
+      TextTool: "Text",
+      Meeting: "Streams",
+      Backdrops: "Backdrops",
+      Avatars: "Avatars",
+      Props: "Props",
+      Whiteboard: "Live drawing",
+      Draw: "Object drawing",
+      Depth: "Depth",
+      Curtain: "Curtain",
+      Scenes: "Scenes",
+      Settings: "Settings",
+    };
+    const panelTitle = computed(() => {
+      const key = props.tool;
+      const t = key ? toolPanelTitles[key] : undefined;
+      return t ?? props.tool ?? "";
+    });
+
     // When a position has been set we drop the default centred CSS
     // (top: safe inset; left/right: 0; margin: auto) by forcing
     // `right: auto; margin: 0`. The :style binding then takes over.
@@ -131,6 +153,7 @@ export default {
       compact,
       position,
       collapsed,
+      panelTitle,
       dynamicStyle,
       startDrag,
       toggleCollapsed,
@@ -166,7 +189,7 @@ export default {
           <Icon src="movement-slider.svg" size="16" />
         </button>
       </a-tooltip>
-      <span class="topbar-title">{{ tool }}</span>
+      <span class="topbar-title">{{ panelTitle }}</span>
       <div class="topbar-actions">
         <a-tooltip
           :title="

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import Icon from "components/Icon.vue";
 import Asset from "components/Asset.vue";
+import VideoFirstFrameThumb from "components/media/VideoFirstFrameThumb.vue";
 
 const props = defineProps({
   modelValue: {
@@ -98,10 +99,11 @@ const drop = (e) => {
                 <br />
                 <b>{{ item.name }}</b>
               </div>
-              <div v-else-if="assetType === 'video'">
-                <Icon src="stream.svg" />
-                <br />
-                <b>{{ item.name }}</b>
+              <div v-else-if="assetType === 'video'" class="video-reorder-cell">
+                <div class="video-reorder-thumb">
+                  <VideoFirstFrameThumb :media="item" />
+                </div>
+                <b class="video-reorder-name">{{ item.name }}</b>
               </div>
               <Asset v-else :asset="item" />
             </div>
@@ -180,6 +182,40 @@ const drop = (e) => {
   }
   .dragging {
     opacity: 0.5;
+  }
+
+  .video-reorder-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    height: 100%;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .video-reorder-thumb {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    max-height: 58px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #1a1a1a;
+  }
+
+  .video-reorder-name {
+    flex: 0 0 auto;
+    font-size: 11px;
+    line-height: 1.15;
+    word-break: break-word;
+    max-height: 2.6em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
   }
 }
 </style>
