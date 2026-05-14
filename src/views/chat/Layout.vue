@@ -148,7 +148,8 @@ export default {
      chat input isn't pushed off-screen when the bar collapses. Falls
      back to the standard vh on engines that don't grok dvh. */
   height: 100dvh;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   background-color: #f5f5f5;

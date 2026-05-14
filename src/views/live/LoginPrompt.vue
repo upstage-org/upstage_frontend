@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { inject, onMounted, ref, watch } from "vue";
 import { animate } from "animejs";
 import { message } from "ant-design-vue";
 import LoginForm from "components/LoginForm.vue";
@@ -11,6 +11,8 @@ import { storeToRefs } from "pinia";
 
 const stageStore = useStageStore();
 const userStore = useUserStore();
+/** When true (standalone `/chat/:url`), skip portrait `zoom` — it blows up mobile layout. */
+const isChatStandalone = inject<boolean>("isChatStandalone", false);
 const { loggedIn } = storeToRefs(useAuthStore());
 const showing = ref<boolean>(!loggedIn.value);
 const showLoginForm = ref<boolean>(false);
@@ -55,7 +57,10 @@ const onLoginSuccess = () => {
 </script>
 
 <template>
-  <div class="modal" :class="{ 'is-active': showing }">
+  <div
+    class="modal"
+    :class="{ 'is-active': showing, 'login-prompt--chat-standalone': isChatStandalone }"
+  >
     <div class="modal-background" @click="enterAsAudience"></div>
     <div ref="modal" class="modal-content">
       <LoginForm v-if="showLoginForm" @success="onLoginSuccess" />
@@ -104,12 +109,32 @@ const onLoginSuccess = () => {
   max-width: 500px;
 }
 @media only screen and (orientation: portrait) {
-  .modal {
+  /* Live stage only: enlarge the overlay so tap targets are usable on a tiny stage frame. */
+  .modal:not(.login-prompt--chat-standalone) {
     zoom: 3;
   }
-  .modal-content {
+  .modal:not(.login-prompt--chat-standalone) .modal-content {
     max-width: unset;
     width: 100%;
   }
+}
+
+/* `/chat/:url` — fill the viewport width without CSS zoom (readable on phones & tablets). */
+.login-prompt--chat-standalone.modal {
+  align-items: flex-start;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.login-prompt--chat-standalone .modal-content {
+  width: 100%;
+  max-width: min(500px, calc(100vw - 24px));
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.login-prompt--chat-standalone > .button {
+  align-self: center;
+  width: 100%;
+  max-width: min(500px, calc(100vw - 24px));
+  box-sizing: border-box;
 }
 </style>
