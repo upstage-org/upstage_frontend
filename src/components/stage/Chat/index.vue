@@ -26,9 +26,7 @@ export default {
     //   * skip the collapse / minimise affordance (no reason to
     //     collapse a window that is dedicated to chat).
     const isStandalone = inject("isChatStandalone", false);
-    const chatVisibility = computed(
-      () => isStandalone || stageStore.settings.chatVisibility,
-    );
+    const chatVisibility = computed(() => isStandalone || stageStore.settings.chatVisibility);
     const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
 
     const popOut = () => {
@@ -200,7 +198,12 @@ export default {
       ref="theChatbox"
       :key="chatPosition"
       class="card is-light"
-      :class="{ collapsed, dark: chatDarkMode, 'is-positioned': chatDragPosition }"
+      :class="{
+        collapsed,
+        dark: chatDarkMode,
+        'is-positioned': chatDragPosition,
+        'chat-standalone-host': isStandalone,
+      }"
       :style="{
         opacity,
         fontSize,
@@ -232,10 +235,7 @@ export default {
       </transition>
       <div class="actions">
         <Reaction v-if="collapsed" />
-        <a-tooltip
-          v-if="!isStandalone"
-          :title="collapsed ? 'Maximise' : 'Minimise'"
-        >
+        <a-tooltip v-if="!isStandalone" :title="collapsed ? 'Maximise' : 'Minimise'">
           <button
             :key="collapsed"
             class="chat-setting button is-rounded is-outlined"
@@ -254,10 +254,7 @@ export default {
           /chat/<stage> window where the chat fills its own host
           browser window.
         -->
-        <a-tooltip
-          v-if="!isStandalone"
-          :title="$t('drag_panel') || 'Drag panel'"
-        >
+        <a-tooltip v-if="!isStandalone" :title="$t('drag_panel') || 'Drag panel'">
           <button
             class="chat-setting button is-rounded is-outlined drag-icon-button"
             @mousedown.prevent="startChatDrag"
@@ -278,10 +275,7 @@ export default {
           v-if="!isStandalone && chatDragPosition"
           :title="$t('reset_panel_position') || 'Reset position'"
         >
-          <button
-            class="chat-setting button is-rounded is-outlined"
-            @click="resetChatPosition"
-          >
+          <button class="chat-setting button is-rounded is-outlined" @click="resetChatPosition">
             <span class="icon">
               <Icon src="refresh.svg" size="20" />
             </span>
@@ -294,10 +288,7 @@ export default {
           so the popped-out window doesn't show its own pop-out
           button.
         -->
-        <a-tooltip
-          v-if="!isStandalone"
-          :title="$t('pop_out_chat') || 'Pop out chat'"
-        >
+        <a-tooltip v-if="!isStandalone" :title="$t('pop_out_chat') || 'Pop out chat'">
           <button class="chat-setting button is-rounded is-outlined" @click="popOut">
             <span class="icon">
               <Icon src="bring-to-front.svg" size="20" />
@@ -370,16 +361,22 @@ export default {
     height: calc(100% - 135px) !important;
   }
 
+  /*
+   * On-stage mobile (portrait stage viewport): enlarge chat content for
+   * touch. The popped-out /chat/<stage> window is often portrait too,
+   * but zoom:3 is wrong there — it should match the desktop in-stage
+   * panel. `chat-standalone-host` is set when isChatStandalone is true.
+   */
   @media only screen and (orientation: portrait) {
     width: calc(100vw - 32px) !important;
 
-    .actions,
-    .card-content,
-    .card-footer {
+    &:not(.chat-standalone-host) .actions,
+    &:not(.chat-standalone-host) .card-content,
+    &:not(.chat-standalone-host) .card-footer {
       zoom: 3;
     }
 
-    .actions {
+    &:not(.chat-standalone-host) .actions {
       button:first-child {
         display: none;
       }

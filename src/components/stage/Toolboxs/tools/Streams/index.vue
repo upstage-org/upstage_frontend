@@ -32,7 +32,7 @@ export default {
 </script>
 
 <template>
-  <div v-for="video in videos" :key="video">
+  <div v-for="video in videos" :key="video.id ?? video.url">
     <Skeleton :data="video">
       <!--
         Performer-side video thumbnail. We use a server-extracted

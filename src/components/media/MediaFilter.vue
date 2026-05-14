@@ -2,54 +2,17 @@
 import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
-import { gql } from "@apollo/client/core";
 import { editingMediaVar, inquiryVar } from "apollo";
+import { MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
 import dayjs, { type Dayjs } from "@utils/dayjs";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 
-const { result: response, loading } = useQuery(gql`
-  {
-    whoami {
-      username
-      displayName
-      roleName
-    }
-    users(active: true) {
-      id
-      username
-      displayName
-    }
-    stages(input: {}) {
-      edges {
-        id
-        name
-        createdOn
-        owner {
-          username
-          displayName
-        }
-      }
-    }
-    getAllStages {
-      id
-      name
-      permission
-    }
-    tags {
-      id
-      name
-      color
-      createdOn
-    }
-    mediaTypes {
-      id
-      name
-    }
-  }
-`);
+const { result: response, loading } = useQuery(MEDIA_PAGE_TOOLBAR_QUERY, null, {
+  fetchPolicy: "cache-and-network",
+});
 const { isAdmin } = storeToRefs(useUserStore());
 const result = computed(() => response?.value);
 
@@ -169,9 +132,7 @@ const onVisibleDropzone = () => {
 
 <template>
   <a-affix :offset-top="0">
-    <div
-      class="shadow rounded-xl px-4 py-2 bg-white flex justify-between items-center w-full"
-    >
+    <div class="shadow rounded-xl px-4 py-2 bg-white flex justify-between items-center w-full">
       <a-space class="flex-wrap">
         <a-button v-if="composingMode" type="primary" danger @click="composingMode = false">
           <template #icon>

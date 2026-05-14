@@ -2,6 +2,7 @@ import { useMutation } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 import { gql } from "@apollo/client/core";
 import { ref, computed } from "vue";
+import { MEDIA_FORM_META_QUERY, MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
 import { permissionFragment } from "models/fragment";
 import { AvatarVoice, CopyrightLevel, Link, Media, Permission, UploadFile } from "models/studio";
 
@@ -56,15 +57,21 @@ export const useSaveMedia = (
   const { mutate } = useMutation<
     { saveMedia: { asset: Media } },
     { input: SaveMediaMutationVariables }
-  >(gql`
-    mutation SaveMedia($input: SaveMediaInput!) {
-      saveMedia(input: $input) {
-        asset {
-          id
+  >(
+    gql`
+      mutation SaveMedia($input: SaveMediaInput!) {
+        saveMedia(input: $input) {
+          asset {
+            id
+          }
         }
       }
-    }
-  `);
+    `,
+    {
+      refetchQueries: [MEDIA_PAGE_TOOLBAR_QUERY, MEDIA_FORM_META_QUERY],
+      awaitRefetchQueries: true,
+    },
+  );
   const progress = ref(100);
 
   const saveMedia = async () => {

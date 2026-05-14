@@ -225,17 +225,14 @@ export default {
   z-index: 1 !important;
 }
 
-/* Make tap targets in the embedded chats finger-friendly. */
-:deep(.actions button),
-:deep(.button) {
-  min-width: 36px;
-  min-height: 36px;
-}
-
 /*
- * Sticky chat input. The child components render their input inside
- * a <footer class="card-footer">, so we pin that footer to the
- * bottom of the standalone pane. position: sticky inside an
+ * Do not set global min-width/min-height on `.button` here: the chat
+ * components size their controls; a blanket rule inflated the emoji
+ * send/reaction controls in the pop-out (especially with portrait layout).
+ *
+ * Sticky chat input: child components render their input inside
+ * <footer class="card-footer">, so we pin that footer to the bottom of the
+ * standalone pane. position: sticky inside an
  * `overflow-y: auto` scroll container keeps the input in view when
  * iOS Safari's URL bar collapses; the fallback `position: sticky;
  * bottom: 0` is also picked up by Chrome / Firefox on Android.

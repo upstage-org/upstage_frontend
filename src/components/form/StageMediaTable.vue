@@ -7,6 +7,7 @@ import { ColumnType, TablePaginationConfig } from "ant-design-vue/lib/table";
 import { SorterResult } from "ant-design-vue/lib/table/interface";
 import { useI18n } from "vue-i18n";
 import MediaPreview from "components/media/MediaPreview.vue";
+import { tagChipColor } from "utils/tagChipColor";
 
 interface Props {
   loading?: boolean;
@@ -181,8 +182,8 @@ const filterTag = (tag: string) => {
           <a-tag
             v-for="(tag, i) in text"
             :key="i"
-            :color="tag"
-            class="cursor-pointer"
+            :color="tagChipColor(tag)"
+            class="cursor-pointer mb-1 mr-1 inline-block"
             @click="filterTag(tag)"
             >{{ tag }}
           </a-tag>

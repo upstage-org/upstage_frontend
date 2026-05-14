@@ -8,6 +8,7 @@ import configs from "config";
 import { permissionFragment } from "models/fragment";
 import { Media, MediaAttributes, StudioGraph, UploadFile } from "models/studio";
 import { absolutePath } from "utils/common";
+import { tagChipColor } from "utils/tagChipColor";
 import MediaPreview from "./MediaPreview.vue";
 import RequestPermission from "./MediaForm/RequestPermission.vue";
 import RequestAcknowledge from "./MediaForm/RequestAcknowledge.vue";
@@ -328,8 +329,8 @@ const filterTag = (tag: string) => {
           <a-tag
             v-for="(tag, i) in text"
             :key="i"
-            :color="tag"
-            class="cursor-pointer"
+            :color="tagChipColor(tag)"
+            class="cursor-pointer mb-1 mr-1 inline-block"
             @click="filterTag(tag)"
             >{{ tag }}
           </a-tag>

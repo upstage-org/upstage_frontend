@@ -69,17 +69,14 @@ const drop = (e) => {
 </script>
 
 <template>
-  <div v-for="assetType in types" :key="assetType" class="columns is-vcentered has-text-centered">
-    <div class="column is-1">
+  <div v-for="assetType in types" :key="assetType" class="columns is-vcentered is-mobile">
+    <div class="column is-narrow has-text-left media-type-label-col">
       <h4 class="subtitle">
         <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px" />
-        <br />
-        {{ assetType }}
-        <br />
-        <small>({{ mediaGroups[assetType]?.length }})</small>
+        <span class="type-caption">{{ assetType }} ({{ mediaGroups[assetType]?.length }})</span>
       </h4>
     </div>
-    <div class="column is-11">
+    <div class="column">
       <div class="toolbox">
         <div class="scroller">
           <div
@@ -116,10 +113,32 @@ const drop = (e) => {
 </template>
 
 <style scoped lang="scss">
+.media-type-label-col {
+  /* was Bulma `is-1` (~8%); too narrow → mid-word wraps. */
+  flex: none;
+  min-width: 11rem;
+
+  &.column {
+    width: auto;
+  }
+}
+
 .subtitle {
   text-transform: capitalize;
   margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
 }
+
+.type-caption {
+  display: block;
+  font-size: 0.925em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
 .toolbox {
   background-color: #fdedf6;
   border-radius: 8px;

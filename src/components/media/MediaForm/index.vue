@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Modal } from "ant-design-vue";
+import { Modal, message } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import { gql } from "@apollo/client/core";
 import {
@@ -33,7 +33,7 @@ import AvatarVoice from "./AvatarVoice.vue";
 import PropLink from "./PropLink.vue";
 import { getDefaultAvatarVoice } from "services/speech/voice";
 import { useMutation, useQuery } from "@vue/apollo-composable";
-import { message } from "ant-design-vue";
+import { MEDIA_FORM_META_QUERY } from "services/graphql/mediaList";
 
 const model = defineModel<boolean>();
 const files = inject<Ref<UploadFile[]>>("files");
@@ -215,21 +215,15 @@ const handleClose = () => {
 
 const clearMode = ref(false);
 
-const { result } = useQuery<StudioGraph>(
-  gql`
-    {
-      mediaTypes {
-        id
-        name
-      }
-      tags {
-        id
-        name
-      }
-    }
-  `,
-  null,
-  { fetchPolicy: "cache-only" },
+const { result } = useQuery<StudioGraph>(MEDIA_FORM_META_QUERY, undefined, {
+  fetchPolicy: "cache-and-network",
+});
+const tagOptions = computed(() =>
+  (result.value?.tags ?? []).map((node) => ({
+    value: node.name,
+    label: node.name,
+    key: node.id,
+  })),
 );
 const mediaTypes = computed(() => {
   if (result.value?.mediaTypes) {
@@ -618,6 +612,28 @@ const getUserDisplayName = (user: User) => {
             <a-tab-pane key="stages" tab="Stages" class="pb-4">
               <StageAssignment v-model="stageIds as any" />
             </a-tab-pane>
+            <a-tab-pane key="tags" tab="Tags" class="pb-4">
+              <div class="p-2 media-form-tags-pane">
+                <p class="text-gray-600 text-sm mb-3">
+                  Add labels so you can find this media faster. Pick existing tags or type a new one
+                  and press Enter; after you save, the tag appears here and in the
+                  &ldquo;Tags&rdquo; filter above the list for everyone.
+                </p>
+                <a-select
+                  v-model:value="tags"
+                  data-testid="media-form-tags"
+                  mode="tags"
+                  class="w-full text-left media-form-tags-select"
+                  placeholder="Type to add tags or choose from the list"
+                  :filter-option="
+                    (input: string, option: { label?: string }) =>
+                      !!option.label?.toLowerCase().includes(input.toLowerCase())
+                  "
+                  :options="tagOptions"
+                >
+                </a-select>
+              </div>
+            </a-tab-pane>
             <a-tab-pane key="permissions" tab="Permissions">
               <MediaPermissions
                 :key="editingMediaResult?.editingMedia?.id"
@@ -676,22 +692,6 @@ const getUserDisplayName = (user: User) => {
     </a-progress>
     <template #footer>
       <a-space>
-        <a-select
-          v-model:value="tags"
-          class="text-left"
-          style="min-width: 200px"
-          mode="tags"
-          placeholder="Tags"
-          :options="
-            result
-              ? result.tags.map((node) => ({
-                  value: node.name,
-                  label: node.name,
-                }))
-              : []
-          "
-        >
-        </a-select>
         <a-button
           key="submit"
           data-testid="media-form-save"

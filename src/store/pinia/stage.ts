@@ -333,6 +333,7 @@ export interface ToolsState {
   props: ToolboxItem[];
   backdrops: ToolboxItem[];
   audios: ToolboxItem[];
+  videos: ToolboxItem[];
   meetings: ToolboxItem[];
   curtains: ToolboxItem[];
   [k: string]: ToolboxItem[];
@@ -414,6 +415,7 @@ export const useStageStore = defineStore("stage", () => {
     props: [],
     backdrops: [],
     audios: [],
+    videos: [],
     meetings: [],
     curtains: [],
   });
@@ -520,6 +522,8 @@ export const useStageStore = defineStore("stage", () => {
         .map((a) => a.frames ?? [])
         .flat(),
     );
+    assets.push(...tools.value.videos.filter((v) => v.url).map((v) => `${v.url}.poster.jpg`));
+
     // Drop falsy so we never block on a slot that will never @load
     return assets.filter((src): src is string => Boolean(src));
   });
@@ -609,7 +613,14 @@ export const useStageStore = defineStore("stage", () => {
       const media = newModel.assets;
       if (media && media.length) {
         media.forEach((item) => {
-          if (item.assetType?.name === "video") {
+          const assetName = item.assetType?.name?.toLowerCase() ?? "";
+          // Streams/index.vue expects `stageStore.tools.videos`. GraphQL sometimes
+          // returns capitalised asset type labels ("Video"); without lowercasing we
+          // populated `Videos` instead and the palette rendered empty (see Streams tool).
+          if (assetName) {
+            item.type = assetName;
+          }
+          if (assetName === "video") {
             item.url = absolutePath(item.fileLocation ?? "");
           } else {
             if (item.description) {
@@ -622,7 +633,10 @@ export const useStageStore = defineStore("stage", () => {
           if (item.multi && item.frames) {
             item.frames = item.frames.map((src: string) => absolutePath(src));
           }
-          const key = (item.assetType?.name ?? "") + "s";
+          const key = assetName ? `${assetName}s` : "";
+          if (!key) {
+            return;
+          }
           if (!tools.value[key]) {
             tools.value[key] = [];
           }
@@ -671,6 +685,7 @@ export const useStageStore = defineStore("stage", () => {
     tools.value.avatars = [];
     tools.value.props = [];
     tools.value.backdrops = [];
+    tools.value.videos = [];
     tools.value.curtains = [];
     _config.value = getDefaultStageConfig() as StageConfig;
     settings.value = getDefaultStageSettings() as StageSettings;
@@ -1168,8 +1183,9 @@ export const useStageStore = defineStore("stage", () => {
         board.value.texts.splice(toIndex, 0, tool);
       }
     } else {
-      const toolName = (from.type ?? "") + "s";
-      if (tools.value[toolName]) {
+      const tn = String(from.type ?? "").toLowerCase();
+      const toolName = tn ? `${tn}s` : "";
+      if (toolName && tools.value[toolName]) {
         const fromIndex = tools.value[toolName].findIndex((t) => t.id === from.id);
         const toIndex = tools.value[toolName].findIndex((t) => t.id === to.id);
         if (fromIndex > -1 && toIndex > -1) {
