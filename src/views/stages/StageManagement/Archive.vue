@@ -7,9 +7,11 @@ import CustomConfirm from "components/CustomConfirm.vue";
 import Field from "components/form/Field.vue";
 import ClearChat from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
-import { computed, inject } from "vue";
+import { computed, inject, ref } from "vue";
 import dayjs from "@utils/dayjs";
 import humanizeDuration from "humanize-duration";
+import { useI18n } from "vue-i18n";
+import { message } from "ant-design-vue";
 import { useMutation } from "services/graphql/composable";
 import { stageGraph } from "services/graphql";
 
@@ -27,6 +29,18 @@ export default {
   setup: () => {
     const stage = inject("stage");
     const refresh = inject("refresh");
+    const { t } = useI18n();
+
+    const trimPerformanceId = ref(null);
+    const trimNewName = ref("");
+    const trimMinPauseSeconds = ref(30);
+
+    const initTrimForm = (item) => {
+      trimPerformanceId.value = item.id;
+      const suffix = t("trim_replay_name_suffix");
+      trimNewName.value = item.name ? `${item.name} ${suffix}` : t("trim_replay_default_name");
+      trimMinPauseSeconds.value = 30;
+    };
 
     const date = (value) => {
       return value ? dayjs(value).format("YYYY-MM-DD") : "Now";
@@ -238,6 +252,38 @@ export default {
       }
     };
 
+    const { loading: trimming, save: trimSave } = useMutation(
+      stageGraph.duplicatePerformanceWithTrimmedPauses,
+    );
+    const duplicateWithTrimmedPauses = async (closeModal) => {
+      const secs = Number(trimMinPauseSeconds.value);
+      if (!trimNewName.value?.trim()) {
+        message.error(t("trim_replay_name_required"));
+        return;
+      }
+      if (!(secs > 0)) {
+        message.error(t("trim_replay_pause_positive"));
+        return;
+      }
+      await trimSave(
+        () => {
+          message.success(t("trim_replay_success"));
+          if (refresh) {
+            refresh(stage.value.id);
+          }
+          closeModal?.();
+        },
+        {
+          input: {
+            sourcePerformanceId: trimPerformanceId.value,
+            name: trimNewName.value.trim(),
+            description: null,
+            minPauseSeconds: secs,
+          },
+        },
+      );
+    };
+
     return {
       stage,
       sessions,
@@ -248,6 +294,12 @@ export default {
       updating,
       deletePerformance,
       deleting,
+      trimPerformanceId,
+      trimNewName,
+      trimMinPauseSeconds,
+      initTrimForm,
+      duplicateWithTrimmedPauses,
+      trimming,
     };
   },
 };
@@ -325,6 +377,34 @@ export default {
       </router-link>
     </template>
     <template #actions="{ item }">
+      <Modal>
+        <template #trigger>
+          <button type="button" class="button is-light" @click="initTrimForm(item)">
+            <Icon src="pause.svg" style="width: 16px; height: 16px" />
+          </button>
+        </template>
+        <template #header>{{ $t("trim_replay_title") }}</template>
+        <template #content="{ closeModal }">
+          <p class="mb-3">{{ $t("trim_replay_help") }}</p>
+          <Field v-model="trimNewName" :label="$t('trim_replay_new_name')" required />
+          <Field
+            v-model.number="trimMinPauseSeconds"
+            type="number"
+            :label="$t('trim_replay_min_pause_label')"
+            required
+          />
+          <div class="mt-4">
+            <button
+              type="button"
+              class="button is-primary"
+              :disabled="trimming"
+              @click="duplicateWithTrimmedPauses(closeModal)"
+            >
+              {{ $t("trim_replay_create") }}
+            </button>
+          </div>
+        </template>
+      </Modal>
       <CustomConfirm
         :loading="updating"
         :only-yes="true"

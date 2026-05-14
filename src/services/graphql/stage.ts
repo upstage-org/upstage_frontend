@@ -543,6 +543,18 @@ const stageOps = {
       `,
       { id, name, description },
     ),
+  duplicatePerformanceWithTrimmedPauses: (variables) =>
+    studioClient.request(
+      gql`
+        mutation DuplicatePerformanceWithTrimmedPauses($input: DuplicatePerformanceTrimInput!) {
+          duplicatePerformanceWithTrimmedPauses(input: $input) {
+            id
+            name
+          }
+        }
+      `,
+      variables,
+    ),
   startRecording: (stageId, name, description) =>
     studioClient.request(
       gql`
