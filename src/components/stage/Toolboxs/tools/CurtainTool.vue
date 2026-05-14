@@ -136,11 +136,8 @@ export default {
       </div>
       <!--
         Two independent timing knobs for multi-frame curtains.
-        Mirrors Backdrops.vue: see the comment there for the full
-        rationale. `speed` is the fade duration (legacy field name
-        kept for wire compatibility), `dwell` is the new hold
-        duration that defaults to 0 to preserve pre-feature
-        behaviour on existing media.
+        Mirrors Backdrops.vue: `speed` is fade duration, `dwell` is hold.
+        Crossfade row uses crossfade.svg; hold row uses animation-slider.svg.
       -->
       <div
         v-if="curtain.multi && isActive(curtain)"
@@ -148,7 +145,7 @@ export default {
       >
         <p class="control menu-group-title">
           <span class="panel-icon pt-1">
-            <Icon src="animation-slider.svg" />
+            <Icon src="crossfade.svg" />
           </span>
         </p>
         <p class="control menu-group-item is-fullwidth">

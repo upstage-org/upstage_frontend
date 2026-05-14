@@ -161,10 +161,9 @@ export default {
                     fades. `dwell` on the wire. Defaults to 0 so
                     media without an explicit hold value animates
                     exactly as it did pre-feature.
-        Same icon for both rows (animation-slider.svg) — the
-        `placeholder` on each input is what disambiguates them at a
-        glance, and the `title` tooltip carries the full explanation
-        for keyboard / hover users.
+        `crossfade.svg` vs `animation-slider.svg` distinguish crossfade
+        duration from per-frame hold; placeholders and `title` still spell
+        out each field.
       -->
       <div
         v-if="background.id === currentBackground.id"
@@ -172,7 +171,7 @@ export default {
       >
         <p class="control menu-group-title">
           <span class="panel-icon pt-1">
-            <Icon src="animation-slider.svg" />
+            <Icon src="crossfade.svg" />
           </span>
         </p>
         <p class="control menu-group-item is-fullwidth">
