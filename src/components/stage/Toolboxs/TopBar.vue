@@ -112,7 +112,7 @@ export default {
     };
 
     // When a position has been set we drop the default centred CSS
-    // (top: -12px; left/right: 0; margin: auto) by forcing
+    // (top: safe inset; left/right: 0; margin: auto) by forcing
     // `right: auto; margin: 0`. The :style binding then takes over.
     const dynamicStyle = computed(() => {
       if (!position.value) return {};
@@ -210,31 +210,28 @@ export default {
   flex-direction: column;
   position: fixed;
   max-width: 80vw;
-  height: 100px;
-  top: -12px;
+  max-height: calc(100vh - 16px);
+  height: auto;
+  /* Keep the whole panel (header + controls) inside the viewport — a negative
+     top was clipping tool headers and breaking slider hit targets. */
+  top: max(8px, env(safe-area-inset-top, 0px));
   left: 0;
   right: 0;
   margin: auto;
   text-align: center;
   width: fit-content;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: auto;
   z-index: 5;
 
-  /* When the player has dragged the panel, height grows to fit
-     header + content (no fixed 100px). The dynamic :style provides
-     the new left/top and clears `right: auto; margin: 0`. */
+  /* Dragged panels use explicit left/top via :style (margin: 0). */
   &.is-positioned {
-    height: auto;
     margin: 0;
   }
 
   &.is-collapsed {
     height: auto;
     overflow: visible;
-  }
-
-  &:hover {
-    overflow-x: auto;
   }
 
   .topbar-header {
@@ -304,7 +301,8 @@ export default {
     > div {
       position: relative;
       width: 100px;
-      height: 88px;
+      min-height: 88px;
+      height: auto;
       background: #f5f5f5;
       display: flex;
       flex-direction: column;

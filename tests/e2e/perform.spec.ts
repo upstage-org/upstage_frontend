@@ -951,43 +951,80 @@ async function runBeat({
           authorization: `Bearer ${token}`,
         };
 
-        const stageResp = await fetch("/api/studio_graphql", {
-          method: "POST",
-          headers: gqlHeaders,
-          body: JSON.stringify({
-            query: `query StageBackdropAsset($id: ID!) {
+        // Read the body ONCE as text so we can include it in error
+        // messages on failure. `Response.json()` on an empty body throws
+        // "Unexpected end of JSON input" with no context (which is the
+        // exact symptom we hit), so we go through text first and parse
+        // ourselves. The thrown error is labeled with `op` so the test
+        // log says which fetch failed.
+        const gqlFetch = async <T,>(
+          op: string,
+          body: Record<string, unknown>,
+        ): Promise<T> => {
+          const r = await fetch("/api/studio_graphql", {
+            method: "POST",
+            headers: gqlHeaders,
+            body: JSON.stringify(body),
+          });
+          const text = await r.text();
+          const ct = r.headers.get("content-type") ?? "";
+          const snippet =
+            text.length > 400 ? `${text.slice(0, 400)}…(+${text.length - 400} chars)` : text;
+          if (!r.ok) {
+            throw new Error(
+              `[${op}] HTTP ${r.status} ${r.statusText} ct="${ct}" body=${JSON.stringify(snippet)}`,
+            );
+          }
+          if (!text) {
+            throw new Error(
+              `[${op}] HTTP ${r.status} ${r.statusText} returned EMPTY body ct="${ct}"`,
+            );
+          }
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(text);
+          } catch (e) {
+            throw new Error(
+              `[${op}] HTTP ${r.status} ${r.statusText} non-JSON body ct="${ct}" body=${JSON.stringify(snippet)} parseErr=${(e as Error).message}`,
+            );
+          }
+          const j = parsed as { errors?: unknown };
+          if (j.errors) {
+            throw new Error(`[${op}] GraphQL errors: ${JSON.stringify(j.errors)}`);
+          }
+          return parsed as T;
+        };
+
+        const stageJson = await gqlFetch<{
+          data?: { stage?: { assets?: { id: string; fileLocation?: string }[] } };
+        }>("StageBackdropAsset", {
+          query: `query StageBackdropAsset($id: ID!) {
             stage(id: $id) {
               assets { id fileLocation }
             }
           }`,
-            variables: { id: String(stageId) },
-          }),
+          variables: { id: String(stageId) },
         });
-        const stageJson = await stageResp.json();
-        if (stageJson.errors) throw new Error(JSON.stringify(stageJson.errors));
         const assets = stageJson.data?.stage?.assets ?? [];
         const asset = assets.find((a: { id: string }) => String(a.id) === String(mediaId));
         if (!asset?.fileLocation) {
-          throw new Error(`backdrop asset ${mediaId} not found on stage or missing fileLocation`);
+          throw new Error(
+            `[StageBackdropAsset] backdrop asset ${mediaId} not on stage ${stageId}; ` +
+              `assets returned=${JSON.stringify(assets.map((a) => a.id))}`,
+          );
         }
 
-        const resp = await fetch("/api/studio_graphql", {
-          method: "POST",
-          headers: gqlHeaders,
-          body: JSON.stringify({
-            query: `mutation SaveBackdropCover($input: StageInput!) {
+        await gqlFetch("SaveBackdropCover", {
+          query: `mutation SaveBackdropCover($input: StageInput!) {
             updateStage(input: $input) { id cover }
           }`,
-            variables: {
-              input: {
-                id: String(stageId),
-                cover: asset.fileLocation,
-              },
+          variables: {
+            input: {
+              id: String(stageId),
+              cover: asset.fileLocation,
             },
-          }),
+          },
         });
-        const result = await resp.json();
-        if (result.errors) throw new Error(JSON.stringify(result.errors));
       },
       { stageId: runtime.stageId, mediaId: ref.id },
     );

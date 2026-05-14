@@ -10,12 +10,22 @@ const props = defineProps({
   },
 });
 
-const types = computed(() => [...new Set(props.modelValue.map((media) => media.assetType))]);
+const emit = defineEmits(["update:modelValue"]);
+
+/** GraphQL returns `assetType: { name }`; older code may still use a string. */
+function assetTypeName(media) {
+  const t = media?.assetType;
+  if (t && typeof t === "object") return t.name ?? "";
+  return t ?? "";
+}
+
+const types = computed(() => [...new Set(props.modelValue.map((m) => assetTypeName(m)).filter(Boolean))]);
 
 const mediaGroups = computed(() => {
   const res = {};
   props.modelValue.forEach((item) => {
-    res[item.assetType] = (res[item.assetType] ?? []).concat(item);
+    const key = assetTypeName(item) || "unknown";
+    res[key] = (res[key] ?? []).concat(item);
   });
   return res;
 });
@@ -50,7 +60,10 @@ const drop = (e) => {
     // update:modelValue below — the parent owns the canonical array.
     const next = props.modelValue.slice();
     const media = next.splice(fromIndex, 1)[0];
-    emit("update:modelValue", next.slice(0, toIndex).concat(media).concat(next.slice(toIndex)));
+    emit(
+      "update:modelValue",
+      next.slice(0, toIndex).concat(media).concat(next.slice(toIndex)),
+    );
   }
 };
 </script>

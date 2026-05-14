@@ -111,6 +111,7 @@ export default {
 
 #live-logo {
   position: fixed;
+  top: max(8px, env(safe-area-inset-top, 0px));
   right: 0px;
   max-width: 200px;
   z-index: 1;
