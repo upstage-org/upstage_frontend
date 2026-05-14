@@ -5,8 +5,10 @@ import {
   type RouteLocationNormalized,
   type RouteRecordRaw,
 } from "vue-router";
+import { message } from "ant-design-vue";
 import { useAuthStore } from "@stores/pinia/auth";
 import { useUserStore } from "@stores/pinia/user";
+import { UPLOAD_LIMIT_MESSAGE_KEY } from "@utils/constants";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -207,6 +209,7 @@ router.beforeEach(
 
 router.afterEach(() => {
   document.body.classList.remove("waiting");
+  message.destroy(UPLOAD_LIMIT_MESSAGE_KEY);
 });
 
 export default router;

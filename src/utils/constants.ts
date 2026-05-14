@@ -132,3 +132,6 @@ export const orderTitle = [
     },
   },
 ];
+
+/** Ant Design Vue `message` key for oversized uploads (`Dropzone.vue`); router clears it on navigate. */
+export const UPLOAD_LIMIT_MESSAGE_KEY = "upstage-upload-limit";

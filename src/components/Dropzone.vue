@@ -7,6 +7,7 @@ import { gql } from "@apollo/client/core";
 import { uploadDefault } from "models/studio";
 import i18n from "../i18n";
 import { humanFileSize } from "utils/common";
+import { UPLOAD_LIMIT_MESSAGE_KEY } from "@utils/constants";
 import { Media, StudioGraph, UploadFile } from "models/studio";
 import { useQuery } from "@vue/apollo-composable";
 
@@ -58,12 +59,14 @@ const handleUpload = async (file: UploadFile) => {
     const canUpload = file.file.size <= uploadLimit;
     if (!canUpload) {
       const hide = message.error({
+        key: UPLOAD_LIMIT_MESSAGE_KEY,
         content: i18n.global.t("over_limit_upload", {
           size: humanFileSize(file.file.size),
           limit: humanFileSize(uploadLimit ?? 0),
           name: file.file.name,
         }),
-        duration: 0,
+        /** Long enough to read; click still dismisses immediately (onClick below). */
+        duration: 10,
         onClick: () => hide(),
         class: "cursor-pointer",
       });
