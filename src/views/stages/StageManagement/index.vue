@@ -5,9 +5,10 @@ import { stageGraph } from "services/graphql";
 import Loading from "components/Loading.vue";
 // Aliased: "Header" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppHeader from "components/Header.vue";
+import { LoginOutlined } from "@ant-design/icons-vue";
 
 export default {
-  components: { Loading, AppHeader },
+  components: { Loading, AppHeader, LoginOutlined },
   props: { id: [String, Number] },
   setup: (props) => {
     const { nodes, loading, refetch, data, refresh, clearCache } = useRequest(stageGraph.getStage);
@@ -41,11 +42,11 @@ export default {
           </h3>
           <p class="mb-0">{{ $t("stage_management") }}</p>
         </div>
-        <router-link :to="`/${stage.fileLocation}`" target="_blank" class="button is-primary">
-          <span>{{ $t("enter") }}</span>
-          <span class="icon">
-            <i class="fas fa-chevron-right"></i>
-          </span>
+        <router-link v-slot="{ href }" :to="`/${stage.fileLocation}`" custom>
+          <a-button type="primary" :href="href" target="_blank" rel="noopener noreferrer">
+            <template #icon><LoginOutlined /></template>
+            {{ $t("enter") }}
+          </a-button>
         </router-link>
       </a-space>
     </template>

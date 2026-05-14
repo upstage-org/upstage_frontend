@@ -199,47 +199,49 @@ const { proceed, loading } = useLoading(
           </a-space>
         </template>
         <a-spin :spinning="isReady">
-          <a-transfer
-            v-model:target-keys="receiverEmails"
-            :locale="{
-              itemUnit: 'recipient',
-              itemsUnit: 'recipients',
-              notFoundContent: '',
-              searchPlaceholder: 'Search by email or name',
-            }"
-            :list-style="{
-              flex: '1',
-              height: '300px',
-            }"
-            :titles="[' available', ' selected']"
-            :data-source="dataSource"
-            show-search
-            :filter-option="filterOption"
-          >
-            <template #render="item">
-              <a-space class="flex justify-between">
-                <span>
-                  {{ item?.title }}
-                  <a-tag v-if="!item?.title?.includes('<')">Custom recipient</a-tag>
-                </span>
-                <a-switch
-                  size="small"
-                  :checked="!directToEmails.includes(item?.key as string)"
-                  @change="
-                    (checked: boolean | string | number, e: Event) =>
-                      onToggleDirect(checked, e, item?.key as string)
-                  "
-                >
-                  <template #checkedChildren>
-                    <span class="text-[8px] leading-none">BCC</span>
-                  </template>
-                  <template #unCheckedChildren>
-                    <span class="text-[8px] leading-none">BCC</span>
-                  </template>
-                </a-switch>
-              </a-space>
-            </template>
-          </a-transfer>
+          <div class="upstage-transfer--sorter-arrows">
+            <a-transfer
+              v-model:target-keys="receiverEmails"
+              :locale="{
+                itemUnit: 'recipient',
+                itemsUnit: 'recipients',
+                notFoundContent: '',
+                searchPlaceholder: 'Search by email or name',
+              }"
+              :list-style="{
+                flex: '1',
+                height: '300px',
+              }"
+              :titles="[' available', ' selected']"
+              :data-source="dataSource"
+              show-search
+              :filter-option="filterOption"
+            >
+              <template #render="item">
+                <a-space class="flex justify-between">
+                  <span>
+                    {{ item?.title }}
+                    <a-tag v-if="!item?.title?.includes('<')">Custom recipient</a-tag>
+                  </span>
+                  <a-switch
+                    size="small"
+                    :checked="!directToEmails.includes(item?.key as string)"
+                    @change="
+                      (checked: boolean | string | number, e: Event) =>
+                        onToggleDirect(checked, e, item?.key as string)
+                    "
+                  >
+                    <template #checkedChildren>
+                      <span class="text-[8px] leading-none">BCC</span>
+                    </template>
+                    <template #unCheckedChildren>
+                      <span class="text-[8px] leading-none">BCC</span>
+                    </template>
+                  </a-switch>
+                </a-space>
+              </template>
+            </a-transfer>
+          </div>
         </a-spin>
       </a-form-item>
       <a-form-item

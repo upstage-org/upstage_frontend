@@ -133,20 +133,24 @@ export default {
       }"
       v-html="data.content"
     ></p>
-    <div v-else-if="data.type === 'video'" :title="`Stream key: ${data.name}`" class="is-fullwidth">
+    <div
+      v-else-if="data.type === 'video'"
+      :title="`Stream key: ${data.name}`"
+      class="skeleton-meta"
+    >
       <Icon src="stream.svg" size="36" />
       <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7)">{{
         data.name
       }}</span>
     </div>
-    <div v-else-if="data.type === 'meeting'" class="is-flex-grow-1 pt-2">
-      <Icon src="meeting.svg" size="48" />
+    <div v-else-if="data.type === 'meeting'" class="skeleton-meta">
+      <Icon src="meeting.svg" size="36" />
       <span class="tag is-light is-block stream-key">{{ data.name }}</span>
     </div>
     <a-tooltip v-else-if="!data.src" :title="data.displayName">
       <Icon src="meeting.svg" size="36" />
     </a-tooltip>
-    <AppImage v-else :src="data.src" />
+    <AppImage v-else class="skeleton-image" :src="data.src" />
     <Icon
       v-if="data.multi"
       class="is-multi"
@@ -159,13 +163,54 @@ export default {
 <style scoped lang="scss">
 .stream-key {
   width: 100%;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skeleton-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  gap: 2px;
 }
 
 .skeleton {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+
   > * {
     transition-duration: 0.25s;
+  }
+
+  :deep(.skeleton-image) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  :deep(.skeleton-image img) {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center;
   }
 }
 

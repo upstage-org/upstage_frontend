@@ -2,7 +2,9 @@
 import { reactive } from "vue";
 import { watch } from "vue";
 import { includesIgnoreCase } from "utils/common";
+import { RightOutlined, LeftOutlined } from "@ant-design/icons-vue";
 export default {
+  components: { RightOutlined, LeftOutlined },
   props: {
     columns: Array,
     modelValue: Array,
@@ -134,15 +136,28 @@ export default {
           </div>
         </article>
       </div>
-      <div v-if="i < columns.length - 1" class="column is-narrow px-0">
-        <button class="button is-primary is-small" @click="moveAll(i, i + 1)">
-          <i class="fas fa-angle-double-right"></i>
-        </button>
-        <br />
-        <br />
-        <button class="button is-primary is-small" @click="moveAll(i + 1, i)">
-          <i class="fas fa-angle-double-left"></i>
-        </button>
+      <div
+        v-if="i < columns.length - 1"
+        class="column is-narrow px-0 is-flex is-align-self-center"
+      >
+        <div class="upstage-multi-transfer-arrows">
+          <button
+            type="button"
+            class="upstage-multi-transfer-btn"
+            title="Move all matching right"
+            @click="moveAll(i, i + 1)"
+          >
+            <RightOutlined />
+          </button>
+          <button
+            type="button"
+            class="upstage-multi-transfer-btn"
+            title="Move all matching left"
+            @click="moveAll(i + 1, i)"
+          >
+            <LeftOutlined />
+          </button>
+        </div>
       </div>
     </template>
   </div>

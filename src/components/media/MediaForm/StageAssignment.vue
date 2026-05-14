@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
-import { ref, computed, watchEffect, PropType } from "vue";
+import { ref, computed, watchEffect, PropType, h, unref } from "vue";
 import { TransferItem } from "ant-design-vue/lib/transfer";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
@@ -53,26 +53,35 @@ watchEffect(() => {
   targetKeys.value = props.modelValue;
 });
 
-const renderItem = (item: TransferItem) => item.name;
+const renderItem = (item: TransferItem) => {
+  const keys = (unref(targetKeys) ?? []) as string[];
+  const assigned = keys.map(String).includes(String(item.key));
+  if (assigned) {
+    return h("span", { class: "upstage-transfer-assigned-pill" }, String(item.name ?? ""));
+  }
+  return String(item.name ?? "");
+};
 </script>
 
 <template>
-  <a-transfer
-    v-model:target-keys="targetKeys"
-    :locale="{
-      itemUnit: 'stage',
-      itemsUnit: 'stages',
-      notFoundContent: 'No stage available',
-      searchPlaceholder: 'Search stage name',
-    }"
-    :list-style="{
-      flex: '1',
-      height: '300px',
-    }"
-    :titles="[' available', ' assigned']"
-    :data-source="stages as any"
-    show-search
-    :filter-option="filterOption"
-    :render="renderItem"
-  />
+  <div class="upstage-transfer--sorter-arrows">
+    <a-transfer
+      v-model:target-keys="targetKeys"
+      :locale="{
+        itemUnit: 'stage',
+        itemsUnit: 'stages',
+        notFoundContent: 'No stage available',
+        searchPlaceholder: 'Search stage name',
+      }"
+      :list-style="{
+        flex: '1',
+        height: '300px',
+      }"
+      :titles="[' available', ' assigned']"
+      :data-source="stages as any"
+      show-search
+      :filter-option="filterOption"
+      :render="renderItem"
+    />
+  </div>
 </template>

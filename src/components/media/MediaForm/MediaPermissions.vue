@@ -170,31 +170,33 @@ watch(isAdmin, console.log);
           </small>
         </template>
       </a-alert>
-      <a-transfer
-        v-model:target-keys="targetKeys"
-        :locale="{
-          itemUnit: 'player',
-          itemsUnit: 'players',
-          notFoundContent: 'No player available',
-          searchPlaceholder: 'Search player name',
-        }"
-        :list-style="{
-          flex: '1',
-          height: '300px',
-        }"
-        :titles="[' available', ' granted']"
-        :data-source="
-          result
-            ? (result.users.map((e: any) => ({
-                key: e.id,
-                ...e,
-              })) as any)
-            : []
-        "
-        show-search
-        :filter-option="filterOption"
-        :render="renderItem"
-      />
+      <div class="upstage-transfer--sorter-arrows">
+        <a-transfer
+          v-model:target-keys="targetKeys"
+          :locale="{
+            itemUnit: 'player',
+            itemsUnit: 'players',
+            notFoundContent: 'No player available',
+            searchPlaceholder: 'Search player name',
+          }"
+          :list-style="{
+            flex: '1',
+            height: '300px',
+          }"
+          :titles="[' available', ' granted']"
+          :data-source="
+            result
+              ? (result.users.map((e: any) => ({
+                  key: e.id,
+                  ...e,
+                })) as any)
+              : []
+          "
+          show-search
+          :filter-option="filterOption"
+          :render="renderItem"
+        />
+      </div>
     </template>
   </a-space>
 </template>

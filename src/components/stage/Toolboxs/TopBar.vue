@@ -324,14 +324,27 @@ export default {
     > div {
       position: relative;
       width: 100px;
-      min-height: 88px;
-      height: auto;
+      height: 100px;
+      min-width: 100px;
+      min-height: 100px;
+      max-height: 100px;
+      flex-shrink: 0;
+      overflow: hidden;
       background: #f5f5f5;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       border-radius: 8px;
+
+      .skeleton {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 0;
+        width: 100%;
+        max-height: 100%;
+        align-self: stretch;
+      }
 
       > div {
         padding: 12px;

@@ -4,9 +4,10 @@ import Loading from "components/Loading.vue";
 import { computed } from "vue";
 import dayjs from "@utils/dayjs";
 import Pagination from "./Pagination.vue";
+import { CaretUpOutlined, CaretDownOutlined } from "@ant-design/icons-vue";
 
 export default {
-  components: { Loading, Pagination },
+  components: { Loading, Pagination, CaretUpOutlined, CaretDownOutlined },
   props: {
     query: {
       type: Function,
@@ -148,18 +149,23 @@ export default {
               </abbr>
             </a-tooltip>
             &nbsp;
-            <template v-if="sortBy?.title === header.title">
-              <i
-                v-if="header.type === 'date'"
-                :class="`fas ${sortOrder ? 'fa-sort-amount-down' : 'fa-sort-amount-down-alt'}`"
-              />
-              <i
-                v-else
-                :class="`fas ${sortOrder ? 'fa-sort-alpha-down' : 'fa-sort-alpha-down-alt'}`"
-              />
-            </template>
-            <template v-else-if="header.sortable">
-              <i class="fas fa-sort" />
+            <template v-if="header.sortable">
+              <span class="upstage-dt-sorter" aria-hidden="true">
+                <CaretUpOutlined
+                  class="upstage-dt-sorter-icon"
+                  :class="{
+                    'upstage-dt-sorter-icon--active':
+                      sortBy?.title === header.title && sortOrder,
+                  }"
+                />
+                <CaretDownOutlined
+                  class="upstage-dt-sorter-icon"
+                  :class="{
+                    'upstage-dt-sorter-icon--active':
+                      sortBy?.title === header.title && !sortOrder,
+                  }"
+                />
+              </span>
             </template>
           </th>
         </tr>
@@ -208,8 +214,23 @@ export default {
 </template>
 
 <style scoped>
-i.fas {
-  cursor: pointer;
+.upstage-dt-sorter {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 4px;
+  vertical-align: middle;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.25);
+}
+.upstage-dt-sorter-icon {
+  line-height: 1;
+}
+.upstage-dt-sorter-icon:first-of-type {
+  margin-bottom: -0.3em;
+}
+.upstage-dt-sorter-icon--active {
+  color: #007011;
 }
 
 .table-wrapper {
