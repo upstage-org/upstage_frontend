@@ -26,9 +26,10 @@ import { useStageStore } from "@stores/pinia/stage";
 import Chat from "components/stage/Chat/index.vue";
 import PlayerChat from "components/stage/Chat/PlayerChat.vue";
 import LoginPrompt from "../live/LoginPrompt.vue";
+import HiddenStageAssetPreloader from "./HiddenStageAssetPreloader.vue";
 
 export default {
-  components: { Chat, PlayerChat, LoginPrompt },
+  components: { Chat, PlayerChat, LoginPrompt, HiddenStageAssetPreloader },
   setup: () => {
     const stageStore = useStageStore();
     const route = useRoute();
@@ -79,6 +80,8 @@ export default {
 
 <template>
   <div class="chat-standalone">
+    <!-- Keeps Pinia `preloading` in sync with main Live Preloader.vue (stage `ready`). -->
+    <HiddenStageAssetPreloader />
     <div v-if="ready" class="chat-standalone__inner">
       <!--
         LoginPrompt mirrors the main-stage flow: an unauthenticated
