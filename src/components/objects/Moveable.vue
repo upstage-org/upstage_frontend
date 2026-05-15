@@ -168,6 +168,10 @@ export default {
     watch(
       () => props.object,
       () => {
+        if (!el.value) {
+          return;
+        }
+        const x = props.object;
         const {
           x: left,
           y: top,
@@ -178,7 +182,7 @@ export default {
           opacity,
           scaleX,
           scaleY,
-        } = props.object;
+        } = x;
         if (animation) {
           animation.pause(true);
         }

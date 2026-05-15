@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref } from "vue";
+import { computed, inject, nextTick, onMounted, ref } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 import Popover from "components/Popover.vue";
@@ -25,13 +25,16 @@ const masquerading = computed<boolean>(() => stageStore.masquerading);
 const replaying = inject<boolean>("replaying");
 
 onMounted(() => {
-  if (dot.value) {
+  nextTick(() => {
+    if (!dot.value) {
+      return;
+    }
     animate(dot.value, {
       opacity: [1, 0, 1],
       duration: 2000,
       loop: true,
     });
-  }
+  });
 });
 </script>
 

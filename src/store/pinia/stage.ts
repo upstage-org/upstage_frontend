@@ -56,6 +56,14 @@ import { avatarSpeak, stopSpeaking } from "@services/speech";
 import { useAuthStore } from "@stores/pinia/auth";
 import { useUserStore } from "@stores/pinia/user";
 
+/** Skip anime when the selector is not in DOM (e.g. MQTT before live Layout mounts #board). */
+function animateIfPresent(selector: string, options: Parameters<typeof animate>[1]) {
+  const node = document.querySelector(selector);
+  if (node) {
+    animate(node as HTMLElement, options);
+  }
+}
+
 // ====================================================================
 // SHAPES
 //
@@ -761,7 +769,7 @@ export const useStageStore = defineStore("stage", () => {
       if (!background.value || !background.value.at || (background.value.at ?? 0) < (bg.at ?? 0)) {
         if (!background.value || background.value.id !== bg.id) {
           // Not playing animation if only opacity change
-          animate("#board", { opacity: [0, 1], duration: 5000 });
+          animateIfPresent("#board", { opacity: [0, 1], duration: 5000 });
         }
         background.value = bg;
       }
@@ -1099,7 +1107,7 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   function REPLACE_SCENE({ payload }: { payload?: string | null }) {
-    animate("#live-stage", {
+    animateIfPresent("#live-stage", {
       filter: ["brightness(0)", "brightness(1)"],
       ease: "linear",
       duration: 3000,
@@ -2130,7 +2138,7 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   function replaceScene(sceneId: ObjectId) {
-    animate("#live-stage", {
+    animateIfPresent("#live-stage", {
       filter: "brightness(0)",
     });
     const scene = model.value?.scenes?.find((s) => s.id == sceneId);
