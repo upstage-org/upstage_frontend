@@ -5,7 +5,7 @@ import Divider from "components/Divider.vue";
 import ContextMenu from "components/ContextMenu.vue";
 import Icon from "components/Icon.vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { computed } from "vue";
+import { computed, inject } from "vue";
 
 export default {
   components: { Linkify, Divider, ContextMenu, Icon },
@@ -14,6 +14,7 @@ export default {
     style: [String, Object],
   },
   setup: () => {
+    const isChatStandalone = inject("isChatStandalone", false);
     const stageStore = useStageStore();
     const messageClass = {
       think: "has-text-info has-background-info-light",
@@ -44,13 +45,17 @@ export default {
       }
     };
 
-    return { messageClass, time, removeChat, highlightChat, canPlay, session };
+    return { messageClass, time, removeChat, highlightChat, canPlay, session, isChatStandalone };
   },
 };
 </script>
 
 <template>
-  <div v-if="!messages.length" class="columns is-vcentered is-fullheight">
+  <div
+    v-if="!messages.length"
+    class="columns is-vcentered"
+    :class="{ 'is-fullheight': !isChatStandalone, 'chat-empty-standalone': isChatStandalone }"
+  >
     <div class="column has-text-centered has-text-light">
       <i class="fas fa-comments fa-4x"></i>
       <p class="subtitle has-text-light">No messages yet!</p>
@@ -179,5 +184,13 @@ export default {
 
 .guest {
   opacity: 0.8;
+}
+
+/* Avoid stretching to the full scroll viewport in /chat/:url — that defeats
+   bottom-anchoring of the message list near the composer on mobile. */
+.chat-empty-standalone {
+  flex-grow: 0 !important;
+  min-height: 0 !important;
+  padding-bottom: 0.5rem;
 }
 </style>

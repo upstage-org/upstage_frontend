@@ -1,5 +1,5 @@
 <script>
-import { computed, inject, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { animate } from "animejs";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
@@ -40,6 +40,12 @@ export default {
         ease: "inOutQuad",
       });
     };
+    const scrollContentToBottomInstant = () => {
+      const el = theContent.value;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    };
     const sendChat = () => {
       if (message.value.trim() && !loadingUser.value) {
         stageStore.sendChat({
@@ -51,7 +57,20 @@ export default {
       }
     };
     watch(messages.value, scrollToEnd);
-    onMounted(scrollToEnd);
+    onMounted(() => {
+      scrollToEnd();
+      if (isStandalone && window.visualViewport) {
+        window.visualViewport.addEventListener("resize", scrollContentToBottomInstant);
+        window.visualViewport.addEventListener("scroll", scrollContentToBottomInstant);
+      }
+    });
+    onUnmounted(() => {
+      if (!isStandalone) return;
+      const vv = window.visualViewport;
+      if (!vv) return;
+      vv.removeEventListener("resize", scrollContentToBottomInstant);
+      vv.removeEventListener("scroll", scrollContentToBottomInstant);
+    });
 
     const opacity = computed(() => stageStore.chat.opacity);
     const fontSize = computed(() => stageStore.chat.playerFontSize);
@@ -325,8 +344,17 @@ export default {
         </a-tooltip>
         <ClearChat option="player-chat" />
       </div>
-      <div ref="theContent" class="card-content">
-        <Messages :messages="messages" :style="{ fontSize }" />
+      <div
+        ref="theContent"
+        class="card-content"
+        :class="{ 'card-content--standalone-anchor': isStandalone }"
+      >
+        <div
+          class="chat-messages-scroll-inner"
+          :class="{ 'chat-messages-scroll-inner--standalone': isStandalone }"
+        >
+          <Messages :messages="messages" :style="{ fontSize }" />
+        </div>
       </div>
       <footer class="card-footer">
         <div class="card-footer-item">
@@ -374,6 +402,18 @@ export default {
     overflow-y: auto;
     overflow-x: hidden;
     padding-top: 36px;
+  }
+
+  .card-content.card-content--standalone-anchor {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+
+    .chat-messages-scroll-inner--standalone {
+      margin-top: auto;
+      width: 100%;
+      min-width: 0;
+    }
   }
 
   .card-footer-item {

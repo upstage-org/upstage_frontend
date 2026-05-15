@@ -1,5 +1,5 @@
 <script>
-import { computed, inject, onMounted, ref, watch, watchEffect } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { animate } from "animejs";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
@@ -75,6 +75,13 @@ export default {
         ease: "inOutQuad",
       });
     };
+    /** Keeps newest messages pinned when mobile browsers reflow / zoom for the keyboard. */
+    const scrollContentToBottomInstant = () => {
+      const el = theContent.value;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    };
     const sendChat = () => {
       if (message.value.trim() && !loadingUser.value) {
         stageStore.sendChat({ message: message.value });
@@ -82,7 +89,20 @@ export default {
         scrollToEnd();
       }
     };
-    onMounted(scrollToEnd);
+    onMounted(() => {
+      scrollToEnd();
+      if (isStandalone && window.visualViewport) {
+        window.visualViewport.addEventListener("resize", scrollContentToBottomInstant);
+        window.visualViewport.addEventListener("scroll", scrollContentToBottomInstant);
+      }
+    });
+    onUnmounted(() => {
+      if (!isStandalone) return;
+      const vv = window.visualViewport;
+      if (!vv) return;
+      vv.removeEventListener("resize", scrollContentToBottomInstant);
+      vv.removeEventListener("scroll", scrollContentToBottomInstant);
+    });
     watch(messages.value, scrollToEnd);
     watch(collapsed, (val) => {
       if (!val) {
@@ -304,8 +324,17 @@ export default {
         </a-tooltip>
         <ClearChat option="public-chat" />
       </div>
-      <div ref="theContent" class="card-content">
-        <Messages :messages="messages" :style="{ fontSize }" />
+      <div
+        ref="theContent"
+        class="card-content"
+        :class="{ 'card-content--standalone-anchor': isStandalone }"
+      >
+        <div
+          class="chat-messages-scroll-inner"
+          :class="{ 'chat-messages-scroll-inner--standalone': isStandalone }"
+        >
+          <Messages :messages="messages" :style="{ fontSize }" />
+        </div>
       </div>
       <footer class="card-footer">
         <div class="card-footer-item">
@@ -388,6 +417,20 @@ export default {
     overflow-y: auto;
     overflow-x: hidden;
     padding-top: 36px;
+  }
+
+  /* Popped-out /chat/: short threads stay above the sticky input so the first
+     lines are not stranded under the OS keyboard on phones. */
+  .card-content.card-content--standalone-anchor {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+
+    .chat-messages-scroll-inner--standalone {
+      margin-top: auto;
+      width: 100%;
+      min-width: 0;
+    }
   }
 
   .card-footer-item {

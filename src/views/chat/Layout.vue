@@ -20,8 +20,10 @@
  * popped-out / mobile windows, so chat is bidirectional with zero
  * additional plumbing.
  */
-import { computed, onUnmounted, provide, ref } from "vue";
+import { computed, onUnmounted, provide, ref, watch } from "vue";
+import { storeToRefs } from "pinia";
 import { useRoute } from "vue-router";
+import { useAuthStore } from "@stores/pinia/auth";
 import { useStageStore } from "@stores/pinia/stage";
 import Chat from "components/stage/Chat/index.vue";
 import PlayerChat from "components/stage/Chat/PlayerChat.vue";
@@ -32,6 +34,7 @@ export default {
   components: { Chat, PlayerChat, LoginPrompt, HiddenStageAssetPreloader },
   setup: () => {
     const stageStore = useStageStore();
+    const { loggedIn } = storeToRefs(useAuthStore());
     const route = useRoute();
 
     // Two consumers of this flag inside the chat components:
@@ -66,14 +69,24 @@ export default {
 
     const ready = computed(() => stageStore.ready);
     const canPlay = computed(() => stageStore.canPlay);
+    // Pop-out/mobile chat must mirror the live stage UX: Player Chat is only
+    // for authenticated performers. `canPlay` alone follows GraphQL permission
+    // and can disagree with absent auth (guests opening `/chat/:url`).
+    const showPlayerChatStandalone = computed(() => loggedIn.value && canPlay.value);
 
-    // Which pane is active when both are available (canPlay). The
+    // Which pane is active when both are available (`showPlayerChatStandalone`). The
     // standalone view stacks the two chats behind a small tab bar
     // instead of rendering both at once, so the mobile viewport
     // isn't split between two half-height panes.
     const activeTab = ref("public");
 
-    return { ready, canPlay, activeTab };
+    watch(showPlayerChatStandalone, (ok) => {
+      if (!ok && activeTab.value === "player") {
+        activeTab.value = "public";
+      }
+    });
+
+    return { ready, canPlay: showPlayerChatStandalone, activeTab };
   },
 };
 </script>
@@ -93,9 +106,10 @@ export default {
       <LoginPrompt />
 
       <!--
-        Tab bar appears only when the visitor has player privileges
-        on this stage. Audience members see just the public chat
-        pane with no tab chrome at all.
+        Tab bar only when the visitor is authenticated and has on-stage
+        player permissions (see `showPlayerChatStandalone` in script).
+        Guests and audience see only public chat and the login / nickname
+        onboarding from LoginPrompt.
       -->
       <nav v-if="canPlay" class="chat-standalone__tabs">
         <button
@@ -120,8 +134,8 @@ export default {
         <!--
           v-show (not v-if) keeps the inactive pane mounted so its
           MQTT subscription state and unread-counters survive a tab
-          switch. For audience-only visitors (canPlay === false) the
-          tab bar isn't rendered and only the public pane is shown.
+          switch. When the Player tab is unavailable (!canPlay in this
+          template) the tab bar is hidden and only the public pane is shown.
         -->
         <Chat v-show="!canPlay || activeTab === 'public'" />
         <PlayerChat v-if="canPlay" v-show="activeTab === 'player'" />
