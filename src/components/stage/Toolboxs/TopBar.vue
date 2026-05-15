@@ -321,6 +321,15 @@ export default {
       width: 100%;
     }
 
+    /* When a tool only has a single thumbnail (e.g. one audio clip) the
+       panel's `width: fit-content` is driven by the wider header strip,
+       leaving the lone tile flush-left. `margin: 0 auto` on a single
+       flex-row child distributes the slack on both sides and centres
+       it; the rule self-disables as soon as a second tile arrives. */
+    > div:only-child {
+      margin: 0 auto;
+    }
+
     > div {
       position: relative;
       width: 100px;
