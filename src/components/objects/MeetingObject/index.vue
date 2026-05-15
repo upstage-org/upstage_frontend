@@ -32,9 +32,10 @@ import { useJitsiEndpoint } from "./composable";
 const TIMEOUT_MS = 15000;
 
 // Translate a value into its URL-fragment-safe Jitsi config encoding.
-// Jitsi parses fragment params as JS literals, so booleans/arrays/etc.
-// must be JSON-serialised, then URI-encoded so `=`/`&`/etc. inside an
-// array literal don't break the fragment grammar.
+// Current Jitsi Meet parses fragment values with JSON.parse(), so strings
+// must still be JSON.stringify'd (quotes + escaping), not passed raw.
+// URI-encode afterward so `=`/`&`/etc. inside literals don't break the
+// fragment grammar.
 const encodeConfigValue = (v) => encodeURIComponent(JSON.stringify(v));
 
 export default {
@@ -98,10 +99,10 @@ export default {
         ...Object.entries(interfaceConfig).map(
           ([k, v]) => `interfaceConfig.${k}=${encodeConfigValue(v)}`,
         ),
-        `userInfo.displayName=${encodeURIComponent(userStore.chatname || "Guest")}`,
+        `userInfo.displayName=${encodeConfigValue(userStore.chatname || "Guest")}`,
       ];
       if (userStore.user?.email) {
-        fragmentParts.push(`userInfo.email=${encodeURIComponent(userStore.user.email)}`);
+        fragmentParts.push(`userInfo.email=${encodeConfigValue(userStore.user.email)}`);
       }
 
       const room = encodeURIComponent(props.object.name);

@@ -188,6 +188,7 @@ declare module 'vue' {
     StageMediaTable: typeof import('./src/components/form/StageMediaTable.vue')['default']
     StageTable: typeof import('./src/components/stage/StageTable.vue')['default']
     Streams: typeof import('./src/components/stage/Toolboxs/tools/Streams/index.vue')['default']
+    StreamToolboxThumb: typeof import('./src/components/stage/Toolboxs/tools/Streams/StreamToolboxThumb.vue')['default']
     StudioVersion: typeof import('./src/components/StudioVersion.vue')['default']
     Switch: typeof import('./src/components/form/Switch.vue')['default']
     Tabs: typeof import('./src/components/Tabs.vue')['default']
