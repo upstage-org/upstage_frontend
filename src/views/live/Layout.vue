@@ -12,9 +12,10 @@ import LoginPrompt from "./LoginPrompt.vue";
 import ConnectionStatus from "./ConnectionStatus.vue";
 import MasqueradingStatus from "./MasqueradingStatus.vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { computed, onUnmounted } from "vue";
+import { useAuthStore } from "@stores/pinia/auth";
+import { computed, onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
-import { loggedIn } from "utils/auth";
+import { isJwtExpired, loggedIn } from "utils/auth";
 
 export default {
   components: {
@@ -33,6 +34,7 @@ export default {
   },
   setup: () => {
     const stageStore = useStageStore();
+    const authStore = useAuthStore();
     const ready = computed(() => stageStore.ready);
 
     const route = useRoute();
@@ -42,6 +44,30 @@ export default {
 
     onUnmounted(() => {
       stageStore.disconnect();
+    });
+
+    // Live-route expiry guard. The Live route does NOT set requireAuth
+    // (audience members must be able to land here unauthenticated), so
+    // a player whose JWT has gone stale can sit on the stage indefinitely
+    // until something happens to fire a GraphQL call. MQTT chat / board
+    // messages keep flowing because MQTT auth is build-time creds, not
+    // the user's JWT — exactly the silent-zombie state the proactive
+    // refresh in the auth store is designed to prevent. Re-check on
+    // mount and on visibilitychange so a tab brought back from the
+    // background after an overnight expiry detects it without waiting
+    // for the next GraphQL operation.
+    const checkExpiry = () => {
+      if (authStore.loggedIn && isJwtExpired(authStore.getToken)) {
+        authStore.logout();
+      }
+    };
+    onMounted(checkExpiry);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") checkExpiry();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    onUnmounted(() => {
+      document.removeEventListener("visibilitychange", onVisibility);
     });
 
     // `beforeunload` is the historical hook but Firefox in particular often

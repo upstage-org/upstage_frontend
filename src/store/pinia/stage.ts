@@ -1339,6 +1339,31 @@ export const useStageStore = defineStore("stage", () => {
     on(event: "error", cb: (err: { message?: string } | undefined) => void): void;
   };
 
+  // Presence heartbeat: re-publishes the local session on TOPICS.COUNTER
+  // every 5 minutes so other clients' UPDATE_SESSIONS_COUNTER 60-min trim
+  // never reaches the row. Without this, a quiet performer silently
+  // disappears from every other client's player list while remaining
+  // fully connected to MQTT/chat (the bug Vicki hit during the walkthrough).
+  // Single-slot interval; startHeartbeat() is idempotent.
+  const HEARTBEAT_MS = 5 * 60 * 1000;
+  let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
+  function startHeartbeat() {
+    if (heartbeatInterval !== null) return;
+    heartbeatInterval = setInterval(() => {
+      if (session.value) {
+        void joinStage();
+      }
+    }, HEARTBEAT_MS);
+  }
+
+  function stopHeartbeat() {
+    if (heartbeatInterval !== null) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
+  }
+
   function connect() {
     SET_STATUS("CONNECTING");
     const client = mqtt.connect() as MqttClient | null;
@@ -1360,16 +1385,31 @@ export const useStageStore = defineStore("stage", () => {
           }
         }
         await joinStage();
+        // Arm the presence heartbeat AFTER the first joinStage so we never
+        // race a heartbeat publish against the initial join. mqtt.js auto-
+        // reconnects fire 'connect' again, so re-arming here is also the
+        // re-arm path post-disconnect — startHeartbeat is idempotent.
+        startHeartbeat();
       })();
     });
     client.on("error", (err) => {
       console.error("[MQTT] Stage client error:", err?.message ?? err);
       SET_STATUS("OFFLINE");
+      stopHeartbeat();
     });
     client.on("reconnect", () => SET_STATUS("CONNECTING"));
-    client.on("close", () => SET_STATUS("OFFLINE"));
-    client.on("disconnect", () => SET_STATUS("OFFLINE"));
-    client.on("offline", () => SET_STATUS("OFFLINE"));
+    client.on("close", () => {
+      SET_STATUS("OFFLINE");
+      stopHeartbeat();
+    });
+    client.on("disconnect", () => {
+      SET_STATUS("OFFLINE");
+      stopHeartbeat();
+    });
+    client.on("offline", () => {
+      SET_STATUS("OFFLINE");
+      stopHeartbeat();
+    });
     mqtt.receiveMessage((payload: { topic: string; message: unknown }) => handleMessage(payload));
   }
 
@@ -1393,6 +1433,7 @@ export const useStageStore = defineStore("stage", () => {
   }
 
   async function disconnect() {
+    stopHeartbeat();
     await leaveStage();
     mqtt.disconnect();
   }
@@ -2341,6 +2382,7 @@ export const useStageStore = defineStore("stage", () => {
   // awaited statistics-rebroadcast (which would never finish) and just
   // emits the leave message + clears local state.
   function disconnectSync() {
+    stopHeartbeat();
     const id = session.value;
     if (id != null) {
       mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });

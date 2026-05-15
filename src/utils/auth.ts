@@ -49,3 +49,51 @@ export function displayRole(user: AuthUser): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * Decode the `exp` (expiry) claim from a JWT without verifying the signature.
+ * The server still verifies on every request — this is just so the SPA can
+ * (a) schedule a proactive refresh before the token dies and (b) detect a
+ * stale token on cold boot / on tab focus, instead of relying on a GraphQL
+ * call to surface the expiry.
+ *
+ * Returns the `exp` value in seconds-since-epoch (as JWTs encode it), or
+ * `null` if the token is malformed / lacks an `exp` / cannot be base64-
+ * decoded. Callers should treat `null` as "unknown — do nothing", not
+ * "expired"; an invalid token will be caught by the GraphQL error path
+ * the next time it's used.
+ *
+ * Implementation note: JWT payloads are base64URL (`-`/`_` instead of
+ * `+`/`/`) without padding. atob() requires the standard alphabet, so
+ * normalise and re-pad before decoding. Keep this dependency-free —
+ * pulling in jwt-decode for ~10 lines is not worth the install.
+ */
+export function decodeJwtExp(token: string | undefined | null): number | null {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    let payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = payload.length % 4;
+    if (pad) payload += "=".repeat(4 - pad);
+    const decoded = JSON.parse(atob(payload)) as { exp?: unknown };
+    if (typeof decoded.exp === "number" && isFinite(decoded.exp)) {
+      return decoded.exp;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True iff the token's `exp` is strictly in the past (relative to the
+ * caller's clock). `null` exp (unknown) and tokens with no `exp` claim
+ * return `false` so we never trigger a phantom logout for tokens we
+ * cannot reason about.
+ */
+export function isJwtExpired(token: string | undefined | null): boolean {
+  const exp = decodeJwtExp(token);
+  if (exp == null) return false;
+  return exp * 1000 <= Date.now();
+}
