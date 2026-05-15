@@ -417,6 +417,9 @@ export const useStageStore = defineStore("stage", () => {
     tracks: [],
   });
 
+  /** Set when lib-jitsi-meet reports CONFERENCE_JOINED; used to fill jitsi board objects dragged before myUserId existed. */
+  const localJitsiParticipantId = ref<string | null>(null);
+
   const tools = ref<ToolsState>({
     avatars: [],
     props: [],
@@ -750,6 +753,7 @@ export const useStageStore = defineStore("stage", () => {
     topbarPosition.value = null;
     topbarCollapsed.value = false;
     publicChatPosition.value = null;
+    localJitsiParticipantId.value = null;
   }
 
   function SET_BACKGROUND(bg: Background | null) {
@@ -1574,6 +1578,14 @@ export const useStageStore = defineStore("stage", () => {
       id: uuidv4(),
       type: data.assetType?.name || data.type,
     };
+    const inferredJitsiId = localJitsiParticipantId.value;
+    if (
+      object.type === "jitsi" &&
+      (object.participantId == null || object.participantId === "") &&
+      inferredJitsiId
+    ) {
+      object.participantId = inferredJitsiId;
+    }
     if (object.type === "video") {
       object.hostId = session.value;
       // Start playing as soon as the video is placed on stage so the
@@ -1596,6 +1608,21 @@ export const useStageStore = defineStore("stage", () => {
       SET_ACTIVE_MOVABLE(null);
     }
     return object;
+  }
+
+  /**
+   * Set when lib-jitsi-meet reports CONFERENCE_JOINED / left. With a non-null
+   * id, back-fills `participantId` on jitsi objects placed before myUserId
+   * existed (drag racing the conference handshake).
+   */
+  function syncLocalJitsiParticipantId(id: string | null) {
+    localJitsiParticipantId.value = id;
+    if (id == null) return;
+    for (const o of board.value.objects) {
+      if (o.type === "jitsi" && (o.participantId == null || o.participantId === "")) {
+        UPDATE_OBJECT({ ...o, participantId: id } as BoardObject);
+      }
+    }
   }
 
   function shapeObject(object: BoardObject) {
@@ -2564,6 +2591,7 @@ export const useStageStore = defineStore("stage", () => {
     speakAsAvatar,
     handleChatMessage,
     placeObjectOnStage,
+    syncLocalJitsiParticipantId,
     shapeObject,
     deleteObject,
     switchFrame,

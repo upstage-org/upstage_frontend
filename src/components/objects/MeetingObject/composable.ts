@@ -211,6 +211,10 @@ export const useJitsi = () => {
       jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e) => {
         console.log("Conference joined", e);
         joined.value = true;
+        const myId = jitsi.room?.myUserId?.();
+        if (myId != null) {
+          stageStore.syncLocalJitsiParticipantId(String(myId));
+        }
       });
       jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (...args) => {
         console.warn("[diag] composable CONFERENCE_FAILED", ...args);
@@ -221,12 +225,14 @@ export const useJitsi = () => {
     jitsi.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, (e) => {
       console.error("Connection failed", e);
       joined.value = false;
+      stageStore.syncLocalJitsiParticipantId(null);
     });
     jitsi.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
       (e) => {
         console.error("Connection disconnected", e);
         joined.value = false;
+        stageStore.syncLocalJitsiParticipantId(null);
       },
     );
 
@@ -256,6 +262,7 @@ export const useJitsi = () => {
       console.warn("jitsi.connection.disconnect() during unmount:", err);
     }
     joined.value = false;
+    stageStore.syncLocalJitsiParticipantId(null);
   });
 
   return [jitsi, joined];

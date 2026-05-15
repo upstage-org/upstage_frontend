@@ -32,6 +32,11 @@ export default {
     const stageStore = useStageStore();
 
     const dragstart = (e) => {
+      // Emit before serialising the payload so parents (e.g. Yourself.vue)
+      // can run publish-side effects while `props.data` is still the live
+      // reactive object; `setData` snapshots JSON and would otherwise miss
+      // updates that land in the same event tick.
+      emit("dragstart", e);
       e.dataTransfer.setData(
         "text",
         JSON.stringify({
@@ -41,7 +46,6 @@ export default {
         }),
       );
       document.getElementById("meeting-room")?.classList.add("disable-pointer");
-      emit("dragstart", e);
     };
 
     const dragend = () => {
