@@ -242,4 +242,8 @@ export default {
   expand_panel: "Expand panel",
   reset_panel_position: "Reset position",
   close_panel: "Close panel",
+  refresh_meeting: "Uppdatera möte",
+  refresh_meeting_tooltip: "Ladda om det inbäddade mötet om det inte laddades",
+  refresh_streams: "Uppdatera strömmar",
+  refresh_streams_tooltip: "Försök koppla individuella videoströmmar på scenen igen",
 };

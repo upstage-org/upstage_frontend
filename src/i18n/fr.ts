@@ -244,4 +244,8 @@ export default {
   expand_panel: "Expand panel",
   reset_panel_position: "Reset position",
   close_panel: "Close panel",
+  refresh_meeting: "Actualiser la réunion",
+  refresh_meeting_tooltip: "Recharger la réunion intégrée si elle n'a pas chargé",
+  refresh_streams: "Actualiser les flux",
+  refresh_streams_tooltip: "Réessayer de connecter les flux vidéo individuels sur scène",
 };

@@ -72,6 +72,10 @@ export default {
   expand_panel: "Expand panel",
   reset_panel_position: "Reset position",
   close_panel: "Close panel",
+  refresh_meeting: "Meeting neu laden",
+  refresh_meeting_tooltip: "Eingebettetes Meeting neu laden, wenn es nicht geladen wurde",
+  refresh_streams: "Streams aktualisieren",
+  refresh_streams_tooltip: "Einzelne Videostreams auf der Bühne erneut verbinden",
   multiframe_loop_tooltip:
     "Wiederholung: eingeschaltet laufen die Bilder endlos. Aus (ausgegraut): alle Bilder einmal abspielen, dann Stopp.",
 };

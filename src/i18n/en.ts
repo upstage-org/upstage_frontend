@@ -229,4 +229,8 @@ export default {
   expand_panel: "Expand panel",
   reset_panel_position: "Reset position",
   close_panel: "Close panel",
+  refresh_meeting: "Refresh meeting",
+  refresh_meeting_tooltip: "Reload the embedded meeting if it failed to load",
+  refresh_streams: "Refresh streams",
+  refresh_streams_tooltip: "Retry attaching individual video streams on stage",
 };

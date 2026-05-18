@@ -519,6 +519,8 @@ export const useStageStore = defineStore("stage", () => {
     donationDetails: { amount: 0, date: "" },
   });
   const _reloadStreams = ref<Date | null>(null);
+  /** Bumped by `refreshMeeting()` to remount embedded conference iframes. */
+  const _meetingRefreshKey = ref(0);
   const _enabledLiveStreaming = ref<boolean>(true);
   /**
    * Standalone `/chat/:url` connects to the same MQTT stream as the live
@@ -648,6 +650,7 @@ export const useStageStore = defineStore("stage", () => {
   const jitsiTracks = computed(() => board.value.tracks);
 
   const reloadStreams = computed(() => _reloadStreams.value);
+  const meetingRefreshKey = computed(() => _meetingRefreshKey.value);
 
   const activeObject = computed(() =>
     board.value.objects.find((o) => o.id == _activeMovable.value),
@@ -1336,6 +1339,10 @@ export const useStageStore = defineStore("stage", () => {
 
   function RELOAD_STREAMS() {
     _reloadStreams.value = new Date();
+  }
+
+  function REFRESH_MEETING() {
+    _meetingRefreshKey.value += 1;
   }
 
   function OPEN_RECEIPT_POPUP(_payload?: unknown) {
@@ -2634,6 +2641,11 @@ export const useStageStore = defineStore("stage", () => {
     RELOAD_STREAMS();
   }
 
+  /** Remount every on-stage `meeting` iframe (embedded Jitsi conference tile). */
+  function refreshMeeting() {
+    REFRESH_MEETING();
+  }
+
   // ====================================================================
   // RETURN — public store surface
   // ====================================================================
@@ -2675,6 +2687,7 @@ export const useStageStore = defineStore("stage", () => {
     purchasePopup,
     receiptPopup,
     _reloadStreams,
+    _meetingRefreshKey,
     _enabledLiveStreaming,
     // getters (computed views)
     ready,
@@ -2693,6 +2706,7 @@ export const useStageStore = defineStore("stage", () => {
     whiteboard,
     jitsiTracks,
     reloadStreams,
+    meetingRefreshKey,
     activeObject,
     enabledLiveStreaming,
     // mutations (UPPER_SNAKE_CASE)
@@ -2754,6 +2768,7 @@ export const useStageStore = defineStore("stage", () => {
     SET_PURCHASE_POPUP,
     ADD_TRACK,
     RELOAD_STREAMS,
+    REFRESH_MEETING,
     OPEN_RECEIPT_POPUP,
     CLOSE_RECEIPT_POPUP,
     // actions (lowerCamelCase; the `setShowPlayerChat` and
@@ -2839,5 +2854,6 @@ export const useStageStore = defineStore("stage", () => {
     closeReceiptPopup,
     addTrack,
     triggerReloadStreams,
+    refreshMeeting,
   };
 });

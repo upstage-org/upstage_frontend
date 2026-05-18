@@ -242,4 +242,9 @@ export default {
   expand_panel: "Expand panel",
   reset_panel_position: "Reset position",
   close_panel: "Close panel",
+  refresh_meeting: "Atualizar reunião",
+  refresh_meeting_tooltip: "Recarregar a reunião incorporada se não tiver carregado",
+  refresh_streams: "Atualizar transmissões",
+  refresh_streams_tooltip:
+    "Tentar novamente conectar as transmissões de vídeo individuais no palco",
 };

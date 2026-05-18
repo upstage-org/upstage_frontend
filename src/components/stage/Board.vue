@@ -94,6 +94,12 @@ export default {
     };
 
     const backdropColor = computed(() => stageStore.backdropColor);
+    const meetingRefreshKey = computed(() => stageStore.meetingRefreshKey);
+
+    // Remount embedded conference tiles when the user hits "Refresh
+    // meeting" so a stuck/failed iframe reloads from scratch.
+    const boardObjectKey = (object) =>
+      object.type === "meeting" ? `${object.id}-${meetingRefreshKey.value}` : object.id;
 
     return {
       objects,
@@ -104,6 +110,7 @@ export default {
       backdropColor,
       canPlay,
       resolveType,
+      boardObjectKey,
     };
   },
 };
@@ -133,7 +140,7 @@ export default {
           :is="resolveType(object)"
           v-for="object in objects"
           :id="object.id"
-          :key="object.id"
+          :key="boardObjectKey(object)"
           :object="object"
         />
       </transition-group>

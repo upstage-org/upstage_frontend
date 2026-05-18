@@ -207,4 +207,8 @@ export default {
   expand_panel: "Expand panel",
   reset_panel_position: "Reset position",
   close_panel: "Close panel",
+  refresh_meeting: "Làm mới cuộc họp",
+  refresh_meeting_tooltip: "Tải lại cuộc họp nhúng nếu không tải được",
+  refresh_streams: "Làm mới luồng",
+  refresh_streams_tooltip: "Thử kết nối lại các luồng video cá nhân trên sân khấu",
 };

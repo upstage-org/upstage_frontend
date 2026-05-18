@@ -183,6 +183,8 @@ export default {
 
     const activeMovable = computed(() => stageStore.activeMovable);
 
+    const retryMeeting = () => stageStore.refreshMeeting();
+
     return {
       meeting,
       activeMovable,
@@ -193,6 +195,7 @@ export default {
       onLoad,
       onError,
       canPlay,
+      retryMeeting,
     };
   },
 };
@@ -221,8 +224,11 @@ export default {
             <p class="hint">
               If you have a content blocker enabled (Brave Shields, uBlock Origin, Privacy Badger,
               Firefox Strict tracking protection, etc.), allow this page to embed
-              <code>{{ iframeSrc.split("/")[2] }}</code> and refresh.
+              <code>{{ iframeSrc.split("/")[2] }}</code> and try again.
             </p>
+            <button class="button is-small is-light" type="button" @click="retryMeeting">
+              {{ $t("refresh_meeting") }}
+            </button>
           </div>
           <iframe
             v-show="!failed"
