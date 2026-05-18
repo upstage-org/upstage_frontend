@@ -64,6 +64,95 @@ export const useJitsiEndpoint = () => {
 
 export const useJitsiDomain = () => useJitsiEndpoint()?.host ?? "";
 
+/**
+ * Load the Jitsi server's own `config.js` and extract the canonical
+ * XMPP hosts + transport URLs from it.
+ *
+ * Why: the previously hard-coded `conference.${domain}` / `focus.${domain}`
+ * prefixes are docker-jitsi-meet defaults, but installs that follow the
+ * other Jitsi reference deployment use `muc.${domain}` (no focus
+ * component is advertised — modern Jicofo handles focus discovery
+ * dynamically). Sending MUC presence to the wrong component is a
+ * silent hang: Prosody/ejabberd drops the stanza, no error comes back,
+ * `room.join()` returns successfully, and `CONFERENCE_JOINED` never
+ * fires — exactly the symptom we spent a long time chasing.
+ *
+ * The server-shipped `config.js` is the ground truth. The iframe-based
+ * `<MeetingObject>` works because it loads that file directly; this
+ * helper brings the same source of truth to the lib-jitsi-meet path.
+ *
+ * Implementation: `config.js` is a vanilla JS file that builds a global
+ * `config` object via assignments + string concatenations referencing
+ * locally-scoped helpers (`subdir`, `subdomain`). Two viable load
+ * strategies:
+ *
+ *   1. `fetch + new Function(text)` — sandbox-execute the source and
+ *      return the resulting `config`. Doesn't pollute `window`. Needs
+ *      both CORS (server must emit Access-Control-Allow-Origin) AND a
+ *      CSP that permits `unsafe-eval`. The Jitsi server here doesn't
+ *      send a CORS header, so this path is unreachable.
+ *
+ *   2. `<script src=...>` injection — bypasses CORS because script
+ *      loads are not subject to it, and runs at the page scope so the
+ *      `var config = {}` declarations end up on `window`. We pay a
+ *      tiny global namespace cost (`window.config`) which is acceptable
+ *      because the SPA itself never reads `window.config` (grep'd) and
+ *      Jitsi's iframe approach already implicitly relies on this same
+ *      pattern.
+ *
+ * Going with (2). Cached per host so repeat calls (route changes,
+ * reconnect attempts) don't re-inject the same script.
+ */
+const serverConfigCache = new Map<string, Promise<Record<string, any> | null>>();
+export const loadJitsiServerConfig = (
+  httpScheme: string,
+  host: string,
+): Promise<Record<string, any> | null> => {
+  const cacheKey = `${httpScheme}://${host}`;
+  const existing = serverConfigCache.get(cacheKey);
+  if (existing) return existing;
+  const promise = new Promise<Record<string, any> | null>((resolve) => {
+    try {
+      const script = document.createElement("script");
+      script.src = `${cacheKey}/config.js`;
+      script.async = true;
+      // Deliberately NOT setting `crossOrigin`. The Jitsi server does
+      // not emit `Access-Control-Allow-Origin`, so requesting CORS
+      // validation would block the load. As a plain classic script the
+      // browser executes the response without exposing its bytes to JS
+      // — which is exactly what we need (we read `window.config`
+      // afterwards, not the script source).
+      const cleanup = () => {
+        script.onload = null;
+        script.onerror = null;
+      };
+      script.onload = () => {
+        cleanup();
+        const cfg = (window as any).config ?? null;
+        console.log("[diag] loadJitsiServerConfig loaded", {
+          hostsDomain: cfg?.hosts?.domain,
+          hostsMuc: cfg?.hosts?.muc,
+          hostsFocus: cfg?.hosts?.focus,
+          websocket: cfg?.websocket,
+          bosh: cfg?.bosh,
+        });
+        resolve(cfg);
+      };
+      script.onerror = (ev) => {
+        cleanup();
+        console.warn("[diag] loadJitsiServerConfig script error", ev);
+        resolve(null);
+      };
+      document.head.appendChild(script);
+    } catch (err) {
+      console.warn("[diag] loadJitsiServerConfig threw", err);
+      resolve(null);
+    }
+  });
+  serverConfigCache.set(cacheKey, promise);
+  return promise;
+};
+
 export const useJitsi = () => {
   const joined = ref(false);
   // Reactive ref of the local performer's `JitsiTrack`s the moment
@@ -102,7 +191,7 @@ export const useJitsi = () => {
    * Defer connection setup until `stageStore.url` resolves to the real
    * stage URL via a one-shot watcher inside `onMounted`.
    */
-  const startConnection = (stageUrl: string) => {
+  const startConnection = async (stageUrl: string) => {
     if (!endpoint) {
       console.warn(
         "useJitsi: VITE_JITSI_ENDPOINT is unset/unparseable; skipping conference connect.",
@@ -110,7 +199,40 @@ export const useJitsi = () => {
       return;
     }
     console.log("[diag] useJitsi: starting connection", { stageUrl });
-    const { host, httpScheme, wsScheme, xmppDomain, mucDomain, focusDomain } = endpoint;
+    const { host, httpScheme, wsScheme } = endpoint;
+
+    // Pull the Jitsi server's own host configuration before connecting.
+    // The previously derived `conference.${domain}` / `focus.${domain}`
+    // defaults are docker-jitsi-meet conventions; this install (and many
+    // others) uses `muc.${domain}` with no separate focus component.
+    // Letting the server's `config.js` win — overlaid by env vars if
+    // anyone needs to force a value — ensures we send MUC presence to
+    // the JID the server is actually listening on. Without this, the
+    // presence is silently dropped and `CONFERENCE_JOINED` never fires
+    // (the long "preview works but other browsers can't see me" bug).
+    const serverCfg = await loadJitsiServerConfig(httpScheme, host);
+    const envXmpp = readEnvString("VITE_JITSI_XMPP_DOMAIN");
+    const envMuc = readEnvString("VITE_JITSI_XMPP_MUC_DOMAIN");
+    const envFocus = readEnvString("VITE_JITSI_XMPP_FOCUS_DOMAIN");
+    const xmppDomain = envXmpp ?? serverCfg?.hosts?.domain ?? endpoint.xmppDomain;
+    const mucDomain = envMuc ?? serverCfg?.hosts?.muc ?? endpoint.mucDomain;
+    // `config.hosts.focus` is unset on modern Jicofo deployments — leave
+    // `focus` out of the connectionOptions when neither env nor server
+    // advertise it, so lib-jitsi-meet falls back to dynamic discovery
+    // instead of dialing a hard-coded `focus.${domain}` that doesn't
+    // resolve.
+    const focusDomain = envFocus ?? serverCfg?.hosts?.focus ?? null;
+    const serverWebsocket = typeof serverCfg?.websocket === "string" ? serverCfg.websocket : null;
+    const serverBosh = typeof serverCfg?.bosh === "string" ? serverCfg.bosh : null;
+    console.log("[diag] useJitsi: resolved hosts", {
+      xmppDomain,
+      mucDomain,
+      focusDomain,
+      serverWebsocket,
+      serverBosh,
+      fromEnv: { envXmpp, envMuc, envFocus },
+      fromServer: !!serverCfg,
+    });
 
     // lib-jitsi-meet ships with two implementations of the bridge-channel
     // "ReceiverVideoConstraints" protocol gated by FeatureFlags:
@@ -174,6 +296,20 @@ export const useJitsi = () => {
       return String(raw).toLowerCase() !== "false";
     })();
 
+    const hostsObj: Record<string, string> = {
+      domain: xmppDomain,
+      muc: mucDomain,
+    };
+    if (focusDomain) hostsObj.focus = focusDomain;
+
+    // Prefer the server-published transport URLs (from `config.js`) so
+    // hostnames/paths match what the server actually serves. Fall back
+    // to constructing them from the endpoint host. Append the `?room=`
+    // hint that jitsi-videobridge uses to associate the WS with a
+    // specific conference when present.
+    const baseBosh = serverBosh ?? `${httpScheme}://${host}/http-bind`;
+    const baseWs = serverWebsocket ?? `${wsScheme}://${host}/xmpp-websocket`;
+
     console.log("[diag] useJitsi: connection options", {
       transportHost: host,
       xmppDomain,
@@ -181,21 +317,19 @@ export const useJitsi = () => {
       focusDomain,
       httpScheme,
       wsScheme,
+      hostsObj,
+      baseBosh,
+      baseWs,
     });
 
     const connectionOptions: Record<string, unknown> = {
-      hosts: {
-        domain: xmppDomain,
-        muc: mucDomain,
-        focus: focusDomain,
-      },
-      bosh: `${httpScheme}://${host}/http-bind`,
+      hosts: hostsObj,
+      bosh: baseBosh,
     };
     if (preferWebSocket) {
-      connectionOptions.serviceUrl = `${wsScheme}://${host}/xmpp-websocket?room=${encodeURIComponent(
-        stageUrl,
-      )}`;
-      connectionOptions.websocket = `${wsScheme}://${host}/xmpp-websocket`;
+      const sep = baseWs.indexOf("?") >= 0 ? "&" : "?";
+      connectionOptions.serviceUrl = `${baseWs}${sep}room=${encodeURIComponent(stageUrl)}`;
+      connectionOptions.websocket = baseWs;
     }
 
     jitsi.connection = new JitsiMeetJS.JitsiConnection(null, null, connectionOptions);
