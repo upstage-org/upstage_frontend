@@ -150,7 +150,7 @@ export default {
             .map((p) => p.getId())
             .concat(jitsi.room.myUserId());
           if (!participants.some((p) => p === props.object.participantId)) {
-            stageStore.deleteObject(props.object);
+            stageStore.removeObjectLocally(props.object);
           }
         }
       },

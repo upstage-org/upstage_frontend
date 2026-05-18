@@ -508,12 +508,14 @@ export const useJitsi = () => {
           type: track?.type,
           participantId: track?.getParticipantId?.(),
         });
+        if (track) stageStore.removeTrack(track);
       });
       jitsi.room.on(JitsiMeetJS.events.conference.USER_JOINED, (id) => {
         console.log("[diag] composable USER_JOINED", id);
       });
       jitsi.room.on(JitsiMeetJS.events.conference.USER_LEFT, (id) => {
         console.log("[diag] composable USER_LEFT", id);
+        if (id != null) stageStore.removeJitsiParticipantLocally(String(id));
       });
       jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e) => {
         console.log("[diag] composable CONFERENCE_JOINED", {

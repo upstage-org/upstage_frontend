@@ -907,6 +907,28 @@ export const useStageStore = defineStore("stage", () => {
       .forEach((costume) => {
         costume.wornBy = null;
       });
+    if (isJitsiBoardType(object.type) && object.participantId) {
+      pruneJitsiTracksForParticipant(String(object.participantId));
+    }
+  }
+
+  /** Drop WebRTC tracks when no on-stage tile still references the participant. */
+  function pruneJitsiTracksForParticipant(participantId: string) {
+    const stillOnBoard = board.value.objects.some(
+      (o) => isJitsiBoardType(o.type) && o.participantId === participantId,
+    );
+    if (stillOnBoard) return;
+    board.value.tracks = board.value.tracks.filter(
+      (t) => t.getParticipantId?.() !== participantId,
+    );
+  }
+
+  function REMOVE_TRACK(track: JitsiTrack) {
+    const id = track.getId?.();
+    board.value.tracks = board.value.tracks.filter((t) => {
+      if (id !== undefined) return t.getId?.() !== id;
+      return t !== track;
+    });
   }
 
   function SET_OBJECT_SPEAK({
@@ -1814,7 +1836,9 @@ export const useStageStore = defineStore("stage", () => {
       delete localPayload.commands;
     }
     DELETE_OBJECT(localPayload);
-    if (object.liveAction) {
+    // Only performers publish board deletes; audience-side orphan cleanup
+    // (e.g. Jitsi.vue when a remote peer leaves) must stay local.
+    if (object.liveAction && canPlay.value) {
       const wirePayload = serializeForBroadcast(object);
       if (wirePayload.drawingId) {
         delete wirePayload.commands;
@@ -2631,6 +2655,29 @@ export const useStageStore = defineStore("stage", () => {
     ADD_TRACK(track);
   }
 
+  function removeTrack(track: JitsiTrack) {
+    REMOVE_TRACK(track);
+  }
+
+  /** Remove a board tile locally without publishing MQTT (audience cleanup). */
+  function removeObjectLocally(object: BoardObject) {
+    DELETE_OBJECT(serializeObject(object));
+  }
+
+  /**
+   * When a lib-jitsi-meet peer leaves, drop their on-stage tiles and any
+   * lingering tracks on this client (MQTT DESTROY may never arrive).
+   */
+  function removeJitsiParticipantLocally(participantId: string) {
+    const targets = board.value.objects.filter(
+      (o) => isJitsiBoardType(o.type) && o.participantId === participantId,
+    );
+    for (const o of targets) {
+      DELETE_OBJECT(serializeObject(o));
+    }
+    pruneJitsiTracksForParticipant(participantId);
+  }
+
   /**
    * Trigger a stream-reload tick. Renamed from the bare
    * `reloadStreams()` action — the computed getter of the same name
@@ -2853,6 +2900,9 @@ export const useStageStore = defineStore("stage", () => {
     openReceiptPopup,
     closeReceiptPopup,
     addTrack,
+    removeTrack,
+    removeObjectLocally,
+    removeJitsiParticipantLocally,
     triggerReloadStreams,
     refreshMeeting,
   };
