@@ -39,7 +39,9 @@ const stages = computed((): StageRow[] => {
         isAdmin.value ? true : el.permission == "editor" || el.permission == "owner",
       )
       .map(({ id, name }: { id: string; name: string }) => ({ key: id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      .sort((a: StageRow, b: StageRow) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      );
   }
   return [];
 });

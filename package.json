@@ -8,7 +8,7 @@
     "node": ">=22 <23",
     "pnpm": ">=10"
   },
-  "packageManager": "pnpm@10.7.1+sha1.11ea2eb2e09f608614c62db024375b462aa3d861",
+  "packageManager": "pnpm@11.1.2",
   "scripts": {
     "serve": "vite --port=3000 --host",
     "dev": "vite --port=3000 --host",
