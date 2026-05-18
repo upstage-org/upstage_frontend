@@ -1727,6 +1727,25 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
+  /** MQTT board tracing for individual Jitsi stream tiles (not video bytes). */
+  function diagMqttJitsiBoard(
+    direction: "out" | "in",
+    action: string,
+    object?: BoardObject,
+    extra?: Record<string, unknown>,
+  ) {
+    if (!object || !isJitsiBoardType(object.type)) return;
+    console.log(`[diag] mqtt board ${direction}`, {
+      action,
+      objectId: object.id,
+      participantId: object.participantId,
+      type: object.type,
+      liveAction: object.liveAction,
+      published: object.published,
+      ...extra,
+    });
+  }
+
   function shapeObject(object: BoardObject) {
     // Sender always reflects their own change locally. This used to live
     // only in the `else` branch and the live branch relied on the broker
@@ -1738,6 +1757,7 @@ export const useStageStore = defineStore("stage", () => {
     UPDATE_OBJECT(serializeObject(object));
     if (object.liveAction) {
       if (object.published) {
+        diagMqttJitsiBoard("out", BOARD_ACTIONS.MOVE_TO, object);
         mqtt.sendMessage(TOPICS.BOARD, {
           type: BOARD_ACTIONS.MOVE_TO,
           object: serializeForBroadcast(object),
@@ -1745,6 +1765,9 @@ export const useStageStore = defineStore("stage", () => {
       } else {
         object.published = true;
         object.displayName = useUserStore().nickname ?? "";
+        diagMqttJitsiBoard("out", BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE, object, {
+          note: "first publish — remote clients get tile metadata only; video uses Jitsi WebRTC",
+        });
         mqtt.sendMessage(TOPICS.BOARD, {
           type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
           object: serializeForBroadcast(object),
@@ -1872,6 +1895,9 @@ export const useStageStore = defineStore("stage", () => {
     switch (message.type) {
       case BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE:
         if (message.object) {
+          diagMqttJitsiBoard("in", BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE, message.object, {
+            note: "tile metadata received — Jitsi.vue still needs TRACK_ADDED on this client",
+          });
           // The broadcast strips `liveAction` (serializeForBroadcast),
           // so incoming objects arrive without it. From the receiver's
           // point of view the object IS live — someone just published
@@ -1881,11 +1907,20 @@ export const useStageStore = defineStore("stage", () => {
           // "never published" white) for objects placed by collaborators,
           // and keeps the moveable in full color (Moveable.vue grayscale
           // matches `liveAction === false`).
+          //
+          // Individual Jitsi streams: MQTT carries the board object
+          // (type, x/y/w/h, participantId) only. Media tracks live in
+          // board.tracks and are filled by lib-jitsi-meet on each
+          // browser after the publisher's room.addTrack() succeeds —
+          // they are never serialized onto TOPICS.BOARD.
           PUSH_OBJECT({ ...message.object, liveAction: true, published: true });
         }
         break;
       case BOARD_ACTIONS.MOVE_TO:
-        if (message.object) UPDATE_OBJECT(message.object);
+        if (message.object) {
+          diagMqttJitsiBoard("in", BOARD_ACTIONS.MOVE_TO, message.object);
+          UPDATE_OBJECT(message.object);
+        }
         break;
       case BOARD_ACTIONS.DESTROY:
         if (message.object) DELETE_OBJECT(message.object);
