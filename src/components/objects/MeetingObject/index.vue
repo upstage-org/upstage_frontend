@@ -38,6 +38,54 @@ const TIMEOUT_MS = 15000;
 // fragment grammar.
 const encodeConfigValue = (v) => encodeURIComponent(JSON.stringify(v));
 
+/**
+ * Jitsi `config` / `interfaceConfig` overrides for audience viewers
+ * (`stageStore.canPlay === false`: guest, audience permission, replay,
+ * masquerade). Goal: join muted, watch only — no flip, pin-to-stage,
+ * participant menus, reactions, profile, or share/embed affordances.
+ * Performers omit this block and keep the server defaults.
+ */
+const AUDIENCE_JITSI_CONFIG = {
+  toolbarButtons: [],
+  disableShortcuts: true,
+  readOnlyName: true,
+  disableDeepLinking: true,
+  disableInviteFunctions: true,
+  disableProfile: true,
+  disableReactions: true,
+  disableReactionsInChat: true,
+  disableModeratorIndicator: true,
+  disableRemoteMute: true,
+  disableSelfView: true,
+  disableSelfViewSettings: true,
+  disableLocalVideoFlip: true,
+  hiddenPremeetingButtons: ["microphone", "camera", "select-background", "invite", "settings"],
+  filmstrip: {
+    disableResizable: true,
+    disableStageFilmstrip: true,
+  },
+  remoteVideoMenu: {
+    disabled: true,
+    disableKick: true,
+    disableGrantModerator: true,
+    disablePrivateChat: "all",
+    disableDemote: true,
+  },
+  participantsPane: {
+    hideModeratorSettingsTab: true,
+    hideMoreActionsButton: true,
+    hideMuteAllButton: true,
+  },
+};
+
+const AUDIENCE_JITSI_INTERFACE_CONFIG = {
+  TOOLBAR_BUTTONS: [],
+  SETTINGS_SECTIONS: [],
+  MOBILE_APP_PROMO: false,
+  SHARING_FEATURES: [],
+  DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+};
+
 export default {
   components: { AppObject },
   props: { object: Object },
@@ -56,13 +104,9 @@ export default {
     //    own camera/mic during the meeting. Joining muted+cameraless
     //    is preserved (matches the prior `startVideoMuted/startAudioMuted`
     //    + `disableInitialGUM` behaviour).
-    //  - Audience get an empty toolbar, no shortcuts, and
-    //    `disableInitialGUM` so the iframe never attempts to access
-    //    their devices. Even if the toolbar somehow rendered, the
-    //    iframe's `allow=` attribute (below) does not delegate the
-    //    `camera` / `microphone` Permissions-Policy features to them,
-    //    so getUserMedia inside the iframe would fail at the browser
-    //    boundary.
+    //  - Audience: see AUDIENCE_JITSI_* below — watch-only (no flip, pin,
+    //    participant menus, reactions, etc.), `disableInitialGUM`, no
+    //    `allowfullscreen`. Performers keep full Jitsi UI + allow= media.
     const iframeSrc = computed(() => {
       const endpoint = useJitsiEndpoint();
       if (!endpoint) return "";
@@ -73,25 +117,11 @@ export default {
         startVideoMuted: 1,
         startAudioMuted: 1,
         disableInitialGUM: !canPlay.value,
-        ...(canPlay.value
-          ? {}
-          : {
-              // Modern Jitsi key (>= 2.0.x).
-              toolbarButtons: [],
-              disableShortcuts: true,
-              readOnlyName: true,
-            }),
+        ...(canPlay.value ? {} : AUDIENCE_JITSI_CONFIG),
       };
       const interfaceConfig = {
         SHOW_CHROME_EXTENSION_BANNER: false,
-        ...(canPlay.value
-          ? {}
-          : {
-              // Legacy interfaceConfig key (older Jitsi installs).
-              TOOLBAR_BUTTONS: [],
-              SETTINGS_SECTIONS: [],
-              MOBILE_APP_PROMO: false,
-            }),
+        ...(canPlay.value ? {} : AUDIENCE_JITSI_INTERFACE_CONFIG),
       };
 
       const fragmentParts = [
@@ -199,7 +229,7 @@ export default {
             class="room"
             :src="iframeSrc"
             :allow="iframeAllow"
-            allowfullscreen
+            :allowfullscreen="canPlay"
             referrerpolicy="no-referrer-when-downgrade"
             @load="onLoad"
             @error="onError"
