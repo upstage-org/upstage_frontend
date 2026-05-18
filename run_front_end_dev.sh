@@ -60,7 +60,7 @@ fi
 
 if [[ "$MODE" == "serve" ]]; then
   if ! command -v pnpm >/dev/null 2>&1; then
-    echo "pnpm not found on PATH. Install it (e.g. \`corepack enable && corepack prepare pnpm@10.7.1 --activate\`) and try again." >&2
+    echo "pnpm not found on PATH. Install it (e.g. \`corepack enable && corepack prepare pnpm@11.1.2 --activate\`) and try again." >&2
     exit 1
   fi
   echo "--serve: running Vite dev server on 0.0.0.0:${FRONTEND_PORT} (no docker)." >&2
