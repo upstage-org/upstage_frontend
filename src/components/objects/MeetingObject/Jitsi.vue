@@ -34,6 +34,13 @@ export default {
       const remote = stageStore.jitsiTracks.filter(
         (t) => t.getParticipantId() === props.object.participantId,
       );
+      // Own-tile fast-path tracks: tracks acquired by Yourself.vue and
+      // published into the shared composable ref the moment
+      // `createLocalTracks` resolved, BEFORE the conference round-trip.
+      // Read it eagerly (even when this isn't the own tile) so Vue
+      // registers the dependency and we recompute when Yourself.vue
+      // swaps the array.
+      const composableLocal = jitsi?.localTracks?.value ?? [];
       console.log("[diag] Jitsi.vue tracks recompute", {
         objectId: props.object.id,
         objectParticipantId: props.object.participantId,
@@ -43,28 +50,35 @@ export default {
         storeJitsiTracksParticipantIds: stageStore.jitsiTracks.map((t) => t.getParticipantId?.()),
         roomLocalTracksLen: jitsi?.room?.getLocalTracks?.()?.length,
         roomLocalTracksParticipantIds: jitsi?.room?.getLocalTracks?.()?.map((t) => t.getParticipantId?.()),
+        composableLocalLen: composableLocal.length,
         remoteMatchLen: remote.length,
       });
       if (!isOwnTile.value) return remote;
 
-      // Local tile: also include the conference's local tracks. The
-      // qmu_copy code implicitly relied on lib-jitsi-meet putting
-      // local tracks into `getLocalTracks()` synchronously after
-      // `room.addTrack()` resolved, so the per-participantId filter
-      // always saw them. Mirror that behaviour explicitly here so the
-      // performer's own on-stage tile renders even if the store entry
-      // hasn't been re-published yet via TRACK_ADDED. Dedupe by
-      // JitsiTrack.getId() so we never attach the same MediaStream
-      // twice.
+      // Local tile: combine
+      //   (a) anything that already made it into `stageStore.jitsiTracks`
+      //       via the normal `addTrack` path (when the conference is
+      //       healthy this is the canonical source), and
+      //   (b) the conference's `getLocalTracks()` — covers the legacy
+      //       path where lib-jitsi-meet has the track on the room but
+      //       the store-republish hasn't fired yet, and
+      //   (c) the composable's `localTracks` ref written by Yourself.vue
+      //       directly from `createLocalTracks`, which is the ONLY
+      //       source that works when the conference join is stalled
+      //       (the "preview works, dragged tile spins forever" symptom).
+      // Dedupe by JitsiTrack.getId() so a track that exists in multiple
+      // sources only gets attached once.
       const local = jitsi?.room?.getLocalTracks?.() ?? [];
       const seen = new Set(remote.map((t) => t.getId?.()));
-      for (const t of local) {
-        const id = t.getId?.();
+      const pushUnique = (t) => {
+        const id = t?.getId?.();
         if (id === undefined || !seen.has(id)) {
           remote.push(t);
           if (id !== undefined) seen.add(id);
         }
-      }
+      };
+      for (const t of local) pushUnique(t);
+      for (const t of composableLocal) pushUnique(t);
       return remote;
     });
     const volume = computed(() => props.object.volume);

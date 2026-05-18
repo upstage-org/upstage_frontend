@@ -2,6 +2,7 @@
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { computed, provide, reactive, ref, watch } from "vue";
+import { isStreamPlaybackBoardType } from "@utils/common";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
@@ -189,6 +190,7 @@ export default {
       openLink,
       loadeddata,
       video,
+      isStreamPlaybackBoardType,
     };
   },
 };
@@ -273,7 +275,10 @@ export default {
             -->
             <!-- eslint-disable-next-line vue/no-mutating-props -->
             <video
-              v-if="object.assetType?.name == 'video'"
+              v-if="
+                isStreamPlaybackBoardType(object.type) ||
+                isStreamPlaybackBoardType(object.assetType?.name)
+              "
               :id="'video' + object.id"
               ref="video"
               class="the-object-video"

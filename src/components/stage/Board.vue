@@ -1,6 +1,7 @@
 <script>
 import { computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { isStreamPlaybackBoardType } from "@utils/common";
 import Avatar from "components/objects/Avatar/index.vue";
 import Drawing from "components/objects/Drawing.vue";
 import Meeting from "components/objects/MeetingObject/index.vue";
@@ -29,7 +30,7 @@ const TYPE_TO_COMPONENT = {
 
 const resolveType = (object) => {
   if (object.drawingId) return "Drawing";
-  if (object.type === "video") return "Avatar";
+  if (isStreamPlaybackBoardType(object.type)) return "Avatar";
   return TYPE_TO_COMPONENT[object.type] || "Avatar";
 };
 

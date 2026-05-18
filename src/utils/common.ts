@@ -26,6 +26,26 @@ export function posterJpgForVideoUrl(url: string): string {
   return `${pathOnly}.poster.jpg${query}${frag}`;
 }
 
+/**
+ * Toolbox / GraphQL asset labels that map onto the Streams strip and play back
+ * as `BoardObject.type === "video"` with `object.url` (synonyms are lowercase
+ * in SET_MODEL except when `assetType.name` overrides with e.g. "Video").
+ */
+const STREAM_PLAYBACK_TYPE_ALIASES = new Set(["video", "stream", "streams", "streaming"]);
+
+export function isStreamPlaybackBoardType(type: unknown): boolean {
+  if (type == null) return false;
+  return STREAM_PLAYBACK_TYPE_ALIASES.has(String(type).trim().toLowerCase());
+}
+
+/** GraphQL `assetType.name` may be `Jitsi`; board resolution uses key `jitsi` only. */
+const JITSI_BOARD_TYPE_ALIASES = new Set(["jitsi"]);
+
+export function isJitsiBoardType(type: unknown): boolean {
+  if (type == null) return false;
+  return JITSI_BOARD_TYPE_ALIASES.has(String(type).trim().toLowerCase());
+}
+
 // `upstage-auth` is the key written by `pinia-plugin-persistedstate` for the
 // Pinia auth store (see `src/store/pinia/auth.ts`). After the Phase 5 cutover
 // from Vuex this is the single source of truth for the persisted access /

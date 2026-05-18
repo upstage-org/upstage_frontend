@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { isJitsiBoardType } from "@utils/common";
 
 const stageStore = useStageStore();
 const objects = computed<{ type?: string }[]>(() => stageStore.objects);
-const hasJitsi = computed(() => objects.value.some((el) => el.type === "jitsi"));
+const hasJitsi = computed(() => objects.value.some((el) => isJitsiBoardType(el.type)));
 const onReload = () => stageStore.triggerReloadStreams();
 </script>
 

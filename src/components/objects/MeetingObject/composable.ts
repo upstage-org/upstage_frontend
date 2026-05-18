@@ -1,6 +1,6 @@
 // @ts-nocheck
 import configs from "config";
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 
 export const useLowLevelAPI = () => {
@@ -66,20 +66,50 @@ export const useJitsiDomain = () => useJitsiEndpoint()?.host ?? "";
 
 export const useJitsi = () => {
   const joined = ref(false);
-  const jitsi = { room: null, connection: null };
+  // Reactive ref of the local performer's `JitsiTrack`s the moment
+  // `createLocalTracks` resolves in `Yourself.vue`, *before* the
+  // conference's `room.addTrack()` round-trip. Used by `Jitsi.vue`'s
+  // own-tile branch as a fallback path so the performer can see their
+  // own dragged stream rendering on the stage without waiting for —
+  // or depending on — `CONFERENCE_JOINED`. Cross-peer broadcast still
+  // requires the conference, but the local preview/on-stage tile no
+  // longer hangs on a spinner when the MUC join silently stalls.
+  //
+  // shallowRef is intentional: `JitsiTrack` instances mutate internal
+  // state and replace MediaStream references; deep reactivity would
+  // try to proxy through them and either trip lib-jitsi-meet's
+  // identity checks or thrash recompute. We only need to know when
+  // the *array* changes, not when individual track internals change.
+  const localTracks = shallowRef([]);
+  const jitsi = { room: null, connection: null, localTracks };
   const endpoint = useJitsiEndpoint();
   const stageStore = useStageStore();
-  const stageUrl = stageStore.url;
 
   const JitsiMeetJS = useLowLevelAPI();
 
-  onMounted(() => {
+  /**
+   * `stageStore.url` is `computed(() => model.value?.fileLocation ?? "demo")`.
+   * Until `loadStage()` populates `model.value`, the getter returns the
+   * placeholder string `"demo"`. Shell.vue calls `useJitsi()` inside
+   * Layout.vue's template, which mounts in the same tick that `loadStage`
+   * is *kicked off* (async, network-bound), so the previous code captured
+   * `"demo"` and pinned the conference to a sentinel room for the rest of
+   * the session — `initJitsiConference("demo")` succeeds quietly, the
+   * performer joins a room nobody else is in, and even local-tile rendering
+   * is brittle because the per-participantId filter races with myUserId
+   * timing on a not-really-joined room.
+   *
+   * Defer connection setup until `stageStore.url` resolves to the real
+   * stage URL via a one-shot watcher inside `onMounted`.
+   */
+  const startConnection = (stageUrl: string) => {
     if (!endpoint) {
       console.warn(
         "useJitsi: VITE_JITSI_ENDPOINT is unset/unparseable; skipping conference connect.",
       );
       return;
     }
+    console.log("[diag] useJitsi: starting connection", { stageUrl });
     const { host, httpScheme, wsScheme, xmppDomain, mucDomain, focusDomain } = endpoint;
 
     // lib-jitsi-meet ships with two implementations of the bridge-channel
@@ -122,7 +152,14 @@ export const useJitsi = () => {
         ssrcRewritingOnBridgeSupported: true,
       },
     });
-    JitsiMeetJS.setLogLevel(JitsiMeetJS.logLevels.ERROR);
+    // Temporarily downgrade from ERROR to WARN so the XMPP/MUC/focus
+    // handshake surfaces in the console. The previous ERROR-only filter
+    // suppressed exactly the lines we need to see when `room.join()`
+    // returns but CONFERENCE_JOINED never fires (e.g. "ConferenceFocus
+    // not found", "Could not allocate channels", presence rejections).
+    // TODO(streaming-diag): revert to logLevels.ERROR once the
+    // CONFERENCE_JOINED-never-fires root cause is identified.
+    JitsiMeetJS.setLogLevel(JitsiMeetJS.logLevels.WARN);
 
     // Transport selection. Modern Jitsi servers expose XMPP-over-WebSocket
     // at `/xmpp-websocket`, which is lower latency than BOSH (long-poll
@@ -163,6 +200,132 @@ export const useJitsi = () => {
 
     jitsi.connection = new JitsiMeetJS.JitsiConnection(null, null, connectionOptions);
 
+    // Raw XMPP stanza tracing.
+    //
+    // First attempt was to set `rawInput` / `rawOutput` on the Strophe
+    // connection at `jitsi.connection.xmpp.connection`. Strophe's
+    // WebSocket transport (which lib-jitsi-meet picks here because of
+    // `serviceUrl: wss://…/xmpp-websocket?room=…`) bypasses those for
+    // outbound traffic in this version, so the hooks attached cleanly
+    // but never fired. The `xmlInput` / `xmlOutput` hooks have the
+    // same problem.
+    //
+    // Reliable fallback: monkey-patch the global `WebSocket` constructor
+    // *once* and wrap any socket whose URL hits our Jitsi WS endpoint.
+    // We instrument `socket.send(data)` and intercept `message` events
+    // before lib-jitsi-meet's handlers see them, so we capture the
+    // actual XMPP bytes regardless of which Strophe internals routed
+    // them. Truncate so a noisy ICE candidate / DTLS fingerprint blast
+    // doesn't drown the console.
+    // TODO(streaming-diag): remove once the CONFERENCE_JOINED-never-fires
+    // root cause is identified.
+    {
+      const w = window as unknown as {
+        WebSocket: typeof WebSocket;
+        __upstageWsHooked?: boolean;
+      };
+      if (!w.__upstageWsHooked) {
+        const OriginalWebSocket = w.WebSocket;
+        const wsHostHint = `${wsScheme}://${host}/xmpp-websocket`;
+        const truncate = (s: unknown) => {
+          const str = typeof s === "string" ? s : "(non-string frame)";
+          return str.length > 800 ? `${str.slice(0, 800)}…(+${str.length - 800})` : str;
+        };
+        const PatchedWebSocket = function (this: WebSocket, url: string, protocols?: string | string[]) {
+          const sock = new OriginalWebSocket(url, protocols);
+          // Log EVERY ws creation so we know whether lib-jitsi-meet
+          // even reached the WebSocket transport. If we only see MQTT
+          // sockets here and no xmpp-websocket, lib-jitsi-meet silently
+          // fell back to BOSH/XHR.
+          console.log("[diag] WebSocket OPEN", url);
+          const isJitsi = typeof url === "string" && url.indexOf("/xmpp-websocket") !== -1;
+          if (isJitsi) {
+            const origSend = sock.send.bind(sock);
+            sock.send = function (data: string | ArrayBufferLike | Blob | ArrayBufferView) {
+              try {
+                console.log("[diag] xmpp ⇒ out", truncate(data));
+              } catch (_) {
+                /* logging must not break send */
+              }
+              return origSend(data as never);
+            };
+            sock.addEventListener("message", (ev: MessageEvent) => {
+              try {
+                console.log("[diag] xmpp ⇐ in ", truncate(ev.data));
+              } catch (_) {
+                /* logging must not break recv */
+              }
+            });
+            sock.addEventListener("close", (ev: CloseEvent) => {
+              console.warn("[diag] xmpp ws CLOSE", {
+                code: ev.code,
+                reason: ev.reason,
+                wasClean: ev.wasClean,
+              });
+            });
+            sock.addEventListener("error", (ev: Event) => {
+              console.warn("[diag] xmpp ws ERROR", ev);
+            });
+          }
+          return sock;
+        } as unknown as typeof WebSocket;
+        PatchedWebSocket.prototype = OriginalWebSocket.prototype;
+        (PatchedWebSocket as any).CONNECTING = OriginalWebSocket.CONNECTING;
+        (PatchedWebSocket as any).OPEN = OriginalWebSocket.OPEN;
+        (PatchedWebSocket as any).CLOSING = OriginalWebSocket.CLOSING;
+        (PatchedWebSocket as any).CLOSED = OriginalWebSocket.CLOSED;
+        w.WebSocket = PatchedWebSocket;
+        w.__upstageWsHooked = true;
+        console.log("[diag] composable WebSocket-wrap installed for", wsHostHint);
+
+        // BOSH fallback tracing. If lib-jitsi-meet didn't open a
+        // WebSocket to /xmpp-websocket (because of an internal
+        // capability check failure, transport negotiation, or because
+        // it deliberately preferred BOSH), every XMPP stanza goes over
+        // HTTPS POSTs to `/http-bind` instead. Hook XMLHttpRequest so
+        // we still capture the protocol-level conversation.
+        const wXhr = window as unknown as { __upstageXhrHooked?: boolean };
+        if (!wXhr.__upstageXhrHooked) {
+          const OriginalOpen = XMLHttpRequest.prototype.open;
+          const OriginalSend = XMLHttpRequest.prototype.send;
+          XMLHttpRequest.prototype.open = function (
+            method: string,
+            url: string | URL,
+            ...rest: unknown[]
+          ) {
+            (this as unknown as { __upstageUrl?: string }).__upstageUrl = String(url);
+            // eslint-disable-next-line prefer-rest-params
+            return OriginalOpen.apply(this, arguments as any);
+          };
+          XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
+            const url = (this as unknown as { __upstageUrl?: string }).__upstageUrl ?? "";
+            const isBosh = url.indexOf("/http-bind") !== -1;
+            if (isBosh) {
+              try {
+                console.log("[diag] bosh ⇒ out", truncate(body as unknown));
+              } catch (_) {
+                /* logging must not break send */
+              }
+              this.addEventListener("load", () => {
+                try {
+                  console.log("[diag] bosh ⇐ in ", "status=" + this.status, truncate(this.responseText));
+                } catch (_) {
+                  /* logging must not break recv */
+                }
+              });
+              this.addEventListener("error", (ev: Event) => {
+                console.warn("[diag] bosh xhr ERROR", { status: this.status, ev });
+              });
+            }
+            // eslint-disable-next-line prefer-rest-params
+            return OriginalSend.apply(this, arguments as any);
+          };
+          wXhr.__upstageXhrHooked = true;
+          console.log("[diag] composable XHR-wrap installed for /http-bind");
+        }
+      }
+    }
+
     jitsi.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED, (e) => {
       console.log("Connection established", e);
       // NOTE on the Colibri "bridge channel":
@@ -186,7 +349,17 @@ export const useJitsi = () => {
       // flip `videobridge.websockets.tls = false` inside the JVB
       // container's `/config/jvb.conf`. See REMAINING_STEPS / README for
       // the docker exec one-liner.
-      jitsi.room = jitsi.connection.initJitsiConference(stageUrl, {});
+      console.log("[diag] composable initJitsiConference", {
+        stageUrl,
+        stageUrlType: typeof stageUrl,
+        stageUrlEmpty: !stageUrl,
+      });
+      try {
+        jitsi.room = jitsi.connection.initJitsiConference(stageUrl, {});
+      } catch (initErr) {
+        console.error("[diag] composable initJitsiConference threw", initErr);
+        return;
+      }
       jitsi.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track) => {
         console.log("[diag] composable TRACK_ADDED", {
           type: track?.type,
@@ -209,7 +382,10 @@ export const useJitsi = () => {
         console.log("[diag] composable USER_LEFT", id);
       });
       jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e) => {
-        console.log("Conference joined", e);
+        console.log("[diag] composable CONFERENCE_JOINED", {
+          myUserId: jitsi.room?.myUserId?.(),
+          e,
+        });
         joined.value = true;
         const myId = jitsi.room?.myUserId?.();
         if (myId != null) {
@@ -220,7 +396,116 @@ export const useJitsi = () => {
         console.warn("[diag] composable CONFERENCE_FAILED", ...args);
       });
 
-      jitsi.room.join();
+      try {
+        console.log("[diag] composable room.join() about to call", {
+          myUserIdBeforeJoin: jitsi.room?.myUserId?.(),
+        });
+        jitsi.room.join();
+        console.log("[diag] composable room.join() returned");
+      } catch (joinErr) {
+        console.error("[diag] composable room.join() threw", joinErr);
+      }
+      // Watchdog: dump a verbose snapshot at 5s/15s/30s so we can see
+      // whether the MUC join progresses, stays totally silent, or
+      // surfaces a late presence-error. ALSO confirms the WebSocket
+      // patch is wired (window.WebSocket.name should be "PatchedWebSocket"
+      // and __upstageWsHooked=true) — if it isn't, the "no [diag] xmpp"
+      // lines aren't evidence of a server-side hang but of a patch
+      // installation race.
+      // TODO(streaming-diag): remove once root cause identified.
+      const watchdog = (afterMs: number) => {
+        setTimeout(() => {
+          if (joined.value) return;
+          const r = jitsi.room;
+          const xmppConn = jitsi.connection?.xmpp?.connection;
+          let members: unknown;
+          try {
+            members = r?.getParticipants?.()?.length;
+          } catch (_) {
+            members = "throw";
+          }
+          let role: unknown;
+          try {
+            role = r?.getRole?.();
+          } catch (_) {
+            role = "throw";
+          }
+          const w = window as unknown as { WebSocket: typeof WebSocket; __upstageWsHooked?: boolean };
+          console.error(`[diag] composable JOIN_WATCHDOG joined=false after ${afterMs}ms`, {
+            hasRoom: !!r,
+            myUserId: r?.myUserId?.(),
+            myroomjid: r?.myroomjid,
+            roomjid: r?.roomjid,
+            members,
+            role,
+            isJoined: r?.isJoined?.(),
+            isFocus: r?.focusFeatureDiscoveryComplete,
+            xmpp: {
+              connected: xmppConn?.connected,
+              authenticated: xmppConn?.authenticated,
+              jid: xmppConn?.jid,
+              transport: xmppConn?._proto?.constructor?.name,
+              wsUrl: xmppConn?._proto?._wsUrl,
+              boshUrl: xmppConn?._proto?._url,
+              disconnecting: xmppConn?.disconnecting,
+              do_authentication: xmppConn?.do_authentication,
+            },
+            patch: {
+              wsHooked: !!w.__upstageWsHooked,
+              wsConstructorName: typeof w.WebSocket === "function" ? w.WebSocket.name : typeof w.WebSocket,
+            },
+          });
+        }, afterMs);
+      };
+      watchdog(5_000);
+      watchdog(15_000);
+      watchdog(30_000);
+
+      // One-shot raw XMPP tap on Strophe itself. Earlier `rawInput` /
+      // `rawOutput` attempts failed because they were set BEFORE the
+      // Strophe connection existed; by the time CONNECTION_ESTABLISHED
+      // fires the connection IS there, so wiring them here catches
+      // every inbound stanza (including any MUC presence-error that
+      // would explain a silent join hang). Outbound `rawOutput` was
+      // documented as unreliable for the WebSocket transport, so we
+      // still keep the global WebSocket wrap as the canonical outbound
+      // capture. Defensive: lib could reorganise this internal path
+      // between releases, so wrap in try/catch.
+      // TODO(streaming-diag): remove with the rest of the trace.
+      try {
+        const xmppConn = jitsi.connection?.xmpp?.connection;
+        if (xmppConn && typeof xmppConn.xmlInput !== "function") {
+          xmppConn.xmlInput = (elem: { outerHTML?: string }) => {
+            try {
+              const s = elem?.outerHTML ?? String(elem);
+              console.log(
+                "[diag] strophe xmlInput",
+                s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
+              );
+            } catch (_) {
+              /* swallow */
+            }
+          };
+        }
+        if (xmppConn && typeof xmppConn.xmlOutput !== "function") {
+          xmppConn.xmlOutput = (elem: { outerHTML?: string }) => {
+            try {
+              const s = elem?.outerHTML ?? String(elem);
+              console.log(
+                "[diag] strophe xmlOutput",
+                s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
+              );
+            } catch (_) {
+              /* swallow */
+            }
+          };
+        }
+        console.log("[diag] strophe xmlInput/xmlOutput hooks installed", {
+          hasXmppConn: !!xmppConn,
+        });
+      } catch (hookErr) {
+        console.warn("[diag] failed to install strophe xmlInput/xmlOutput", hookErr);
+      }
     });
     jitsi.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, (e) => {
       console.error("Connection failed", e);
@@ -236,7 +521,43 @@ export const useJitsi = () => {
       },
     );
 
+    // Sanity log right before connect(): confirms our WebSocket wrap
+    // is in place at the moment Strophe is about to dial out. If
+    // `wsConstructorName` is anything other than "PatchedWebSocket"
+    // (e.g. native "WebSocket"), the patch race is the reason we're
+    // not seeing [diag] xmpp lines, NOT a server hang.
+    // TODO(streaming-diag): remove with the rest of the trace.
+    {
+      const w = window as unknown as { WebSocket: typeof WebSocket; __upstageWsHooked?: boolean };
+      console.log("[diag] composable about to connect()", {
+        wsHooked: !!w.__upstageWsHooked,
+        wsConstructorName: typeof w.WebSocket === "function" ? w.WebSocket.name : typeof w.WebSocket,
+      });
+    }
     jitsi.connection.connect();
+  };
+
+  // One-shot watcher: as soon as `stageStore.url` reports a real stage
+  // (anything other than the empty/"demo" placeholder), kick off the
+  // conference connect with the *resolved* URL. The watcher self-stops
+  // after the first non-placeholder value so a transient model refresh
+  // can't tear down and re-create the conference mid-session.
+  const isPlaceholderStageUrl = (u: unknown) =>
+    u == null || u === "" || u === "demo";
+  onMounted(() => {
+    const initialUrl = stageStore.url;
+    if (!isPlaceholderStageUrl(initialUrl)) {
+      startConnection(String(initialUrl));
+      return;
+    }
+    const stop = watch(
+      () => stageStore.url,
+      (url) => {
+        if (isPlaceholderStageUrl(url)) return;
+        stop();
+        startConnection(String(url));
+      },
+    );
   });
 
   // Tear down the XMPP/BOSH/WebSocket connection on unmount so it does

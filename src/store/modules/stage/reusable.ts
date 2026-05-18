@@ -1,6 +1,7 @@
 // @ts-nocheck
 import configs from "config";
 import { useStageStore } from "@stores/pinia/stage";
+import { isJitsiBoardType, isStreamPlaybackBoardType } from "@utils/common";
 
 // `useStageStore()` is cheap to call repeatedly — Pinia caches the
 // instance — so these helpers re-resolve the store on each call rather
@@ -27,7 +28,7 @@ export function serializeObject(object) {
   const { src, type } = object;
   object = {
     ...object,
-    src: type === "video" ? null : src,
+    src: isStreamPlaybackBoardType(type) ? null : src,
   };
   object.x = toRelative(object.x);
   object.y = toRelative(object.y);
@@ -53,8 +54,11 @@ export function serializeForBroadcast(object) {
 }
 
 export function deserializeObject(object) {
-  if (object.type === "video") {
+  if (isStreamPlaybackBoardType(object.type)) {
+    object.type = "video";
     delete object.src;
+  } else if (isJitsiBoardType(object.type)) {
+    object.type = "jitsi";
   }
   object.x = toAbsolute(object.x);
   object.y = toAbsolute(object.y);

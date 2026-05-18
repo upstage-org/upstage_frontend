@@ -60,8 +60,39 @@ export default {
     const joined = inject("joined");
     const JitsiMeetJS = useLowLevelAPI();
     const stageStore = useStageStore();
-    /** Cleared on unmount; set when user drags/clicks publish before CONFERENCE_JOINED. */
+    /**
+     * Set when the user has signalled intent to publish (drag from the
+     * Yourself preview, or click the preview <video>). Cleared once the
+     * tracks have actually been pushed into the room, OR on unmount.
+     *
+     * Required because the user can request publish *before* either of
+     * the two async preconditions is satisfied:
+     *
+     *   (a) CONFERENCE_JOINED has fired (`joined.value === true`), and
+     *   (b) `createLocalTracks` has resolved (`tracks.length > 0`).
+     *
+     * The previous code only gated on (a) via `pendingPublish`. If the
+     * user dragged after (a) but before (b) — typical when the browser
+     * permission prompt takes a couple of seconds on Brave/Safari — the
+     * `for (const t of tracks)` loop in `publishLocalTracksToRoom`
+     * iterated an empty array, no `addTrack` was called, no TRACK_ADDED
+     * fired, and the on-stage tile span forever with `tracksLen: 0`.
+     */
     const pendingPublish = ref(false);
+    /**
+     * Set once the current set of `tracks` has been pushed into the
+     * conference. Re-cleared by `acquireLocalTracks` when it acquires a
+     * *new* set of tracks (DEVICE_LIST_CHANGED hot-swap), so the
+     * replacement tracks get published when the user next drags.
+     *
+     * Without this, a second drag (or back-to-back wake-ups from
+     * `joined` / `acquireLocalTracks`) would re-enter
+     * `publishLocalTracksToRoom` with the same `tracks` array and call
+     * `room.addTrack(t)` on tracks the conference already has.
+     * lib-jitsi-meet rejects that (or no-ops with a warning depending
+     * on version), which is harmless but noisy.
+     */
+    const published = ref(false);
 
     const setBlocked = (message) => {
       blocked.value = true;
@@ -99,6 +130,16 @@ export default {
           }
         }
         tracks = [];
+        // Tracks are being replaced (initial acquire or hot-swap via
+        // DEVICE_LIST_CHANGED). Reset `published` so the new set gets
+        // pushed into the room on the next `tryPublishWhenReady`.
+        published.value = false;
+        // Clear the previous set from the shared composable ref so
+        // any on-stage own-tile bound to the old MediaStream detaches
+        // before we publish the new one below.
+        if (jitsi?.localTracks) {
+          jitsi.localTracks.value = [];
+        }
 
         for (const t of newTracks) {
           tracks.push(t);
@@ -143,6 +184,24 @@ export default {
         // Acquisition succeeded — clear any prior blocked flag.
         blocked.value = false;
         blockedMessage.value = "";
+
+        // Publish the freshly-acquired tracks into the shared
+        // composable ref so `Jitsi.vue`'s own-tile branch can render
+        // them immediately, independently of conference join. This is
+        // the path that lets the performer see their own dragged
+        // stream even when `room.addTrack()` is still waiting on (or
+        // permanently blocked by) a stuck `CONFERENCE_JOINED`.
+        if (jitsi?.localTracks) {
+          jitsi.localTracks.value = tracks.slice();
+        }
+
+        // If the user already requested publish (dragged the preview
+        // before the camera prompt resolved), `pendingPublish` is true
+        // and the joined-watch's earlier attempt was a no-op because
+        // `tracks` was still empty. Drive the publish from this side
+        // too so whichever of (joined, tracks-acquired) lands second
+        // wakes up the publish.
+        await tryPublishWhenReady("acquire-resolved");
       } catch (err) {
         console.error("Failed to create local tracks:", err);
         setBlocked(blockedReason(err));
@@ -184,6 +243,13 @@ export default {
         }
       }
       tracks = [];
+      // Clear the shared composable ref so any still-mounted on-stage
+      // own-tile drops its now-disposed track reference and re-renders
+      // the loading branch instead of holding onto an inert
+      // MediaStream.
+      if (jitsi?.localTracks) {
+        jitsi.localTracks.value = [];
+      }
     });
 
     watch(joined, () => (data.participantId = jitsi.room?.myUserId()), {
@@ -191,6 +257,13 @@ export default {
     });
 
     const publishLocalTracksToRoom = async () => {
+      console.log("[diag] Yourself.publishLocalTracksToRoom enter", {
+        joined: joined.value,
+        hasRoom: !!jitsi.room,
+        tracksLen: tracks.length,
+        trackTypes: tracks.map((t) => t.type),
+        published: published.value,
+      });
       if (!joined.value || !jitsi.room) return;
       for (const t of tracks) {
         try {
@@ -223,20 +296,53 @@ export default {
       }
     };
 
-    watch(joined, async (isJoined) => {
-      if (isJoined && pendingPublish.value) {
+    /**
+     * Single chokepoint that publishes iff *both* async preconditions
+     * have landed. Called from three places that may each be the last
+     * to flip a precondition:
+     *   - `join()`             (user dragged / clicked the preview)
+     *   - `joined` watcher     (CONFERENCE_JOINED fired)
+     *   - `acquireLocalTracks` (camera permission resolved)
+     *
+     * Clears `pendingPublish` synchronously *before* the awaited
+     * `publishLocalTracksToRoom` so a second wake-up while the first is
+     * still in-flight cannot double-publish the same tracks. `published`
+     * gates subsequent wake-ups after the publish has completed.
+     */
+    const tryPublishWhenReady = async (reason) => {
+      console.log("[diag] Yourself.tryPublishWhenReady", {
+        reason,
+        pendingPublish: pendingPublish.value,
+        joined: joined.value,
+        hasRoom: !!jitsi.room,
+        tracksLen: tracks.length,
+        published: published.value,
+      });
+      if (!pendingPublish.value) return;
+      if (published.value) {
         pendingPublish.value = false;
-        await publishLocalTracksToRoom();
+        return;
+      }
+      if (!joined.value || !jitsi.room) return;
+      if (tracks.length === 0) return;
+      pendingPublish.value = false;
+      await publishLocalTracksToRoom();
+      published.value = true;
+    };
+
+    watch(joined, async (isJoined) => {
+      if (isJoined) {
+        await tryPublishWhenReady("joined-watch");
       }
     });
 
     const join = async () => {
-      if (!joined.value) {
-        pendingPublish.value = true;
-        return;
-      }
-      pendingPublish.value = false;
-      await publishLocalTracksToRoom();
+      // Always record intent first so a slow precondition can wake the
+      // publish later from its own callback. Previously this set the
+      // pending flag only when not yet joined, which left the
+      // "joined but tracks not yet acquired" race uncovered.
+      pendingPublish.value = true;
+      await tryPublishWhenReady("join-action");
     };
 
     const userStore = useUserStore();

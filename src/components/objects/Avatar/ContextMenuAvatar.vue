@@ -3,7 +3,12 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { computed, inject, ref } from "vue";
 import Icon from "components/Icon.vue";
-import { coerceNumber, isIOS } from "utils/common";
+import {
+  coerceNumber,
+  isIOS,
+  isJitsiBoardType,
+  isStreamPlaybackBoardType,
+} from "utils/common";
 
 // `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
 // `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
@@ -218,6 +223,12 @@ export default {
     // control that silently does nothing.
     const supportsPerStreamVolume = !isIOS();
 
+    const isStreamBoardObject = computed(
+      () =>
+        isStreamPlaybackBoardType(props.object.type) ||
+        isStreamPlaybackBoardType(props.object.assetType?.name),
+    );
+
     return {
       switchFrame,
       holdAvatar,
@@ -250,6 +261,8 @@ export default {
       toggleVideoLoop,
       restartVideo,
       supportsPerStreamVolume,
+      isStreamBoardObject,
+      isJitsiBoardType,
     };
   },
 };
@@ -279,7 +292,7 @@ export default {
         <span>{{ $t("remove_from_avatar") }}</span>
       </a>
       <a
-        v-else-if="currentAvatar && object.type !== 'video'"
+        v-else-if="currentAvatar && !isStreamBoardObject"
         class="panel-block"
         @click="wearCostume"
       >
@@ -289,7 +302,7 @@ export default {
         <span>{{ $t("add_to_avatar") }}</span>
       </a>
     </template>
-    <div v-if="object.type == 'video'">
+    <div v-if="isStreamBoardObject">
       <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
         <span class="panel-icon">
           <i class="fas fa-pause"></i>
@@ -388,7 +401,7 @@ export default {
           </button>
         </a-tooltip>
       </p>
-      <p v-if="object.type == 'jitsi' && supportsPerStreamVolume" class="control menu-group-item">
+      <p v-if="isJitsiBoardType(object.type) && supportsPerStreamVolume" class="control menu-group-item">
         <a-tooltip title="Volume" placement="bottom">
           <button
             class="button is-light"

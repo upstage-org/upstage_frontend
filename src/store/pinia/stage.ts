@@ -36,6 +36,8 @@ import { stageGraph } from "@services/graphql";
 import {
   absolutePath,
   cloneDeep,
+  isJitsiBoardType,
+  isStreamPlaybackBoardType,
   posterJpgForVideoUrl,
   randomColor,
   randomMessageColor,
@@ -388,6 +390,33 @@ export interface StageSize {
   height: number;
   left: number;
   top: number;
+}
+
+/**
+ * Per-tab stage session id. Stored in `sessionStorage` so refreshes
+ * inside the same tab keep the same id (no stale "viewer" left behind
+ * in other clients' sessions lists for ~60 minutes) but new tabs and
+ * second logins on the same account each get a distinct id.
+ *
+ * sessionStorage is intentional: localStorage would be shared across
+ * tabs and reintroduce the cross-contamination bug we're solving.
+ */
+const TAB_SESSION_ID_KEY = "upstage:stage:tabSessionId";
+function readOrMintTabSessionId(): string {
+  try {
+    const ss = window.sessionStorage;
+    const existing = ss.getItem(TAB_SESSION_ID_KEY);
+    if (existing) return existing;
+    const fresh = uuidv4();
+    ss.setItem(TAB_SESSION_ID_KEY, fresh);
+    return fresh;
+  } catch {
+    // sessionStorage can throw in private-mode / iframes with cookies
+    // disabled. Fall back to an in-memory uuid — same-tab refresh will
+    // mint a new id, which matches the pre-fix behaviour for anon
+    // viewers and is strictly safer than colliding ids.
+    return uuidv4();
+  }
 }
 
 export const useStageStore = defineStore("stage", () => {
@@ -1382,9 +1411,11 @@ export const useStageStore = defineStore("stage", () => {
       SET_STATUS("LIVE");
       void reloadMissingEvents();
       subscribe();
-      // Hydrate the current user before announcing presence so joinStage()
-      // can use the canonical DB user id rather than a placeholder uuid
-      // (which would change on every refresh and look like a new viewer).
+      // Hydrate the current user before announcing presence so the
+      // first joinStage() publishes the resolved nickname / isPlayer
+      // flag rather than a guest placeholder. The session id itself is
+      // a per-tab uuid (see readOrMintTabSessionId), independent of
+      // user.id, so this is just about the rest of the payload.
       void (async () => {
         const userStore = useUserStore();
         if (useAuthStore().loggedIn && userStore.user?.id == null) {
@@ -1615,6 +1646,12 @@ export const useStageStore = defineStore("stage", () => {
       description?: string;
     },
   ): BoardObject {
+    const inheritedTypeLabel = `${data.assetType?.name ?? data.type ?? ""}`.trim();
+    const resolvedBoardType =
+      isStreamPlaybackBoardType(inheritedTypeLabel) ? "video"
+      : isJitsiBoardType(inheritedTypeLabel) ? "jitsi"
+      : inheritedTypeLabel || data.type;
+
     const object: BoardObject = {
       w: 100,
       h: 100,
@@ -1635,17 +1672,23 @@ export const useStageStore = defineStore("stage", () => {
       y: 0,
       ...data,
       id: uuidv4(),
-      type: data.assetType?.name || data.type,
+      // Prefer GraphQL assetType.name (legacy) OR flat type but fold
+      // case/synonyms so Streams strip items never land as `"Video"` on
+      // board (which skipped Object.vue's <video slot and showed a
+      // broken <AppImage>: streams use `url`, not `src`).
+      // Same fold for `Jitsi` → `jitsi` so Board.vue's TYPE_TO_COMPONENT
+      // lookup resolves to Jitsi.vue (keys are lowercase).
+      type: resolvedBoardType,
     };
     const inferredJitsiId = localJitsiParticipantId.value;
     if (
-      object.type === "jitsi" &&
+      isJitsiBoardType(object.type) &&
       (object.participantId == null || object.participantId === "") &&
       inferredJitsiId
     ) {
       object.participantId = inferredJitsiId;
     }
-    if (object.type === "video") {
+    if (isStreamPlaybackBoardType(object.type)) {
       object.hostId = session.value;
       // Start playing as soon as the video is placed on stage so the
       // performer doesn't have to right-click -> Play to start every
@@ -1678,7 +1721,7 @@ export const useStageStore = defineStore("stage", () => {
     localJitsiParticipantId.value = id;
     if (id == null) return;
     for (const o of board.value.objects) {
-      if (o.type === "jitsi" && (o.participantId == null || o.participantId === "")) {
+      if (isJitsiBoardType(o.type) && (o.participantId == null || o.participantId === "")) {
         UPDATE_OBJECT({ ...o, participantId: id } as BoardObject);
       }
     }
@@ -2326,24 +2369,58 @@ export const useStageStore = defineStore("stage", () => {
 
   function handleCounterMessage({ message }: { message: Session }) {
     UPDATE_SESSIONS_COUNTER(message);
-    if (message.id === session.value && message.avatarId) {
-      useUserStore().avatarId = message.avatarId;
-    }
+    // We deliberately do NOT mirror `message.avatarId` back onto
+    // `userStore.avatarId` here.
+    //
+    // The previous code did:
+    //   if (message.id === session.value && message.avatarId) {
+    //     useUserStore().avatarId = message.avatarId;
+    //   }
+    // The intent was "this counter message is my own echo, sync my
+    // local avatarId from it" — but that only made sense back when
+    // `session.value` was guaranteed to be unique per tab. Today
+    // `joinStage` may derive `session.value` from the logged-in user's
+    // DB id (so refreshes don't mint a new presence), which means two
+    // humans signed into the *same account* — e.g. both performers
+    // logging in as "admin" — share a session id. Helen's counter
+    // publish then matched the local user's `session.value`, and her
+    // `avatarId` got copied onto the local user's `userStore.avatarId`,
+    // causing the local user's chat to be spoken by Helen's avatar
+    // (and visually erasing the user's teardrop because the two
+    // collided sessions were deduped in `UPDATE_SESSIONS_COUNTER`).
+    //
+    // The local user's `avatarId` is already set synchronously by
+    // `setAvatarId` (ContextMenuAvatar / Object / Skeleton / drop on
+    // stage) BEFORE the publish, and we don't want any other party's
+    // claim to silently rewrite it. If we ever need a same-account
+    // multi-tab "follow my own avatar across tabs" sync, it has to
+    // address the local tab specifically (e.g. an instanceId field on
+    // `Session`), not the user-level session id.
   }
 
   async function joinStage() {
     const userStore = useUserStore();
     const isPlayer = useAuthStore().loggedIn;
-    // Derive a stable session id every join: for logged-in performers the
-    // canonical DB user id (stringified), reserving uuidv4() only for true
-    // anonymous audience. Without this, an MQTT connect that fires before
-    // userStore.fetchCurrent() returns would mint a uuid and stick with it
-    // across the session, causing a fresh "viewer" on every page refresh
-    // (the previous uuid lingers in other clients' sessions lists).
-    if (isPlayer && userStore.user?.id != null) {
-      session.value = String(userStore.user.id);
-    } else if (!session.value) {
-      session.value = uuidv4();
+    // Every browser tab gets its own opaque session id, persisted in
+    // sessionStorage so refreshes within the tab keep the same id (no
+    // stale "ghost viewer" left behind in other clients' sessions
+    // lists) but new tabs — including a second human signing in to the
+    // *same account* — each get a distinct id.
+    //
+    // The previous implementation used `String(userStore.user.id)` for
+    // logged-in performers to dodge the "fresh uuid every refresh"
+    // problem. That made two performers on the same account (e.g. two
+    // people both logged in as "admin") share a session id, which:
+    //   * collapsed both into a single record in
+    //     `UPDATE_SESSIONS_COUNTER` (only one teardrop visible), and
+    //   * let `handleCounterMessage` overwrite one user's `avatarId`
+    //     with the other's, so typing in chat suddenly spoke as the
+    //     other person's held avatar.
+    // Per-tab uuids cure both. Stale-on-crash sessions are still
+    // pruned by the 60-minute trim in `UPDATE_SESSIONS_COUNTER` plus
+    // the `leaving:true` publish on pagehide.
+    if (!session.value) {
+      session.value = readOrMintTabSessionId();
     }
     const id = session.value;
     const nickname = userStore.nickname;
