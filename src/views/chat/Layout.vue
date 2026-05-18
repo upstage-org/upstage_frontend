@@ -19,8 +19,13 @@
  * MQTT topic carries messages between the main stage view and any
  * popped-out / mobile windows, so chat is bidirectional with zero
  * additional plumbing.
+ *
+ * Avatar text-to-speech (meSpeak) is suppressed while this layout is
+ * mounted: standalone chat participants should not hear voices on every
+ * phone in a hybrid room when the projected stage already carries audio.
  */
-import { computed, onUnmounted, provide, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, provide, ref, watch } from "vue";
+import { stopSpeaking } from "@services/speech";
 import { storeToRefs } from "pinia";
 import { useRoute } from "vue-router";
 import { useAuthStore } from "@stores/pinia/auth";
@@ -45,11 +50,17 @@ export default {
     //     lays out inline inside this view.
     provide("isChatStandalone", true);
 
+    onMounted(() => {
+      stageStore.setSuppressAvatarSpeechOutput(true);
+      stopSpeaking();
+    });
+
     stageStore.loadStage({ url: route.params.url }).then(() => {
       stageStore.connect();
     });
 
     onUnmounted(() => {
+      stageStore.setSuppressAvatarSpeechOutput(false);
       stageStore.disconnect();
     });
 

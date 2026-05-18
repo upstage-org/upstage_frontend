@@ -38,10 +38,11 @@ const save = async () => {
     :label-col="{ span: 12, xl: { span: 4 }, xxl: { span: 3 } }"
   >
     <template v-if="typeof value === 'string'">
-      <a-input-group compact style="display: flex">
+      <a-input-group compact style="display: flex; width: 100%; align-items: flex-start">
         <RichTextEditor
           v-if="richTextEditor"
           v-model="value"
+          class="min-w-0 flex-1"
           :readonly="!editing"
           :style="{
             boxShadow: 'none',
@@ -71,7 +72,3 @@ const save = async () => {
     <help v-if="help" class="mt-2" />
   </a-form-item>
 </template>
-<style>
-.richtexteditor {
-}
-</style>

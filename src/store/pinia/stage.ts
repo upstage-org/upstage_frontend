@@ -491,6 +491,12 @@ export const useStageStore = defineStore("stage", () => {
   });
   const _reloadStreams = ref<Date | null>(null);
   const _enabledLiveStreaming = ref<boolean>(true);
+  /**
+   * Standalone `/chat/:url` connects to the same MQTT stream as the live
+   * stage but renders only chat — avatar meSpeak would otherwise play on
+   * each audience device (e.g. many phones in a hybrid room).
+   */
+  const suppressAvatarSpeechOutput = ref(false);
 
   // ====================================================================
   // GETTERS
@@ -886,7 +892,11 @@ export const useStageStore = defineStore("stage", () => {
       speak.hash = hash(speak as Record<string, unknown>);
       if (m.speak?.hash !== speak.hash) {
         m.speak = speak;
-        if (!mute && (status.value === "LIVE" || replay.value.isReplaying)) {
+        if (
+          !mute &&
+          (status.value === "LIVE" || replay.value.isReplaying) &&
+          !suppressAvatarSpeechOutput.value
+        ) {
           avatarSpeak(m, speak.message);
         }
         setTimeout(
@@ -2434,6 +2444,10 @@ export const useStageStore = defineStore("stage", () => {
     }
   }
 
+  function setSuppressAvatarSpeechOutput(value: boolean) {
+    suppressAvatarSpeechOutput.value = value;
+  }
+
   function setTopbarPosition(pos: { x: number; y: number } | null) {
     topbarPosition.value = pos;
   }
@@ -2697,6 +2711,7 @@ export const useStageStore = defineStore("stage", () => {
     removeChat,
     highlightChat,
     setShowPlayerChat,
+    setSuppressAvatarSpeechOutput,
     setTopbarPosition,
     setTopbarCollapsed,
     setPublicChatPosition,
