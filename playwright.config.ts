@@ -73,7 +73,11 @@ export default defineConfig({
     {
       name: "webkit",
       testMatch: /stage\.spec\.ts$/,
-      use: { ...devices["Desktop Safari"] },
+      use: {
+        ...devices["Desktop Safari"],
+        // WebKit's pw_run.sh does not accept Chromium flags like --mute-audio.
+        launchOptions: { args: [] },
+      },
     },
     {
       // Performer-streams + audience-views coverage:

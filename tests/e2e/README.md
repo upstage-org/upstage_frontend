@@ -5,7 +5,8 @@ Mosquitto. The main flow authors a Romeo and Juliet Act I Scene I stage as
 `admin`, then runs the play with thirteen player browser contexts plus an
 admin observer so chats and board actions round-trip through MQTT.
 
-Configuration and secrets are merged into `process.env` from **`upstage_frontend/.env.test`**.
+Configuration and secrets are merged into `process.env` from **`upstage_frontend/.env.test`**
+(copy from **`.env.test.example`** on first setup).
 The authoritative defaults and summaries live in **`tests/e2e/e2e-config.ts`**
 (`loadE2eConfig()`, `formatE2eConfigSummary()`). `tests/e2e/e2e-env-bootstrap.ts`
 runs first in Playwright and GraphQL entrypoints so `.env.test` is found whether

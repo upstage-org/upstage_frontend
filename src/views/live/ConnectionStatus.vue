@@ -8,8 +8,8 @@ import ReloadStream from "./ReloadStream.vue";
 import RecordingControl from "components/stage/RecordingControl.vue";
 
 defineProps<{
-  /** Live stage: stack under `#live-logo` instead of overlapping it. */
-  stackUnderLogo?: boolean;
+  /** Live stage: inline in `#live-top-bar` to the left of the logo. */
+  inTopBar?: boolean;
 }>();
 
 const stageStore = useStageStore();
@@ -49,7 +49,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div id="connection-status" :class="{ 'stack-under-logo': stackUnderLogo }">
+  <div id="connection-status" :class="{ 'in-top-bar': inTopBar }">
     <RecordingControl v-if="!replaying && canPlay" />
     <ReloadStream v-if="!replaying" />
     <span
@@ -113,15 +113,24 @@ onMounted(() => {
   text-align: center;
   z-index: 4;
 
-  &.stack-under-logo {
-    // Logo plaque: safe-area + 8px padding + 36px image + 8px gap
-    top: calc(max(8px, env(safe-area-inset-top, 0px)) + 52px);
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+  &.in-top-bar {
+    position: static;
+    display: inline-flex;
+    flex-flow: row nowrap;
+    align-items: center;
     gap: 4px;
     width: auto;
-    max-width: 250px;
+    max-width: none;
+    text-align: left;
+    z-index: auto;
+
+    .status-text {
+      margin-top: 0;
+    }
+
+    .tag {
+      flex-shrink: 0;
+    }
   }
 
   @media screen and (max-width: 767px) {
@@ -129,7 +138,7 @@ onMounted(() => {
     top: 8px;
     left: 0;
 
-    &.stack-under-logo {
+    &:not(.in-top-bar) {
       align-items: flex-start;
     }
   }

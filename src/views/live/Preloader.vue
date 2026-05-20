@@ -34,10 +34,10 @@ watchEffect(() => {
 watch(
   preloading,
   (val) => {
-    const logo = document.querySelector("#live-logo");
-    if (logo) {
-      if (val) logo.classList.add("preloader");
-      else logo.classList.remove("preloader");
+    const topBar = document.querySelector("#live-top-bar");
+    if (topBar) {
+      if (val) topBar.classList.add("preloader");
+      else topBar.classList.remove("preloader");
     }
   },
   { immediate: true },

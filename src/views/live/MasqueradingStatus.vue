@@ -23,9 +23,7 @@ const exitAudienceView = () => {
 
 <style scoped lang="scss">
 #masquerading-status {
-  position: absolute;
-  z-index: 10;
-  top: 76px;
-  right: 16px;
+  flex: 0 0 auto;
+  line-height: 0;
 }
 </style>

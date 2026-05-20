@@ -110,16 +110,20 @@ export default {
 </script>
 
 <template>
-  <div id="live-logo">
-    <Logo v-if="loggedIn" :link="studioEndpoint" />
-    <Logo v-else to="/" />
+  <div id="live-top-bar">
+    <div v-if="ready" class="live-top-bar-controls">
+      <ConnectionStatus in-top-bar />
+      <MasqueradingStatus />
+    </div>
+    <div id="live-logo">
+      <Logo v-if="loggedIn" :link="studioEndpoint" />
+      <Logo v-else to="/" />
+    </div>
   </div>
   <Shell id="main-content">
     <Preloader />
     <template v-if="ready">
       <Board />
-      <ConnectionStatus stack-under-logo />
-      <MasqueradingStatus />
       <StageToolbox v-if="canPlay" />
       <Chat />
       <PlayerChat v-if="canPlay" />
@@ -144,12 +148,49 @@ export default {
   }
 }
 
-#live-logo {
+#live-top-bar {
   position: fixed;
   top: max(8px, env(safe-area-inset-top, 0px));
-  right: 0px;
-  max-width: 140px;
+  right: 0;
   z-index: 5;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: calc(100vw - 8px);
+  pointer-events: none;
+
+  &.preloader {
+    z-index: 20001;
+  }
+
+  .live-top-bar-controls,
+  #live-logo {
+    pointer-events: auto;
+  }
+
+  .live-top-bar-controls {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+#live-logo {
+  flex: 0 0 auto;
+  max-width: 140px;
 
   // The Logo component renders inside a Bulma .navbar-item, which is
   // transparent at rest and only gains a light hover-background. On a
@@ -167,14 +208,5 @@ export default {
     width: auto;
     height: auto;
   }
-
-  &.preloader {
-    z-index: 20001;
-  }
-}
-
-// Masquerade affordance sits under the LIVE / counter stack (live view only).
-#masquerading-status {
-  top: calc(max(8px, env(safe-area-inset-top, 0px)) + 96px);
 }
 </style>

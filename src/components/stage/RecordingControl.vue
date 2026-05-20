@@ -121,6 +121,7 @@ const discardRecording = async (complete: () => void) => {
 <style scoped>
 .recording-control {
   margin: 0;
+  flex-shrink: 0;
 }
 .has-addons {
   flex-wrap: nowrap;

@@ -43,13 +43,7 @@ const onRefreshMeeting = () => stageStore.refreshMeeting();
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-right: 10px;
-
-  @media screen and (max-width: 767px) {
-    right: unset;
-    top: 8px;
-    left: 0;
-  }
+  flex-shrink: 0;
 }
 
 .refresh-icon {
