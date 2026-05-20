@@ -13,27 +13,33 @@ import { FetchResult } from "@apollo/client/core";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 import PlayerAudienceCounter from "components/stage/PlayerAudienceCounter.vue";
+import { normalizeStageAccess } from "utils/studioInquiry";
 
 const { t } = useI18n();
 const { isAdmin } = storeToRefs(useUserStore());
 const enterStage = (stage: Stage) => {
   window.open(`/${stage.fileLocation}`, "_blank");
 };
+const DEFAULT_SORT = ["LAST_ACCESS_DESC"] as const;
+
 const tableParams = reactive({
   page: 1,
   limit: 10,
-  sort: ["LAST_ACCESS_DESC"],
-  access: [],
+  sort: [...DEFAULT_SORT],
 });
 const { result: inquiryResult } = useQuery(gql`
   {
     inquiry @client
   }
 `);
-const params = computed(() => ({
-  ...tableParams,
-  ...inquiryResult.value.inquiry,
-}));
+const params = computed(() => {
+  const inquiry = inquiryResult.value?.inquiry ?? {};
+  return {
+    ...tableParams,
+    ...inquiry,
+    access: normalizeStageAccess(inquiry.access),
+  };
+});
 
 const { result, loading, refetch } = useQuery(
   gql`
@@ -89,6 +95,23 @@ const { result, loading, refetch } = useQuery(
 onMounted(() => {
   refetch();
 });
+
+// Changing filters while on page 2+ often shows an empty table even though
+// matches exist on page 1 — reset pagination when inquiry filters change.
+watch(
+  () => {
+    const inquiry = inquiryResult.value?.inquiry ?? {};
+    return [
+      inquiry.name,
+      inquiry.createdBetween,
+      inquiry.owners,
+      inquiry.access,
+    ];
+  },
+  () => {
+    tableParams.page = 1;
+  },
+);
 
 watch(params, () => {
   refetch();
@@ -183,6 +206,7 @@ const handleTableChange = (
   sorter: SorterResult<Media> | SorterResult<Media>[],
 ) => {
   const sort = (Array.isArray(sorter) ? sorter : [sorter])
+    .filter((entry) => entry?.order && entry?.columnKey)
     .sort((a, b) => (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple)
     .map(({ columnKey, order }) =>
       `${columnKey == "permission" ? "access" : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
@@ -191,7 +215,7 @@ const handleTableChange = (
   Object.assign(tableParams, {
     page: current,
     limit: pageSize,
-    sort,
+    sort: sort.length ? sort : [...DEFAULT_SORT],
   });
 };
 const dataSource = computed(() => {

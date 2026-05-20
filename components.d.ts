@@ -165,6 +165,7 @@ declare module 'vue' {
     RadioGroup: typeof import('./src/components/form/RadioGroup.vue')['default']
     Reaction: typeof import('./src/components/stage/Chat/Reaction.vue')['default']
     RecordActions: typeof import('./src/components/stage/RecordActions.vue')['default']
+    RecordingControl: typeof import('./src/components/stage/RecordingControl.vue')['default']
     RequestAcknowledge: typeof import('./src/components/media/MediaForm/RequestAcknowledge.vue')['default']
     RequestPermission: typeof import('./src/components/media/MediaForm/RequestPermission.vue')['default']
     RichTextEditor: typeof import('./src/components/editor/RichTextEditor.vue')['default']

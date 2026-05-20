@@ -34,6 +34,9 @@ export default {
     const position = reactive({ x: 100, y: 100 });
 
     const openMenu = (e) => {
+      if (props.preventClicking) {
+        return;
+      }
       if (!props.preventClicking) {
         e.currentTarget.click();
       }

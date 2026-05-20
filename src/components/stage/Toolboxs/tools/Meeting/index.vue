@@ -1,4 +1,6 @@
 <script setup>
+defineOptions({ name: "Meeting" });
+
 import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import Skeleton from "../../Skeleton.vue";

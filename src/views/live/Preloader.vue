@@ -116,7 +116,11 @@ const masquerading = computed<boolean>(() => stageStore.masquerading);
                 @error="increaseProgress"
               />
             </div>
-            <template v-if="status !== 'live' && !canPlay">
+            <template v-if="replaying && (!model.events || model.events.length === 0)">
+              <h2 class="subtitle">{{ $t("replay_no_events_title") }}</h2>
+              <p>{{ $t("replay_no_events_body") }}</p>
+            </template>
+            <template v-else-if="status !== 'live' && !canPlay && !replaying">
               <span v-if="status" class="tag is-dark">{{ status.toUpperCase() }}</span
               >&nbsp;
               <span>This stage is not currently open to the public. Please come back later!</span>

@@ -44,6 +44,7 @@ import {
   randomRange,
 } from "@utils/common";
 import { BACKGROUND_ACTIONS, BOARD_ACTIONS, COLORS, DRAW_ACTIONS, TOPICS } from "@utils/constants";
+import { loadReplayMarkers } from "@utils/replayMarkers";
 import {
   deserializeObject,
   getDefaultStageConfig,
@@ -195,6 +196,8 @@ export interface StageModel {
   assets?: ToolboxItem[];
   scenes?: Scene[];
   events?: ReplayEvent[];
+  chats?: { payload: ChatMessage | string; performanceId?: string | number }[];
+  activeRecording?: { id: string | number; name?: string; createdOn?: string } | null;
   [k: string]: unknown;
 }
 
@@ -373,12 +376,22 @@ export interface ReceiptPopup {
   donationDetails: { amount: number; date: string; [k: string]: unknown };
 }
 
+export interface ReplayMarker {
+  id: string;
+  label: string;
+  mqttTimestamp: number;
+}
+
 export interface ReplayState {
   timestamp: { begin: number; end: number; current: number };
   timers: ReturnType<typeof setTimeout>[];
   interval: ReturnType<typeof setInterval> | null;
   speed: number;
   isReplaying?: boolean;
+  /** Restart from `begin` when playback passes `end` (exhibition loop). */
+  loop?: boolean;
+  performanceId?: string | null;
+  markers?: ReplayMarker[];
 }
 
 export interface Viewport {
@@ -488,6 +501,9 @@ export const useStageStore = defineStore("stage", () => {
     timers: [],
     interval: null,
     speed: 1,
+    loop: false,
+    performanceId: null,
+    markers: [],
   });
   const audioPlayers = ref<AudioPlayer[]>([]);
   const isSavingScene = ref<boolean>(false);
@@ -919,9 +935,7 @@ export const useStageStore = defineStore("stage", () => {
       (o) => isJitsiBoardType(o.type) && o.participantId === participantId,
     );
     if (stillOnBoard) return;
-    board.value.tracks = board.value.tracks.filter(
-      (t) => t.getParticipantId?.() !== participantId,
-    );
+    board.value.tracks = board.value.tracks.filter((t) => t.getParticipantId?.() !== participantId);
   }
 
   function REMOVE_TRACK(track: JitsiTrack) {
@@ -1677,10 +1691,11 @@ export const useStageStore = defineStore("stage", () => {
     },
   ): BoardObject {
     const inheritedTypeLabel = `${data.assetType?.name ?? data.type ?? ""}`.trim();
-    const resolvedBoardType =
-      isStreamPlaybackBoardType(inheritedTypeLabel) ? "video"
-      : isJitsiBoardType(inheritedTypeLabel) ? "jitsi"
-      : inheritedTypeLabel || data.type;
+    const resolvedBoardType = isStreamPlaybackBoardType(inheritedTypeLabel)
+      ? "video"
+      : isJitsiBoardType(inheritedTypeLabel)
+        ? "jitsi"
+        : inheritedTypeLabel || data.type;
 
     const object: BoardObject = {
       w: 100,
@@ -2240,6 +2255,8 @@ export const useStageStore = defineStore("stage", () => {
         const { events } = stage as StageModel;
         if (recordId && events && events.length > 0) {
           SET_REPLAY({
+            performanceId: String(recordId),
+            markers: loadReplayMarkers(String(recordId)),
             timestamp: {
               begin: events[0].mqttTimestamp,
               current: events[0].mqttTimestamp,
@@ -2343,6 +2360,39 @@ export const useStageStore = defineStore("stage", () => {
     });
   }
 
+  const chatDedupeKey = (msg: ChatMessage) =>
+    `${msg.id ?? ""}:${msg.at ?? ""}:${msg.user ?? ""}:${msg.message ?? ""}`;
+
+  /** Supplement event-stream chat with archived performance chat rows (studio DB). */
+  function scheduleArchivedChats(current: number, speed: number, seenKeys: Set<string>) {
+    const performanceId = replay.value.performanceId;
+    if (!performanceId) return;
+    const rows = model.value?.chats ?? [];
+    rows.forEach((row) => {
+      if (String(row.performanceId) !== String(performanceId)) return;
+      let msg: ChatMessage =
+        typeof row.payload === "string"
+          ? (JSON.parse(row.payload) as ChatMessage)
+          : ({ ...row.payload } as ChatMessage);
+      const key = chatDedupeKey(msg);
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      const at = Number(msg.at ?? 0);
+      if (!at) return;
+      if (at - current >= 0) {
+        const timer = setTimeout(
+          () => {
+            handleChatMessage({ message: msg });
+          },
+          ((at - current) * 1000) / speed,
+        );
+        replay.value.timers.push(timer);
+      } else {
+        handleChatMessage({ message: msg });
+      }
+    });
+  }
+
   async function replayRecording(timestamp?: number | string) {
     stopSpeaking();
     pauseReplay();
@@ -2366,11 +2416,24 @@ export const useStageStore = defineStore("stage", () => {
     replay.value.interval = setInterval(() => {
       replay.value.timestamp.current += 1;
       if (replay.value.timestamp.current > replay.value.timestamp.end) {
-        replay.value.timestamp.current = replay.value.timestamp.begin;
-        pauseReplay();
+        if (replay.value.loop) {
+          void replayRecording(replay.value.timestamp.begin);
+        } else {
+          replay.value.timestamp.current = replay.value.timestamp.end;
+          pauseReplay();
+        }
       }
     }, 1000 / speed);
+    const seenChatKeys = new Set<string>();
     events.forEach((event: ReplayEvent) => {
+      if (unnamespaceTopic(event.topic ?? "") === TOPICS.CHAT) {
+        const raw = event.payload;
+        const msg =
+          typeof raw === "string" ? (JSON.parse(raw) as ChatMessage) : (raw as ChatMessage);
+        if (msg && typeof msg === "object") {
+          seenChatKeys.add(chatDedupeKey(msg));
+        }
+      }
       if (event.mqttTimestamp - current >= 0) {
         const timer = setTimeout(
           () => {
@@ -2383,6 +2446,7 @@ export const useStageStore = defineStore("stage", () => {
         replicateEvent(event);
       }
     });
+    scheduleArchivedChats(current, speed, seenChatKeys);
   }
 
   /**

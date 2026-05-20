@@ -1,7 +1,7 @@
 <script>
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
-import { computed, provide, reactive, ref, watch } from "vue";
+import { computed, inject, provide, reactive, ref, watch } from "vue";
 import { isStreamPlaybackBoardType } from "@utils/common";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
@@ -26,6 +26,7 @@ export default {
     const el = ref();
     const video = ref();
     const stageStore = useStageStore();
+    const replaying = inject("replaying", false);
     const stageSize = computed(() => stageStore.stageSize);
 
     const active = ref(false);
@@ -33,8 +34,9 @@ export default {
     const beforeDragPosition = ref();
     const isHolding = computed(() => props.object.holder?.id === stageStore.session);
     const holdable = computed(() => ["avatar"].includes(props.object.type));
-    const canPlay = computed(() => stageStore.canPlay);
+    const canPlay = computed(() => stageStore.canPlay && !replaying);
     const controlable = computed(() => {
+      if (replaying) return false;
       return holdable.value ? isHolding.value : canPlay.value && !props.object.wornBy;
     });
     provide("holdable", holdable);
@@ -101,6 +103,7 @@ export default {
     });
 
     const hold = () => {
+      if (replaying) return;
       if (holdable.value && canPlay.value && !props.object.holder) {
         useUserStore().setAvatarId(props.object.id);
       }
@@ -218,6 +221,7 @@ export default {
     :pad-top="-stageSize.top"
     :pad-right="250"
     :opacity="0.8"
+    :prevent-clicking="replaying"
   >
     <template #trigger>
       <div

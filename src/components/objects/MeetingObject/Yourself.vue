@@ -1,6 +1,16 @@
 <script>
 import Skeleton from "components/stage/Toolboxs/Skeleton.vue";
-import { computed, inject, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import {
+  computed,
+  inject,
+  onActivated,
+  onDeactivated,
+  onMounted,
+  onUnmounted,
+  reactive,
+  ref,
+  watch,
+} from "vue";
 import { useUserStore } from "@stores/pinia/user";
 import { useStageStore } from "@stores/pinia/stage";
 import { useLowLevelAPI } from "./composable";
@@ -227,6 +237,66 @@ export default {
     if (deviceEvents && mediaDevicesAPI?.addEventListener) {
       mediaDevicesAPI.addEventListener(deviceEvents.DEVICE_LIST_CHANGED, onDeviceListChanged);
     }
+
+    const detachPreview = () => {
+      for (const t of tracks) {
+        if (t.type === "video") {
+          try {
+            t.detach(el.value);
+          } catch (e) {
+            console.warn("Detaching local preview:", e);
+          }
+        }
+      }
+    };
+
+    const attachPreview = () => {
+      const videoTrack = tracks.find((t) => t.type === "video");
+      if (videoTrack && el.value) {
+        try {
+          videoTrack.attach(el.value);
+        } catch (e) {
+          console.warn("Re-attaching local preview:", e);
+        }
+      }
+    };
+
+    // Meeting toolbox is keep-alive'd while other tools are open; only
+    // detach the preview <video> while deactivated — do not dispose tracks.
+    onDeactivated(detachPreview);
+    onActivated(attachPreview);
+
+    /**
+     * Re-publish local tracks into the conference (refresh icon / frozen
+     * remote tile). Removes and re-adds each track so peers receive a
+     * fresh SSRC without tearing down the MediaStream.
+     */
+    const republishLocalTracks = async () => {
+      if (!joined.value || !jitsi.room || tracks.length === 0) return;
+      for (const t of tracks) {
+        try {
+          await jitsi.room.removeTrack(t);
+        } catch (err) {
+          console.warn("room.removeTrack failed:", err);
+        }
+        try {
+          await jitsi.room.addTrack(t);
+          stageStore.addTrack(t);
+        } catch (err) {
+          console.warn("room.addTrack failed:", err);
+        }
+      }
+      if (jitsi?.localTracks) {
+        jitsi.localTracks.value = tracks.slice();
+      }
+    };
+
+    watch(
+      () => stageStore.reloadStreams,
+      (tick) => {
+        if (tick) void republishLocalTracks();
+      },
+    );
 
     onUnmounted(() => {
       pendingPublish.value = false;

@@ -222,7 +222,15 @@ export default {
       :class="{ 'is-compact': compact }"
       @wheel="horizontalScroll"
     >
-      <component :is="tool" />
+      <!-- Keep the Meeting panel (and its Yourself preview / local
+           WebRTC tracks) alive while switching toolbox tabs so a
+           published stream on the board behaves like any other avatar:
+           it stays up when you open Audio, Props, etc. Without this,
+           unmounting Meeting ran Yourself's onUnmounted, which disposed
+           camera/mic tracks and froze the tile for everyone. -->
+      <keep-alive include="Meeting">
+        <component :is="tool" />
+      </keep-alive>
     </div>
   </div>
 </template>

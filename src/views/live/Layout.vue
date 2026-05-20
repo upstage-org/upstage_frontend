@@ -109,7 +109,7 @@ export default {
     <Preloader />
     <template v-if="ready">
       <Board />
-      <ConnectionStatus />
+      <ConnectionStatus stack-under-logo />
       <MasqueradingStatus />
       <StageToolbox v-if="canPlay" />
       <Chat />
@@ -139,8 +139,8 @@ export default {
   position: fixed;
   top: max(8px, env(safe-area-inset-top, 0px));
   right: 0px;
-  max-width: 200px;
-  z-index: 1;
+  max-width: 140px;
+  z-index: 5;
 
   // The Logo component renders inside a Bulma .navbar-item, which is
   // transparent at rest and only gains a light hover-background. On a
@@ -153,14 +153,19 @@ export default {
     padding: 4px 8px;
   }
 
+  img {
+    max-height: 36px;
+    width: auto;
+    height: auto;
+  }
+
   &.preloader {
     z-index: 20001;
   }
+}
 
-  @media screen and (min-width: 1024px) {
-    img {
-      max-height: unset;
-    }
-  }
+// Masquerade affordance sits under the LIVE / counter stack (live view only).
+#masquerading-status {
+  top: calc(max(8px, env(safe-area-inset-top, 0px)) + 96px);
 }
 </style>

@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { useI18n } from "vue-i18n";
+import { message } from "ant-design-vue";
 import Icon from "components/Icon.vue";
 import Modal from "components/Modal.vue";
 import EventIndicator from "./EventIndicator.vue";
 import { useShortcut } from "components/stage/composable";
 import { displayTimestamp } from "utils/common";
+import { saveReplayMarkers } from "@utils/replayMarkers";
 
 interface ReplayTimestamp {
   begin: number;
@@ -13,17 +16,14 @@ interface ReplayTimestamp {
   end: number;
 }
 
+const { t } = useI18n();
 const stageStore = useStageStore();
 const timestamp = computed<ReplayTimestamp>(() => stageStore.replay.timestamp);
-// `replay.interval` is a `setInterval` handle when playing and `null`
-// when paused — coerce to boolean for the template guard.
 const isPlaying = computed<boolean>(() => !!stageStore.replay.interval);
 const speed = computed<number>(() => stageStore.replay.speed);
+const loopEnabled = computed<boolean>(() => !!stageStore.replay.loop);
 const speeds = [0.5, 1, 2, 4, 8, 16, 32];
 const speedIndex = computed<number>(() => {
-  // Allow for an unknown stored speed (e.g., set externally) by snapping
-  // to the nearest known step rather than returning -1, which would leave
-  // both step buttons disabled and trap the UI.
   const i = speeds.indexOf(speed.value);
   if (i >= 0) return i;
   let best = 0;
@@ -39,10 +39,50 @@ const speedIndex = computed<number>(() => {
 });
 
 const showSpeedWarning = ref<boolean>(false);
+const scrubValue = ref<number>(0);
+const seekDebounce = ref<ReturnType<typeof setTimeout> | null>(null);
+const markerLabel = ref("");
 
-const seek = (e: Event) => {
+const syncScrub = () => {
+  scrubValue.value = timestamp.value.current;
+};
+syncScrub();
+
+watch(
+  () => timestamp.value.current,
+  () => {
+    syncScrub();
+  },
+);
+
+const scheduleSeek = (value: number) => {
+  scrubValue.value = value;
+  if (seekDebounce.value) clearTimeout(seekDebounce.value);
+  seekDebounce.value = setTimeout(() => {
+    stageStore.replayRecording(value);
+  }, 120);
+};
+
+const onScrubInput = (e: Event) => {
   const target = e.target as HTMLInputElement;
+  scheduleSeek(Number(target.value));
+};
+
+const onScrubChange = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (seekDebounce.value) {
+    clearTimeout(seekDebounce.value);
+    seekDebounce.value = null;
+  }
   stageStore.replayRecording(target.value);
+};
+
+const onIndicatorSeek = (mqttTimestamp: number) => {
+  if (seekDebounce.value) {
+    clearTimeout(seekDebounce.value);
+    seekDebounce.value = null;
+  }
+  stageStore.replayRecording(mqttTimestamp);
 };
 
 const play = () => {
@@ -53,11 +93,12 @@ const pause = () => {
   stageStore.pauseReplay();
 };
 
+const toggleLoop = () => {
+  stageStore.SET_REPLAY({ loop: !loopEnabled.value });
+};
+
 const applySpeed = (newSpeed: number) => {
   stageStore.SET_REPLAY({ speed: newSpeed });
-  // If we're mid-playback, restart at the current timestamp so the new
-  // rate takes effect immediately (replayRecording reads `speed` at the
-  // top of the action and reschedules every event timer).
   if (isPlaying.value) play();
   if (newSpeed >= 16) showSpeedWarning.value = true;
 };
@@ -75,14 +116,31 @@ const onSpeedSelect = (e: Event) => {
   }
 };
 
+const addMarker = () => {
+  const label = markerLabel.value.trim();
+  if (!label) {
+    message.warning(t("replay_marker_label_required"));
+    return;
+  }
+  const performanceId = stageStore.replay.performanceId;
+  if (!performanceId) return;
+  const id = `mk-${Date.now()}`;
+  const next = [
+    ...(stageStore.replay.markers ?? []),
+    { id, label, mqttTimestamp: timestamp.value.current },
+  ].sort((a, b) => a.mqttTimestamp - b.mqttTimestamp);
+  stageStore.SET_REPLAY({ markers: next });
+  saveReplayMarkers(performanceId, next);
+  markerLabel.value = "";
+  message.success(t("replay_marker_added"));
+};
+
 const seekForward = () => stageStore.seekForwardReplay();
 const seekBackward = () => stageStore.seekBackwardReplay();
 
 const collapsed = ref<boolean>(false);
 
 useShortcut((e: KeyboardEvent) => {
-  // Use `key` rather than the deprecated `keyCode`. Behaviour matches
-  // across Chromium (Chrome/Edge/Brave), Firefox and Safari.
   if (e.key === "Escape") {
     collapsed.value = !collapsed.value;
   }
@@ -95,7 +153,7 @@ useShortcut((e: KeyboardEvent) => {
       <div class="is-fullwidth my-2 has-text-centered controls-row">
         <button
           class="button is-primary is-outlined is-rounded reaction is-small m-1"
-          title="Skip back 10s"
+          :title="$t('replay_skip_back')"
           @click="seekBackward"
         >
           <i class="fas fa-fast-backward"></i>
@@ -103,38 +161,36 @@ useShortcut((e: KeyboardEvent) => {
         <button
           v-if="isPlaying"
           class="button is-primary is-outlined is-rounded reaction mx-1"
-          title="Pause"
+          :title="$t('pause')"
           @click="pause"
         >
           <i class="fas fa-pause"></i>
         </button>
-        <button
-          v-else
-          class="button is-primary is-rounded reaction mx-1"
-          title="Play"
-          @click="play"
-        >
+        <button v-else class="button is-primary is-rounded reaction mx-1" :title="$t('play')" @click="play">
           <i class="fas fa-play"></i>
         </button>
         <button
           class="button is-primary is-outlined is-rounded reaction is-small m-1"
-          title="Skip forward 10s"
+          :title="$t('replay_skip_forward')"
           @click="seekForward"
         >
           <i class="fas fa-fast-forward"></i>
         </button>
 
-        <!-- Inline speed control. Replaces the prior teleported Dropdown
-             (which was floated absolutely off the controls card and easy
-             to miss). Step buttons walk the discrete `speeds` array; the
-             native <select> exposes the same values for one-click jumps.
-             Speed changes restart playback at the current timestamp via
-             changeSpeed → play, so the new rate takes effect immediately. -->
+        <button
+          class="button is-light is-small"
+          :class="{ 'is-info': loopEnabled }"
+          :title="$t('replay_loop')"
+          @click="toggleLoop"
+        >
+          <i class="fas fa-redo"></i>
+        </button>
+
         <span class="speed-control mx-2" :title="`Replay speed: ${speed}x`">
           <button
             class="button is-light is-small"
             :disabled="speedIndex <= 0"
-            title="Slower"
+            :title="$t('slower')"
             @click="stepSpeed(-1)"
           >
             <i class="fas fa-minus"></i>
@@ -145,7 +201,7 @@ useShortcut((e: KeyboardEvent) => {
           <button
             class="button is-light is-small"
             :disabled="speedIndex >= speeds.length - 1"
-            title="Faster"
+            :title="$t('faster')"
             @click="stepSpeed(1)"
           >
             <i class="fas fa-plus"></i>
@@ -156,7 +212,7 @@ useShortcut((e: KeyboardEvent) => {
           <template #trigger>
             <button
               class="button minimise is-rounded is-light is-small"
-              title="Hide controls (Esc)"
+              :title="$t('replay_hide_controls')"
               @click="collapsed = true"
             >
               <span class="icon">
@@ -167,39 +223,46 @@ useShortcut((e: KeyboardEvent) => {
           <template #header>{{ $t("tips") }}</template>
           <template #content>
             <p>
-              Replay controls are hidden! You can toggle the
-              <code>{{ $t("esc") }}</code> key to quickly hide the replay controls or bring it back.
+              {{ $t("replay_controls_hidden_hint", { key: $t("esc") }) }}
             </p>
           </template>
         </Modal>
       </div>
     </div>
-    <footer class="card-footer">
-      <div class="card-footer-item" style="width: 60px">
+    <footer class="card-footer scrub-footer">
+      <div class="card-footer-item time-label">
         {{ displayTimestamp(timestamp.current - timestamp.begin) }}
       </div>
-      <div class="card-footer-item">
+      <div class="card-footer-item scrub-column">
+        <EventIndicator seekable @seek="onIndicatorSeek" />
         <input
           type="range"
-          class="slider is-fullwidth my-2"
-          style="width: 250px"
+          class="slider scrub-slider"
           :min="timestamp.begin"
           :max="timestamp.end"
-          :value="timestamp.current"
-          @change="seek"
+          :value="scrubValue"
+          @input="onScrubInput"
+          @change="onScrubChange"
         />
-        <EventIndicator />
+        <div class="marker-row">
+          <input
+            v-model="markerLabel"
+            class="input is-small marker-input"
+            type="text"
+            :placeholder="$t('replay_marker_placeholder')"
+            @keyup.enter="addMarker"
+          />
+          <button type="button" class="button is-small is-light" @click="addMarker">
+            {{ $t("replay_add_marker") }}
+          </button>
+        </div>
       </div>
-      <div class="card-footer-item" style="width: 60px">
+      <div class="card-footer-item time-label">
         {{ displayTimestamp(timestamp.end - timestamp.begin) }}
       </div>
     </footer>
   </div>
 
-  <!-- Speed warning modal. Opened programmatically when the user picks a
-       playback rate at which TTS / audio cannot keep up. Replaces the
-       prior pattern of opening the warning Modal as a side-effect of the
-       speed Dropdown's render slot. -->
   <teleport to="body">
     <div v-if="showSpeedWarning" class="modal is-active">
       <div class="modal-background" @click="showSpeedWarning = false"></div>
@@ -210,10 +273,7 @@ useShortcut((e: KeyboardEvent) => {
           </header>
           <div class="card-content">
             <div class="content">
-              <p>
-                Audio and avatar speeches won't be able to play in 16x speed or more. You should
-                only use these playback rates for seeking purposes.
-              </p>
+              <p>{{ $t("replay_speed_warning") }}</p>
             </div>
           </div>
           <footer class="card-footer">
@@ -230,43 +290,66 @@ useShortcut((e: KeyboardEvent) => {
   position: fixed;
   left: 16px;
   bottom: 16px;
-  height: 108px;
+  min-height: 108px;
+  max-width: min(92vw, 520px);
+
   .button.is-rounded {
     width: 16px;
   }
-  .card-footer-item {
-    padding-top: 0;
-    padding-bottom: 0;
-    flex-wrap: wrap;
+
+  .scrub-footer {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 8px;
   }
-  input[type="range"] {
-    // Lift the thumb above the EventIndicator overlay. Browsers expose
-    // the thumb under different vendor pseudo-elements, so target each.
-    // Without the Firefox / IE rules the thumb sat behind event markers.
-    &::-webkit-slider-thumb {
-      position: relative;
-      z-index: 100;
-    }
-    &::-moz-range-thumb {
-      position: relative;
-      z-index: 100;
-    }
-    &::-ms-thumb {
-      position: relative;
-      z-index: 100;
+
+  .time-label {
+    width: 56px;
+    flex-shrink: 0;
+    padding-top: 18px;
+    font-size: 0.75rem;
+  }
+
+  .scrub-column {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 4px;
+    padding-bottom: 8px;
+  }
+
+  .scrub-slider {
+    width: 100%;
+    margin: 4px 0 0;
+  }
+
+  .marker-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+
+    .marker-input {
+      flex: 1;
+      min-width: 0;
     }
   }
+
   .button.minimise {
     position: absolute;
     right: 8px;
   }
+
   .controls-row {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 2px;
     flex-wrap: nowrap;
+    position: relative;
+    width: 100%;
   }
+
   .speed-control {
     display: inline-flex;
     align-items: center;
@@ -274,6 +357,7 @@ useShortcut((e: KeyboardEvent) => {
     padding: 0 4px;
     border-left: 1px solid rgba(0, 0, 0, 0.1);
     border-right: 1px solid rgba(0, 0, 0, 0.1);
+
     .speed-select {
       appearance: none;
       -webkit-appearance: none;
@@ -287,6 +371,7 @@ useShortcut((e: KeyboardEvent) => {
       text-align: center;
       cursor: pointer;
     }
+
     .button.is-small {
       width: 28px;
     }

@@ -42,6 +42,19 @@ export default {
       trimMinPauseSeconds.value = 30;
     };
 
+    const trimSession = computed(() =>
+      sessions.value.find((s) => String(s.id) === String(trimPerformanceId.value)),
+    );
+
+    const trimDurationHint = computed(() => {
+      const s = trimSession.value;
+      if (!s?.duration) return "";
+      return t("trim_replay_duration_hint", {
+        duration: humanizeDuration(s.duration, { round: true }),
+        seconds: trimMinPauseSeconds.value,
+      });
+    });
+
     const date = (value) => {
       return value ? dayjs(value).format("YYYY-MM-DD") : "Now";
     };
@@ -245,11 +258,28 @@ export default {
 
     const { loading: deleting, save: deleteMutation } = useMutation(stageGraph.deletePerformance);
     const deletePerformance = async (item, complete) => {
-      await deleteMutation("Performance deleted successfully!", item.id);
+      const id = Number(item.id);
+      if (!Number.isFinite(id)) {
+        message.error(t("replay_delete_invalid_id"));
+        return;
+      }
+      const response = await deleteMutation("Performance deleted successfully!", id);
+      const ok = response?.deletePerformance?.success;
+      if (ok === false) {
+        message.error(t("replay_delete_failed"));
+        return;
+      }
       complete();
       if (refresh) {
         refresh(stage.value.id);
       }
+    };
+
+    const copyReplayLink = async (item) => {
+      if (!stage.value?.fileLocation || item?.id == null) return;
+      const { copyReplayLink: copy } = await import("@utils/replayLink");
+      await copy(stage.value.fileLocation, item.id);
+      message.success(t("replay_link_copied"));
     };
 
     const { loading: trimming, save: trimSave } = useMutation(
@@ -300,6 +330,8 @@ export default {
       initTrimForm,
       duplicateWithTrimmedPauses,
       trimming,
+      copyReplayLink,
+      trimDurationHint,
     };
   },
 };
@@ -369,12 +401,23 @@ export default {
       </button>
     </template>
     <template #replay="{ item }">
-      <router-link
-        :to="`/replay/${stage.fileLocation}/${item.id}`"
-        :class="`button ${item.recording ? 'is-primary' : 'is-dark'}`"
-      >
-        <i class="fas fa-video"></i>
-      </router-link>
+      <span class="buttons are-small">
+        <router-link
+          :to="`/replay/${stage.fileLocation}/${item.id}`"
+          :class="`button ${item.recording ? 'is-primary' : 'is-dark'}`"
+          :title="$t('replay_open')"
+        >
+          <i class="fas fa-video"></i>
+        </router-link>
+        <button
+          type="button"
+          class="button is-light"
+          :title="$t('replay_copy_link')"
+          @click="copyReplayLink(item)"
+        >
+          <i class="fas fa-link"></i>
+        </button>
+      </span>
     </template>
     <template #actions="{ item }">
       <Modal>
@@ -386,6 +429,7 @@ export default {
         <template #header>{{ $t("trim_replay_title") }}</template>
         <template #content="{ closeModal }">
           <p class="mb-3">{{ $t("trim_replay_help") }}</p>
+          <p v-if="trimDurationHint" class="mb-3 has-text-grey">{{ trimDurationHint }}</p>
           <Field v-model="trimNewName" :label="$t('trim_replay_new_name')" required />
           <Field
             v-model.number="trimMinPauseSeconds"

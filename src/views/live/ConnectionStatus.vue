@@ -5,6 +5,12 @@ import { animate } from "animejs";
 import Popover from "components/Popover.vue";
 import Session from "./Session.vue";
 import ReloadStream from "./ReloadStream.vue";
+import RecordingControl from "components/stage/RecordingControl.vue";
+
+defineProps<{
+  /** Live stage: stack under `#live-logo` instead of overlapping it. */
+  stackUnderLogo?: boolean;
+}>();
 
 const stageStore = useStageStore();
 const dot = ref<HTMLElement>();
@@ -22,7 +28,11 @@ const status = computed<string>(() => {
 const players = computed(() => stageStore.players);
 const audiences = computed(() => stageStore.audiences);
 const masquerading = computed<boolean>(() => stageStore.masquerading);
-const replaying = inject<boolean>("replaying");
+const replaying = inject<boolean>("replaying", false);
+const canPlay = computed(() => stageStore.canPlay);
+const hasSessionHistory = computed(
+  () => players.value.length > 0 || audiences.value.length > 0,
+);
 
 onMounted(() => {
   nextTick(() => {
@@ -39,8 +49,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div id="connection-status">
-    <ReloadStream />
+  <div id="connection-status" :class="{ 'stack-under-logo': stackUnderLogo }">
+    <RecordingControl v-if="!replaying && canPlay" />
+    <ReloadStream v-if="!replaying" />
     <span
       class="tag is-light is-small"
       :class="{
@@ -80,6 +91,12 @@ onMounted(() => {
         </span>
       </template>
       <div style="max-height: 50vh; overflow-y: auto">
+        <p v-if="replaying && !hasSessionHistory" class="is-size-7 px-2 pb-2 has-text-grey">
+          {{ $t("replay_counter_empty") }}
+        </p>
+        <p v-else-if="replaying" class="is-size-7 px-2 pb-2 has-text-grey">
+          {{ $t("replay_counter_replay_hint") }}
+        </p>
         <Session v-for="player in players" :key="player.id" :session="player" />
         <Session v-for="audience in audiences" :key="audience.id" :session="audience" />
       </div>
@@ -96,10 +113,25 @@ onMounted(() => {
   text-align: center;
   z-index: 4;
 
+  &.stack-under-logo {
+    // Logo plaque: safe-area + 8px padding + 36px image + 8px gap
+    top: calc(max(8px, env(safe-area-inset-top, 0px)) + 52px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    width: auto;
+    max-width: 250px;
+  }
+
   @media screen and (max-width: 767px) {
     right: unset;
     top: 8px;
     left: 0;
+
+    &.stack-under-logo {
+      align-items: flex-start;
+    }
   }
 }
 

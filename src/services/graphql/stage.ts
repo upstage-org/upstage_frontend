@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { gql } from "@apollo/client/core";
+import { deriveActiveRecording } from "@utils/stageRecording";
 import { studioClient } from "../graphql";
 
 export const stageFragment = gql`
@@ -238,6 +239,12 @@ const stageOps = {
             stageList(input: { fileLocation: $fileLocation, performanceId: $performanceId }) {
               ...stageFragment
               permission
+              performances {
+                id
+                name
+                createdOn
+                recording
+              }
               scenes {
                 ...sceneFragment
               }
@@ -248,6 +255,10 @@ const stageOps = {
                 mqttTimestamp
                 performanceId
               }
+              chats {
+                payload
+                performanceId
+              }
             }
           }
           ${stageFragment}
@@ -255,11 +266,9 @@ const stageOps = {
         `,
         { fileLocation, performanceId },
       )
-      .then((response) => {
-        return {
-          stage: response.stageList[0],
-        };
-      }),
+      .then((response) => ({
+        stage: deriveActiveRecording(response.stageList[0]),
+      })),
   loadPermission: (fileLocation) =>
     studioClient
       .request(
@@ -524,13 +533,14 @@ const stageOps = {
   deletePerformance: (id) =>
     studioClient.request(
       gql`
-        mutation DeletePerformance($id: Int!) {
+        mutation DeletePerformance($id: ID!) {
           deletePerformance(id: $id) {
             success
+            message
           }
         }
       `,
-      { id },
+      { id: String(id) },
     ),
   updatePerformance: (id, name, description) =>
     studioClient.request(
@@ -558,28 +568,29 @@ const stageOps = {
   startRecording: (stageId, name, description) =>
     studioClient.request(
       gql`
-        mutation startRecording($stageId: ID!, $name: String, $description: String) {
-          startRecording(stageId: $stageId, name: $name, description: $description) {
-            recording {
-              id
-            }
+        mutation startRecording($input: RecordInput!) {
+          startRecording(input: $input) {
+            id
+            name
+            createdOn
+            recording
           }
         }
       `,
-      { stageId, name, description },
+      { input: { stageId: String(stageId), name, description } },
     ),
   saveRecording: (id) =>
     studioClient.request(
       gql`
-        mutation saveRecording($id: Int!) {
+        mutation saveRecording($id: ID!) {
           saveRecording(id: $id) {
-            recording {
-              id
-            }
+            id
+            name
+            recording
           }
         }
       `,
-      { id },
+      { id: String(id) },
     ),
   getStreamSign: (key) =>
     studioClient

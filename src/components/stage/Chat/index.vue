@@ -26,6 +26,7 @@ export default {
     //   * skip the collapse / minimise affordance (no reason to
     //     collapse a window that is dedicated to chat).
     const isStandalone = inject("isChatStandalone", false);
+    const replaying = inject("replaying", false);
     const chatVisibility = computed(() => isStandalone || stageStore.settings.chatVisibility);
     const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
 
@@ -156,7 +157,7 @@ export default {
       stageStore.SET_CHAT_PARAMETERS(parameters);
     };
     const chatPosition = computed(() => stageStore.chatPosition);
-    const canPlay = computed(() => stageStore.canPlay);
+    const canPlay = computed(() => stageStore.canPlay && !replaying);
     const stageSize = computed(() => stageStore.stageSize);
 
     watchEffect(() => {
@@ -205,6 +206,7 @@ export default {
       bounceUnread,
       isStandalone,
       popOut,
+      replaying,
     };
   },
 };
@@ -254,7 +256,7 @@ export default {
         </a-tooltip>
       </transition>
       <div class="actions">
-        <Reaction v-if="collapsed" />
+        <Reaction v-if="collapsed && !replaying" />
         <a-tooltip v-if="!isStandalone" :title="collapsed ? 'Maximise' : 'Minimise'">
           <button
             :key="collapsed"
@@ -322,7 +324,7 @@ export default {
             </span>
           </button>
         </a-tooltip>
-        <ClearChat option="public-chat" />
+        <ClearChat v-if="!replaying" option="public-chat" />
       </div>
       <div
         ref="theContent"
@@ -336,7 +338,7 @@ export default {
           <Messages :messages="messages" :style="{ fontSize }" />
         </div>
       </div>
-      <footer class="card-footer">
+      <footer v-if="!replaying" class="card-footer">
         <div class="card-footer-item">
           <div v-if="!collapsed" class="is-fullwidth my-1 reaction-bar">
             <Reaction :custom-emoji="true" />

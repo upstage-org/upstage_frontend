@@ -1,5 +1,5 @@
 <script>
-import { ref } from "vue";
+import { ref, inject } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
 import { useStageStore } from "@stores/pinia/stage";
@@ -17,7 +17,8 @@ export default {
     const isDragging = ref(false);
 
     const stageStore = useStageStore();
-    const canPlay = computed(() => stageStore.canPlay);
+    const replaying = inject("replaying", false);
+    const canPlay = computed(() => stageStore.canPlay && !replaying);
     const config = stageStore.config;
     const moveable = new Moveable(document.body, {
       draggable: true,
@@ -146,6 +147,7 @@ export default {
     const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
     const clickInside = (e) => {
+      if (replaying) return;
       if (props.controlable && canPlay.value) {
         showControls(true, e);
         stageStore.SET_ACTIVE_MOVABLE(props.object.id);
@@ -153,6 +155,7 @@ export default {
     };
 
     const clickOutside = (e) => {
+      if (replaying) return;
       if ((!e || e.target.id === "board") && props.controlable && canPlay.value) {
         stageStore.SET_ACTIVE_MOVABLE(null);
       }

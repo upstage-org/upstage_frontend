@@ -7,6 +7,11 @@ import { StudioGraph } from "models/studio";
 import { inquiryVar } from "apollo";
 import Navbar from "../Navbar.vue";
 import dayjs, { type Dayjs } from "@utils/dayjs";
+import {
+  ALL_STAGE_ACCESS,
+  DEFAULT_STAGE_ACCESS,
+  normalizeStageAccess,
+} from "utils/studioInquiry";
 
 const { result, loading } = useQuery<StudioGraph>(gql`
   query StageFilter {
@@ -49,7 +54,7 @@ const owners = ref([]);
 const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
-const access = ref(["owner", "editor", "player"]);
+const access = ref<string[]>([...DEFAULT_STAGE_ACCESS]);
 const dates = ref<[Dayjs, Dayjs] | undefined>();
 
 const ranges = [
@@ -89,9 +94,23 @@ const updateInquiry = (vars: any) =>
   });
 
 const watchInquiryVar = (vars: any) => {
-  types.value = vars.mediaTypes ?? [];
-  tags.value = vars.tags ?? [];
-  access.value = vars.access ?? [];
+  if (Array.isArray(vars.mediaTypes)) {
+    types.value = vars.mediaTypes;
+  }
+  if (Array.isArray(vars.tags)) {
+    tags.value = vars.tags;
+  }
+  if (Array.isArray(vars.owners)) {
+    owners.value = vars.owners;
+  }
+  if (typeof vars.name === "string") {
+    name.value = vars.name;
+  }
+  // Only apply `access` when another writer set it; Media/Admin updates
+  // often omit `access`, which previously reset this to [] and blanked the table.
+  if (Object.prototype.hasOwnProperty.call(vars, "access")) {
+    access.value = normalizeStageAccess(vars.access);
+  }
   inquiryVar.onNextChange(watchInquiryVar);
 };
 inquiryVar.onNextChange(watchInquiryVar);
@@ -102,13 +121,14 @@ watchEffect(() => {
     stages: stages.value,
     tags: tags.value,
     mediaTypes: types.value,
-    access: access.value,
+    access: normalizeStageAccess(access.value),
   });
 });
 
 onMounted(() => {
   updateInquiry({
     createdBetween: undefined,
+    access: normalizeStageAccess(access.value),
   });
 });
 
@@ -133,20 +153,24 @@ const clearFilters = () => {
   types.value = [];
   stages.value = [];
   tags.value = [];
-  access.value = [];
+  access.value = [...DEFAULT_STAGE_ACCESS];
   dates.value = undefined;
 };
 
-const hasFilter = computed(
-  () =>
+const hasFilter = computed(() => {
+  const accessFiltered =
+    access.value.length !== DEFAULT_STAGE_ACCESS.length ||
+    !DEFAULT_STAGE_ACCESS.every((level) => access.value.includes(level));
+  return (
     name.value ||
     owners.value.length ||
     types.value.length ||
     stages.value.length ||
     tags.value.length ||
-    access.value.length ||
-    dates.value,
-);
+    accessFiltered ||
+    dates.value
+  );
+});
 
 const handleFilterOwnerName = (keyword: string, option: any) => {
   const s = keyword.toLowerCase();
@@ -212,7 +236,7 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
             <div
               class="w-full cursor-pointer text-center"
               @mousedown.prevent
-              @click.stop.prevent="access = ['owner', 'editor', 'player', 'audience']"
+              @click.stop.prevent="access = [...ALL_STAGE_ACCESS]"
             >
               <unlock-outlined />&nbsp;All Access
             </div>

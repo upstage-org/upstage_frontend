@@ -2,7 +2,10 @@
 import { computed, onUnmounted, provide } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
+import { message } from "ant-design-vue";
 import { stopSpeaking } from "@services/speech";
+import { copyReplayLink } from "@utils/replayLink";
 import Logo from "components/Logo.vue";
 import Chat from "components/stage/Chat/index.vue";
 import Board from "components/stage/Board.vue";
@@ -27,6 +30,18 @@ stageStore.loadStage({
 
 provide("replaying", true);
 
+const { t } = useI18n();
+
+const copyLink = async () => {
+  if (!url || !id) return;
+  try {
+    await copyReplayLink(url, id);
+    message.success(t("replay_link_copied"));
+  } catch {
+    message.error(t("replay_copy_failed"));
+  }
+};
+
 onUnmounted(() => {
   stopSpeaking();
   stageStore.pauseReplay();
@@ -35,6 +50,12 @@ onUnmounted(() => {
 
 <template>
   <Logo id="live-logo" />
+  <div v-if="ready" class="replay-header-actions">
+    <button type="button" class="button is-small is-light" @click="copyLink">
+      <i class="fas fa-link"></i>
+      <span>{{ $t("replay_copy_link_header") }}</span>
+    </button>
+  </div>
   <div id="main-content">
     <Preloader />
     <template v-if="ready">
@@ -57,6 +78,13 @@ onUnmounted(() => {
     user-select: none;
   }
 }
+.replay-header-actions {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  right: 148px;
+  z-index: 5;
+}
+
 #live-logo {
   position: fixed;
   right: 0px;
