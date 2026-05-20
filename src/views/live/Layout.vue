@@ -13,6 +13,8 @@ import ConnectionStatus from "./ConnectionStatus.vue";
 import MasqueradingStatus from "./MasqueradingStatus.vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useAuthStore } from "@stores/pinia/auth";
+import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
+import { storeToRefs } from "pinia";
 import { computed, onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import { isJwtExpired, loggedIn } from "utils/auth";
@@ -35,7 +37,7 @@ export default {
   setup: () => {
     const stageStore = useStageStore();
     const authStore = useAuthStore();
-    const ready = computed(() => stageStore.ready);
+    const { ready, canPlay } = storeToRefs(stageStore);
 
     const route = useRoute();
     stageStore.loadStage({ url: route.params.url }).then(() => {
@@ -70,6 +72,15 @@ export default {
       document.removeEventListener("visibilitychange", onVisibility);
     });
 
+    usePageWakeRecovery(() => {
+      checkExpiry();
+      if (canPlay.value && stageStore.status === "OFFLINE") {
+        stageStore.connect();
+      } else if (canPlay.value) {
+        stageStore.triggerReloadStreams();
+      }
+    });
+
     // `beforeunload` is the historical hook but Firefox in particular often
     // tears the page down before the awaited disconnect publishes its
     // counter-leave, leaving zombie viewers in everyone else's session list
@@ -87,8 +98,6 @@ export default {
         onUnload();
       }
     });
-
-    const canPlay = computed(() => stageStore.canPlay);
 
     return {
       ready,

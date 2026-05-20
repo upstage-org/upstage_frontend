@@ -5,6 +5,8 @@ import Loading from "components/Loading.vue";
 import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { isIOS } from "utils/common";
+import { playMediaElement, retryPlayOnUserGesture } from "@utils/mediaPlayback";
+import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
 
 export default {
@@ -217,19 +219,9 @@ export default {
           // explicitly and surface (not throw) the rejection — the next
           // user gesture (e.g. clicking on the stage) will re-trigger
           // it via the browser's autoplay-allowance window.
-          const playPromise = audio.play();
-          if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch((err) => {
-              console.warn("Remote stream audio autoplay was blocked:", err);
-              const retry = () => {
-                audio.play().catch(() => {});
-                window.removeEventListener("pointerdown", retry);
-                window.removeEventListener("keydown", retry);
-              };
-              window.addEventListener("pointerdown", retry, { once: true });
-              window.addEventListener("keydown", retry, { once: true });
-            });
-          }
+          playMediaElement(audio).catch(() => {
+            retryPlayOnUserGesture(audio);
+          });
         }
       },
       { immediate: true },
@@ -257,6 +249,15 @@ export default {
     // volume slider would silently do nothing. Hide it on iOS rather than
     // present a control that lies to the performer.
     const supportsPerStreamVolume = !isIOS();
+
+    usePageWakeRecovery(() => {
+      if (audioEl.value) {
+        playMediaElement(audioEl.value).catch(() => retryPlayOnUserGesture(audioEl.value));
+      }
+      if (videoEl.value) {
+        playMediaElement(videoEl.value, { muted: true, inline: true }).catch(() => {});
+      }
+    });
 
     return {
       videoTrack,

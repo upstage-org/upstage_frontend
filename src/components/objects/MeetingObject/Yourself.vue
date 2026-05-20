@@ -14,6 +14,8 @@ import {
 import { useUserStore } from "@stores/pinia/user";
 import { useStageStore } from "@stores/pinia/stage";
 import { useLowLevelAPI } from "./composable";
+import { playMediaElement } from "@utils/mediaPlayback";
+import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 
 // Map a `getUserMedia` DOMException name to a short, performer-facing
 // message. Each browser raises a different name for the same condition;
@@ -174,13 +176,9 @@ export default {
               //  - In Safari, if anything still rejects (e.g. user
               //    disabled autoplay site-wide), we surface it instead
               //    of leaving `loading.value` stuck at true forever.
-              const playPromise = el.value.play();
-              if (playPromise && typeof playPromise.catch === "function") {
-                playPromise.catch((err) => {
-                  console.warn("Local preview autoplay was blocked:", err);
-                  loading.value = false;
-                });
-              }
+              playMediaElement(el.value, { muted: true, inline: true }).catch(() => {
+                loading.value = false;
+              });
             }
 
             el.value.addEventListener("loadedmetadata", () => {
@@ -220,6 +218,12 @@ export default {
 
     onMounted(() => {
       acquireLocalTracks();
+    });
+
+    usePageWakeRecovery(() => {
+      if (joined.value && tracks.length > 0) {
+        void acquireLocalTracks();
+      }
     });
 
     // Subscribe to device-list changes (camera/mic plugged in or removed,

@@ -1,7 +1,8 @@
 // @ts-nocheck
-import configs from "config";
 import { useStageStore } from "@stores/pinia/stage";
 import { isJitsiBoardType, isStreamPlaybackBoardType } from "@utils/common";
+
+export { namespaceTopic, unnamespaceTopic } from "@utils/mqttTopics";
 
 // `useStageStore()` is cheap to call repeatedly — Pinia caches the
 // instance — so these helpers re-resolve the store on each call rather
@@ -66,22 +67,6 @@ export function deserializeObject(object) {
   object.h = toAbsolute(object.h);
   recalcFontSize(toAbsolute);
   return object;
-}
-
-export function namespaceTopic(topicName, stageUrl) {
-  const url = stageUrl ?? useStageStore().url;
-  const namespace = configs.MQTT_NAMESPACE;
-  return `${namespace}/${url}/${topicName}`;
-}
-
-export function unnamespaceTopic(topicName) {
-  if (topicName == null || typeof topicName !== "string") return "";
-  const url = useStageStore().url;
-  const namespace = configs.MQTT_NAMESPACE;
-  if (url == null || namespace == null) return topicName;
-  const prefixLen = String(namespace).length + String(url).length + 2;
-  if (topicName.length <= prefixLen) return topicName;
-  return topicName.substring(prefixLen);
 }
 
 export function getDefaultStageConfig() {

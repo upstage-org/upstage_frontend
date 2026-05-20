@@ -1,5 +1,6 @@
 <script lang="jsx">
 import { onMounted, onUnmounted, ref } from "vue";
+import { prepareMediaElement } from "@utils/mediaPlayback";
 
 export default {
   props: {
@@ -16,12 +17,7 @@ export default {
       // mirror it by hand here, the JSX equivalent of the
       // `:muted.attr="true"` modifier used in the .vue templates.
       if (props.track.getType() === "video" && el.value) {
-        el.value.setAttribute("muted", "");
-        // IDL-property mirror for `disablePictureInPicture` — same
-        // Vue-3-property-patching concern as for `muted` above. The
-        // HTML attribute is set in the rendered JSX, but the IDL
-        // property is what Firefox / Chromium actually read when
-        // deciding whether to overlay the PiP toggle on hover.
+        prepareMediaElement(el.value, { muted: true, inline: true });
         el.value.disablePictureInPicture = true;
       }
       props.track.attach(el.value);

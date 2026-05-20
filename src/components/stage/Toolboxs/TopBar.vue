@@ -26,6 +26,7 @@
  * [views/live/Layout.vue].
  */
 import { computed, inject, onUnmounted, ref } from "vue";
+import { storeToRefs } from "pinia";
 import { useStageStore } from "@stores/pinia/stage";
 import { useDraggablePanel } from "composables/index";
 import Icon from "components/Icon.vue";
@@ -94,8 +95,7 @@ export default {
       window.removeEventListener("keyup", toggleCompact);
     });
 
-    const position = computed(() => stageStore.topbarPosition);
-    const collapsed = computed(() => stageStore.topbarCollapsed);
+    const { topbarPosition: position, topbarCollapsed: collapsed } = storeToRefs(stageStore);
 
     const { startDrag } = useDraggablePanel({
       panelEl: panel,

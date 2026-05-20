@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 // Pull the default and read connect off it.
 import mqtt from "mqtt";
 const { connect } = mqtt;
-import { namespaceTopic, unnamespaceTopic } from "store/modules/stage/reusable";
+import { namespaceTopic, unnamespaceTopic } from "@utils/mqttTopics";
 import { isJson } from "utils/common";
 
 export default function buildClient() {

@@ -70,7 +70,9 @@ onUnmounted(() => {
 
 <style lang="scss">
 #main-content {
-  min-height: calc(100vh - 120px);
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
 }
 #live-stage {
   *:not(input, textarea) {

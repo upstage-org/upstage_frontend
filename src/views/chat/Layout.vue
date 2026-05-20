@@ -30,6 +30,7 @@ import { storeToRefs } from "pinia";
 import { useRoute } from "vue-router";
 import { useAuthStore } from "@stores/pinia/auth";
 import { useStageStore } from "@stores/pinia/stage";
+import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import Chat from "components/stage/Chat/index.vue";
 import PlayerChat from "components/stage/Chat/PlayerChat.vue";
 import LoginPrompt from "../live/LoginPrompt.vue";
@@ -40,6 +41,7 @@ export default {
   setup: () => {
     const stageStore = useStageStore();
     const { loggedIn } = storeToRefs(useAuthStore());
+    const { ready, canPlay } = storeToRefs(stageStore);
     const route = useRoute();
 
     // Two consumers of this flag inside the chat components:
@@ -78,12 +80,16 @@ export default {
       }
     });
 
-    const ready = computed(() => stageStore.ready);
-    const canPlay = computed(() => stageStore.canPlay);
     // Pop-out/mobile chat must mirror the live stage UX: Player Chat is only
     // for authenticated performers. `canPlay` alone follows GraphQL permission
     // and can disagree with absent auth (guests opening `/chat/:url`).
     const showPlayerChatStandalone = computed(() => loggedIn.value && canPlay.value);
+
+    usePageWakeRecovery(() => {
+      if (stageStore.status === "OFFLINE") {
+        stageStore.connect();
+      }
+    });
 
     // Which pane is active when both are available (`showPlayerChatStandalone`). The
     // standalone view stacks the two chats behind a small tab bar

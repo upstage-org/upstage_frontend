@@ -52,8 +52,8 @@ import {
   recalcFontSize,
   serializeForBroadcast,
   serializeObject,
-  unnamespaceTopic,
 } from "@stores/modules/stage/reusable";
+import { unnamespaceTopic } from "@utils/mqttTopics";
 import { useAttribute } from "@services/graphql/composable";
 import { avatarSpeak, stopSpeaking } from "@services/speech";
 import { useAuthStore } from "@stores/pinia/auth";
@@ -489,13 +489,14 @@ export const useStageStore = defineStore("stage", () => {
     text: { fontSize: "20px", fontFamily: "Josefin Sans" },
   });
   const reactions = ref<Reaction[]>([]);
-  // Static placeholder; `useStageViewport()` (reactiveViewport.ts)
+  // Static placeholder; `useStageViewport()` (composables/useStageViewport.ts)
   // starts mutating this once App.vue mounts. TDZ caveat: do not call
   // `getViewport()` here — the helper depends on `window.innerWidth`
   // which is `0` during SSR / pre-mount Vite startup.
   const viewport = ref<Viewport>({ width: 0, height: 0 });
   const sessions = ref<Session[]>([]);
   const session = ref<string | null>(null);
+  const REPLAY_LOOP_KEY = "upstage-replay-loop";
   const replay = ref<ReplayState>({
     timestamp: { begin: 0, end: 0, current: 0 },
     timers: [],
@@ -505,6 +506,13 @@ export const useStageStore = defineStore("stage", () => {
     performanceId: null,
     markers: [],
   });
+  try {
+    if (typeof localStorage !== "undefined" && localStorage.getItem(REPLAY_LOOP_KEY) === "true") {
+      replay.value.loop = true;
+    }
+  } catch {
+    /* private mode / blocked storage */
+  }
   const audioPlayers = ref<AudioPlayer[]>([]);
   const isSavingScene = ref<boolean>(false);
   const isLoadingScenes = ref<boolean>(false);
@@ -1127,6 +1135,13 @@ export const useStageStore = defineStore("stage", () => {
 
   function SET_REPLAY(r: Partial<ReplayState>) {
     Object.assign(replay.value, r);
+    if ("loop" in r) {
+      try {
+        localStorage.setItem(REPLAY_LOOP_KEY, r.loop ? "true" : "false");
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   function SET_ACTIVE_MOVABLE(id: ObjectId | null) {
@@ -2971,4 +2986,13 @@ export const useStageStore = defineStore("stage", () => {
     triggerReloadStreams,
     refreshMeeting,
   };
+}, {
+  persist: {
+    key: "upstage-stage-ui",
+    pick: ["chatPosition"],
+  },
 });
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useStageStore, import.meta.hot));
+}

@@ -34,6 +34,7 @@
     "e2e:features": "pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=features",
     "e2e:smoke": "E2E_BEATS=smoke pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=perform",
     "e2e:smoke:stub": "pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=smoke --grep @smoke",
+    "e2e:webkit": "pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=webkit",
     "codegen": "graphql-codegen --config codegen.ts",
     "codegen:watch": "graphql-codegen --config codegen.ts --watch",
     "depcheck": "depcheck --ignores=\"@types/*,eslint-*,@vue/eslint-config-*,@typescript-eslint/*,vue-eslint-parser,jsdom,postcss,autoprefixer,vite-tsconfig-paths,@playwright/test,@vitest/ui,@vue/test-utils,@graphql-codegen/*\"",

@@ -1,5 +1,6 @@
 <script>
 import { computed } from "vue";
+import { storeToRefs } from "pinia";
 import { useStageStore } from "@stores/pinia/stage";
 import { isStreamPlaybackBoardType } from "@utils/common";
 import Avatar from "components/objects/Avatar/index.vue";
@@ -49,11 +50,7 @@ export default {
   },
   setup: () => {
     const stageStore = useStageStore();
-    const canPlay = computed(() => stageStore.canPlay);
-
-    const stageSize = computed(() => stageStore.stageSize);
-    const config = computed(() => stageStore.config);
-    const objects = computed(() => stageStore.objects);
+    const { canPlay, stageSize, config, objects } = storeToRefs(stageStore);
     const drop = (e) => {
       const { object, isReal, nodrop } = JSON.parse(e.dataTransfer.getData("text"));
       if (isReal) {

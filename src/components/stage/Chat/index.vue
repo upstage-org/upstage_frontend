@@ -1,6 +1,7 @@
 <script>
 import { computed, inject, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { animate } from "animejs";
+import { storeToRefs } from "pinia";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { useDraggablePanel } from "composables/index";
@@ -16,6 +17,8 @@ export default {
     const theContent = ref();
     const theChatbox = ref();
     const stageStore = useStageStore();
+    const { chatPosition, canPlay: storeCanPlay, stageSize, chat, publicChatPosition } =
+      storeToRefs(stageStore);
     const userStore = useUserStore();
     // Set by views/chat/Layout.vue when this component is mounted
     // inside the standalone /chat/<stage> view. We use it to:
@@ -54,7 +57,7 @@ export default {
     // Suppressed inside the standalone /chat/<stage> window because
     // there the chat IS the whole viewport — host OS window
     // manager handles positioning instead.
-    const chatDragPosition = computed(() => stageStore.publicChatPosition);
+    const chatDragPosition = computed(() => publicChatPosition.value);
     const { startDrag: startChatDrag } = useDraggablePanel({
       panelEl: theChatbox,
       setPosition: (pos) => stageStore.setPublicChatPosition(pos),
@@ -64,7 +67,7 @@ export default {
 
     stageStore.loadPermission();
 
-    const messages = computed(() => stageStore.chat.messages);
+    const messages = computed(() => chat.value.messages);
     // `store.state.user.loadingUser` was a broken read after the user
     // module moved to Pinia; Pinia user store has the real flag.
     const loadingUser = computed(() => userStore.loadingUser);
@@ -156,9 +159,7 @@ export default {
       };
       stageStore.SET_CHAT_PARAMETERS(parameters);
     };
-    const chatPosition = computed(() => stageStore.chatPosition);
-    const canPlay = computed(() => stageStore.canPlay && !replaying);
-    const stageSize = computed(() => stageStore.stageSize);
+    const canPlay = computed(() => storeCanPlay.value && !replaying);
 
     watchEffect(() => {
       if (!collapsed.value) {

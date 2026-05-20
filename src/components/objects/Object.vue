@@ -1,6 +1,7 @@
 <script>
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 import { computed, inject, provide, reactive, ref, watch } from "vue";
 import { isStreamPlaybackBoardType } from "@utils/common";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
@@ -27,14 +28,14 @@ export default {
     const video = ref();
     const stageStore = useStageStore();
     const replaying = inject("replaying", false);
-    const stageSize = computed(() => stageStore.stageSize);
+    const { stageSize, session, canPlay: storeCanPlay } = storeToRefs(stageStore);
 
     const active = ref(false);
     const sliderMode = ref("opacity");
     const beforeDragPosition = ref();
-    const isHolding = computed(() => props.object.holder?.id === stageStore.session);
+    const isHolding = computed(() => props.object.holder?.id === session.value);
     const holdable = computed(() => ["avatar"].includes(props.object.type));
-    const canPlay = computed(() => stageStore.canPlay && !replaying);
+    const canPlay = computed(() => storeCanPlay.value && !replaying);
     const controlable = computed(() => {
       if (replaying) return false;
       return holdable.value ? isHolding.value : canPlay.value && !props.object.wornBy;

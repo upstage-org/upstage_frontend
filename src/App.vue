@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useTitle } from "@vueuse/core";
-import { useStageViewport } from "store/modules/stage/reactiveViewport";
+import { useStageViewport } from "@composables/useStageViewport";
 import { useUserStore } from "@stores/pinia/user";
 import { useConfigStore } from "@stores/pinia/config";
 import "styles/bulma.css";

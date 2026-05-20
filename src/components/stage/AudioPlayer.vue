@@ -1,5 +1,6 @@
 <script>
 import { computed, onMounted, watch } from "vue";
+import { message } from "ant-design-vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 export default {
@@ -39,6 +40,12 @@ export default {
             index,
             currentTime: el.currentTime,
           });
+        });
+        el.addEventListener("error", function () {
+          const audio = audios[refs.indexOf(el)];
+          const label = audio?.name || audio?.src || "audio";
+          message.error(`Could not play ${label}. This format may not be supported in your browser.`);
+          stopAudio(audio);
         });
       }
     };
