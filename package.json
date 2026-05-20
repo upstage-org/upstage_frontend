@@ -30,6 +30,7 @@
     "e2e:perform:rehearsal": "E2E_PHASES=rehearsal pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=perform",
     "e2e:perform:live": "E2E_PHASES=live pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=perform",
     "e2e:perform:replay": "E2E_PHASES=replay pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=perform",
+    "e2e:replay-studio": "pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=replay-studio",
     "e2e:features": "pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=features",
     "e2e:smoke": "E2E_BEATS=smoke pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=perform",
     "e2e:smoke:stub": "pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=smoke --grep @smoke",

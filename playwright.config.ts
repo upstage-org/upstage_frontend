@@ -65,6 +65,12 @@ export default defineConfig({
       dependencies: ["setup"],
     },
     {
+      name: "replay-studio",
+      testMatch: /replay-studio\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+    {
       // Performer-streams + audience-views coverage:
       //   • Embedded MeetingObject: verifies the post-"option B" iframe
       //     Permissions Policy boundary (audience iframe MUST NOT delegate

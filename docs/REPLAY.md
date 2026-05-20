@@ -12,6 +12,8 @@ Each saved performance has its own URL:
 
 Use **Copy replay link** in Studio → Archive or on the replay page header.
 
+Automated check (requires e2e setup + archived performance): `pnpm e2e:replay-studio`.
+
 ## Studio (Archive tab)
 
 - **Archive performance** (Sweep) creates a new recording from activity since the last archive.

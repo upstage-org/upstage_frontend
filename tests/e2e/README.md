@@ -124,6 +124,8 @@ Passwords are not stored in `runtime.json`; they stay in code and env.
 | `pnpm e2e:features` | Features project (drawing, drawing-as-avatar, opacity, depth; setup runs first via dependencies). |
 | `pnpm e2e:smoke` | Short perform slice via `E2E_BEATS=smoke` + `run-e2e` preflight. |
 | `pnpm e2e:smoke:stub` | Mock smoke specs only + `run-e2e` preflight. |
+| `pnpm e2e:replay-studio` | Studio Archive → replay viewer (`replay-studio.spec.ts`; needs setup + archived performance). |
+| `pnpm e2e:perform:replay` | Perform pass 3 only (`E2E_PHASES=replay`). |
 
 ## Environment variables
 
@@ -148,6 +150,7 @@ Passwords are not stored in `runtime.json`; they stay in code and env.
 | `setup` | `setup.spec.ts` |
 | `perform` | `perform.spec.ts` (runs after `setup` in one invocation) |
 | `features` | `features.spec.ts` — drawing, drawing-as-avatar, opacity, depth (runs after `setup`) |
+| `replay-studio` | `replay-studio.spec.ts` — Studio Archive tab opens `/replay/:slug/:id` (runs after `setup`) |
 
 `workers: 1` and `fullyParallel: false` keep ordering predictable for setup and MQTT.
 

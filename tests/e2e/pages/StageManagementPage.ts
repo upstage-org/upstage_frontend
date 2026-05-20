@@ -43,13 +43,21 @@ export class StageManagementPage {
   }
 
   async openMediaTab(): Promise<void> {
-    // The Customisation/Media/Archive tabs are router-link <a>s under the
-    // stage-management layout.
-    const link = this.page.getByRole("link", { name: /^Stage Media$|^Media$/i }).first();
+    await this.openManagementTab(/^Stage Media$|^Media$/i, "media");
+  }
+
+  /** Stage Management → Archive (performances / replay list). */
+  async openArchiveTab(): Promise<void> {
+    await this.openManagementTab(/^Archive$/i, "archive");
+  }
+
+  private async openManagementTab(namePattern: RegExp, pathSegment: string): Promise<void> {
+    // Customisation / Media / Archive tabs are router-link <a>s under the layout.
+    const link = this.page.getByRole("link", { name: namePattern }).first();
     if (await link.count()) {
       await link.click();
     } else {
-      await this.page.goto(`${this.page.url().replace(/\/$/, "")}/media`);
+      await this.page.goto(`${this.page.url().replace(/\/$/, "")}/${pathSegment}`);
     }
     await this.page.waitForLoadState("networkidle").catch(() => undefined);
   }
