@@ -1,32 +1,23 @@
-<template>
-    <a-layout>
-        <Sidebar />
-        <a-layout class="h-screen space-y-2 p-2" :style="{ background: route?.meta?.background }">
-            <router-view />
-        </a-layout>
-    </a-layout>
-</template>
-
-<script>
-import Sidebar from "components/Sidebar.vue";
-import Footer from "components/Footer.vue";
-import OneTimePurchase from "components/payment/OneTimePurchase.vue";
-import PurchasePopup from "components/payment/PurchasePopup.vue";
-import { useStore } from "vuex";
-import { ref, watchEffect } from "vue";
+<script setup lang="ts">
 import { useRoute } from "vue-router";
+import Sidebar from "components/Sidebar.vue";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 
-export default {
-    components: { Footer, OneTimePurchase, PurchasePopup },
-    setup: () => {
-        const store = useStore();
-        const enableDonate = ref(false);
-        const route = useRoute();
-        watchEffect(() => {
-            enableDonate.value = store.getters["config/enableDonate"];
-        });
+const route = useRoute();
+const { enableDonate } = storeToRefs(useConfigStore());
 
-        return { enableDonate, route };
-    },
-};
+defineExpose({ enableDonate });
 </script>
+
+<template>
+  <a-layout>
+    <Sidebar />
+    <a-layout
+      class="h-screen space-y-2 p-2"
+      :style="{ background: route?.meta?.background as string | undefined }"
+    >
+      <router-view />
+    </a-layout>
+  </a-layout>
+</template>

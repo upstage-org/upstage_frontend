@@ -1,75 +1,10 @@
-<template>
-  <div class="container-fluid">
-    <div class="columns">
-      <div class="column">
-        <div class="box">
-          <p v-if="titles" class="title is-5">{{ titles[0] }}</p>
-          <Loading v-if="loading" />
-          <div v-else class="columns is-multiline">
-            <div
-              class="column item is-3"
-              v-for="item in data"
-              :key="item"
-              :class="columnClass(item)"
-            >
-              <Selectable
-                multiple
-                :selected="modelValue.includes(item)"
-                @select="select(item)"
-              >
-                <slot name="render" :item="item">
-                  {{ item.name }}
-                </slot>
-              </Selectable>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="column is-narrow">
-        <button class="button is-primary" @click="selectAll">
-          <i class="fas fa-angle-double-right"></i>
-        </button>
-        <br />
-        <br />
-        <button class="button is-primary" @click="removeAll">
-          <i class="fas fa-angle-double-left"></i>
-        </button>
-      </div>
-      <div class="column">
-        <div class="box">
-          <p v-if="titles" class="title is-5">{{ titles[1] }}</p>
-          <p v-if="sizeTotal || sizeTotal === 0" class="subtitle is-6">
-            Total file size: {{ humanFileSize(sizeTotal) }}
-          </p>
-          <Loading v-if="loading" />
-          <div v-else class="columns is-multiline">
-            <template v-for="item in modelValue" :key="item">
-              <div
-                class="column item is-3"
-                @click="remove(item)"
-                :class="columnClass(item)"
-              >
-                <Selectable revert @select="remove(item)">
-                  <slot name="render" :item="item">
-                    {{ item.name }}
-                  </slot>
-                </Selectable>
-              </div>
-            </template>
-            <slot name="extras"></slot>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script>
 import Loading from "components/Loading.vue";
 import Selectable from "components/Selectable.vue";
 import { humanFileSize } from "utils/common";
 
 export default {
+  components: { Loading, Selectable },
   props: {
     modelValue: {
       type: Array,
@@ -85,7 +20,6 @@ export default {
     },
   },
   emits: ["update:modelValue"],
-  components: { Loading, Selectable },
   setup: (props, { emit }) => {
     const remove = (item) => {
       emit(
@@ -117,6 +51,64 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="container-fluid">
+    <div class="columns">
+      <div class="column">
+        <div class="box">
+          <p v-if="titles" class="title is-5">{{ titles[0] }}</p>
+          <Loading v-if="loading" />
+          <div v-else class="columns is-multiline">
+            <div
+              v-for="item in data"
+              :key="item"
+              class="column item is-3"
+              :class="columnClass(item)"
+            >
+              <Selectable multiple :selected="modelValue.includes(item)" @select="select(item)">
+                <slot name="render" :item="item">
+                  {{ item.name }}
+                </slot>
+              </Selectable>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="column is-narrow">
+        <button class="button is-primary" @click="selectAll">
+          <i class="fas fa-angle-double-right"></i>
+        </button>
+        <br />
+        <br />
+        <button class="button is-primary" @click="removeAll">
+          <i class="fas fa-angle-double-left"></i>
+        </button>
+      </div>
+      <div class="column">
+        <div class="box">
+          <p v-if="titles" class="title is-5">{{ titles[1] }}</p>
+          <p v-if="sizeTotal || sizeTotal === 0" class="subtitle is-6">
+            Total file size: {{ humanFileSize(sizeTotal) }}
+          </p>
+          <Loading v-if="loading" />
+          <div v-else class="columns is-multiline">
+            <template v-for="item in modelValue" :key="item">
+              <div class="column item is-3" :class="columnClass(item)" @click="remove(item)">
+                <Selectable revert @select="remove(item)">
+                  <slot name="render" :item="item">
+                    {{ item.name }}
+                  </slot>
+                </Selectable>
+              </div>
+            </template>
+            <slot name="extras"></slot>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .item {

@@ -5,7 +5,7 @@ import { User } from "models/studio";
 const { user } = defineProps({
   user: {
     type: Object as PropType<User>,
-    default: 0,
+    required: true,
   },
 });
 

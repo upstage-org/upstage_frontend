@@ -14,12 +14,10 @@ import DeletePlayer from "./DeletePlayer.vue";
 import type { DefaultOptionType } from "ant-design-vue/lib/select";
 import Confirm from "components/Confirm.vue";
 import { useUpdateUser } from "hooks/mutations";
-import { useAsyncState } from "@vueuse/core";
 import { computed, ComputedRef } from "vue";
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import configs from "config";
-import { useRouter } from "vue-router";
 
 interface Pagination {
   current: number;
@@ -32,7 +30,6 @@ interface Pagination {
 export default {
   setup() {
     const { t } = useI18n();
-    const router = useRouter();
 
     const tableParams = reactive({
       page: 1,
@@ -49,42 +46,42 @@ export default {
       ...inquiryResult.value.inquiry,
     }));
 
-    const { result, loading, fetchMore, refetch } = useQuery(
+    const { result, loading, refetch } = useQuery(
       gql`
-          query adminPlayersTable(
-            $page: Int
-            $limit: Int
-            $usernameLike: String
-            $createdBetween: [String]
-            $sort: [AdminPlayerSortEnum]
+        query adminPlayersTable(
+          $page: Int
+          $limit: Int
+          $usernameLike: String
+          $createdBetween: [String]
+          $sort: [AdminPlayerSortEnum]
+        ) {
+          adminPlayers(
+            page: $page
+            limit: $limit
+            usernameLike: $usernameLike
+            createdBetween: $createdBetween
+            sort: $sort
           ) {
-            adminPlayers(
-              page: $page 
-              limit: $limit 
-              usernameLike: $usernameLike 
-              createdBetween: $createdBetween
-              sort: $sort
-            ) {
-              totalCount
-              edges {
-                id
-                username
-                email
-                role
-                firstName
-                lastName
-                displayName
-                active
-                createdOn
-                uploadLimit
-                intro
-                canSendEmail
-                lastLogin
-                roleName
-              }
+            totalCount
+            edges {
+              id
+              username
+              email
+              role
+              firstName
+              lastName
+              displayName
+              active
+              createdOn
+              uploadLimit
+              intro
+              canSendEmail
+              lastLogin
+              roleName
             }
           }
-        `,
+        }
+      `,
       params,
       { notifyOnNetworkStatusChange: true },
     );
@@ -106,27 +103,21 @@ export default {
           return h(
             Confirm,
             {
-              title: `Are you sure you want to change ${displayName(
-                opt.record,
-              )}'s role?`,
-              onConfirm: async ([value, selectedOption]: [
-                number,
-                DefaultOptionType,
-              ]) => {
+              title: `Are you sure you want to change ${displayName(opt.record)}'s role?`,
+              onConfirm: async ([value, selectedOption]: [number, DefaultOptionType]) => {
                 await updateUser({
                   ...opt.record,
                   role: value,
                 });
                 message.success(
-                  `Successfully switch ${displayName(opt.record)}'s role to ${(selectedOption as DefaultOptionType).label
+                  `Successfully switch ${displayName(opt.record)}'s role to ${
+                    (selectedOption as DefaultOptionType).label
                   }!`,
                 );
               },
             },
             {
-              default: (slotProps: {
-                confirm: (payload: [number, DefaultOptionType]) => void;
-              }) =>
+              default: (slotProps: { confirm: (payload: [number, DefaultOptionType]) => void }) =>
                 h(Select, {
                   options: Object.entries(configs.ROLES).map(([key, id]) => ({
                     value: String(id),
@@ -175,8 +166,8 @@ export default {
         customRender(opt) {
           return opt.text
             ? h(DDate, {
-              value: opt.text,
-            })
+                value: opt.text,
+              })
             : "";
         },
       },
@@ -209,7 +200,8 @@ export default {
                 active: !!value,
               });
               message.success(
-                `Account ${displayName(opt.record)} ${value ? "activated" : "deactivated"
+                `Account ${displayName(opt.record)} ${
+                  value ? "activated" : "deactivated"
                 } successfully!`,
               );
             },
@@ -244,18 +236,14 @@ export default {
                   },
                   true,
                 );
-                message.success(
-                  `Successfully reset ${displayName(player)}'s password!`,
-                );
+                message.success(`Successfully reset ${displayName(player)}'s password!`);
               },
             }),
             h(DeletePlayer, {
               player: opt.record,
               onDone: async (player) => {
                 refresh();
-                message.success(
-                  `Successfully delete ${displayName(player)}'s account!`,
-                );
+                message.success(`Successfully delete ${displayName(player)}'s account!`);
               },
             }),
           ]);
@@ -269,11 +257,7 @@ export default {
       sorter: SorterResult<Media> | SorterResult<Media>[],
     ) => {
       const sort = (Array.isArray(sorter) ? sorter : [sorter])
-        .sort(
-          (a, b) =>
-            (a.column?.sorter as any).multiple -
-            (b.column?.sorter as any).multiple,
-        )
+        .sort((a, b) => (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple)
         .map(({ columnKey, order }) =>
           `${columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
         );
@@ -316,9 +300,7 @@ export default {
             pagination: {
               showQuickJumper: true,
               showSizeChanger: true,
-              total: result.value?.adminPlayers
-                ? result.value.adminPlayers.totalCount
-                : 0,
+              total: result.value?.adminPlayers ? result.value.adminPlayers.totalCount : 0,
             } as Pagination,
           }),
         ],

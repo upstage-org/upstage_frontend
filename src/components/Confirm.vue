@@ -9,9 +9,7 @@ export default {
     title: String,
     description: String,
     onConfirm: {
-      type: Function as PropType<
-        (payload: any, e: MouseEvent) => Promise<void>
-      >,
+      type: Function as PropType<(payload: any, e: MouseEvent) => Promise<void>>,
       required: true,
     },
   },

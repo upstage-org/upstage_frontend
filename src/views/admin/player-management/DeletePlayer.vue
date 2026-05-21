@@ -4,7 +4,7 @@ import { Button, Popconfirm, message } from "ant-design-vue";
 import { h } from "vue";
 import { DeleteOutlined } from "@ant-design/icons-vue";
 import { PropType } from "vue";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { useMutation } from "@vue/apollo-composable";
 
 export default {
@@ -21,7 +21,7 @@ export default {
   setup(props) {
     const { t } = useI18n();
 
-    const { mutate: deleteUser, loading: deleting } = useMutation<
+    const { mutate: deleteUser } = useMutation<
       {
         deleteUser: { success: boolean };
       },
@@ -47,9 +47,7 @@ export default {
               await deleteUser({ id: props.player.id });
               await props.onDone?.(props.player);
             } catch (error) {
-              message.error(
-                error instanceof Error ? error.message : (error as string),
-              );
+              message.error(error instanceof Error ? error.message : (error as string));
             }
           },
         },

@@ -1,3 +1,14 @@
+<script>
+export default {
+  props: {
+    selected: Boolean,
+    revert: Boolean,
+    multiple: Boolean,
+  },
+  emits: ["select"],
+};
+</script>
+
 <template>
   <div class="selectable" :class="{ selected }" @click="$emit('select')">
     <slot></slot>
@@ -14,19 +25,7 @@
   </div>
 </template>
 
-<script>
-export default {
-  props: {
-    selected: Boolean,
-    revert: Boolean,
-    multiple: Boolean,
-  },
-  emits: ["select"],
-};
-</script>
-
 <style lang="scss" scoped>
-
 .selectable {
   position: relative;
   cursor: pointer;
@@ -41,7 +40,7 @@ export default {
     background-color: rgba($color: #007011, $alpha: 0.5);
 
     &.danger {
-      background-color: rgba($color: #DC5D44, $alpha: 0.5);
+      background-color: rgba($color: #dc5d44, $alpha: 0.5);
     }
 
     .icon {

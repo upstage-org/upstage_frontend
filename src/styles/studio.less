@@ -2,11 +2,12 @@
 @import (css) url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100;0,400;0,700;1,400&display=swap');
 @import 'ant-design-vue/dist/reset.css';
 
-// TailwindCSS
-@tailwind components;
-@tailwind utilities;
+// TailwindCSS v4 — single import; config is auto-loaded via @config below.
+@import "tailwindcss";
+@config "../../tailwind.config.js";
 
 @import './custom.less';
+@import './webkit-compat.less';
 
 blockquote.bubble { 
     display: flex;

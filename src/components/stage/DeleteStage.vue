@@ -20,20 +20,21 @@ const deleteStage = async (complete) => {
 </script>
 
 <template>
-  <CustomConfirm @confirm="(complete) => deleteStage(complete)" :loading="loading">
+  <CustomConfirm :loading="loading" @confirm="(complete) => deleteStage(complete)">
     <p>
       Deleting
-      <b>{{ stage.name }}</b> will also remove all records and chat that ever
-      happened on this stage, there is no undo!
+      <b>{{ stage.name }}</b> will also remove all records and chat that ever happened on this
+      stage, there is no undo!
       <span class="has-text-danger">Are you sure you want to delete this stage?</span>
     </p>
     <br />
     <p>
-      If you would like to download the stage's archives before deleting it,
-      please click
+      If you would like to download the stage's archives before deleting it, please click
       <a-tooltip :title="`Archives of ${stage.name}`">
         <router-link :to="`/stages/stage-management/${stage.id}/archive`">
-          <b>{{ $t("here") }}</b> </router-link></a-tooltip>.
+          <b>{{ $t("here") }}</b>
+        </router-link></a-tooltip
+      >.
     </p>
     <template #trigger>
       <slot></slot>

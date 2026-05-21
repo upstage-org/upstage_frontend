@@ -1,55 +1,36 @@
-<template>
-  <section id="welcome" class="hero is-fullheight foyer-background">
-    <div class="hero-body">
-      <div class="container">
-        <div class="describe">
-          <h1 class="title" v-html="foyer.title?.value" />
-          <div v-if="foyer.description" class="subtitle" v-html="foyer.description.value" />
-        </div>
-        <Loading v-if="loading" />
-        <div v-else class="stages my-4 pt-6">
-          <masonry-wall :items="visibleStages" :ssr-columns="1" :column-width="300" :gap="32">
-            <template #default="{ item }">
-              <Entry :stage="item" :fallback-cover="'greencurtain.jpg'" />
-            </template>
-          </masonry-wall>
-        </div>
-      </div>
-    </div>
-  </section>
-</template>
-
 <script>
 import { computed } from "vue";
-import { useStore } from "vuex";
 import Loading from "components/Loading.vue";
 import { absolutePath } from "utils/common";
 import Entry from "components/stage/Entry.vue";
-import MasonryWall from "@yeger/vue-masonry-wall";
-import { stageGraph } from "services/graphql";
+import { MasonryWall } from "@yeger/vue-masonry-wall";
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
+import { useConfigStore } from "@stores/pinia/config";
+import { storeToRefs } from "pinia";
 
 export default {
   name: "Home",
   components: { Loading, Entry, MasonryWall },
   setup: () => {
-    const store = useStore();
-    const { result, loading } = useQuery(gql`
-      query ListFoyerStage {
-        foyerStageList {
-          id
-          name
-          owner {
-            displayName
-            username
+    const { result, loading } = useQuery(
+      gql`
+        query ListFoyerStage {
+          foyerStageList {
+            id
+            name
+            owner {
+              displayName
+              username
+            }
+            fileLocation
+            cover
           }
-          fileLocation
-          cover
         }
-      }
-    `, null);
-    const foyer = computed(() => store.getters["config/foyer"]);
+      `,
+      null,
+    );
+    const { foyer } = storeToRefs(useConfigStore());
     const visibleStages = computed(() => result?.value?.foyerStageList || []);
     return {
       visibleStages,
@@ -60,6 +41,27 @@ export default {
   },
 };
 </script>
+
+<template>
+  <section id="welcome" class="hero is-fullheight foyer-background">
+    <div class="hero-body">
+      <div class="container">
+        <div class="describe">
+          <h1 class="title" v-html="foyer.title?.value" />
+          <div v-if="foyer.description" class="subtitle" v-html="foyer.description.value" />
+        </div>
+        <Loading v-if="loading" />
+        <div v-else class="stages my-4 pt-6">
+          <MasonryWall :items="visibleStages" :ssr-columns="1" :column-width="300" :gap="32">
+            <template #default="{ item }">
+              <Entry :stage="item" :fallback-cover="'greencurtain.jpg'" />
+            </template>
+          </MasonryWall>
+        </div>
+      </div>
+    </div>
+  </section>
+</template>
 
 <style scoped lang="scss">
 #welcome {
@@ -125,7 +127,7 @@ export default {
       font-size: inherit !important;
     }
 
-    >:after {
+    > :after {
       content: "";
       pointer-events: none;
       position: absolute;

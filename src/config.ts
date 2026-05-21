@@ -1,4 +1,3 @@
-
 const {
   VITE_GRAPHQL_ENDPOINT,
   VITE_STATIC_ASSETS_ENDPOINT,
@@ -10,22 +9,36 @@ const {
   VITE_JITSI_ENDPOINT,
   VITE_STRIPE_KEY,
   VITE_RELEASE_VERSION,
-  VITE_ALIAS_RELEASE_VERSION
+  VITE_ALIAS_RELEASE_VERSION,
 } = import.meta.env;
 
 // Fallback when env was not set at build time (e.g. wrong .env path or CI build)
 const ensureTrailingSlash = (url: string) => (url.endsWith("/") ? url : `${url}/`);
+
+/**
+ * Source of truth is the `.env`'s `VITE_GRAPHQL_ENDPOINT` (or the matching
+ * env_backup_<site> file copied into `.env` by run_front_end_*.sh). The SPA
+ * makes whichever absolute origin/path is configured there — same-origin
+ * (e.g. `/api/` behind a reverse proxy on remote) or cross-origin
+ * (e.g. `http://localhost:9090/api/` when running `--serve` against a
+ * backend container that publishes APP_PORT on the host). Backend CORS in
+ * dev is `*` (see upstage_backend/main.py), so cross-origin POSTs work.
+ *
+ * If the env var is not set at build time (wrong .env path, CI build with
+ * no env, etc.) we fall back to same-origin `/api/` so the page at least
+ * tries something deterministic.
+ */
 const graphqlEndpoint =
-  (typeof VITE_GRAPHQL_ENDPOINT === "string" && VITE_GRAPHQL_ENDPOINT)
+  typeof VITE_GRAPHQL_ENDPOINT === "string" && VITE_GRAPHQL_ENDPOINT
     ? ensureTrailingSlash(VITE_GRAPHQL_ENDPOINT)
     : ensureTrailingSlash(`${window.location.origin}/api/`);
 const staticAssetsEndpoint =
-  (typeof VITE_STATIC_ASSETS_ENDPOINT === "string" && VITE_STATIC_ASSETS_ENDPOINT)
+  typeof VITE_STATIC_ASSETS_ENDPOINT === "string" && VITE_STATIC_ASSETS_ENDPOINT
     ? ensureTrailingSlash(VITE_STATIC_ASSETS_ENDPOINT)
     : ensureTrailingSlash(`${window.location.origin}/resources/`);
 
 const jitsiEndpoint =
-  (typeof VITE_JITSI_ENDPOINT === "string" && VITE_JITSI_ENDPOINT)
+  typeof VITE_JITSI_ENDPOINT === "string" && VITE_JITSI_ENDPOINT
     ? VITE_JITSI_ENDPOINT.replace(/\/$/, "")
     : window.location.origin;
 
@@ -47,14 +60,12 @@ const configs = {
     {
       value: 0,
       name: "✅ Copyright free",
-      description:
-        "Can be used by other players in any way without need for permission",
+      description: "Can be used by other players in any way without need for permission",
     },
     {
       value: 1,
       name: "👌 Use with acknowledgement",
-      description:
-        "Other players can use the media item as long as the owner is acknowledged",
+      description: "Other players can use the media item as long as the owner is acknowledged",
     },
     {
       value: 2,
@@ -86,8 +97,8 @@ const configs = {
     retain: true,
   },
   STRIPE_KEY: VITE_STRIPE_KEY,
-  RELEASE_VERSION: VITE_RELEASE_VERSION || '3.0.0',
-  ALIAS_RELEASE_VERSION: VITE_ALIAS_RELEASE_VERSION || 'Build 001'
+  RELEASE_VERSION: VITE_RELEASE_VERSION || "2026.05.05",
+  ALIAS_RELEASE_VERSION: VITE_ALIAS_RELEASE_VERSION || "84a231c",
 };
 
 export default configs;

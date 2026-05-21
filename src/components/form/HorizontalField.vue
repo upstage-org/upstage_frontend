@@ -1,3 +1,9 @@
+<script>
+export default {
+  props: { title: String },
+};
+</script>
+
 <template>
   <div class="field is-horizontal">
     <div class="field-label is-normal">
@@ -10,11 +16,5 @@
     </div>
   </div>
 </template>
-
-<script>
-export default {
-  props: ["title"],
-};
-</script>
 
 <style></style>

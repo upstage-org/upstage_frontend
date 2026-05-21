@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
-import { ref, computed, watchEffect, PropType } from "vue";
-import { StudioGraph } from "models/studio";
-import { TransferItem } from "ant-design-vue/lib/transfer";
-import store from "store";
+import { gql } from "@apollo/client/core";
+import { computed, PropType, ref } from "vue";
+import { includesIgnoreCase } from "utils/common";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
 const props = defineProps({
   modelValue: {
@@ -14,54 +14,217 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["update:modelValue"]);
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { isAdmin } = storeToRefs(useUserStore());
 
-const { result, loading } = useQuery(
+const { result } = useQuery(
   gql`
-  {
-    getAllStages {
+    {
+      getAllStages {
         id
         name
         permission
       }
-  }
+    }
   `,
   null,
   { fetchPolicy: "cache-and-network" },
 );
-const stages = computed(() => {
+
+type StageRow = { key: string; name: string };
+
+const stages = computed((): StageRow[] => {
   if (result.value?.getAllStages) {
-    return result.value.getAllStages.filter((el: any) => isAdmin.value ? true : (el.permission == "editor" || el.permission == "owner"))
-      .map(({ id, name }: any) => ({ key: id, name }));
+    return result.value.getAllStages
+      .filter((el: { permission: string }) =>
+        isAdmin.value ? true : el.permission == "editor" || el.permission == "owner",
+      )
+      .map(({ id, name }: { id: string; name: string }) => ({ key: id, name }))
+      .sort((a: StageRow, b: StageRow) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      );
   }
   return [];
 });
 
-const targetKeys = ref(props.modelValue);
-const filterOption = (inputValue: string, option: TransferItem) => {
-  return option.name.toLowerCase().indexOf(inputValue.toLowerCase()) > -1;
-};
+const assignedIdSet = computed(() => new Set(props.modelValue.map((id) => String(id))));
 
-watchEffect(() => {
-  emits("update:modelValue", targetKeys.value);
+const searchAvailable = ref("");
+const searchAssigned = ref("");
+
+const availableStages = computed(() =>
+  stages.value.filter(
+    (s) =>
+      !assignedIdSet.value.has(String(s.key)) &&
+      (!searchAvailable.value.trim() ||
+        includesIgnoreCase(s.name, searchAvailable.value.trim())),
+  ),
+);
+
+const assignedStages = computed(() => {
+  const byId = new Map(stages.value.map((s) => [String(s.key), s]));
+  const ordered: StageRow[] = [];
+  for (const id of props.modelValue) {
+    const row = byId.get(String(id));
+    if (row) ordered.push(row);
+  }
+  const q = searchAssigned.value.trim();
+  if (!q) return ordered;
+  return ordered.filter((s) => includesIgnoreCase(s.name, q));
 });
 
-watchEffect(() => {
-  targetKeys.value = props.modelValue;
-});
+function assignStage(id: string) {
+  const sid = String(id);
+  if (props.modelValue.some((k) => String(k) === sid)) return;
+  emits("update:modelValue", [...props.modelValue, sid]);
+}
 
-const renderItem = (item: TransferItem) => item.name;
+function unassignStage(id: string) {
+  const sid = String(id);
+  emits(
+    "update:modelValue",
+    props.modelValue.filter((k) => String(k) !== sid),
+  );
+}
+
+function availableEmptyMessage(): string {
+  if (stages.value.length === 0) return "No stages available.";
+  if (searchAvailable.value.trim()) return "No stages match your search.";
+  const allAssigned =
+    stages.value.length > 0 && stages.value.every((s) => assignedIdSet.value.has(String(s.key)));
+  if (allAssigned) return "All stages are assigned.";
+  return "No stages match your search.";
+}
+
+function assignedEmptyMessage(): string {
+  if (props.modelValue.length === 0) return "No stages assigned yet — click names on the left.";
+  return "No assigned stages match your search.";
+}
 </script>
 
 <template>
-  <a-transfer :locale="{
-    itemUnit: 'stage',
-    itemsUnit: 'stages',
-    notFoundContent: 'No stage available',
-    searchPlaceholder: 'Search stage name',
-  }" :list-style="{
-    flex: '1',
-    height: '300px',
-  }" :titles="[' available', ' assigned']" v-model:target-keys="targetKeys" :data-source="stages as any" show-search
-    :filter-option="filterOption" :render="renderItem" />
+  <div>
+    <p class="stage-assignment-help help mb-3">
+      Click a stage name to move it between the lists — the same interaction as assigning player
+      access on Stage Management. Use Save on the media form when you are finished.
+    </p>
+    <div class="columns stage-assignment-columns">
+      <div class="column">
+        <article class="panel is-light">
+          <p class="panel-heading">
+            Available stages
+            <span class="tag is-primary">{{ availableStages.length }}</span>
+          </p>
+          <div class="panel-heading pt-0">
+            <p class="control has-icons-left">
+              <input
+                v-model="searchAvailable"
+                class="input is-primary"
+                type="search"
+                placeholder="Search stage name"
+                autocomplete="off"
+              />
+              <span class="icon is-left">
+                <i class="fas fa-search" aria-hidden="true"></i>
+              </span>
+            </p>
+          </div>
+          <div class="panel-body">
+            <p v-if="!availableStages.length" class="panel-block has-text-grey">
+              {{ availableEmptyMessage() }}
+            </p>
+            <button
+              v-for="stage in availableStages"
+              :key="stage.key"
+              type="button"
+              class="panel-block stage-assignment-row"
+              @click="assignStage(stage.key)"
+            >
+              {{ stage.name }}
+            </button>
+          </div>
+        </article>
+      </div>
+      <div class="column">
+        <article class="panel is-light">
+          <p class="panel-heading">
+            Assigned stages
+            <span class="tag is-primary">{{ assignedStages.length }}</span>
+          </p>
+          <div class="panel-heading pt-0">
+            <p class="control has-icons-left">
+              <input
+                v-model="searchAssigned"
+                class="input is-primary"
+                type="search"
+                placeholder="Search stage name"
+                autocomplete="off"
+              />
+              <span class="icon is-left">
+                <i class="fas fa-search" aria-hidden="true"></i>
+              </span>
+            </p>
+          </div>
+          <div class="panel-body">
+            <p v-if="!assignedStages.length" class="panel-block has-text-grey">
+              {{ assignedEmptyMessage() }}
+            </p>
+            <button
+              v-for="stage in assignedStages"
+              :key="stage.key"
+              type="button"
+              class="panel-block stage-assignment-row stage-assignment-row--assigned"
+              @click="unassignStage(stage.key)"
+            >
+              {{ stage.name }}
+            </button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+.stage-assignment-help {
+  max-width: 52rem;
+}
+
+.stage-assignment-columns article.panel {
+  width: 100%;
+}
+
+.stage-assignment-columns .panel-heading {
+  font-size: unset;
+}
+
+.stage-assignment-columns .panel-body {
+  max-height: 50vh;
+  overflow-y: auto !important;
+}
+
+button.stage-assignment-row {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.5em 0.75em;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.stage-assignment-row:hover {
+  background-color: rgba(0, 112, 17, 0.08);
+}
+
+button.stage-assignment-row--assigned {
+  background-color: rgba(0, 112, 17, 0.12);
+  border-left: 3px solid #007011;
+}
+
+button.stage-assignment-row--assigned:hover {
+  background-color: rgba(0, 112, 17, 0.18);
+}
+</style>

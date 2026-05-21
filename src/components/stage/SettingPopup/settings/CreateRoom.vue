@@ -1,3 +1,33 @@
+<script>
+import Field from "components/form/Field.vue";
+import SaveButton from "components/form/SaveButton.vue";
+import { useStageStore } from "@stores/pinia/stage";
+import { reactive, computed } from "vue";
+import HorizontalField from "components/form/HorizontalField.vue";
+export default {
+  components: { Field, SaveButton, HorizontalField },
+  emits: ["close"],
+  setup: (_, { emit }) => {
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
+
+    const form = reactive({ name: "" });
+    const createRoom = async () => {
+      stageStore.CREATE_ROOM({
+        type: "meeting",
+        name: form.name,
+        description: "",
+        w: stageSize.value.width / 2,
+        h: stageSize.value.height / 2,
+      });
+      emit("close");
+    };
+
+    return { form, createRoom };
+  },
+};
+</script>
+
 <template>
   <div class="card-header">
     <span class="card-header-title">{{ $t("create_new_meeting_room") }}</span>
@@ -14,41 +44,9 @@
         >
         </Field>
       </HorizontalField>
-      <SaveButton :disabled="!form.name.trim()">{{
-        $t("create_room")
-      }}</SaveButton>
+      <SaveButton :disabled="!form.name.trim()">{{ $t("create_room") }}</SaveButton>
     </form>
   </div>
 </template>
-
-<script>
-import Field from "components/form/Field.vue";
-import SaveButton from "components/form/SaveButton.vue";
-import { useStore } from "vuex";
-import { reactive, computed } from "vue";
-import HorizontalField from "components/form/HorizontalField.vue";
-export default {
-  components: { Field, SaveButton, HorizontalField },
-  emits: ["close"],
-  setup: (_, { emit }) => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-
-    const form = reactive({ name: "" });
-    const createRoom = async () => {
-      store.commit("stage/CREATE_ROOM", {
-        type: "meeting",
-        name: form.name,
-        description: "",
-        w: stageSize.value.width / 2,
-        h: stageSize.value.height / 2,
-      });
-      emit("close");
-    };
-
-    return { form, createRoom };
-  },
-};
-</script>
 
 <style></style>

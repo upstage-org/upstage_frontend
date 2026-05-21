@@ -1,3 +1,28 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import dayjs from "@utils/dayjs";
+import { useStageStore } from "@stores/pinia/stage";
+
+interface SessionInfo {
+  isPlayer?: boolean;
+  nickname?: string;
+  at: string | number | Date;
+}
+
+const props = defineProps<{ session: SessionInfo }>();
+
+const stageStore = useStageStore();
+const joinedAt = computed(() => dayjs(new Date(props.session.at)));
+const isOnline = computed(() => dayjs().diff(joinedAt.value, "minutes") < 60);
+
+const tagPlayer = () => {
+  if (props.session.isPlayer && props.session.nickname) {
+    stageStore.TAG_PLAYER({ nickname: props.session.nickname });
+    stageStore.setShowPlayerChat(true);
+  }
+};
+</script>
+
 <template>
   <div :title="'Joined ' + joinedAt.fromNow()" @click="tagPlayer">
     <span class="icon">
@@ -13,32 +38,6 @@
     {{ session.nickname }}
   </div>
 </template>
-
-<script>
-import { computed } from "vue";
-import moment from "moment";
-import { useStore } from "vuex";
-export default {
-  props: ["session"],
-  setup: (props) => {
-    const store = useStore();
-    const joinedAt = computed(() => {
-      return moment(new Date(props.session.at));
-    });
-    const isOnline = computed(() => {
-      return moment().diff(joinedAt.value, "minutes") < 60;
-    });
-
-    const tagPlayer = () => {
-      if (props.session.isPlayer) {
-        store.commit("stage/TAG_PLAYER", props.session);
-        store.dispatch("stage/showPlayerChat", true);
-      }
-    };
-    return { joinedAt, isOnline, tagPlayer };
-  },
-};
-</script>
 
 <style scoped>
 div {

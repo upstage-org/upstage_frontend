@@ -1,8 +1,44 @@
+<script>
+import { computed, provide, ref } from "vue";
+import TopBar from "./TopBar.vue";
+import PanelItem from "./PanelItem.vue";
+import PlayerChatTool from "./PlayerChatTool.vue";
+import { useStageStore } from "@stores/pinia/stage";
+
+export default {
+  components: { TopBar, PanelItem, PlayerChatTool },
+  setup: () => {
+    const tool = ref();
+    const stageStore = useStageStore();
+    const changeTool = (newTool) => {
+      if (tool.value === newTool) {
+        tool.value = undefined;
+      } else {
+        tool.value = newTool;
+      }
+      stageStore.SET_ACTIVE_MOVABLE(null);
+    };
+    provide("tool", tool);
+    provide("changeTool", changeTool);
+
+    const isScene = computed(() => tool.value === "Scene");
+    const enabledLiveStreaming = computed(() => stageStore.enabledLiveStreaming);
+
+    return {
+      tool,
+      changeTool,
+      isScene,
+      enabledLiveStreaming,
+    };
+  },
+};
+</script>
+
 <template>
   <TopBar :tool="tool" />
   <nav id="toolbox" class="panel">
     <div class="panel-body">
-      <PanelItem name="Audio" icon="audio.svg" />
+      <PanelItem name="AudioTool" icon="audio.svg" label="Audio" />
       <hr />
       <PanelItem name="Backdrops" icon="backdrop.svg" />
       <PanelItem name="Avatars" icon="avatar.svg" />
@@ -11,7 +47,7 @@
       <PanelItem v-if="enabledLiveStreaming" name="Meeting" label="Streams" icon="meeting.svg" />
       <PanelItem name="Whiteboard" icon="whiteboard.svg" label="Live drawing" />
       <PanelItem name="Draw" icon="object-drawing.svg" label="Object drawing" />
-      <PanelItem name="Text" icon="text.svg" />
+      <PanelItem name="TextTool" icon="text.svg" label="Text" />
       <hr />
       <PanelItem name="Depth" icon="depth.svg" />
       <PanelItem name="Curtain" icon="curtain.svg" />
@@ -22,42 +58,6 @@
     </div>
   </nav>
 </template>
-
-<script>
-import { computed, provide, ref, watch } from "vue";
-import TopBar from "./TopBar.vue";
-import PanelItem from "./PanelItem.vue";
-import PlayerChatTool from "./PlayerChatTool.vue";
-import { useStore } from "vuex";
-
-export default {
-  components: { TopBar, PanelItem, PlayerChatTool },
-  setup: () => {
-    const tool = ref();
-    const store = useStore();
-    const changeTool = (newTool) => {
-      if (tool.value === newTool) {
-        tool.value = undefined;
-      } else {
-        tool.value = newTool;
-      }
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
-    };
-    provide("tool", tool);
-    provide("changeTool", changeTool);
-
-    const isScene = computed(() => tool.value === "Scene");
-    const enabledLiveStreaming = computed(() => store.getters["stage/enabledLiveStreaming"]);
-
-    return {
-      tool,
-      changeTool,
-      isScene,
-      enabledLiveStreaming
-    };
-  },
-};
-</script>
 
 <style lang="scss">
 #toolbox {

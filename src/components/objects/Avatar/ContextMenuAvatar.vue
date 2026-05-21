@@ -1,3 +1,273 @@
+<script>
+import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
+import { computed, inject, ref } from "vue";
+import Icon from "components/Icon.vue";
+import {
+  coerceNumber,
+  isIOS,
+  isJitsiBoardType,
+  isStreamPlaybackBoardType,
+} from "utils/common";
+
+// `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
+// `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
+// synchronous (the underlying MQTT publish isn't awaited), so the
+// `props.closeMenu` / `emit('update:active', true)` continuations
+// below can run inline rather than chaining off a Promise.
+export default {
+  components: { Icon },
+  props: {
+    object: Object,
+    closeMenu: Function,
+    active: Boolean,
+    sliderMode: String,
+    setSliderMode: Function,
+    keepActive: Function,
+  },
+  emits: ["update:active", "hold"],
+  setup: (props, { emit }) => {
+    const stageStore = useStageStore();
+    const userStore = useUserStore();
+
+    const holdAvatar = () => {
+      userStore.setAvatarId(props.object.id);
+      props.closeMenu();
+    };
+
+    const releaseAvatar = () => {
+      userStore.setAvatarId(null);
+      props.closeMenu();
+    };
+
+    const deleteObject = () => {
+      stageStore.deleteObject(props.object);
+      props.closeMenu();
+    };
+
+    const switchFrame = (frame) => {
+      stageStore.switchFrame({
+        ...props.object,
+        src: frame,
+      });
+    };
+
+    const flipHorizontal = () => {
+      const scaleX = -1 * (props.object.scaleX ?? 1);
+      stageStore.shapeObject({
+        ...props.object,
+        scaleX,
+      });
+    };
+
+    const flipVertical = () => {
+      const scaleY = -1 * (props.object.scaleY ?? 1);
+      stageStore.shapeObject({
+        ...props.object,
+        scaleY,
+      });
+    };
+
+    const toggleAutoplayFrames = () => {
+      stageStore.toggleAutoplayFrames({
+        ...props.object,
+        ...(props.object.autoplayFrames
+          ? {
+              autoplayFrames: null,
+              lastAutoplayFrames: props.object.autoplayFrames,
+            }
+          : {
+              autoplayFrames: props.object.lastAutoplayFrames || 1,
+            }),
+      });
+      emit("update:active", true);
+    };
+
+    const toggleFrameLoop = () => {
+      const nowLooping = props.object.frameLoop !== false;
+      stageStore.shapeObject({
+        ...props.object,
+        frameLoop: !nowLooping,
+      });
+      emit("update:active", true);
+    };
+
+    const changeNickname = () => {
+      stageStore.openSettingPopup({
+        type: "ChatParameters",
+      });
+      props.closeMenu();
+    };
+
+    const bringToFront = () => {
+      stageStore.bringToFront(props.object);
+      props.closeMenu();
+    };
+
+    const sendToBack = () => {
+      stageStore.sendToBack(props.object);
+      props.closeMenu();
+    };
+
+    const changeSliderMode = (mode) => {
+      props.setSliderMode(mode);
+      emit("update:active", true);
+      props.keepActive(true);
+    };
+
+    const holdable = inject("holdable") ?? ref();
+    const isHolding = computed(
+      () => props.object.holder && props.object.holder.id === stageStore.session,
+    );
+
+    const openVoiceSetting = () => {
+      stageStore.openSettingPopup({
+        type: "VoiceParameters",
+      });
+      props.closeMenu();
+    };
+
+    const isWearing = inject("isWearing");
+    const currentAvatar = computed(() => stageStore.currentAvatar);
+
+    const wearCostume = () => {
+      if (currentAvatar.value) {
+        stageStore.shapeObject({
+          ...props.object,
+          rotate: 0,
+          wornBy: currentAvatar.value.id,
+        });
+        props.closeMenu();
+      }
+    };
+
+    const takeOffCostume = () => {
+      if (isWearing.value) {
+        stageStore.shapeObject({
+          ...props.object,
+          wornBy: null,
+        });
+        props.closeMenu();
+      }
+    };
+
+    const deletePermanently = () => {
+      if (props.object.drawingId) {
+        stageStore.deleteObject(props.object);
+        props.closeMenu();
+        stageStore.POP_DRAWING(props.object.drawingId);
+      }
+      if (props.object.textId) {
+        stageStore.deleteObject(props.object);
+        props.closeMenu();
+        stageStore.POP_TEXT(props.object.textId);
+      }
+    };
+
+    const hasLink = computed(() => props.object.link && props.object.link.url);
+    const openLink = () => {
+      const { url, blank } = props.object.link;
+      window.open(url, blank ? "_blank" : "_self").focus();
+    };
+
+    const animationSpeed = computed(() => {
+      return props.object.autoplayFrames || "";
+    });
+    const handleChangeAnimationSpeed = (e) => {
+      // Coerce so Firefox / Safari behave like Chromium: bare `e.target.value`
+      // is a string, may contain non-numeric characters in Firefox, and
+      // doesn't honour `step="0.5"` until blur.
+      const speed = coerceNumber(e.target.value, { min: 0, step: 0.5 });
+      stageStore.shapeObject({
+        ...props.object,
+        autoplayFrames: speed ?? 0,
+      });
+    };
+
+    const pauseVideo = () => {
+      stageStore.shapeObject({
+        ...props.object,
+        isPlaying: false,
+      });
+      props.closeMenu();
+    };
+    const playVideo = () => {
+      stageStore.shapeObject({
+        ...props.object,
+        isPlaying: true,
+      });
+      props.closeMenu();
+    };
+    const openVolumePopup = () => {
+      stageStore.openSettingPopup({
+        type: "VolumeParameters",
+      });
+      props.closeMenu();
+    };
+    const toggleVideoLoop = () => {
+      stageStore.shapeObject({
+        ...props.object,
+        loop: !props.object.loop,
+      });
+      props.closeMenu();
+    };
+    const restartVideo = () => {
+      stageStore.shapeObject({
+        ...props.object,
+        replayed: (props.object.replayed || 0) + 1,
+      });
+      props.closeMenu();
+    };
+    // iOS / iPadOS HTMLMediaElement.volume is read-only; suppress the
+    // per-stream volume UI on those devices so performers don't see a
+    // control that silently does nothing.
+    const supportsPerStreamVolume = !isIOS();
+
+    const isStreamBoardObject = computed(
+      () =>
+        isStreamPlaybackBoardType(props.object.type) ||
+        isStreamPlaybackBoardType(props.object.assetType?.name),
+    );
+
+    return {
+      switchFrame,
+      holdAvatar,
+      releaseAvatar,
+      deleteObject,
+      changeNickname,
+      bringToFront,
+      sendToBack,
+      toggleAutoplayFrames,
+      toggleFrameLoop,
+      changeSliderMode,
+      openVoiceSetting,
+      wearCostume,
+      takeOffCostume,
+      currentAvatar,
+      isWearing,
+      isHolding,
+      holdable,
+      deletePermanently,
+      flipHorizontal,
+      flipVertical,
+      hasLink,
+      openLink,
+
+      animationSpeed,
+      handleChangeAnimationSpeed,
+      pauseVideo,
+      playVideo,
+      openVolumePopup,
+      toggleVideoLoop,
+      restartVideo,
+      supportsPerStreamVolume,
+      isStreamBoardObject,
+      isJitsiBoardType,
+    };
+  },
+};
+</script>
+
 <template>
   <div class="avatar-context-menu card-content p-0">
     <template v-if="holdable">
@@ -21,14 +291,18 @@
         </span>
         <span>{{ $t("remove_from_avatar") }}</span>
       </a>
-      <a v-else-if="currentAvatar && object.type !== 'video'" class="panel-block" @click="wearCostume">
+      <a
+        v-else-if="currentAvatar && !isStreamBoardObject"
+        class="panel-block"
+        @click="wearCostume"
+      >
         <span class="panel-icon">
           <Icon src="prop.svg" />
         </span>
         <span>{{ $t("add_to_avatar") }}</span>
       </a>
     </template>
-    <div v-if="object.type == 'video'">
+    <div v-if="isStreamBoardObject">
       <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
         <span class="panel-icon">
           <i class="fas fa-pause"></i>
@@ -47,7 +321,7 @@
         </span>
         <span>{{ $t("restart") }}</span>
       </a>
-      <a class="panel-block" @click="openVolumePopup(slotProps)">
+      <a v-if="supportsPerStreamVolume" class="panel-block" @click="openVolumePopup(slotProps)">
         <span class="panel-icon">
           <Icon src="voice-setting.svg" />
         </span>
@@ -93,10 +367,17 @@
         </span>
         <span>{{ "Animation speed" }}</span>
       </span>
-      <input class="input anmation-input" type="number" step="0.5" min="0" :value="animationSpeed"
-        @input="handleChangeAnimationSpeed" placeholder="seconds" />
+      <input
+        class="input anmation-input"
+        type="number"
+        inputmode="decimal"
+        step="0.5"
+        min="0"
+        :value="animationSpeed"
+        placeholder="seconds"
+        @input="handleChangeAnimationSpeed"
+      />
     </div>
-
 
     <div class="field has-addons menu-group">
       <p class="control menu-group-title">
@@ -107,33 +388,45 @@
       </p>
       <p class="control menu-group-item">
         <a-tooltip title="Opacity slider" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-primary-light': sliderMode === 'opacity',
-          }" @click="changeSliderMode('opacity')">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-primary-light': sliderMode === 'opacity',
+            }"
+            @click="changeSliderMode('opacity')"
+          >
             <span class="mt-1">
-              <Icon src="opacity-slider.svg" style="width: 16px; height: 16px;" />
+              <Icon src="opacity-slider.svg" style="width: 16px; height: 16px" />
             </span>
           </button>
         </a-tooltip>
       </p>
-      <p v-if="object.type == 'jitsi'" class="control menu-group-item">
+      <p v-if="isJitsiBoardType(object.type) && supportsPerStreamVolume" class="control menu-group-item">
         <a-tooltip title="Volume" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-warning-light': sliderMode === 'volume',
-          }" @click="changeSliderMode('volume')">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-warning-light': sliderMode === 'volume',
+            }"
+            @click="changeSliderMode('volume')"
+          >
             <span class="mt-1">
-              <Icon src="animation-slider.svg" style="width: 16px; height: 16px;" />
+              <Icon src="animation-slider.svg" style="width: 16px; height: 16px" />
             </span>
           </button>
         </a-tooltip>
       </p>
       <p class="control menu-group-item">
         <a-tooltip title="Move speed" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-danger-light': sliderMode === 'speed',
-          }" @click="changeSliderMode('speed')">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-danger-light': sliderMode === 'speed',
+            }"
+            @click="changeSliderMode('speed')"
+          >
             <span class="mt-1">
-              <Icon src="movement-slider.svg" style="width: 16px; height: 16px;" />
+              <Icon src="movement-slider.svg" style="width: 16px; height: 16px" />
             </span>
           </button>
         </a-tooltip>
@@ -149,18 +442,26 @@
       </p>
       <p class="control menu-group-item">
         <a-tooltip title="Flip Horizontal" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-primary-light': object.scaleX === -1,
-          }" @click="flipHorizontal">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-primary-light': object.scaleX === -1,
+            }"
+            @click="flipHorizontal"
+          >
             <span class="mt-1">{{ $t("horizontal") }}</span>
           </button>
         </a-tooltip>
       </p>
       <p class="control menu-group-item">
         <a-tooltip title="Flip Vertical" placement="bottom">
-          <button class="button is-light" :class="{
-            'has-background-primary-light': object.scaleY === -1,
-          }" @click="flipVertical">
+          <button
+            class="button is-light"
+            :class="{
+              'has-background-primary-light': object.scaleY === -1,
+            }"
+            @click="flipVertical"
+          >
             <span class="mt-1">{{ $t("vertical") }}</span>
           </button>
         </a-tooltip>
@@ -183,7 +484,11 @@
       </span>
       <span>{{ $t("remove") }}</span>
     </a>
-    <a v-if="object.drawingId || object.textId" class="panel-block has-text-danger" @click="deletePermanently">
+    <a
+      v-if="object.drawingId || object.textId"
+      class="panel-block has-text-danger"
+      @click="deletePermanently"
+    >
       <span class="panel-icon">
         <Icon src="remove.svg" />
       </span>
@@ -191,255 +496,34 @@
     </a>
     <div v-if="object.multi" class="field has-addons menu-group">
       <p class="control menu-group-item" @click="toggleAutoplayFrames()">
-        <button class="button is-light">
+        <button type="button" class="button is-light">
           <Icon :src="object.autoplayFrames > 0 ? 'pause.svg' : 'play.svg'" size="24" />
         </button>
       </p>
-      <p v-for="frame in object.frames" :key="frame" @click="switchFrame(frame)" class="control menu-group-item">
-        <button class="button is-light">
+      <p class="control menu-group-item" @click="toggleFrameLoop">
+        <button type="button" class="button is-light" :title="$t('multiframe_loop_tooltip')">
+          <Icon
+            size="24"
+            src="loop.svg"
+            :style="
+              object.frameLoop === false ? { filter: 'grayscale(1)', opacity: 0.55 } : {}
+            "
+          />
+        </button>
+      </p>
+      <p
+        v-for="frame in object.frames"
+        :key="frame"
+        class="control menu-group-item"
+        @click="switchFrame(frame)"
+      >
+        <button type="button" class="button is-light">
           <img :src="frame" style="height: 100%" />
         </button>
       </p>
     </div>
   </div>
 </template>
-
-<script>
-import { useStore } from "vuex";
-import { computed, inject, ref } from "vue";
-import Icon from "components/Icon.vue";
-
-export default {
-  props: [
-    "object",
-    "closeMenu",
-    "active",
-    "sliderMode",
-    "setSliderMode",
-    "keepActive",
-  ],
-  emits: ["update:active", "hold"],
-  components: { Icon },
-  setup: (props, { emit }) => {
-    const store = useStore();
-
-    const holdAvatar = () => {
-      store.dispatch("user/setAvatarId", props.object.id).then(props.closeMenu);
-    };
-
-    const releaseAvatar = () => {
-      store.dispatch("user/setAvatarId", null).then(props.closeMenu);
-    };
-
-    const deleteObject = () => {
-      store.dispatch("stage/deleteObject", props.object).then(props.closeMenu);
-    };
-
-    const switchFrame = (frame) => {
-      store.dispatch("stage/switchFrame", {
-        ...props.object,
-        src: frame,
-      });
-    };
-
-    const flipHorizontal = () => {
-      const scaleX = -1 * (props.object.scaleX ?? 1);
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        scaleX,
-      });
-    };
-
-    const flipVertical = () => {
-      const scaleY = -1 * (props.object.scaleY ?? 1);
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        scaleY,
-      });
-    };
-
-    const toggleAutoplayFrames = () => {
-      store
-        .dispatch("stage/toggleAutoplayFrames", {
-          ...props.object,
-          ...props.object.autoplayFrames ? {
-            autoplayFrames: null,
-            lastAutoplayFrames: props.object.autoplayFrames
-          } : {
-            autoplayFrames: props.object.lastAutoplayFrames || 1
-          }
-        })
-        .then(() => {
-          emit("update:active", true);
-        });
-    };
-
-    const changeNickname = () =>
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "ChatParameters",
-        })
-        .then(props.closeMenu);
-
-    const bringToFront = () => {
-      store.dispatch("stage/bringToFront", props.object).then(props.closeMenu);
-    };
-
-    const sendToBack = () => {
-      store.dispatch("stage/sendToBack", props.object).then(props.closeMenu);
-    };
-
-    const changeSliderMode = (mode) => {
-      props.setSliderMode(mode);
-      emit("update:active", true);
-      props.keepActive(true);
-    };
-
-    const holdable = inject("holdable") ?? ref();
-    const isHolding = computed(
-      () =>
-        props.object.holder &&
-        props.object.holder.id === store.state.stage.session,
-    );
-
-    const openVoiceSetting = () => {
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "VoiceParameters",
-        })
-        .then(props.closeMenu);
-    };
-
-    const isWearing = inject("isWearing");
-    const currentAvatar = computed(() => store.getters["stage/currentAvatar"]);
-
-    const wearCostume = () => {
-      if (currentAvatar.value) {
-        store
-          .dispatch("stage/shapeObject", {
-            ...props.object,
-            rotate: 0,
-            wornBy: currentAvatar.value.id,
-          })
-          .then(props.closeMenu);
-      }
-    };
-
-    const takeOffCostume = () => {
-      if (isWearing.value) {
-        store
-          .dispatch("stage/shapeObject", {
-            ...props.object,
-            wornBy: null,
-          })
-          .then(props.closeMenu);
-      }
-    };
-
-    const deletePermanently = () => {
-      if (props.object.drawingId) {
-        store
-          .dispatch("stage/deleteObject", props.object)
-          .then(props.closeMenu);
-        store.commit("stage/POP_DRAWING", props.object.drawingId);
-      }
-      if (props.object.textId) {
-        store
-          .dispatch("stage/deleteObject", props.object)
-          .then(props.closeMenu);
-        store.commit("stage/POP_TEXT", props.object.textId);
-      }
-    };
-
-    const hasLink = computed(() => props.object.link && props.object.link.url);
-    const openLink = () => {
-      const { url, blank } = props.object.link;
-      window.open(url, blank ? "_blank" : "_self").focus();
-    };
-
-    const animationSpeed = computed(() => {
-      return props.object.autoplayFrames || "";
-    });
-    const handleChangeAnimationSpeed = (e) => {
-      store.dispatch("stage/shapeObject", {
-        ...props.object,
-        autoplayFrames: e.target.value,
-      });
-    };
-
-    const pauseVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          isPlaying: false,
-        })
-        .then(props.closeMenu);
-    }
-    const playVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          isPlaying: true,
-        })
-        .then(props.closeMenu);
-    }
-    const openVolumePopup = () => {
-      store
-        .dispatch("stage/openSettingPopup", {
-          type: "VolumeParameters",
-        })
-        .then(props.closeMenu);
-    }
-    const toggleVideoLoop = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          loop: !props.object.loop,
-        })
-        .then(props.closeMenu);
-    }
-    const restartVideo = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...props.object,
-          replayed: (props.object.replayed || 0) + 1,
-        })
-        .then(props.closeMenu);
-    }
-    return {
-      switchFrame,
-      holdAvatar,
-      releaseAvatar,
-      deleteObject,
-      changeNickname,
-      bringToFront,
-      sendToBack,
-      toggleAutoplayFrames,
-      changeSliderMode,
-      openVoiceSetting,
-      wearCostume,
-      takeOffCostume,
-      currentAvatar,
-      isWearing,
-      isHolding,
-      holdable,
-      deletePermanently,
-      flipHorizontal,
-      flipVertical,
-      hasLink,
-      openLink,
-
-      animationSpeed,
-      handleChangeAnimationSpeed,
-      pauseVideo,
-      playVideo,
-      openVolumePopup,
-      toggleVideoLoop,
-      restartVideo
-    };
-  },
-};
-</script>
 
 <style scoped lang="scss">
 .avatar-context-menu {
@@ -466,7 +550,7 @@ export default {
       width: 100px;
       white-space: nowrap;
 
-      >button {
+      > button {
         justify-content: start;
         padding-left: 12px;
       }

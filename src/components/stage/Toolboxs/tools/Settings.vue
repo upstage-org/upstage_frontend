@@ -1,3 +1,68 @@
+<script>
+import Icon from "components/Icon.vue";
+import ColorPicker from "components/form/ColorPicker.vue";
+import { useStageStore } from "@stores/pinia/stage";
+import { computed } from "vue";
+import { message } from "ant-design-vue";
+export default {
+  components: { Icon, ColorPicker },
+  setup: () => {
+    const stageStore = useStageStore();
+    const chatVisibility = computed(() => stageStore.settings.chatVisibility);
+    const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
+    const reactionVisibility = computed(() => stageStore.settings.reactionVisibility);
+
+    const showChat = (value) => {
+      stageStore.showChatBox(value);
+    };
+
+    const enableDarkModeChat = (value) => {
+      stageStore.enableDarkModeChat(value);
+    };
+
+    const showReactions = (value) => {
+      stageStore.showReactionsBar(value);
+    };
+
+    // `clearChat` is synchronous in Pinia; the previous `.then(...)`
+    // was a Vuex-dispatch artefact.
+    const clearChat = () => {
+      stageStore.clearChat();
+      message.success("Chat cleared successfully!");
+    };
+
+    const backdropColor = computed(() => stageStore.backdropColor);
+    const sendBackdropColor = (color) => {
+      stageStore.setBackdropColor(color);
+    };
+
+    const chatPosition = computed(() => stageStore.chatPosition);
+    const toggleChatPosition = () => {
+      stageStore.setChatPosition(chatPosition.value === "left" ? "right" : "left");
+    };
+
+    const masqueradeAudience = () => {
+      stageStore.TOGGLE_MASQUERADING();
+    };
+
+    return {
+      showChat,
+      chatVisibility,
+      chatDarkMode,
+      enableDarkModeChat,
+      showReactions,
+      reactionVisibility,
+      clearChat,
+      sendBackdropColor,
+      backdropColor,
+      chatPosition,
+      toggleChatPosition,
+      masqueradeAudience,
+    };
+  },
+};
+</script>
+
 <template>
   <div v-if="reactionVisibility" @click="showReactions(false)">
     <div class="icon is-large">
@@ -38,14 +103,9 @@
   </div>
   <div>
     <div class="icon is-large">
-      <ColorPicker
-        v-model="backdropColor"
-        @update:modelValue="sendBackdropColor"
-      />
+      <ColorPicker v-model="backdropColor" @update:model-value="sendBackdropColor" />
     </div>
-    <span class="tag is-light is-block p-0 long-label">{{
-      $t("background_colour")
-    }}</span>
+    <span class="tag is-light is-block p-0 long-label">{{ $t("background_colour") }}</span>
   </div>
   <div @click="masqueradeAudience">
     <div class="icon is-large">
@@ -57,92 +117,15 @@
     <div class="icon is-large">
       <i class="fas fa-sun fa-2x has-text-warning"></i>
     </div>
-    <span class="tag is-light is-block long-label">{{
-      $t("light_mode_chat")
-    }}</span>
+    <span class="tag is-light is-block long-label">{{ $t("light_mode_chat") }}</span>
   </div>
   <div v-else @click="enableDarkModeChat(true)">
     <div class="icon is-large">
       <i class="fas fa-moon fa-2x"></i>
     </div>
-    <span class="tag is-light is-block long-label">{{
-      $t("dark_mode_chat")
-    }}</span>
+    <span class="tag is-light is-block long-label">{{ $t("dark_mode_chat") }}</span>
   </div>
 </template>
-
-<script>
-import Icon from "components/Icon.vue";
-import ColorPicker from "components/form/ColorPicker.vue";
-import { useStore } from "vuex";
-import { computed } from "vue";
-import { message } from "ant-design-vue";
-export default {
-  components: { Icon, ColorPicker },
-  setup: () => {
-    const store = useStore();
-    const chatVisibility = computed(
-      () => store.state.stage.settings.chatVisibility,
-    );
-    const chatDarkMode = computed(
-      () => store.state.stage.settings.chatDarkMode,
-    );
-    const reactionVisibility = computed(
-      () => store.state.stage.settings.reactionVisibility,
-    );
-
-    const showChat = (value) => {
-      store.dispatch("stage/showChatBox", value);
-    };
-
-    const enableDarkModeChat = (value) => {
-      store.dispatch("stage/enableDarkModeChat", value);
-    };
-
-    const showReactions = (value) => {
-      store.dispatch("stage/showReactionsBar", value);
-    };
-
-    const clearChat = () => {
-      store.dispatch("stage/clearChat").then(() => {
-        message.success("Chat cleared successfully!");
-      });
-    };
-
-    const backdropColor = computed(() => store.state.stage.backdropColor);
-    const sendBackdropColor = (color) => {
-      store.dispatch("stage/setBackdropColor", color);
-    };
-
-    const chatPosition = computed(() => store.state.stage.chatPosition);
-    const toggleChatPosition = () => {
-      store.dispatch(
-        "stage/setChatPosition",
-        chatPosition.value === "left" ? "right" : "left",
-      );
-    };
-
-    const masqueradeAudience = () => {
-      store.commit("stage/TOGGLE_MASQUERADING");
-    };
-
-    return {
-      showChat,
-      chatVisibility,
-      chatDarkMode,
-      enableDarkModeChat,
-      showReactions,
-      reactionVisibility,
-      clearChat,
-      sendBackdropColor,
-      backdropColor,
-      chatPosition,
-      toggleChatPosition,
-      masqueradeAudience,
-    };
-  },
-};
-</script>
 
 <style scoped>
 .long-label {

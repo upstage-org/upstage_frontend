@@ -1,9 +1,58 @@
+<script>
+import { computed } from "vue";
+import Dropdown from "components/form/Dropdown.vue";
+export default {
+  components: { Dropdown },
+  props: {
+    total: {
+      type: Number,
+      default: 0,
+    },
+    modelValue: Number,
+    limit: Number,
+    maxNavigationButtons: {
+      type: Number,
+      default: 7,
+    },
+  },
+  emits: ["update:modelValue", "update:limit", "page", "change"],
+  setup: (props, { emit }) => {
+    const goToPage = (page) => {
+      emit("update:modelValue", page);
+      emit("change");
+    };
+
+    const changeLimit = (limit) => {
+      emit("update:modelValue", 1);
+      emit("update:limit", limit);
+      emit("change");
+    };
+
+    const totalPages = computed(() => Math.ceil(props.total / props.limit));
+    const visibleNavigationButtons = computed(() => {
+      const buttons = [];
+      let begin = Math.ceil(props.modelValue - (props.maxNavigationButtons - 2) / 2);
+      if (begin < 2) {
+        begin = 2;
+      }
+      let end = begin + props.maxNavigationButtons - 3;
+      if (end > totalPages.value - 1) {
+        begin = Math.max(2, begin - (end - totalPages.value + 1));
+        end = totalPages.value - 1;
+      }
+      for (let i = begin; i <= end; i++) {
+        buttons.push(i);
+      }
+      return buttons;
+    });
+
+    return { goToPage, totalPages, visibleNavigationButtons, changeLimit };
+  },
+};
+</script>
+
 <template>
-  <nav
-    class="pagination is-centered is-rounded"
-    role="navigation"
-    aria-label="pagination"
-  >
+  <nav class="pagination is-centered is-rounded" role="navigation" aria-label="pagination">
     <button
       class="button pagination-previous"
       :disabled="modelValue === 1"
@@ -24,9 +73,9 @@
       is-right
       is-rounded
       style="order: 3"
-      :modelValue="limit"
-      @update:modelValue="changeLimit"
-      :renderLabel="(value) => `${value} items per page`"
+      :model-value="limit"
+      :render-label="(value) => `${value} items per page`"
+      @update:model-value="changeLimit"
     />
     <ul class="pagination-list">
       <li>
@@ -49,12 +98,7 @@
           {{ page }}
         </a>
       </li>
-      <li
-        v-if="
-          visibleNavigationButtons[visibleNavigationButtons.length - 1] <
-          totalPages - 1
-        "
-      >
+      <li v-if="visibleNavigationButtons[visibleNavigationButtons.length - 1] < totalPages - 1">
         <span class="pagination-ellipsis">&hellip;</span>
       </li>
       <li v-if="totalPages > 1">
@@ -69,61 +113,6 @@
     </ul>
   </nav>
 </template>
-
-<script>
-import { computed } from "vue";
-import Dropdown from "components/form/Dropdown.vue";
-export default {
-  props: {
-    total: {
-      type: Number,
-      default: 0,
-    },
-    modelValue: Number,
-    limit: Number,
-    maxNavigationButtons: {
-      type: Number,
-      default: 7,
-    },
-  },
-  components: { Dropdown },
-  emits: ["update:modelValue", "update:limit", "page"],
-  setup: (props, { emit }) => {
-    const goToPage = (page) => {
-      emit("update:modelValue", page);
-      emit("change");
-    };
-
-    const changeLimit = (limit) => {
-      emit("update:modelValue", 1);
-      emit("update:limit", limit);
-      emit("change");
-    };
-
-    const totalPages = computed(() => Math.ceil(props.total / props.limit));
-    const visibleNavigationButtons = computed(() => {
-      const buttons = [];
-      let begin = Math.ceil(
-        props.modelValue - (props.maxNavigationButtons - 2) / 2,
-      );
-      if (begin < 2) {
-        begin = 2;
-      }
-      let end = begin + props.maxNavigationButtons - 3;
-      if (end > totalPages.value - 1) {
-        begin = Math.max(2, begin - (end - totalPages.value + 1));
-        end = totalPages.value - 1;
-      }
-      for (let i = begin; i <= end; i++) {
-        buttons.push(i);
-      }
-      return buttons;
-    });
-
-    return { goToPage, totalPages, visibleNavigationButtons, changeLimit };
-  },
-};
-</script>
 
 <style>
 .pagination {

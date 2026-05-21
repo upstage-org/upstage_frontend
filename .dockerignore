@@ -1,0 +1,46 @@
+# Exclude heavy or irrelevant paths from daemon build context.
+
+.git/
+.cursor/
+
+# IMPORTANT: do NOT add `.env` here.
+# `vite build` runs *inside* the builder stage and reads VITE_* values via
+# `loadEnv(mode, process.cwd())`, which reads `.env` from the build context
+# root. If `.env` is excluded, every `import.meta.env.VITE_*` resolves to
+# `undefined` and the SPA boots with `mqtt.connect({ url: undefined,
+# username: undefined, password: undefined })` — mosquitto rejects the auth,
+# every client sits in CONNECTING forever, and asset endpoints 404.
+# `run_front_end_*.sh` copies `env_backup_${SITE}` to `./.env` before
+# `docker compose up --build` so this file exists in the context.
+# `env_backup_*` itself stays excluded — it's a host-only convenience copy.
+env_backup*
+
+node_modules/
+dist/
+
+**/.DS_Store
+Thumbs.db
+
+# Python / tooling leftovers (if present)
+.pytest_cache/
+.mypy_cache/
+**/__pycache__/
+*.py[cod]
+
+# Playwright / Vitest
+test-results/
+playwright-report/
+
+# Coverage / ESLint caches
+coverage/
+.cache/
+.parcel-cache/
+.turbo/
+
+# Editor / OS
+.idea/
+*.swp
+*.swo
+*~
+
+**/node_modules/.cache/

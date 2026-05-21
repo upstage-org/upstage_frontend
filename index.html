@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UpStage Studio</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <!--
+      Jitsi (lib-jitsi-meet) still expects `window.jQuery` / `window.$` at runtime; see main.ts.
+      meSpeak: services/speech (mespeak).
+
+      Note: the previous build also synchronously loaded
+      `https://meet.jit.si/external_api.min.js` here. That script was
+      blocked by Brave Shields, Firefox Strict ETP, and many corporate
+      content blockers, leaving `window.JitsiMeetExternalAPI` undefined
+      and crashing `MeetingObject/index.vue` with a ReferenceError.
+      The MeetingObject now embeds the Jitsi room as a direct <iframe>
+      with proper Permissions Policy delegation per role, so the
+      external API script is no longer needed.
+    -->
+    <script type="text/javascript" src="/js/jitsi/lib-jitsi-meet.min.js"></script>
+    <script type="text/javascript" src="/js/mespeak/mespeak.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,64 +1,10 @@
-<template>
-  <div class="columns">
-    <template v-for="(column, i) in columns" :key="column">
-      <div class="column">
-        <article class="panel is-light">
-          <p class="panel-heading">
-            {{ column }}
-            <span class="tag is-primary">
-              {{ i == columns.length - 1 ? count(i) + 1 : count(i) }}
-            </span>
-          </p>
-          <div class="panel-heading pt-0">
-            <p class="control has-icons-left">
-              <input
-                class="input is-primary"
-                type="text"
-                placeholder="Search"
-                v-model="searchs[i]"
-              />
-              <span class="icon is-left">
-                <i class="fas fa-search" aria-hidden="true"></i>
-              </span>
-            </p>
-          </div>
-          <div class="panel-body">
-            <a v-if="i == columns.length - 1" class="panel-block owner">
-              {{ renderLabel(owner) }}
-              <p class="panel-tag">owner</p>
-            </a>
-            <template v-for="(item, j) in data" :key="renderValue(item)">
-              <a
-                v-if="shouldVisible(j, i)"
-                class="panel-block"
-                @click="moveRight(j)"
-                @contextmenu.prevent="moveLeft(j)"
-              >
-                {{ renderLabel(item) }}
-              </a>
-            </template>
-          </div>
-        </article>
-      </div>
-      <div class="column is-narrow px-0" v-if="i < columns.length - 1">
-        <button class="button is-primary is-small" @click="moveAll(i, i + 1)">
-          <i class="fas fa-angle-double-right"></i>
-        </button>
-        <br />
-        <br />
-        <button class="button is-primary is-small" @click="moveAll(i + 1, i)">
-          <i class="fas fa-angle-double-left"></i>
-        </button>
-      </div>
-    </template>
-  </div>
-</template>
-
 <script>
 import { reactive } from "vue";
 import { watch } from "vue";
 import { includesIgnoreCase } from "utils/common";
+import { RightOutlined, LeftOutlined } from "@ant-design/icons-vue";
 export default {
+  components: { RightOutlined, LeftOutlined },
   props: {
     columns: Array,
     modelValue: Array,
@@ -99,7 +45,26 @@ export default {
     };
 
     const moveLeft = (item) => {
-      positions[item] = (positions[item] ?? 1) - 1;
+      const currentPosition = positions[item] ?? 0;
+      if (currentPosition > 0) {
+        positions[item] = currentPosition - 1;
+      }
+    };
+
+    /** Last column cannot move right; primary click moves one step left like other columns advance right. */
+    const onRowClick = (itemIndex, columnIndex) => {
+      if (columnIndex === props.columns.length - 1) {
+        moveLeft(itemIndex);
+      } else {
+        moveRight(itemIndex);
+      }
+    };
+
+    /** Right-click moves one column left; not defined in the audience-only column. */
+    const onRowContextMenu = (e, itemIndex, columnIndex) => {
+      if (columnIndex <= 0) return;
+      e.preventDefault();
+      moveLeft(itemIndex);
     };
 
     watch(positions, () => {
@@ -123,11 +88,8 @@ export default {
         if (props.data) {
           for (let i = 0; i < val.length; i++) {
             for (let j = 0; j < (val[i] ?? []).length; j++) {
-              positions[
-                props.data.findIndex(
-                  (item) => props.renderValue(item) === val[i][j],
-                )
-              ] = i + 1;
+              positions[props.data.findIndex((item) => props.renderValue(item) === val[i][j])] =
+                i + 1;
             }
           }
         }
@@ -136,9 +98,7 @@ export default {
     );
 
     const count = (i) =>
-      props.data
-        ? props.data.filter((item, p) => (positions[p] ?? 0) === i).length
-        : 0;
+      props.data ? props.data.filter((item, p) => (positions[p] ?? 0) === i).length : 0;
 
     const moveAll = (from, to) => {
       for (let i = 0; i < props.data.length; i++) {
@@ -148,10 +108,79 @@ export default {
       }
     };
 
-    return { shouldVisible, moveRight, moveLeft, count, searchs, moveAll };
+    return { shouldVisible, moveRight, moveLeft, onRowClick, onRowContextMenu, count, searchs, moveAll };
   },
 };
 </script>
+
+<template>
+  <div class="columns">
+    <template v-for="(column, i) in columns" :key="column">
+      <div class="column">
+        <article class="panel is-light">
+          <p class="panel-heading">
+            {{ column }}
+            <span class="tag is-primary">
+              {{ i == columns.length - 1 ? count(i) + 1 : count(i) }}
+            </span>
+          </p>
+          <div class="panel-heading pt-0">
+            <p class="control has-icons-left">
+              <input
+                v-model="searchs[i]"
+                class="input is-primary"
+                type="text"
+                placeholder="Search"
+              />
+              <span class="icon is-left">
+                <i class="fas fa-search" aria-hidden="true"></i>
+              </span>
+            </p>
+          </div>
+          <div class="panel-body">
+            <a v-if="i == columns.length - 1" class="panel-block owner">
+              {{ renderLabel(owner) }}
+              <p class="panel-tag">owner</p>
+            </a>
+            <template v-for="(item, j) in data" :key="renderValue(item)">
+              <a
+                v-if="shouldVisible(j, i)"
+                class="panel-block"
+                @click="onRowClick(j, i)"
+                @contextmenu="onRowContextMenu($event, j, i)"
+              >
+                {{ renderLabel(item) }}
+              </a>
+            </template>
+          </div>
+        </article>
+      </div>
+      <div
+        v-if="i < columns.length - 1"
+        class="column is-narrow px-0 is-flex is-align-self-center"
+      >
+        <div class="upstage-multi-transfer-arrows">
+          <button
+            type="button"
+            class="upstage-multi-transfer-btn"
+            title="Move all matching right"
+            @click="moveAll(i, i + 1)"
+          >
+            <RightOutlined />
+          </button>
+          <button
+            type="button"
+            class="upstage-multi-transfer-btn"
+            title="Move all matching left"
+            @click="moveAll(i + 1, i)"
+          >
+            <LeftOutlined />
+          </button>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
 
 <style scoped>
 article.panel {

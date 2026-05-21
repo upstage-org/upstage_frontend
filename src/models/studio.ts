@@ -1,5 +1,3 @@
-import { Static } from "vue";
-
 export interface Connection<T> {
   pageInfo: PageInfo;
   edges: Edge<T>[];
@@ -137,7 +135,6 @@ export interface Permission {
   approved: boolean;
   userId: number;
   assetId: number;
-  seen: boolean;
   createdOn: string;
   note: null;
   user: User;
@@ -158,9 +155,4 @@ export interface AvatarVoice {
   amplitude: number;
 }
 
-export type Privilege =
-  | "NONE"
-  | "OWNER"
-  | "APPROVED"
-  | "PENDING_APPROVAL"
-  | "REQUIRE_APPROVAL";
+export type Privilege = "NONE" | "OWNER" | "APPROVED" | "PENDING_APPROVAL" | "REQUIRE_APPROVAL";

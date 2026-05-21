@@ -1,0 +1,103 @@
+import type { JQueryStatic } from "jquery";
+
+/**
+ * Ambient declarations for legacy global scripts injected from `index.html`.
+ *
+ * - `JitsiMeetJS` ships from `/js/jitsi/lib-jitsi-meet.min.js` and exposes the
+ *   low-level XMPP/RTC primitives used in `services/jitsi` (and expects a global
+ *   jQuery — we assign it from `src/main.ts`).
+ * - `meSpeak` ships from `/js/mespeak/mespeak.js` and powers avatar speech.
+ *
+ * Note: the previous build also declared `JitsiMeetExternalAPI` (loaded from
+ * meet.jit.si). That dependency was removed in favour of a direct <iframe>
+ * embed in `MeetingObject/index.vue` — see that file for the rationale.
+ */
+declare global {
+  interface Window {
+    /**
+     * Hook for Playwright tests that need direct access to Pinia stores.
+     * Present whenever `import.meta.env.DEV` is true (i.e. `pnpm dev`)
+     * OR the bundle was built with `VITE_E2E=1`. Don't rely on it in
+     * feature code — it may be stripped from real prod bundles.
+     *
+     * Property getters lazily call `useXxxStore()` so tests get the
+     * real reactive Pinia instance whether they're the first or
+     * fifteenth reader.
+     */
+    __UPSTAGE_PINIA__?: {
+      readonly auth: ReturnType<typeof import("@stores/pinia/auth").useAuthStore>;
+      readonly cache: ReturnType<typeof import("@stores/pinia/cache").useCacheStore>;
+      readonly config: ReturnType<typeof import("@stores/pinia/config").useConfigStore>;
+      readonly user: ReturnType<typeof import("@stores/pinia/user").useUserStore>;
+      readonly stage: ReturnType<typeof import("@stores/pinia/stage").useStageStore>;
+    };
+    $: JQueryStatic;
+    jQuery: JQueryStatic;
+    JitsiMeetJS: JitsiMeetJSStatic;
+    meSpeak: MeSpeak;
+  }
+
+  interface JitsiMeetJSStatic {
+    init(options?: Record<string, unknown>): void;
+    setLogLevel(level: string): void;
+    JitsiConnection: new (
+      appId: string | null,
+      token: string | null,
+      options: Record<string, unknown>,
+    ) => JitsiConnection;
+    events: Record<string, Record<string, string>>;
+    errors: Record<string, Record<string, string>>;
+    logLevels: Record<string, string>;
+    createLocalTracks(options: Record<string, unknown>): Promise<JitsiLocalTrack[]>;
+  }
+
+  interface JitsiConnection {
+    addEventListener(event: string, listener: (...args: unknown[]) => void): void;
+    removeEventListener(event: string, listener: (...args: unknown[]) => void): void;
+    connect(): void;
+    disconnect(): void;
+    initJitsiConference(name: string, options: Record<string, unknown>): JitsiConference;
+  }
+
+  interface JitsiConference {
+    addEventListener(event: string, listener: (...args: unknown[]) => void): void;
+    removeEventListener(event: string, listener: (...args: unknown[]) => void): void;
+    join(password?: string): void;
+    leave(): Promise<void>;
+    addTrack(track: JitsiLocalTrack): Promise<void>;
+    removeTrack(track: JitsiLocalTrack): Promise<void>;
+    setDisplayName(name: string): void;
+  }
+
+  interface JitsiLocalTrack {
+    getType(): "audio" | "video";
+    dispose(): Promise<void>;
+    attach(element: HTMLElement): void;
+    detach(element?: HTMLElement): void;
+    isMuted(): boolean;
+    mute(): Promise<void>;
+    unmute(): Promise<void>;
+  }
+
+  interface MeSpeak {
+    loadConfig(url: string, callback?: (success: boolean) => void): void;
+    loadVoice(url: string, callback?: (success: boolean) => void): void;
+    speak(
+      text: string,
+      options?: {
+        amplitude?: number;
+        wordgap?: number;
+        pitch?: number;
+        speed?: number;
+        variant?: string;
+        voice?: string;
+        rawdata?: string;
+      },
+      callback?: (success: boolean) => void,
+    ): number;
+    stop(handleId?: number): void;
+    isVoiceLoaded(voice: string): boolean;
+  }
+}
+
+export {};

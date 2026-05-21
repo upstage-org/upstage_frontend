@@ -1,13 +1,3 @@
-<template>
-  <button
-    class="button ml-2 is-warning"
-    @click="clearChat"
-    :class="{ 'is-loading': clearing }"
-  >
-    Clear Chat
-  </button>
-</template>
-
 <script>
 import { inject, ref } from "vue";
 import { message } from "ant-design-vue";
@@ -27,14 +17,9 @@ export default {
       clearing.value = true;
       await new Promise((resolve) => {
         mqttClient.connect().on("connect", () => {
-          const topicChat = namespaceTopic(
-            TOPICS.CHAT,
-            stage.value.fileLocation,
-          );
+          const topicChat = namespaceTopic(TOPICS.CHAT, stage.value.fileLocation);
           mqttClient.sendMessage(topicChat, { clear: true }, true);
-          mqttClient
-            .sendMessage(topicChat, { clearPlayerChat: true }, true)
-            .then(resolve);
+          mqttClient.sendMessage(topicChat, { clearPlayerChat: true }, true).then(resolve);
         });
       });
       clearing.value = false;
@@ -46,5 +31,11 @@ export default {
   },
 };
 </script>
+
+<template>
+  <button class="button ml-2 is-warning" :class="{ 'is-loading': clearing }" @click="clearChat">
+    Clear Chat
+  </button>
+</template>
 
 <style></style>

@@ -20,7 +20,7 @@ export default {
     },
     saving: {
       type: Object as PropType<{ value: boolean }>,
-      default: false,
+      default: () => ({ value: false }),
     },
   },
   setup(props) {
@@ -59,7 +59,7 @@ export default {
           h(
             Modal,
             {
-              title: t("change_password") + props.player.username ,
+              title: t("change_password") + props.player.username,
               visible: visible.value,
               onCancel: () => (visible.value = false),
               onOk: async () => {
@@ -70,7 +70,7 @@ export default {
                     ...toRaw(values),
                   });
                   visible.value = false;
-                } catch (error) {
+                } catch {
                   message.error("Password is required");
                 }
               },
@@ -95,8 +95,7 @@ export default {
                     [
                       h(Input, {
                         value: values.password,
-                        "onUpdate:value": (value: string) =>
-                          (values.password = value),
+                        "onUpdate:value": (value: string) => (values.password = value),
                       }),
                     ],
                   ),

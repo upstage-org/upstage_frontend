@@ -1,16 +1,3 @@
-<template>
-  <button
-    v-if="clearChatVisibility"
-    class="chat-setting button is-rounded is-outlined"
-    @click="clearChat"
-    :class="{ 'is-loading': clearing }"
-  >
-    <span class="icon">
-      <Icon src="clear.svg" size="20" />
-    </span>
-  </button>
-</template>
-
 <script>
 import { ref } from "vue";
 import { message } from "ant-design-vue";
@@ -19,8 +6,8 @@ import buildClient from "services/mqtt";
 import { TOPICS } from "utils/constants";
 import { namespaceTopic } from "store/modules/stage/reusable";
 import { useRoute } from "vue-router";
-import { useStore } from "vuex";
 import { computed } from "vue";
+import { useStageStore } from "@stores/pinia/stage";
 const mqttClient = buildClient();
 
 export default {
@@ -29,7 +16,7 @@ export default {
   setup: (props) => {
     const clearing = ref(false);
     const route = useRoute();
-    const store = useStore();
+    const stageStore = useStageStore();
     console.log(props.option);
     const clearChat = async () => {
       clearing.value = true;
@@ -37,13 +24,9 @@ export default {
         mqttClient.connect().on("connect", () => {
           const topicChat = namespaceTopic(TOPICS.CHAT, route.params.url);
           if (props.option == "public-chat") {
-            mqttClient
-              .sendMessage(topicChat, { clear: true }, true)
-              .then(resolve);
+            mqttClient.sendMessage(topicChat, { clear: true }, true).then(resolve);
           } else {
-            mqttClient
-              .sendMessage(topicChat, { clearPlayerChat: true }, true)
-              .then(resolve);
+            mqttClient.sendMessage(topicChat, { clearPlayerChat: true }, true).then(resolve);
           }
         });
       });
@@ -55,13 +38,24 @@ export default {
       }
     };
 
-    const clearChatVisibility = computed(
-      () => store.state.stage.showClearChatSetting,
-    );
+    const clearChatVisibility = computed(() => stageStore.showClearChatSetting);
 
     return { clearChat, clearing, clearChatVisibility };
   },
 };
 </script>
+
+<template>
+  <button
+    v-if="clearChatVisibility"
+    class="chat-setting button is-rounded is-outlined"
+    :class="{ 'is-loading': clearing }"
+    @click="clearChat"
+  >
+    <span class="icon">
+      <Icon src="clear.svg" size="20" />
+    </span>
+  </button>
+</template>
 
 <style></style>

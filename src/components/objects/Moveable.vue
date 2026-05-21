@@ -1,51 +1,25 @@
-<template>
-  <div
-    ref="el"
-    :style="{
-      position: 'absolute',
-      opacity: object.opacity * (isDragging ? 0.5 : 1),
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
-      'transform-origin': transformOrigin,
-    }"
-    @mousedown="clickInside"
-    v-click-outside="clickOutside"
-  >
-    <slot />
-  </div>
-  <div
-    v-if="isDragging"
-    :style="{
-      position: 'absolute',
-      left: object.x + 'px',
-      top: object.y + 'px',
-      width: object.w + 'px',
-      height: object.h + 'px',
-      transform: `rotate(${object.rotate}deg)`,
-      opacity: object.opacity,
-      filter: `grayscale(${object.liveAction ? 0 : 1})`,
-    }"
-  >
-    <slot />
-  </div>
-</template>
-
 <script>
-import { ref } from "vue";
+import { ref, inject } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 
 export default {
-  props: ["object", "controlable", "active"],
+  props: {
+    object: Object,
+    controlable: Boolean,
+    active: Boolean,
+  },
   emits: ["update:active"],
   setup: (props, { emit }) => {
     const el = ref();
     const isDragging = ref(false);
 
-    const store = useStore();
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const config = store.getters["stage/config"];
+    const stageStore = useStageStore();
+    const replaying = inject("replaying", false);
+    const canPlay = computed(() => stageStore.canPlay && !replaying);
+    const config = stageStore.config;
     const moveable = new Moveable(document.body, {
       draggable: true,
       resizable: true,
@@ -58,7 +32,7 @@ export default {
     const sendMovement = (target, { left, top }) => {
       target.style.left = `${props.object.x}px`;
       target.style.top = `${props.object.y}px`;
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         x: left,
         y: top,
@@ -83,7 +57,7 @@ export default {
       });
 
     const sendResize = (target, { width, height, left, top }) => {
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         x: left,
         y: top,
@@ -121,7 +95,7 @@ export default {
 
     const sendRotation = (target, rotate) => {
       target.style.transform = `rotate(${props.object.rotate}deg)`;
-      store.dispatch("stage/shapeObject", {
+      stageStore.shapeObject({
         ...props.object,
         rotate,
       });
@@ -170,24 +144,20 @@ export default {
       }
     };
 
-    const activeMovable = computed(
-      () => store.getters["stage/activeMovable"] === props.object.id,
-    );
+    const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
     const clickInside = (e) => {
+      if (replaying) return;
       if (props.controlable && canPlay.value) {
         showControls(true, e);
-        store.commit("stage/SET_ACTIVE_MOVABLE", props.object.id);
+        stageStore.SET_ACTIVE_MOVABLE(props.object.id);
       }
     };
 
     const clickOutside = (e) => {
-      if (
-        (!e || e.target.id === "board") &&
-        props.controlable &&
-        canPlay.value
-      ) {
-        store.commit("stage/SET_ACTIVE_MOVABLE", null);
+      if (replaying) return;
+      if ((!e || e.target.id === "board") && props.controlable && canPlay.value) {
+        stageStore.SET_ACTIVE_MOVABLE(null);
       }
     };
     watch(
@@ -201,6 +171,10 @@ export default {
     watch(
       () => props.object,
       () => {
+        if (!el.value) {
+          return;
+        }
+        const x = props.object;
         const {
           x: left,
           y: top,
@@ -211,7 +185,7 @@ export default {
           opacity,
           scaleX,
           scaleY,
-        } = props.object;
+        } = x;
         if (animation) {
           animation.pause(true);
         }
@@ -229,7 +203,7 @@ export default {
           onUpdate: () => {
             try {
               moveable.updateRect();
-            } catch (error) {
+            } catch {
               // pass
             }
           },
@@ -252,9 +226,7 @@ export default {
     });
 
     const transformOrigin = computed(() => {
-      const wearer = store.state.stage.board.objects.find(
-        (a) => a.id === props.object.wornBy,
-      );
+      const wearer = stageStore.board.objects.find((a) => a.id === props.object.wornBy);
       if (wearer) {
         return `${wearer.x + wearer.w / 2 - props.object.x}px ${
           wearer.y + wearer.h / 2 - props.object.y
@@ -268,5 +240,37 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div
+    ref="el"
+    v-click-outside="clickOutside"
+    :style="{
+      position: 'absolute',
+      opacity: object.opacity * (isDragging ? 0.5 : 1),
+      filter: `grayscale(${object.liveAction === false ? 1 : 0})`,
+      'transform-origin': transformOrigin,
+    }"
+    @mousedown="clickInside"
+    @touchstart="clickInside"
+  >
+    <slot />
+  </div>
+  <div
+    v-if="isDragging"
+    :style="{
+      position: 'absolute',
+      left: object.x + 'px',
+      top: object.y + 'px',
+      width: object.w + 'px',
+      height: object.h + 'px',
+      transform: `rotate(${object.rotate}deg)`,
+      opacity: object.opacity,
+      filter: `grayscale(${object.liveAction === false ? 1 : 0})`,
+    }"
+  >
+    <slot />
+  </div>
+</template>
 
 <style></style>

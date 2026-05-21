@@ -1,32 +1,19 @@
-<template>
-  <audio v-for="audio in audios" :key="audio" :ref="setRef" preload="auto">
-    <source :src="audio.src" type="audio/mpeg" />
-    <source :src="audio.src" type="audio/ogg" />
-    <source :src="audio.src" type="audio/wav" />
-    <source :src="audio.src" type="audio/x-aiff" />
-    <object>
-      <param name="src" :value="audio.src" />
-      <param name="controller" value="false" />
-      <embed :src="audio.src" controller="false" type="audio/mpeg" />
-    </object>
-  </audio>
-</template>
-
 <script>
 import { computed, onMounted, watch } from "vue";
-import { useStore } from "vuex";
+import { message } from "ant-design-vue";
+import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 export default {
   setup: () => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const stopAudio = (audio) => {
-      store.dispatch("stage/updateAudioStatus", {
+      stageStore.updateAudioStatus({
         ...audio,
         isPlaying: false,
         currentTime: 0,
       });
     };
-    const audios = store.getters["stage/audios"];
+    const audios = stageStore.audios;
     let refs = [];
     const setRef = (el) => {
       const index = refs.length;
@@ -43,16 +30,22 @@ export default {
           }
         });
         el.addEventListener("loadedmetadata", function () {
-          store.commit("stage/UPDATE_AUDIO_PLAYER_STATUS", {
+          stageStore.UPDATE_AUDIO_PLAYER_STATUS({
             index,
             duration: el.duration,
           });
         });
         el.addEventListener("timeupdate", function () {
-          store.commit("stage/UPDATE_AUDIO_PLAYER_STATUS", {
+          stageStore.UPDATE_AUDIO_PLAYER_STATUS({
             index,
             currentTime: el.currentTime,
           });
+        });
+        el.addEventListener("error", function () {
+          const audio = audios[refs.indexOf(el)];
+          const label = audio?.name || audio?.src || "audio";
+          message.error(`Could not play ${label}. This format may not be supported in your browser.`);
+          stopAudio(audio);
         });
       }
     };
@@ -65,8 +58,8 @@ export default {
     };
 
     const speed = computed(() => {
-      if (store.state.stage.replay.isReplaying) {
-        return Math.min(store.state.stage.replay.speed, 8);
+      if (stageStore.replay.isReplaying) {
+        return Math.min(stageStore.replay.speed, 8);
       }
       return 1;
     });
@@ -97,6 +90,26 @@ export default {
   },
 };
 </script>
+
+<template>
+  <!--
+    Bind the asset URL directly to the <audio> element. Previously this
+    template wrapped four <source> tags with mismatched MIME types
+    (audio/mpeg, audio/ogg, audio/wav, audio/x-aiff) all pointing at the
+    SAME `audio.src` URL. That produced misleading hints across browsers:
+    Safari, which doesn't decode Vorbis/Opus, would accept the audio/mpeg
+    hint, fetch the URL, fail to decode, then walk the same URL three
+    more times under different `type` hints — net effect: silently broken
+    on Safari for non-MP3/WAV uploads.
+
+    The <object>/<embed>/<param> fallback targeted the Netscape Plugin
+    API, which has been removed from every modern browser since ~2018,
+    so it was dead code. We now let the browser sniff the format from
+    the response Content-Type — works uniformly in Chromium / Firefox /
+    Safari for any container the browser can decode natively.
+  -->
+  <audio v-for="audio in audios" :key="audio" :ref="setRef" :src="audio.src" preload="auto" />
+</template>
 
 <style scoped>
 audio {

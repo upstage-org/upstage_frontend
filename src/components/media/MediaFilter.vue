@@ -2,67 +2,24 @@
 import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
-import gql from "graphql-tag";
-import { StudioGraph, UploadFile } from "models/studio";
 import { editingMediaVar, inquiryVar } from "apollo";
-import moment, { Moment } from "moment";
-import configs from "config";
+import { MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
 import { capitalize, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
-import dayjs from 'dayjs';
-import type { Dayjs } from 'dayjs';
-import { useStore } from "vuex";
+import dayjs, { type Dayjs } from "@utils/dayjs";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
-const { result: response, loading } = useQuery(gql`
-  {
-    whoami {
-      username
-      displayName
-      roleName
-    }
-    users(active: true) {
-      id
-      username
-      displayName
-    }
-    stages(input:{}) {
-      edges {
-        id
-        name
-        createdOn
-        owner {
-          username
-          displayName
-        }
-      }
-    }
-    getAllStages {
-        id
-        name
-        permission
-    }
-    tags {
-      id
-      name
-      color
-      createdOn
-    }
-    mediaTypes {
-      id
-      name
-    }
-  }
-`);
-const store = useStore();
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { result: response, loading } = useQuery(MEDIA_PAGE_TOOLBAR_QUERY, null, {
+  fetchPolicy: "cache-and-network",
+});
+const { isAdmin } = storeToRefs(useUserStore());
 const result = computed(() => response?.value);
 
 const sharedAuth = getSharedAuth();
 
 const name = ref("");
-const owners = ref(
-  sharedAuth && sharedAuth.username ? [sharedAuth.username] : [],
-);
+const owners = ref(sharedAuth && sharedAuth.username ? [sharedAuth.username] : []);
 const types = ref([]);
 const stages = ref([]);
 const tags = ref([]);
@@ -71,25 +28,25 @@ const dormant = ref(false);
 
 const ranges = [
   {
-    label: 'Today',
+    label: "Today",
     value: [dayjs(), dayjs()],
   },
   {
-    label: 'Yesterday',
-    value: [dayjs().add(-1, 'd'), dayjs().add(-1, 'd')],
+    label: "Yesterday",
+    value: [dayjs().add(-1, "d"), dayjs().add(-1, "d")],
   },
   {
-    label: 'Last 7 days',
-    value: [dayjs().add(-7, 'd'), dayjs()],
+    label: "Last 7 days",
+    value: [dayjs().add(-7, "d"), dayjs()],
   },
   {
-    label: 'Last month',
-    value: [dayjs().add(-1, 'month'), dayjs()],
+    label: "Last month",
+    value: [dayjs().add(-1, "month"), dayjs()],
   },
   {
-    label: 'This year',
+    label: "This year",
     value: [dayjs().startOf("year"), dayjs()],
-  }
+  },
 ];
 
 const updateInquiry = (vars: any) =>
@@ -111,7 +68,7 @@ watchEffect(() => {
     stages: stages.value,
     tags: tags.value,
     mediaTypes: types.value,
-    dormant: dormant.value
+    dormant: dormant.value,
   });
 });
 watch(
@@ -121,20 +78,17 @@ watch(
   }, 500),
 );
 
-const onRangeChange = (_dates: null | (Dayjs | null)[], dateStrings: string[]) => {
+const onRangeChange = (_dates: null | (Dayjs | null)[], _dateStrings: string[]) => {
   updateInquiry({
     createdBetween: _dates
-      ? [
-        _dates[0]?.format("YYYY-MM-DD"),
-        _dates[1]?.format("YYYY-MM-DD"),
-      ]
+      ? [_dates[0]?.format("YYYY-MM-DD"), _dates[1]?.format("YYYY-MM-DD")]
       : undefined,
   });
 };
 
 onMounted(() => {
   updateInquiry({
-    createdBetween: undefined
+    createdBetween: undefined,
   });
 });
 
@@ -159,10 +113,7 @@ const hasFilter = computed(
 );
 const handleFilterOwnerName = (keyword: string, option: any) => {
   const s = keyword.toLowerCase();
-  return (
-    option.value.toLowerCase().includes(s) ||
-    option.label.toLowerCase().includes(s)
-  );
+  return option.value.toLowerCase().includes(s) || option.label.toLowerCase().includes(s);
 };
 const handleFilterStageName = (keyword: string, option: any) => {
   return option.label.toLowerCase().includes(keyword.toLowerCase());
@@ -176,12 +127,12 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
 };
 const onVisibleDropzone = () => {
   editingMediaVar(undefined);
-}
+};
 </script>
 
 <template>
   <a-affix :offset-top="0">
-    <a-space class="shadow rounded-xl px-4 py-2 bg-white flex justify-between">
+    <div class="shadow rounded-xl px-4 py-2 bg-white flex justify-between items-center w-full upstage-media-toolbar">
       <a-space class="flex-wrap">
         <a-button v-if="composingMode" type="primary" danger @click="composingMode = false">
           <template #icon>
@@ -189,63 +140,112 @@ const onVisibleDropzone = () => {
           </template>
           Back to editing
         </a-button>
-        <a-button type="primary" v-else @click="visibleDropzone = true; onVisibleDropzone();">
+        <a-button
+          v-else
+          type="primary"
+          @click="
+            visibleDropzone = true;
+            onVisibleDropzone();
+          "
+        >
           <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
         </a-button>
-        <a-input-search allowClear class="w-48" placeholder="Search media" v-model:value="name" />
-        <a-select allowClear showArrow :filterOption="handleFilterOwnerName" mode="tags" style="min-width: 124px"
-          placeholder="Owners" :loading="loading" v-model:value="owners" :options="result
-            ? result.users.map((e: any) => ({
-              value: e.username,
-              label: e.displayName || e.username,
-            }))
-            : []
-            ">
+        <a-input-search v-model:value="name" allow-clear class="w-48" placeholder="Search media" />
+        <a-select
+          v-model:value="owners"
+          allow-clear
+          show-arrow
+          :filter-option="handleFilterOwnerName"
+          mode="tags"
+          style="min-width: 124px"
+          placeholder="Owners"
+          :loading="loading"
+          :options="
+            result
+              ? result.users.map((e: any) => ({
+                  value: e.username,
+                  label: e.displayName || e.username,
+                }))
+              : []
+          "
+        >
           <template #dropdownRender="{ menuNode: menu }">
-            <v-nodes :vnodes="menu" />
+            <VNodes :vnodes="menu" />
             <a-divider style="margin: 4px 0" />
-            <div class="w-full cursor-pointer text-center" @mousedown.prevent @click.stop.prevent="owners = []">
+            <div
+              class="w-full cursor-pointer text-center"
+              @mousedown.prevent
+              @click.stop.prevent="owners = []"
+            >
               <team-outlined />&nbsp;All players
             </div>
           </template>
         </a-select>
-        <a-select allowClear showArrow filterOption mode="tags" style="min-width: 128px" placeholder="Media types"
-          :loading="loading" v-model:value="types" :options="result
-            ? result.mediaTypes
-              .filter(
-                (e: any) =>
-                  !['shape', 'media'].includes(e.name.toLowerCase()),
-              )
-              .map((e: any) => ({
-                value: e.name,
-                label: capitalize(e.name),
-              }))
-            : []
-            ">
+        <a-select
+          v-model:value="types"
+          allow-clear
+          show-arrow
+          filter-option
+          mode="tags"
+          style="min-width: 128px"
+          placeholder="Media types"
+          :loading="loading"
+          :options="
+            result
+              ? result.mediaTypes
+                  .filter((e: any) => !['shape', 'media'].includes(e.name.toLowerCase()))
+                  .map((e: any) => ({
+                    value: e.name,
+                    label: capitalize(e.name),
+                  }))
+              : []
+          "
+        >
         </a-select>
-        <a-select allowClear showArrow :filterOption="handleFilterStageName" mode="tags" style="min-width: 160px"
-          placeholder="Stages assigned" :loading="loading" v-model:value="stages" :options="result
-            ? result.getAllStages.map((e: any) => ({
-              value: e.id,
-              label: e.name,
-            }))
-            : []
-            ">
+        <a-select
+          v-model:value="stages"
+          allow-clear
+          show-arrow
+          :filter-option="handleFilterStageName"
+          mode="tags"
+          style="min-width: 160px"
+          placeholder="Stages assigned"
+          :loading="loading"
+          :options="
+            result
+              ? result.getAllStages.map((e: any) => ({
+                  value: e.id,
+                  label: e.name,
+                }))
+              : []
+          "
+        >
         </a-select>
-        <a-select allowClear showArrow mode="tags" style="min-width: 160px" placeholder="Tags" :loading="loading"
-          v-model:value="tags" :options="result
-            ? result.tags.map((e: any) => ({
-              value: e.name,
-              label: e.name,
-            }))
-            : []
-            "></a-select>
-        <a-range-picker :placeholder="['Created from', 'to date']" :presets="ranges as any"
-          :onChange="onRangeChange as any" v-model:value="dates as any" />
+        <a-select
+          v-model:value="tags"
+          allow-clear
+          show-arrow
+          mode="tags"
+          style="min-width: 160px"
+          placeholder="Tags"
+          :loading="loading"
+          :options="
+            result
+              ? result.tags.map((e: any) => ({
+                  value: e.name,
+                  label: e.name,
+                }))
+              : []
+          "
+        ></a-select>
+        <a-range-picker
+          v-model:value="dates as any"
+          :placeholder="['Created from', 'to date']"
+          :presets="ranges as any"
+          :on-change="onRangeChange as any"
+        />
         <a-space v-if="isAdmin">
-          <span>
-            Dormant:
-          </span>
+          <span> Dormant: </span>
           <a-switch v-model:checked="dormant" />
         </a-space>
         <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
@@ -253,6 +253,6 @@ const onVisibleDropzone = () => {
         </a-button>
       </a-space>
       <Navbar />
-    </a-space>
+    </div>
   </a-affix>
 </template>

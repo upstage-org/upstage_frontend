@@ -1,28 +1,3 @@
-<template>
-  <div @contextmenu.prevent="openMenu" :style="style">
-    <slot name="trigger" />
-  </div>
-  <teleport to="body">
-    <transition :css="false" @enter="contextAppear">
-      <div
-        class="card"
-        v-if="$slots.context && isActive"
-        v-click-outside="closeMenu"
-        :style="{
-          position: 'fixed',
-          top: position.y + 'px',
-          left: position.x + 'px',
-          'z-index': 10000,
-          overflow: 'visible',
-          opacity,
-        }"
-      >
-        <slot name="context" :closeMenu="closeMenu" />
-      </div>
-    </transition>
-  </teleport>
-</template>
-
 <script>
 import { reactive, ref } from "vue";
 export default {
@@ -59,6 +34,9 @@ export default {
     const position = reactive({ x: 100, y: 100 });
 
     const openMenu = (e) => {
+      if (props.preventClicking) {
+        return;
+      }
       if (!props.preventClicking) {
         e.currentTarget.click();
       }
@@ -69,8 +47,7 @@ export default {
     const closeMenu = () => (isActive.value = false);
 
     const contextAppear = (el) => {
-      const { width, height, right, bottom } =
-        el?.getBoundingClientRect() ?? {};
+      const { width, height, right, bottom } = el?.getBoundingClientRect() ?? {};
       if (right > window.innerWidth - props.padRight) {
         position.x = position.x - width;
       }
@@ -83,5 +60,30 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div :style="style" @contextmenu.prevent="openMenu">
+    <slot name="trigger" />
+  </div>
+  <teleport to="body">
+    <transition :css="false" @enter="contextAppear">
+      <div
+        v-if="$slots.context && isActive"
+        v-click-outside="closeMenu"
+        class="card"
+        :style="{
+          position: 'fixed',
+          top: position.y + 'px',
+          left: position.x + 'px',
+          'z-index': 10000,
+          overflow: 'visible',
+          opacity,
+        }"
+      >
+        <slot name="context" :close-menu="closeMenu" />
+      </div>
+    </transition>
+  </teleport>
+</template>
 
 <style></style>

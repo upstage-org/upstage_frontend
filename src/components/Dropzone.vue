@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { ref, provide, watch, Ref, defineModel } from "vue";
+import { ref, provide, watch, Ref } from "vue";
 import configs from "config";
 import { message } from "ant-design-vue";
 import { useLazyQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { uploadDefault } from "models/studio";
 import i18n from "../i18n";
 import { humanFileSize } from "utils/common";
-import {
-  Media,
-  StudioGraph,
-  UploadFile,
-} from "models/studio";
+import { UPLOAD_LIMIT_MESSAGE_KEY } from "@utils/constants";
+import { Media, StudioGraph, UploadFile } from "models/studio";
 import { useQuery } from "@vue/apollo-composable";
 
-const model = defineModel()
+const model = defineModel<boolean>();
 const { load, refetch } = useLazyQuery<StudioGraph>(
   gql`
     query WhoAmI {
@@ -49,25 +46,27 @@ const toSrc = ({ file }: { file: File }) => {
   return URL.createObjectURL(file);
 };
 
-watch(visible as Ref, (val) => {
+watch(visible as Ref, () => {
   reload();
 });
 
 const handleUpload = async (file: UploadFile) => {
   let fileType = file.file.type;
   const profile = (await (load as any)()) || (await refetch());
-  const uploadLimit = (profile?.data || profile?.whoami).uploadLimit ?? uploadDefault;
+  const uploadLimit = (profile?.data || profile?.whoami)?.uploadLimit ?? uploadDefault;
 
   if (!fileType.includes("video")) {
     const canUpload = file.file.size <= uploadLimit;
     if (!canUpload) {
       const hide = message.error({
+        key: UPLOAD_LIMIT_MESSAGE_KEY,
         content: i18n.global.t("over_limit_upload", {
           size: humanFileSize(file.file.size),
           limit: humanFileSize(uploadLimit ?? 0),
           name: file.file.name,
         }),
-        duration: 0,
+        /** Long enough to read; click still dismisses immediately (onClick below). */
+        duration: 10,
         onClick: () => hide(),
         class: "cursor-pointer",
       });
@@ -75,23 +74,27 @@ const handleUpload = async (file: UploadFile) => {
     }
   }
   if (editingMediaResult.value?.editingMedia?.id) {
-    const { assetType } = editingMediaResult.value?.editingMedia;
-    if (["video", "audio"].includes(assetType?.name) && !fileType.includes(assetType?.name) ||
-      (fileType.includes("video") || fileType.includes("audio")) && !["video", "audio"].includes(assetType?.name)
+    const { assetType } = editingMediaResult.value.editingMedia;
+    if (
+      (["video", "audio"].includes(assetType?.name) && !fileType.includes(assetType?.name)) ||
+      ((fileType.includes("video") || fileType.includes("audio")) &&
+        !["video", "audio"].includes(assetType?.name))
     ) {
       message.error("Invalid file type!");
       return;
     }
   }
   if (model.value) {
-    files.value = [{
-      ...file,
-      id: files.value.length,
-      preview: toSrc(file),
-      status: "local",
-    }];
+    files.value = [
+      {
+        ...file,
+        id: files.value.length,
+        preview: toSrc(file),
+        status: "local",
+      },
+    ];
 
-    model.value = !model.value
+    model.value = !model.value;
   } else {
     files.value = files.value.concat({
       ...file,
@@ -109,9 +112,21 @@ const uploadFile = async (file: any) => {
 </script>
 
 <template>
-  <a-modal :footer="null" :visible="visible" @cancel="visible = false" width="100%" wrapClassName="fullscreen-dragzone"
-    class="h-full top-0 p-0">
-    <a-upload-dragger :show-upload-list="false" :custom-request="uploadFile" multiple>
+  <a-modal
+    :footer="null"
+    :visible="visible"
+    width="100%"
+    wrap-class-name="fullscreen-dragzone"
+    class="h-full top-0 p-0"
+    data-testid="dropzone"
+    @cancel="visible = false"
+  >
+    <a-upload-dragger
+      data-testid="dropzone-input"
+      :show-upload-list="false"
+      :custom-request="uploadFile"
+      multiple
+    >
       <p class="ant-upload-drag-icon">
         <UploadOutlined />
       </p>

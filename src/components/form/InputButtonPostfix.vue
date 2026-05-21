@@ -1,12 +1,28 @@
+<script>
+import { ref } from "vue";
+export default {
+  props: {
+    icon: String,
+    loading: Boolean,
+    modelValue: [String, Number],
+  },
+  emits: ["update:modelValue", "ok"],
+  setup: () => {
+    const el = ref();
+    return { el };
+  },
+};
+</script>
+
 <template>
   <div class="control has-icons-right is-fullwidth">
     <input
       ref="el"
       class="input is-rounded"
       :value="modelValue"
+      v-bind="$attrs"
       @input="(e) => $emit('update:modelValue', e.target.value)"
       @keyup.enter="(e) => $emit('ok', e.target.value)"
-      v-bind="$attrs"
     />
     <button
       class="icon is-right clickable button is-primary is-rounded"
@@ -20,18 +36,6 @@
     </button>
   </div>
 </template>
-
-<script>
-import { ref } from "vue";
-export default {
-  props: ["icon", "loading", "modelValue"],
-  emits: ["update:modelValue", "ok"],
-  setup: () => {
-    const el = ref();
-    return { el };
-  },
-};
-</script>
 
 <style scoped>
 input.is-rounded {

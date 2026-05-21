@@ -3,7 +3,7 @@ import { useQuery } from "@vue/apollo-composable";
 import { message, Modal } from "ant-design-vue";
 import { SelectValue } from "ant-design-vue/lib/select";
 import { TransferItem } from "ant-design-vue/lib/transfer";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { ref, watchEffect, PropType, inject, ComputedRef, watch } from "vue";
 import { editingMediaVar } from "apollo";
 import configs from "config";
@@ -17,7 +17,7 @@ const props = defineProps({
   },
   users: {
     type: Array as PropType<string[]>,
-    default: [],
+    default: () => [],
   },
   media: Object as PropType<Media>,
   note: {
@@ -27,12 +27,7 @@ const props = defineProps({
     type: String,
   },
 });
-const emits = defineEmits([
-  "update:modelValue",
-  "update:users",
-  "update:owner",
-  "update:note",
-]);
+const emits = defineEmits(["update:modelValue", "update:users", "update:owner", "update:note"]);
 
 const copyrightLevel = ref();
 const targetKeys = ref();
@@ -46,7 +41,7 @@ watchEffect(() => {
   emits("update:users", targetKeys.value);
 });
 
-const { result, loading } = useQuery<StudioGraph>(
+const { result } = useQuery<StudioGraph>(
   gql`
     {
       users(active: true) {
@@ -62,10 +57,7 @@ const { result, loading } = useQuery<StudioGraph>(
 
 const filterOption = (keyword: string, option: any) => {
   const s = keyword.toLowerCase();
-  return (
-    option.value.toLowerCase().includes(s) ||
-    option.label.toLowerCase().includes(s)
-  );
+  return option.value.toLowerCase().includes(s) || option.label.toLowerCase().includes(s);
 };
 
 const renderItem = (item: TransferItem) => item.displayName || item.username;
@@ -100,16 +92,26 @@ watch(isAdmin, console.log);
   <a-space direction="vertical" class="w-full mb-4">
     <div v-if="isAdmin">
       👑 Owner:
-      <a-select :options="result
-          ? (result.users.map((e: any) => ({
-            value: e.username,
-            label: e.displayName || e.username,
-          })) as any)
-          : []
-        " style="min-width: 124px" :value="owner" @change="handleOwnerChange" />
+      <a-select
+        :options="
+          result
+            ? (result.users.map((e: any) => ({
+                value: e.username,
+                label: e.displayName || e.username,
+              })) as any)
+            : []
+        "
+        style="min-width: 124px"
+        :value="owner"
+        @change="handleOwnerChange"
+      />
     </div>
-    <a-select class="w-80" placeholder="Media copyright level" v-model:value="copyrightLevel">
-      <a-select-option v-for="level in configs.MEDIA_COPYRIGHT_LEVELS" :key="level.value" :value="level.value">
+    <a-select v-model:value="copyrightLevel" class="w-80" placeholder="Media copyright level">
+      <a-select-option
+        v-for="level in configs.MEDIA_COPYRIGHT_LEVELS"
+        :key="level.value"
+        :value="level.value"
+      >
         <span>{{ level.name }}</span>
         <span>
           <a-tooltip placement="right">
@@ -122,10 +124,12 @@ watch(isAdmin, console.log);
     <a-tooltip title="Notes">
       <a-textarea
         placeholder="Add notes regarding acknowledgement, credits and permissions for other players who may want to use this media."
-        :value="note" @change="$emit('update:note', $event.target.value)"></a-textarea>
+        :value="note"
+        @change="$emit('update:note', $event.target.value)"
+      ></a-textarea>
     </a-tooltip>
     <template v-if="copyrightLevel === 1">
-      <a-alert show-icon v-for="request in media?.permissions" :key="request.id" class="bg-white">
+      <a-alert v-for="request in media?.permissions" :key="request.id" show-icon class="bg-white">
         <template #icon>✅</template>
         <template #message>
           <b>
@@ -139,8 +143,12 @@ watch(isAdmin, console.log);
       </a-alert>
     </template>
     <template v-else-if="copyrightLevel === 2">
-      <a-alert type="warning" show-icon v-for="request in media?.permissions.filter((p) => !p.approved)"
-        :key="request.id">
+      <a-alert
+        v-for="request in media?.permissions.filter((p) => !p.approved)"
+        :key="request.id"
+        type="warning"
+        show-icon
+      >
         <template #icon>🔑</template>
         <template #message>
           <b>
@@ -149,8 +157,12 @@ watch(isAdmin, console.log);
           is requesting access to this media: &quot;{{ request.note }}&quot;
           <br />
           <a-space>
-            <smart-button type="primary" :action="() => confirm(request.id, true)">{{ $t("approve") }}</smart-button>
-            <smart-button type="danger" :action="() => confirm(request.id, false)">{{ $t("reject") }}</smart-button>
+            <smart-button type="primary" :action="() => confirm(request.id, true)">{{
+              $t("approve")
+            }}</smart-button>
+            <smart-button type="danger" :action="() => confirm(request.id, false)">{{
+              $t("reject")
+            }}</smart-button>
           </a-space>
           <br />
           <small class="text-gray-500">
@@ -158,22 +170,33 @@ watch(isAdmin, console.log);
           </small>
         </template>
       </a-alert>
-      <a-transfer :locale="{
-        itemUnit: 'player',
-        itemsUnit: 'players',
-        notFoundContent: 'No player available',
-        searchPlaceholder: 'Search player name',
-      }" :list-style="{
-          flex: '1',
-          height: '300px',
-        }" :titles="[' available', ' granted']" v-model:target-keys="targetKeys" :data-source="result
-            ? (result.users.map((e: any) => ({
-              key: e.id,
-              ...e,
-            })) as any)
-            : []
-          " show-search :filter-option="filterOption" :render="renderItem" />
+      <div class="upstage-transfer--sorter-arrows">
+        <a-transfer
+          v-model:target-keys="targetKeys"
+          :locale="{
+            itemUnit: 'player',
+            itemsUnit: 'players',
+            notFoundContent: 'No player available',
+            searchPlaceholder: 'Search player name',
+          }"
+          :list-style="{
+            flex: '1',
+            height: '300px',
+          }"
+          :titles="[' available', ' granted']"
+          :data-source="
+            result
+              ? (result.users.map((e: any) => ({
+                  key: e.id,
+                  ...e,
+                })) as any)
+              : []
+          "
+          show-search
+          :filter-option="filterOption"
+          :render="renderItem"
+        />
+      </div>
     </template>
-    
   </a-space>
 </template>

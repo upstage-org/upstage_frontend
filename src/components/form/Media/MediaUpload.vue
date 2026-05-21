@@ -1,29 +1,12 @@
-<template>
-  <div class="dropdown is-hoverable">
-    <div class="dropdown-trigger">
-      <Upload v-if="!active" v-model="base64" @change="handleFileChange">
-        <span>{{ $t("new") }}</span>
-        <span class="icon">
-          <i class="fas fa-plus"></i>
-        </span>
-      </Upload>
-    </div>
-  </div>
-  <Modal width="100%" height="100%" v-model="active">
-    <MediaModal v-if="media" :media="media" @complete="uploadCompleted" />
-  </Modal>
-</template>
-
 <script>
 import Modal from "components/Modal.vue";
 import Upload from "components/form/Upload.vue";
 import MediaModal from "./MediaModal.vue";
-import { ref } from "vue";
-import { inject } from "@vue/runtime-core";
+import { inject, ref } from "vue";
 
 export default {
-  props: ["special"],
   components: { Modal, MediaModal, Upload },
+  props: { special: Boolean },
   setup: () => {
     const base64 = ref();
     const active = ref();
@@ -67,5 +50,21 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div class="dropdown is-hoverable">
+    <div class="dropdown-trigger">
+      <Upload v-if="!active" v-model="base64" @change="handleFileChange">
+        <span>{{ $t("new") }}</span>
+        <span class="icon">
+          <i class="fas fa-plus"></i>
+        </span>
+      </Upload>
+    </div>
+  </div>
+  <Modal v-model="active" width="100%" height="100%">
+    <MediaModal v-if="media" :media="media" @complete="uploadCompleted" />
+  </Modal>
+</template>
 
 <style></style>

@@ -1,19 +1,7 @@
-<template>
-  <textarea
-    ref="el"
-    rows="1"
-    v-bind="$attrs"
-    class="textarea"
-    :value="modelValue"
-    @input="handleInput"
-    @keydown.enter="submit"
-  ></textarea>
-</template>
-
 <script>
 import { onMounted, ref, watch } from "vue";
 export default {
-  props: ["modelValue"],
+  props: { modelValue: [String, Number] },
   emits: ["update:modelValue", "ref", "submit"],
   setup: (props, { emit }) => {
     const el = ref();
@@ -42,6 +30,18 @@ export default {
   },
 };
 </script>
+
+<template>
+  <textarea
+    ref="el"
+    rows="1"
+    v-bind="$attrs"
+    class="textarea"
+    :value="modelValue"
+    @input="handleInput"
+    @keydown.enter="submit"
+  ></textarea>
+</template>
 
 <style scoped>
 textarea {

@@ -2,14 +2,10 @@
 import { h, reactive } from "vue";
 import { Button, Drawer, Input, Space, message } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
-import {
-  SaveOutlined,
-  PlusOutlined,
-  DeleteOutlined,
-} from "@ant-design/icons-vue";
+import { SaveOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons-vue";
 import { computed } from "vue";
 import { useMutation } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { inquiryVar } from "apollo";
 
 export default {
@@ -23,11 +19,9 @@ export default {
       default: () => {},
     },
   },
-  setup(props, ctx) {
+  setup(props) {
     const { t } = useI18n();
-    const players = reactive<
-      { username: string; email: string; password: string }[]
-    >([
+    const players = reactive<{ username: string; email: string; password: string }[]>([
       {
         username: "",
         email: "",
@@ -39,12 +33,7 @@ export default {
       return (
         players.length &&
         players.every((player) => {
-          return (
-            player.username &&
-            player.password &&
-            player.email &&
-            player.email.includes("@")
-          );
+          return player.username && player.password && player.email && player.email.includes("@");
         })
       );
     });
@@ -74,7 +63,7 @@ export default {
       });
     });
 
-    const watchInquiryVar = (vars: any) => {
+    const watchInquiryVar = (_vars: any) => {
       inquiryVar.onNextChange(watchInquiryVar);
     };
     inquiryVar.onNextChange(watchInquiryVar);
@@ -129,13 +118,9 @@ export default {
             let confirmed = true;
             if (
               players.length &&
-              players.some(
-                (player) => player.username || player.password || player.email,
-              )
+              players.some((player) => player.username || player.password || player.email)
             ) {
-              confirmed = confirm(
-                "Are you sure you want to discard the changes?",
-              );
+              confirmed = confirm("Are you sure you want to discard the changes?");
             }
             if (confirmed) {
               props.onClose();
@@ -161,10 +146,7 @@ export default {
                   onChange: (e) => {
                     player.email = e.target.value!;
                   },
-                  status:
-                    !player.email || player.email.includes("@")
-                      ? undefined
-                      : "warning",
+                  status: !player.email || player.email.includes("@") ? undefined : "warning",
                 }),
                 h(Input, {
                   type: "password",

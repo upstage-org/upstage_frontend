@@ -1,0 +1,8 @@
+# Dependency lifecycle scripts allowed during install (pnpm 11 strict dep builds).
+# See https://pnpm.io/cli/approve-builds and ERR_PNPM_IGNORED_BUILDS when building in Docker/CI.
+allowBuilds:
+  '@fortawesome/fontawesome-free': true
+  '@parcel/watcher': true
+  core-js: true
+  esbuild: true
+  vue-demi: true

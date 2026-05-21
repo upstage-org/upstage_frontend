@@ -3,7 +3,7 @@
 import { defineComponent } from "vue";
 import { PropType } from "vue";
 import { Editor } from "@tiptap/vue-3";
-import { Button, ButtonGroup, Modal, Space, message } from "ant-design-vue";
+import { Button, ButtonGroup, Modal, Space } from "ant-design-vue";
 import { h } from "vue";
 import {
   BoldOutlined,
@@ -41,22 +41,19 @@ export default defineComponent({
         {
           type: "heading1",
           icon: h("span", "H1"),
-          action: () =>
-            props.editor.chain().focus().toggleHeading({ level: 1 }).run(),
+          action: () => props.editor.chain().focus().toggleHeading({ level: 1 }).run(),
           isActive: () => props.editor.isActive("heading", { level: 1 }),
         },
         {
           type: "heading2",
           icon: h("span", "H2"),
-          action: () =>
-            props.editor.chain().focus().toggleHeading({ level: 2 }).run(),
+          action: () => props.editor.chain().focus().toggleHeading({ level: 2 }).run(),
           isActive: () => props.editor.isActive("heading", { level: 2 }),
         },
         {
           type: "heading3",
           icon: h("span", "H3"),
-          action: () =>
-            props.editor.chain().focus().toggleHeading({ level: 3 }).run(),
+          action: () => props.editor.chain().focus().toggleHeading({ level: 3 }).run(),
           isActive: () => props.editor.isActive("heading", { level: 3 }),
         },
       ],
@@ -105,13 +102,7 @@ export default defineComponent({
         {
           type: "link",
           icon: h(LinkOutlined),
-          disabled: !props.editor
-            .can()
-            .chain()
-            .focus()
-            .extendMarkRange("link")
-            .unsetLink()
-            .run(),
+          disabled: !props.editor.can().chain().focus().extendMarkRange("link").unsetLink().run(),
           action: () => (showInstruction.value = true),
           isActive: () => props.editor.isActive("link"),
         },

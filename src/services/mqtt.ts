@@ -1,11 +1,15 @@
 // @ts-nocheck
 import config from "config";
 import { v4 as uuidv4 } from "uuid";
-import { connect } from "mqtt/dist/mqtt";
-import {
-  namespaceTopic,
-  unnamespaceTopic,
-} from "store/modules/stage/reusable";
+// mqtt v5's browser ESM bundle (./dist/mqtt.esm.js) ships ONLY a default
+// export ("export default XT()"). A namespace import like
+// `import * as mqtt from "mqtt"` therefore yields { __esModule, default }
+// and `mqtt.connect` is undefined — the audience client crashes silently
+// inside buildClient(), no WS is opened, and mosquitto stats stay at 0.
+// Pull the default and read connect off it.
+import mqtt from "mqtt";
+const { connect } = mqtt;
+import { namespaceTopic, unnamespaceTopic } from "@utils/mqttTopics";
 import { isJson } from "utils/common";
 
 export default function buildClient() {
@@ -18,7 +22,7 @@ export default function buildClient() {
       const connectUrl = url;
       if (!connectUrl || typeof connectUrl !== "string") {
         console.error(
-          "[MQTT] No connection URL. Set VITE_MQTT_ENDPOINT to the broker WebSocket URL (e.g. ws://host:8083 or wss://host:8084)."
+          "[MQTT] No connection URL. Set VITE_MQTT_ENDPOINT to the broker WebSocket URL (e.g. ws://localhost:9001).",
         );
       }
       const clientId = uuidv4();
@@ -36,14 +40,6 @@ export default function buildClient() {
       this.client.once("connect", () => {
         if (this._connectResolve) {
           this._connectResolve();
-          this._connectResolve = null;
-          this._connectReject = null;
-          this._connectPromise = null;
-        }
-      });
-      this.client.once("close", () => {
-        if (this._connectReject) {
-          this._connectReject(new Error("[MQTT] Connection closed before connect."));
           this._connectResolve = null;
           this._connectReject = null;
           this._connectPromise = null;
@@ -87,14 +83,13 @@ export default function buildClient() {
         this.client.end(false, {}, resolve);
       });
     },
-    subscribe(topics, stageUrl) {
+    subscribe(topics, stageUrl?) {
       if (!this.client) {
         return Promise.reject(new Error("[MQTT] Not connected. Call connect() first."));
       }
       const namespacedTopics = {};
       Object.keys(topics).forEach(
-        (key) =>
-          (namespacedTopics[namespaceTopic(key, stageUrl)] = topics[key]),
+        (key) => (namespacedTopics[namespaceTopic(key, stageUrl)] = topics[key]),
       );
       return new Promise((resolve, reject) => {
         this.client.subscribe(namespacedTopics, (error, res) => {
@@ -106,10 +101,10 @@ export default function buildClient() {
         });
       });
     },
-    sendMessage(topic, payload, namespaced, retain = false) {
+    sendMessage(topic, payload, namespaced = false, retain = false) {
       if (!this.client) {
         return Promise.reject(
-          new Error("[MQTT] Not connected. Call connect() first or check MQTT connection.")
+          new Error("[MQTT] Not connected. Call connect() first or check MQTT connection."),
         );
       }
       if (!namespaced) {
@@ -121,19 +116,36 @@ export default function buildClient() {
       }
       console.log(topic, message);
       return new Promise((resolve, reject) => {
-        this.client.publish(
-          topic,
-          message,
-          { qos: 1, retain },
-          (error, res) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(res);
-            }
-          },
-        );
+        this.client.publish(topic, message, { qos: 1, retain }, (error, res) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(res);
+          }
+        });
       });
+    },
+    // Fire-and-forget publish, used from browser-unload handlers where the
+    // page is about to die and we cannot wait for a broker ACK. QoS 0 +
+    // no callback means the message is handed to the underlying socket
+    // immediately; if the connection has already been torn down the
+    // mqtt.js client buffers it but realistically it just gets dropped.
+    // Better than the awaited sendMessage path, which would block on a
+    // Promise that never resolves before the browser kills the JS VM.
+    sendMessageSync(topic, payload, namespaced = false, retain = false) {
+      if (!this.client) return;
+      if (!namespaced) {
+        topic = namespaceTopic(topic);
+      }
+      let message = payload;
+      if (typeof payload === "object") {
+        message = JSON.stringify(payload);
+      }
+      try {
+        this.client.publish(topic, message, { qos: 0, retain });
+      } catch (err) {
+        console.warn("[MQTT] sendMessageSync failed:", err);
+      }
     },
     receiveMessage(handler) {
       if (!this.client) return;

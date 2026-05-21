@@ -25,8 +25,13 @@ const dragleave = (event) => {
 };
 const drop = (event) => {
   event.preventDefault();
+  // Programmatic assignment to <input type="file">.files does NOT fire a
+  // `change` event in any major browser, so the bound @change="onChange"
+  // never ran on drop. Either dispatch the event or invoke onChange()
+  // directly; the latter is simpler and avoids any browser-specific quirks
+  // around constructed FileList / Event objects.
   el.value.files = event.dataTransfer.files;
-  // Clean up
+  onChange();
   event.currentTarget.classList.add("inactive");
   event.currentTarget.classList.remove("active");
 };
@@ -35,13 +40,13 @@ const drop = (event) => {
 <template>
   <div @dragover="dragover" @dragleave="dragleave" @drop="drop">
     <input
+      id="dropzone"
       ref="el"
       type="file"
       multiple
-      id="dropzone"
-      @change="onChange"
       :accept="imageExtensions"
       style="display: none"
+      @change="onChange"
     />
     <label for="dropzone">
       <slot>

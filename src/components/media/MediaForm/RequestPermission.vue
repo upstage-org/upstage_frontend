@@ -35,14 +35,12 @@ const handleOk = async () => {
 </script>
 
 <template>
-  <a-button type="dashed" @click="visible = true">
-    <SendOutlined />Request permission
-  </a-button>
+  <a-button type="dashed" @click="visible = true"> <SendOutlined />Request permission </a-button>
   <a-modal
     v-model:visible="visible"
     :confirm-loading="loading"
+    ok-text="Send Request"
     @ok="handleOk"
-    okText="Send Request"
   >
     You are requesting permission for
     <a-avatar class="my-2" :src="absolutePath(media.fileLocation)" />

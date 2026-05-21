@@ -1,7 +1,3 @@
-<template>
-  <span v-html="html"></span>
-</template>
-
 <script>
 import { linkify } from "utils/common";
 
@@ -16,5 +12,9 @@ export default {
   },
 };
 </script>
+
+<template>
+  <span v-html="html"></span>
+</template>
 
 <style></style>

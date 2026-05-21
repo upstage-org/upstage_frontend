@@ -1,0 +1,239 @@
+import type { Page } from "@playwright/test";
+
+export interface CreateStageOptions {
+  name: string;
+  /** Slug; goes into the live URL `/<slug>`. */
+  fileLocation: string;
+}
+
+/**
+ * Drives the /stages flow rendered by views/stages/**.
+ *
+ * The router mounts /stages/new-stage for create and
+ * /stages/stage-management/:id for edit; we land on the latter after create()
+ * succeeds because StageManagement/General.vue does the redirect.
+ */
+export class StageManagementPage {
+  constructor(private readonly page: Page) {}
+
+  async create({ name, fileLocation }: CreateStageOptions): Promise<string> {
+    await this.page.goto("/stages/new-stage");
+    await this.page.waitForLoadState("networkidle").catch(() => undefined);
+
+    const nameInput = this.fieldInput("stage-name-input");
+    await nameInput.waitFor({ state: "visible", timeout: 15_000 });
+    await nameInput.fill(name);
+
+    const urlInput = this.fieldInput("stage-url-input");
+    await urlInput.fill(fileLocation);
+    // Field has a debounced @input -> checkURL call; wait for the green check.
+    await this.page.locator(".fa-check").first().waitFor({ state: "visible", timeout: 10_000 });
+
+    const createBtn = this.page.locator('[data-testid="stage-create"]').first();
+    await createBtn.click();
+
+    // After create, router pushes to /stages/stage-management/:id/.
+    await this.page.waitForURL(/\/stages\/stage-management\/\d+/, {
+      timeout: 20_000,
+    });
+    const url = this.page.url();
+    const match = url.match(/stage-management\/(\d+)/);
+    if (!match) throw new Error(`Stage id not in URL: ${url}`);
+    return match[1];
+  }
+
+  async openMediaTab(): Promise<void> {
+    await this.openManagementTab(/^Stage Media$|^Media$/i, "media");
+  }
+
+  /** Stage Management → Archive (performances / replay list). */
+  async openArchiveTab(): Promise<void> {
+    await this.openManagementTab(/^Archive$/i, "archive");
+  }
+
+  private async openManagementTab(namePattern: RegExp, pathSegment: string): Promise<void> {
+    // Customisation / Media / Archive tabs are router-link <a>s under the layout.
+    const link = this.page.getByRole("link", { name: namePattern }).first();
+    if (await link.count()) {
+      await link.click();
+    } else {
+      await this.page.goto(`${this.page.url().replace(/\/$/, "")}/${pathSegment}`);
+    }
+    await this.page.waitForLoadState("networkidle").catch(() => undefined);
+  }
+
+  /**
+   * The Reorder/MultiSelectList interface for stage-media assignment isn't
+   * trivially scriptable through the DOM — use the `assignMedia` stage mutation
+   * (see `src/services/graphql/stage.ts`) with the same absolute GraphQL origin
+   * as `E2E_GRAPHQL_ENDPOINT` / `tests/e2e/graphql.ts`.
+   */
+  async assignMediaIds(stageId: string, mediaIds: string[]): Promise<number> {
+    return this.page.evaluate(
+      async ({ stageId, mediaIds }) => {
+        // Auth lives at `upstage-auth` (Pinia) since Phase 5; fall back to
+        // the legacy `vuex` key so a stale tab still yields a token.
+        const readToken = (): string | null => {
+          for (const key of ["upstage-auth", "vuex"] as const) {
+            const raw = window.localStorage.getItem(key);
+            if (!raw) continue;
+            try {
+              const parsed = JSON.parse(raw) as { token?: string; auth?: { token?: string } };
+              const t = parsed?.token ?? parsed?.auth?.token ?? null;
+              if (t) return t;
+            } catch {
+              /* ignore */
+            }
+          }
+          return null;
+        };
+        const token = readToken();
+        if (!token) throw new Error("[e2e] no auth token in localStorage");
+        // Same origin as the SPA (Vite proxy → studio API) — never hit :3001 from
+        // a page on :3000 (CORS) unless the backend lists that origin.
+        const graphQlEndpoint = new URL(
+          "studio_graphql",
+          `${window.location.origin}/api/`,
+        ).toString();
+
+        const resp = await fetch(graphQlEndpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            query: `mutation Assign($id: ID!, $mediaIds: [ID]) {
+              assignMedia(input: { id: $id, mediaIds: $mediaIds }) { id }
+            }`,
+            variables: {
+              id: String(stageId),
+              mediaIds: mediaIds.map((x) => String(x)),
+            },
+          }),
+        });
+        const text = await resp.text();
+        if (!text?.trim()) {
+          throw new Error(`[e2e] empty GraphQL response (${resp.status} ${resp.statusText})`);
+        }
+        const result = JSON.parse(text) as {
+          errors?: ReadonlyArray<{ message?: string }>;
+          data?: { assignMedia?: { id: string } };
+        };
+        if (result.errors && result.errors.length > 0) {
+          throw new Error(`assignMedia failed: ${JSON.stringify(result.errors)}`);
+        }
+        return result.data?.assignMedia?.id ? mediaIds.length : 0;
+      },
+      { stageId, mediaIds },
+    );
+  }
+
+  /**
+   * Grants Player + edit access to the named user ids in a single `updateStage`
+   * mutation, matching the on-disk format the SPA writes from
+   * `MultiTransferAccessColumn` and that `stage_operation_service.resolve_permission`
+   * reads on the backend.
+   *
+   * Wire format: a JSON-stringified **2-element** list — `[playerIds, editorIds]`.
+   * Audience is implicit (any user not in either bucket). The backend checks
+   * `len(accesses) == 2` before honoring the lists; a 3-element list (audience
+   * + player + editor) falls through to `"audience"` for everyone, which makes
+   * `getters.canPlay` false in the SPA and silently disables the SPEAK MQTT
+   * side-channel that drives `Topping.vue` speech bubbles.
+   */
+  async grantPlayerAccess(
+    stageId: string,
+    userIdsByLevel: { player: string[]; playerEdit: string[] },
+  ): Promise<void> {
+    await this.page.evaluate(
+      async ({ stageId, userIdsByLevel }) => {
+        // Auth lives at `upstage-auth` (Pinia) since Phase 5; fall back to
+        // the legacy `vuex` key so a stale tab still yields a token.
+        const readToken = (): string | null => {
+          for (const key of ["upstage-auth", "vuex"] as const) {
+            const raw = window.localStorage.getItem(key);
+            if (!raw) continue;
+            try {
+              const parsed = JSON.parse(raw) as { token?: string; auth?: { token?: string } };
+              const t = parsed?.token ?? parsed?.auth?.token ?? null;
+              if (t) return t;
+            } catch {
+              /* ignore */
+            }
+          }
+          return null;
+        };
+        const token = readToken();
+        if (!token) throw new Error("[e2e] no auth token in localStorage");
+        const endpoint = new URL("studio_graphql", `${window.location.origin}/api/`).toString();
+        const playerAccess = JSON.stringify([userIdsByLevel.player, userIdsByLevel.playerEdit]);
+        const headers = { "content-type": "application/json", authorization: `Bearer ${token}` };
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            query: `mutation UpdateStage($input: StageInput!) {
+              updateStage(input: $input) { id }
+            }`,
+            variables: {
+              input: {
+                id: String(stageId),
+                playerAccess,
+              },
+            },
+          }),
+        });
+        const body = await resp.text();
+        if (!body?.trim()) {
+          throw new Error(`[e2e] empty GraphQL response on updateStage (${resp.status})`);
+        }
+        const result = JSON.parse(body) as { errors?: unknown };
+        if (result.errors) {
+          throw new Error(`updateStage failed: ${JSON.stringify(result.errors)}`);
+        }
+
+        // Read-back. The mutation returns 200/no errors even when the backend
+        // silently ignores `playerAccess` (input shape mismatch, missing
+        // mapper field, etc.). Without this check, a misconfigured stage
+        // gets persisted, validate-runtime accepts it, and the perform suite
+        // explodes much later with `canPlay=false` from speakAsAvatar — which
+        // is hard to trace back to the missing write at setup.
+        const verifyResp = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            query: `query VerifyPlayerAccess($id: ID!) {
+              stage(id: $id) { id playerAccess }
+            }`,
+            variables: { id: String(stageId) },
+          }),
+        });
+        const verifyBody = await verifyResp.text();
+        const verifyResult = JSON.parse(verifyBody) as {
+          data?: { stage?: { playerAccess?: string | null } | null };
+          errors?: unknown;
+        };
+        if (verifyResult.errors) {
+          throw new Error(
+            `[e2e] grantPlayerAccess read-back failed: ${JSON.stringify(verifyResult.errors)}`,
+          );
+        }
+        const persisted = verifyResult.data?.stage?.playerAccess ?? null;
+        if (persisted !== playerAccess) {
+          throw new Error(
+            `[e2e] grantPlayerAccess did not persist on stage ${stageId}: ` +
+              `wrote ${playerAccess} but the backend returned ${
+                persisted === null ? "null" : JSON.stringify(persisted)
+              }. ` +
+              `Check the StageInput GraphQL schema for a missing/renamed playerAccess field.`,
+          );
+        }
+      },
+      { stageId, userIdsByLevel },
+    );
+  }
+
+  private fieldInput(testId: string): ReturnType<Page["locator"]> {
+    // Field.vue passes its v-model down to a child input but the data-testid
+    // lands on the wrapper; descend to the input.
+    return this.page.locator(`[data-testid="${testId}"] input`).first();
+  }
+}

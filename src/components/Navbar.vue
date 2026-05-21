@@ -1,38 +1,45 @@
 <script lang="ts" setup>
 import Notifications from "components/Notifications.vue";
 import LanguageSelector from "components/LanguageSelector.vue";
-import configs from "config";
 import logo from "assets/upstage.png";
 import StudioVersion from "./StudioVersion.vue";
 import PlayerForm from "views/admin/player-management/PlayerForm.vue";
-import { useStore } from "vuex";
-import { userGraph } from "services/graphql";
 import { computed } from "vue";
-import {loggedIn, logout } from "utils/auth";
+import { logout } from "utils/auth";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
-const store = useStore();
-const whoami = computed(() => store.getters["user/whoami"]);
-const loading = computed(() => store.getters["user/loading"]);
+const userStore = useUserStore();
+const { whoami, loadingUser: loading } = storeToRefs(userStore);
 const roleName = computed(() => {
-  switch(whoami.value.role){
-    case "4": return "Guest";
-    case "1": return "Player";
-    case "8": return "Admin";
-    case "32": return "SuperAdmin";
+  switch (whoami.value?.role) {
+    case "4":
+      return "Guest";
+    case "1":
+      return "Player";
+    case "8":
+      return "Admin";
+    case "32":
+      return "SuperAdmin";
   }
   return "";
 });
-const to = (path: string) => `${configs.UPSTAGE_URL}/${path}`;
-
-const onSave =(payload: any) =>{
-  store.dispatch("user/updateUserProfile", payload);
-}
+const onSave = (payload: any) => {
+  userStore.updateUserProfile(payload);
+};
 </script>
 
 <template>
   <a-space>
-    <PlayerForm v-if="whoami" :player="whoami" :onSave="onSave" :saving="loading" noUploadLimit noStatusToggle
-      v-slot="{ onClick }">
+    <PlayerForm
+      v-if="whoami"
+      v-slot="{ onClick }"
+      :player="whoami"
+      :on-save="onSave"
+      :saving="loading"
+      no-upload-limit
+      no-status-toggle
+    >
       <div :onClick="onClick" class="cursor-pointer">
         <span class="text-gray-500 cursor-pointer">{{ roleName }}</span>
         <a-typography-title :level="5" style="margin-bottom: 0">

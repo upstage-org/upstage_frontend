@@ -1,81 +1,57 @@
-<template>
-  <div v-if="!modelValue" class="card-header">
-    <span class="card-header-title">{{ $t("voice_setting") }}</span>
-  </div>
-  <div class="card-content voice-parameters">
-    <a-form-item label="Voice" :labelCol="{ span: 4 }" class="mb-2">
-      <a-select v-model:value="parameters.voice" placeholder="No voice" :options="voices" />
-    </a-form-item>
-
-    <template v-if="parameters.voice">
-      <a-form-item label="Variant" :labelCol="{ span: 4 }" class="mb-2">
-        <a-select v-model:value="parameters.variant" :options="variants" />
-      </a-form-item>
-
-      <a-form-item label="Pitch" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.pitch" :max="50" />
-      </a-form-item>
-
-      <a-form-item label="Rate" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.speed" :max="175" />
-      </a-form-item>
-      <a-form-item label="Volume" :labelCol="{ span: 4 }" class="mb-2">
-        <a-slider v-model:value="parameters.amplitude" />
-      </a-form-item>
-
-      <a-form-item label="Test voice" :labelCol="{ span: 4 }" class="mb-2">
-        <a-input-search :placeholder="defaultTestMessage" v-model:value="test" @search="testVoice">
-          <template #enterButton>
-            <sound-outlined />
-          </template>
-        </a-input-search>
-      </a-form-item>
-
-    </template>
-    <SaveButton v-if="!modelValue" @click="save" />
-  </div>
-</template>
-
 <script>
 import { computed, reactive, ref } from "vue";
 import SaveButton from "components/form/SaveButton.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { avatarSpeak } from "services/speech";
-import {
-  getDefaultVariant,
-  getVariantList,
-  getVoiceList,
-} from "services/speech/voice";
+import { getDefaultAvatarVoice, getVariantList, getVoiceList } from "services/speech/voice";
 
 export default {
   components: {
     SaveButton,
   },
-  props: ["modelValue"],
+  props: { modelValue: Object },
   emits: ["close", "update:modelValue"],
   setup: (props, { emit }) => {
-    const store = useStore();
-    const currentAvatar = computed(() => store.getters["stage/currentAvatar"]);
+    const stageStore = useStageStore();
+    const currentAvatar = computed(() => stageStore.currentAvatar);
     const voices = getVoiceList();
     const variants = getVariantList();
-    const parameters = reactive(
-      props.modelValue ? props.modelValue : currentAvatar.value?.voice,
-    );
-    if (!parameters.variant) {
-      parameters.variant = getDefaultVariant();
-    }
+    // Build a fresh reactive object from the canonical voice defaults
+    // (pitch=50, speed=175, amplitude=50, variant="f1") merged with any
+    // values already saved on the avatar. Two things matter here:
+    //
+    // 1. Without merging defaults, fields like pitch/speed/amplitude
+    //    are `undefined` and render the a-slider at 0 (far left), even
+    //    though meSpeak silently applies its own median defaults during
+    //    playback. Performers see "sliders at zero" while the voice
+    //    sounds "middle", which doesn't match. Filling in defaults makes
+    //    the sliders agree with the audio actually produced.
+    //
+    // 2. Using a new object (instead of wrapping the avatar's existing
+    //    voice ref) means slider drags don't silently mutate the live
+    //    avatar voice in the Pinia store before the performer clicks
+    //    Save. Save is the publish event; before Save, nothing changes.
+    const source = props.modelValue || currentAvatar.value?.voice || {};
+    const parameters = reactive({
+      ...getDefaultAvatarVoice(),
+      ...source,
+    });
     const test = ref("Welcome to UpStage!");
     const testVoice = () => {
       avatarSpeak({ voice: parameters }, test.value);
     };
 
+    // `shapeObject` is synchronous in Pinia (fires MQTT publish but
+    // doesn't await it). The Vuex version was the same shape; Vuex's
+    // dispatch just wrapped the undefined return in Promise.resolve(),
+    // so the previous `.then(() => emit("close"))` ran on the next
+    // microtask. Running the emit inline is functionally equivalent.
     const save = () => {
-      store
-        .dispatch("stage/shapeObject", {
-          ...currentAvatar.value,
-          voice: parameters,
-        })
-        .then(() => emit("close"));
+      stageStore.shapeObject({
+        ...currentAvatar.value,
+        voice: parameters,
+      });
+      emit("close");
     };
 
     return { save, parameters, voices, variants, test, testVoice };
@@ -83,16 +59,67 @@ export default {
 };
 </script>
 
+<template>
+  <div v-if="!modelValue" class="card-header">
+    <span class="card-header-title">{{ $t("voice_setting") }}</span>
+  </div>
+  <div class="card-content voice-parameters">
+    <a-form-item label="Voice" :label-col="{ span: 4 }" class="mb-2">
+      <a-select v-model:value="parameters.voice" placeholder="No voice" :options="voices" />
+    </a-form-item>
+
+    <template v-if="parameters.voice">
+      <a-form-item label="Variant" :label-col="{ span: 4 }" class="mb-2">
+        <a-select v-model:value="parameters.variant" :options="variants" />
+      </a-form-item>
+
+      <!--
+        Slider ranges are chosen so that meSpeak's median defaults
+        (pitch 50, speed 175, amplitude 50 — see getDefaultAvatarVoice)
+        land at the visual midpoint of each slider. Earlier versions
+        used `:max=<default>` for pitch and rate, which pinned the
+        defaults to the right edge of the track and made the freshly
+        opened voice popup look like it had everything cranked to max.
+
+          Pitch:  meSpeak accepts 0–99; full 0–100 keeps 50 centered.
+          Rate:   meSpeak accepts 80–450 wpm; 80–270 keeps 175 centered
+                  while covering the useful performance range.
+          Volume: 0–100 keeps the default (50) centered. Above 100 the
+                  signal usually clips before it sounds louder, so the
+                  cap is intentional.
+      -->
+      <a-form-item label="Pitch" :label-col="{ span: 4 }" class="mb-2">
+        <a-slider v-model:value="parameters.pitch" :min="0" :max="100" />
+      </a-form-item>
+
+      <a-form-item label="Rate" :label-col="{ span: 4 }" class="mb-2">
+        <a-slider v-model:value="parameters.speed" :min="80" :max="270" />
+      </a-form-item>
+      <a-form-item label="Volume" :label-col="{ span: 4 }" class="mb-2">
+        <a-slider v-model:value="parameters.amplitude" :min="0" :max="100" />
+      </a-form-item>
+
+      <a-form-item label="Test voice" :label-col="{ span: 4 }" class="mb-2">
+        <a-input-search v-model:value="test" :placeholder="defaultTestMessage" @search="testVoice">
+          <template #enterButton>
+            <sound-outlined />
+          </template>
+        </a-input-search>
+      </a-form-item>
+    </template>
+    <SaveButton v-if="!modelValue" @click="save" />
+  </div>
+</template>
+
 <style lang="scss">
 .card-footer-item {
   cursor: pointer;
 }
 
 .voice-parameters {
-
   .dropdown,
   .dropdown-trigger,
-  .dropdown-trigger>button,
+  .dropdown-trigger > button,
   .dropdown-menu {
     width: 100%;
   }

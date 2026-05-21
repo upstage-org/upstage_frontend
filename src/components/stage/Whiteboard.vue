@@ -1,20 +1,12 @@
-<template>
-  <canvas
-    class="whiteboard"
-    ref="el"
-    :style="{ top: stageSize.top + 'px', left: stageSize.left + 'px' }"
-  />
-</template>
-
 <script>
 import { computed } from "vue";
 import { useDrawing } from "./Toolboxs/tools/Draw/composable";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 export default {
   setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const whiteboard = computed(() => store.getters["stage/whiteboard"]);
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
+    const whiteboard = computed(() => stageStore.whiteboard);
     const drawing = computed(() => ({
       w: stageSize.value.width,
       h: stageSize.value.height,
@@ -31,6 +23,14 @@ export default {
   },
 };
 </script>
+
+<template>
+  <canvas
+    ref="el"
+    class="whiteboard"
+    :style="{ top: stageSize.top + 'px', left: stageSize.left + 'px' }"
+  />
+</template>
 
 <style scoped>
 .whiteboard {

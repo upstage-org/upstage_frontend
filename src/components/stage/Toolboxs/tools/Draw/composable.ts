@@ -4,19 +4,34 @@ import * as canvasUtil from "utils/canvas";
 
 const eraseDot = (ctx, { x, y, size }) => {
   ctx.globalCompositeOperation = "destination-out";
+  // Erase is always full alpha (destination-out semantics): drawDot would
+  // otherwise respect the current globalAlpha and produce partial erases,
+  // which doesn't match how the eraser is supposed to behave.
+  const previousAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = 1;
   drawDot(ctx, { x, y, size, color: "white" });
+  ctx.globalAlpha = previousAlpha;
   ctx.globalCompositeOperation = "source-over";
 };
 
-const drawDot = (ctx, { x, y, size, color }) => {
+const drawDot = (ctx, { x, y, size, color, alpha }) => {
+  const previousAlpha = ctx.globalAlpha;
+  if (alpha !== undefined && alpha !== null) {
+    ctx.globalAlpha = alpha;
+  }
   ctx.beginPath();
   ctx.arc(x, y, size / 2, 0, Math.PI * 2, true);
   ctx.closePath();
   ctx.fillStyle = color;
   ctx.fill();
+  ctx.globalAlpha = previousAlpha;
 };
 
-const draw = (ctx, { fromX, fromY, x, y, size, color }) => {
+const draw = (ctx, { fromX, fromY, x, y, size, color, alpha }) => {
+  const previousAlpha = ctx.globalAlpha;
+  if (alpha !== undefined && alpha !== null) {
+    ctx.globalAlpha = alpha;
+  }
   ctx.beginPath();
   ctx.moveTo(fromX, fromY);
   ctx.lineTo(x, y);
@@ -24,13 +39,20 @@ const draw = (ctx, { fromX, fromY, x, y, size, color }) => {
   ctx.lineWidth = size;
   ctx.stroke();
   ctx.closePath();
-  drawDot(ctx, { x: fromX, y: fromY, size, color });
+  // Pass alpha through to drawDot for the rounded line cap; it manages its
+  // own save/restore of globalAlpha.
+  drawDot(ctx, { x: fromX, y: fromY, size, color, alpha });
+  ctx.globalAlpha = previousAlpha;
 };
 
 const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
 
+// Delay between line segments when replaying a saved drawing for the audience.
+// Tuned so a typical stroke reads as a live pen rather than an instant flicker.
+const STROKE_SEGMENT_DELAY_MS = 25;
+
 const execute = async (ctx, command, animate) => {
-  const { type, size, color, lines } = command;
+  const { type, size, color, alpha, lines } = command;
   if (lines && lines.length) {
     if (type === "draw") {
       for (let i = 0; i < lines.length; i++) {
@@ -42,9 +64,10 @@ const execute = async (ctx, command, animate) => {
           y,
           size,
           color,
+          alpha,
         });
         if (animate) {
-          await wait(10);
+          await wait(STROKE_SEGMENT_DELAY_MS);
         }
       }
     } else {
@@ -72,6 +95,11 @@ const execute = async (ctx, command, animate) => {
 export const useDrawable = () => {
   const color = ref("#000");
   const size = ref(10);
+  // Per-stroke alpha for live drawing. Default 1 = today's behavior. Sampled
+  // at stroke-build time the same way size/color are, so the slider only
+  // affects the NEXT stroke, not in-flight ones — matches the size/color
+  // mental model.
+  const alpha = ref(1);
   const mode = ref("draw");
   const el = ref(null);
 
@@ -109,6 +137,7 @@ export const useDrawable = () => {
         y: data.currY,
         size: size.value,
         color: color.value,
+        alpha: alpha.value,
       };
       execute(ctx, command);
     }
@@ -118,6 +147,7 @@ export const useDrawable = () => {
         type: mode.value,
         size: size.value,
         color: color.value,
+        alpha: alpha.value,
         lines: data.lines,
         x: data.currX,
         y: data.currY,
@@ -139,6 +169,7 @@ export const useDrawable = () => {
           type: mode.value,
           size: size.value,
           color: color.value,
+          alpha: alpha.value,
           ...coords,
         };
         execute(ctx, command);
@@ -147,39 +178,70 @@ export const useDrawable = () => {
     }
   };
 
+  /*
+   * Pointer events unify mouse, touch, and pen input on every modern
+   * browser. The previous mouse-only listener set produced "only dots,
+   * not lines" on tablets because browsers no longer synthesize
+   * `mousemove` from `touchmove` — unhandled touch drags are eaten by
+   * the browser's scroll/pinch/pan gestures.
+   *
+   * Two pieces that have to go together:
+   *   - `touch-action: none` on the canvas via the consuming
+   *     templates (see Whiteboard / Draw / WhiteboardTools .vue)
+   *     so the browser doesn't intercept the first touchmove.
+   *   - `setPointerCapture(pointerId)` on pointerdown so the
+   *     pointermove / pointerup pair keeps firing if the finger
+   *     drifts off the canvas (replaces the old `mouseout` cleanup).
+   *
+   * Pen-pressure (`e.pressure`) is intentionally NOT consumed yet —
+   * leaving the existing fixed `size` UX in place. Easy to add later.
+   */
   const attachEventLinsteners = () => {
     const { value: canvas } = el;
-    if (canvas) {
-      history.length = 0;
-      canvas.addEventListener(
-        "mousemove",
-        (e) => {
-          findxy("move", e);
-        },
-        false,
-      );
-      canvas.addEventListener(
-        "mousedown",
-        (e) => {
-          findxy("down", e);
-        },
-        false,
-      );
-      canvas.addEventListener(
-        "mouseup",
-        (e) => {
-          findxy("up", e);
-        },
-        false,
-      );
-      canvas.addEventListener(
-        "mouseout",
-        (e) => {
-          findxy("out", e);
-        },
-        false,
-      );
-    }
+    if (!canvas) return;
+    history.length = 0;
+
+    // Belt-and-braces: ensure touch-action is set on the element
+    // itself, even if a consuming template forgot. Without this,
+    // iOS Safari's default page-pan kicks in on the very first
+    // touchmove regardless of pointer handlers.
+    canvas.style.touchAction = "none";
+
+    canvas.addEventListener("pointerdown", (e) => {
+      // Only respond to the primary contact. Multi-touch (e.g. a
+      // second finger landing mid-stroke) is ignored to avoid the
+      // stroke jumping between fingers.
+      if (!e.isPrimary) return;
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // setPointerCapture is allowed to throw if the pointer
+        // is no longer active by the time we get here (race during
+        // synthetic events). Swallow — the rest still works.
+      }
+      findxy("down", e);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!e.isPrimary) return;
+      findxy("move", e);
+    });
+
+    const endStroke = (e: PointerEvent) => {
+      if (!e.isPrimary) return;
+      if (canvas.hasPointerCapture(e.pointerId)) {
+        canvas.releasePointerCapture(e.pointerId);
+      }
+      findxy("up", e);
+    };
+
+    canvas.addEventListener("pointerup", endStroke);
+    // pointercancel fires when the OS / browser yanks the pointer
+    // (e.g. system gesture, app switch). Treat it like pointerup so
+    // we don't leave `data.flag` stuck on, which would replay the
+    // first move of the next gesture as a giant line from wherever
+    // the previous stroke ended.
+    canvas.addEventListener("pointercancel", endStroke);
   };
 
   onMounted(attachEventLinsteners);
@@ -232,6 +294,7 @@ export const useDrawable = () => {
     cursor,
     color,
     size,
+    alpha,
     mode,
     history,
     cropImageFromCanvas,
@@ -282,7 +345,7 @@ export const useDrawing = (drawing) => {
           shouldAnimate = false;
         }
       }
-      execute(ctx, command, shouldAnimate);
+      await execute(ctx, command, shouldAnimate);
     }
     return ctx;
   };

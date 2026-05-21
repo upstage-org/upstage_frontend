@@ -1,13 +1,3 @@
-<template>
-    <router-link :to="`/${stage.fileLocation}`" class="stage">
-      <div class="name">
-        {{ stage.name }}
-      </div>
-      <img class="cover" :src="coverImage(stage.cover)" lazy />
-      <PlayerAudienceCounter :stage-url="stage.fileLocation" class="counter" />
-    </router-link>
-</template>
-
 <script setup>
 import { defineProps } from "vue";
 import PlayerAudienceCounter from "components/stage/PlayerAudienceCounter.vue";
@@ -23,9 +13,18 @@ const props = defineProps({
   },
 });
 console.log(props.fallbackCover, `/img/${props.fallbackCover}`);
-const coverImage = (src) =>
-  src ? absolutePath(src) : `/img/${props.fallbackCover}`;
+const coverImage = (src) => (src ? absolutePath(src) : `/img/${props.fallbackCover}`);
 </script>
+
+<template>
+  <router-link :to="`/${stage.fileLocation}`" class="stage">
+    <div class="name">
+      {{ stage.name }}
+    </div>
+    <img class="cover" :src="coverImage(stage.cover)" lazy />
+    <PlayerAudienceCounter :stage-url="stage.fileLocation" class="counter" />
+  </router-link>
+</template>
 
 <style lang="scss" scoped>
 .stage {

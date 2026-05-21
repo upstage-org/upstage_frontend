@@ -1,7 +1,9 @@
 // UpStage default font
-@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100;0,400;0,700;1,400&display=swap');
+// `(css)` keeps Less from trying to fetch + inline these at build time;
+// the browser handles the @import at runtime as it always did.
+@import (css) url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100;0,400;0,700;1,400&display=swap');
 // Text tool fonts
-@import url('https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Anton&family=Arvo:ital,wght@0,400;0,700;1,400;1,700&family=Asap:ital,wght@0,400;0,700;1,400;1,700&family=Bebas+Neue&family=Fira+Sans:ital,wght@0,400;0,900;1,400;1,900&family=Lato:ital,wght@0,400;0,900;1,400;1,900&family=Lobster&family=Open+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Oswald:wght@400;700&family=Overpass:ital,wght@0,400;0,900;1,400;1,900&family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&family=Pacifico&family=Playfair+Display:ital,wght@0,400;0,900;1,400;1,900&family=Poppins:ital,wght@0,400;0,900;1,400;1,900&family=Roboto+Condensed:ital,wght@0,400;0,700;1,400;1,700&family=Roboto+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Roboto:ital,wght@0,400;0,900;1,400;1,900&family=Ubuntu:ital,wght@0,400;0,700;1,400;1,700&family=Varela+Round&display=swap');
+@import (css) url('https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Anton&family=Arvo:ital,wght@0,400;0,700;1,400;1,700&family=Asap:ital,wght@0,400;0,700;1,400;1,700&family=Bebas+Neue&family=Fira+Sans:ital,wght@0,400;0,900;1,400;1,900&family=Lato:ital,wght@0,400;0,900;1,400;1,900&family=Lobster&family=Open+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Oswald:wght@400;700&family=Overpass:ital,wght@0,400;0,900;1,400;1,900&family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&family=Pacifico&family=Playfair+Display:ital,wght@0,400;0,900;1,400;1,900&family=Poppins:ital,wght@0,400;0,900;1,400;1,900&family=Roboto+Condensed:ital,wght@0,400;0,700;1,400;1,700&family=Roboto+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Roboto:ital,wght@0,400;0,900;1,400;1,900&family=Ubuntu:ital,wght@0,400;0,700;1,400;1,700&family=Varela+Round&display=swap');
 
 * {
     font-family: 'Josefin Sans', sans-serif;
@@ -339,4 +341,117 @@ div.moveable-control-box {
 
 .ant-tooltip {
     z-index: 10001 !important;
+}
+
+/**
+ * Ant Transfer operation buttons: match Ant Table column-sorter caret look
+ * (green #007011 when active, muted when disabled) instead of solid primary pills.
+ * Wrap target <a-transfer> in a div.upstage-transfer--sorter-arrows.
+ */
+.upstage-transfer--sorter-arrows {
+    .ant-transfer-operation {
+        align-self: center;
+        gap: 6px;
+        margin-inline: 4px;
+
+        .ant-btn:first-child {
+            margin-bottom: 0 !important;
+        }
+
+        .ant-btn.ant-btn-primary {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 2px 2px !important;
+            min-width: auto !important;
+            height: auto !important;
+            line-height: 1 !important;
+            color: #007011 !important;
+
+            .anticon {
+                font-size: 12px;
+            }
+
+            &:disabled,
+            &.ant-btn-disabled {
+                color: rgba(0, 0, 0, 0.25) !important;
+                background: transparent !important;
+            }
+
+            &:not(:disabled):not(.ant-btn-disabled):hover {
+                color: #005a0e !important;
+                background: rgba(0, 112, 17, 0.08) !important;
+            }
+        }
+    }
+}
+
+/** Assigned stage rows in media Stage transfer — match table stage pills (#007011). */
+.upstage-transfer--sorter-arrows .upstage-transfer-assigned-pill {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0 8px;
+    line-height: 22px;
+    font-size: 12px;
+    color: #fff;
+    background: #007011;
+    border-radius: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/**
+ * Stage Management player-access columns: same arrow treatment as media transfer.
+ */
+.upstage-multi-transfer-arrows {
+    display: flex;
+    flex-direction: column;
+    align-self: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 2px;
+
+    .upstage-multi-transfer-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px;
+        border: none;
+        background: transparent;
+        color: #007011;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 12px;
+        line-height: 1;
+        transition:
+            color 0.2s,
+            background 0.2s;
+
+        &:hover {
+            color: #005a0e;
+            background: rgba(0, 112, 17, 0.08);
+        }
+
+        &:focus-visible {
+            outline: 2px solid #007011;
+            outline-offset: 1px;
+        }
+    }
+}
+
+/** Media library filter bar: primary-tinted chevrons on selects (match app green). */
+.upstage-media-toolbar {
+    .ant-select .ant-select-arrow {
+        color: #007011;
+    }
+
+    .ant-select:hover .ant-select-arrow {
+        color: #005a0e;
+    }
+
+    .ant-select-disabled .ant-select-arrow {
+        color: rgba(0, 0, 0, 0.25);
+    }
 }

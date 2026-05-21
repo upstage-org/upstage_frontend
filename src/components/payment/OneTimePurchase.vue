@@ -1,3 +1,43 @@
+<script>
+import { ref } from "vue";
+import { useStageStore } from "@stores/pinia/stage";
+import { message } from "ant-design-vue";
+import { coerceNumber } from "utils/common";
+
+export default {
+  setup: () => {
+    const stageStore = useStageStore();
+    const amount = ref(null);
+
+    // Cross-browser parse: Firefox accepts looser strings than Chromium
+    // here ("1,5", trailing letters), and neither browser enforces the
+    // step="0.01" constraint on `input`. coerceNumber handles all of it.
+    const onAmountInput = (e) => {
+      amount.value = coerceNumber(e.target.value, {
+        min: 0,
+        max: 999999.99,
+        step: 0.01,
+      });
+    };
+
+    const openPurchasePopup = () => {
+      if (amount.value && amount.value != 0) {
+        stageStore.openPurchasePopup({
+          type: "OneTimePurchase",
+          amount: amount.value,
+          title: "Donate to UpStage (amounts shown in US dollars)",
+        });
+        amount.value = null;
+      } else {
+        message.warning("Please select amount to donate!");
+      }
+    };
+
+    return { amount, openPurchasePopup, onAmountInput };
+  },
+};
+</script>
+
 <template>
   <div class="payment mb-4">
     <div class="columns is-vcentered">
@@ -27,22 +67,21 @@
           <span class="input-symbol-dollar"></span>
           <input
             ref="custom_amount"
+            :value="amount"
             type="number"
+            inputmode="decimal"
             step="0.01"
             min="0"
             max="999999.99"
             class="button payment-button"
             placeholder="Custom"
-            @input="amount = $event.target.value"
-            v-model="amount"
+            @input="onAmountInput"
+            @blur="onAmountInput"
           />
         </div>
       </div>
       <div class="column">
-        <button
-          class="button is-primary is-fullwidth"
-          @click="openPurchasePopup()"
-        >
+        <button class="button is-primary is-fullwidth" @click="openPurchasePopup()">
           <span>Donate to UpStage (amounts shown in US dollars)</span>
         </button>
       </div>
@@ -51,34 +90,6 @@
     </div>
   </div>
 </template>
-
-<script>
-import { ref } from "vue";
-import { useStore } from "vuex";
-import { message } from "ant-design-vue";
-
-export default {
-  setup: () => {
-    const store = useStore();
-    const amount = ref(null);
-
-    const openPurchasePopup = () => {
-      if (amount.value && amount.value != 0) {
-        store.dispatch("stage/openPurchasePopup", {
-          type: "OneTimePurchase",
-          amount: amount.value,
-          title: "Donate to UpStage (amounts shown in US dollars)",
-        });
-        amount.value = null;
-      } else {
-        message.warning("Please select amount to donate!");
-      }
-    };
-
-    return { amount, openPurchasePopup };
-  },
-};
-</script>
 <style lang="scss" scoped>
 .payment {
   width: 90%;

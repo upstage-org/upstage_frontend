@@ -1,7 +1,91 @@
+<script>
+import { computed } from "vue";
+import { useStageStore } from "@stores/pinia/stage";
+import { useDrawable } from "./composable";
+import ColorPicker from "components/form/ColorPicker.vue";
+import Icon from "components/Icon.vue";
+import ContextMenu from "components/ContextMenu.vue";
+import Skeleton from "../../Skeleton.vue";
+import { v4 as uuidv4 } from "uuid";
+
+export default {
+  components: { Skeleton, ColorPicker, Icon, ContextMenu },
+  setup: () => {
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
+    const drawings = computed(() => stageStore.board.drawings);
+    const isDrawing = computed(() => {
+      return stageStore.preferences.isDrawing;
+    });
+    const {
+      el,
+      cursor,
+      getDrawedArea,
+      clearCanvas,
+      undo,
+      toggleErase,
+      color,
+      size,
+      mode,
+      history,
+    } = useDrawable();
+    const create = () => {
+      stageStore.SET_ACTIVE_MOVABLE(null);
+      stageStore.UPDATE_IS_DRAWING(true);
+      clearCanvas(true);
+    };
+    const cancel = () => {
+      stageStore.UPDATE_IS_DRAWING(false);
+    };
+    const save = (type) => {
+      const area = getDrawedArea();
+      if (area) {
+        const drawingId = uuidv4();
+        const commands = [...history];
+        stageStore.addDrawing({
+          ...area,
+          commands,
+          type,
+          drawingId,
+        });
+      }
+      cancel();
+    };
+
+    const deleteDrawingPermanently = (drawing) => {
+      stageStore.POP_DRAWING(drawing.drawingId);
+      stageStore.objects
+        .filter((o) => o.drawingId === drawing.drawingId)
+        .forEach((o) => {
+          stageStore.deleteObject(o);
+        });
+    };
+
+    return {
+      isDrawing,
+      drawings,
+      color,
+      size,
+      create,
+      save,
+      cancel,
+      el,
+      clearCanvas,
+      undo,
+      toggleErase,
+      mode,
+      cursor,
+      stageSize,
+      deleteDrawingPermanently,
+    };
+  },
+};
+</script>
+
 <template>
   <canvas
-    ref="el"
     v-show="isDrawing"
+    ref="el"
     class="drawing"
     :width="stageSize.width"
     :height="stageSize.height"
@@ -33,20 +117,20 @@
         />
       </div>
       <input
+        v-model="size"
         class="slider is-fullwidth m-0 is-dark"
         step="1"
         min="1"
         max="200"
         type="range"
-        v-model="size"
       />
     </div>
     <div
       class="drawing-tool"
-      @click="toggleErase"
       :class="{
         active: mode === 'erase',
       }"
+      @click="toggleErase"
     >
       <div class="icon is-large">
         <Icon size="36" src="erase.svg" />
@@ -89,7 +173,7 @@
     </div>
   </template>
   <template v-else>
-    <div @click="create" class="is-pulled-left">
+    <div class="is-pulled-left" @click="create">
       <div class="icon is-large">
         <Icon src="new.svg" size="36" />
       </div>
@@ -101,10 +185,7 @@
           <Skeleton :data="drawing" />
         </template>
         <template #context>
-          <a
-            class="panel-block has-text-danger"
-            @click="deleteDrawingPermanently(drawing)"
-          >
+          <a class="panel-block has-text-danger" @click="deleteDrawingPermanently(drawing)">
             <span class="panel-icon">
               <Icon src="remove.svg" />
             </span>
@@ -116,95 +197,17 @@
   </template>
 </template>
 
-<script>
-import { computed } from "vue";
-import { useStore } from "vuex";
-import { useDrawable } from "./composable";
-import ColorPicker from "components/form/ColorPicker.vue";
-import Icon from "components/Icon.vue";
-import ContextMenu from "components/ContextMenu.vue";
-import Skeleton from "../../Skeleton.vue";
-import { v4 as uuidv4 } from "uuid";
-
-export default {
-  components: { Skeleton, ColorPicker, Icon, ContextMenu },
-  setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const drawings = computed(() => store.state.stage.board.drawings);
-    const isDrawing = computed(() => {
-      return store.state.stage.preferences.isDrawing;
-    });
-    const {
-      el,
-      cursor,
-      getDrawedArea,
-      clearCanvas,
-      undo,
-      toggleErase,
-      color,
-      size,
-      mode,
-      history,
-    } = useDrawable();
-    const create = () => {
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
-      store.commit("stage/UPDATE_IS_DRAWING", true);
-      clearCanvas(true);
-    };
-    const cancel = () => {
-      store.commit("stage/UPDATE_IS_DRAWING", false);
-    };
-    const save = (type) => {
-      const area = getDrawedArea();
-      if (area) {
-        const drawingId = uuidv4();
-        const commands = [...history];
-        store.dispatch("stage/addDrawing", {
-          ...area,
-          commands,
-          type,
-          drawingId,
-        });
-      }
-      cancel();
-    };
-
-    const deleteDrawingPermanently = (drawing) => {
-      store.commit("stage/POP_DRAWING", drawing.drawingId);
-      store.getters["stage/objects"]
-        .filter((o) => o.drawingId === drawing.drawingId)
-        .forEach((o) => {
-          store.dispatch("stage/deleteObject", o);
-        });
-    };
-
-    return {
-      isDrawing,
-      drawings,
-      color,
-      size,
-      create,
-      save,
-      cancel,
-      el,
-      clearCanvas,
-      undo,
-      toggleErase,
-      mode,
-      cursor,
-      stageSize,
-      deleteDrawingPermanently,
-    };
-  },
-};
-</script>
-
 <style lang="scss" scoped>
 .drawing {
   position: fixed;
   z-index: 1000;
   background-color: hsla(142, 52%, 96%, 0.8);
+  /* Required for pointer-event drawing on touch screens — see the
+     mirror comment in stage/Toolboxs/tools/WhiteboardTools.vue and
+     the pointer-events refactor in Draw/composable.ts. Without
+     this, iOS / Android browsers swallow the first touchmove as a
+     page-pan gesture and the player only gets a dot. */
+  touch-action: none;
 }
 .drawing-tool {
   z-index: 1001;

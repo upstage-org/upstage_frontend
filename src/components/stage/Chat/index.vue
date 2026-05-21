@@ -1,78 +1,10 @@
-<template>
-  <transition :css="false" @enter="enter" @leave="leave">
-    <div id="chatbox" :key="chatPosition" v-show="chatVisibility" class="card is-light"
-      :class="{ collapsed, dark: chatDarkMode }" :style="{
-    opacity,
-    fontSize,
-    width: `calc(20% + 3*${fontSize}`,
-    height: `calc(100vh - ${stageSize.height}px - 64px)`,
-    left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
-  }">
-      <transition @enter="bounceUnread">
-        <a-tooltip :title="`${unreadMessages} new message${unreadMessages > 1 ? 's' : ''
-    }`">
-          <span v-if="collapsed && unreadMessages" :key="unreadMessages" class="unread clickable tag is-danger is-small"
-            @click="collapsed = false"
-            style="position: absolute;
-            left: 12px;
-            top: 6px;
-            background-color: #f14668 !important;
-            "
-            >{{ unreadMessages }}</span>
-        </a-tooltip>
-      </transition>
-      <div class="actions">
-        <Reaction v-if="collapsed" />
-        <a-tooltip :title="collapsed ? 'Maximise' : 'Minimise'">
-          <button class="chat-setting button is-rounded is-outlined" @click="collapsed = !collapsed" :key="collapsed">
-            <span class="icon">
-              <Icon v-if="collapsed" src="maximise.svg" size="20" />
-              <Icon v-else src="minimise.svg" size="24" class="mt-4" />
-            </span>
-          </button>
-        </a-tooltip>
-        <a-tooltip title="Settings">
-          <button class="chat-setting button is-rounded is-outlined" @click="openChatSetting">
-            <span class="icon">
-              <Icon src="setting.svg" size="32" />
-            </span>
-          </button>
-        </a-tooltip>
-        <ClearChat option="public-chat" />
-      </div>
-      <div class="card-content" ref="theContent">
-        <Messages :messages="messages" :style="{ fontSize }" />
-      </div>
-      <footer class="card-footer">
-        <div class="card-footer-item">
-          <div v-if="!collapsed" class="is-fullwidth my-1 reaction-bar">
-            <Reaction :custom-emoji="true" />
-            <div class="font-size-controls">
-              <a-tooltip title="Increase font size">
-                <button class="button is-small is-rounded mx-1" @click="increateFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
-                  ➕
-                </button>
-              </a-tooltip>
-              <a-tooltip title="Decrease font size">
-                <button class="button is-small is-rounded mx-1" @click="decreaseFontSize()" style="width: 24px; height:24px; padding:0px; padding-top:4px;">
-                  ➖
-                </button>
-              </a-tooltip>
-            </div>
-          </div>
-          <div class="control has-icons-right is-fullwidth">
-            <ChatInput v-model="message" placeholder="Type message" :loading="loadingUser" @submit="sendChat" />
-          </div>
-        </div>
-      </footer>
-    </div>
-  </transition>
-</template>
-
 <script>
-import { computed, onMounted, ref, watch, watchEffect } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { animate } from "animejs";
-import { useStore } from "vuex";
+import { storeToRefs } from "pinia";
+import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
+import { useDraggablePanel } from "composables/index";
 import ChatInput from "components/form/ChatInput.vue";
 import Icon from "components/Icon.vue";
 import Reaction from "./Reaction.vue";
@@ -83,18 +15,62 @@ export default {
   components: { ChatInput, Reaction, Icon, Messages, ClearChat },
   setup: () => {
     const theContent = ref();
-    const store = useStore();
-    const chatVisibility = computed(
-      () => store.state.stage.settings.chatVisibility,
-    );
-    const chatDarkMode = computed(
-      () => store.state.stage.settings.chatDarkMode,
-    );
+    const theChatbox = ref();
+    const stageStore = useStageStore();
+    const { chatPosition, canPlay: storeCanPlay, stageSize, chat, publicChatPosition } =
+      storeToRefs(stageStore);
+    const userStore = useUserStore();
+    // Set by views/chat/Layout.vue when this component is mounted
+    // inside the standalone /chat/<stage> view. We use it to:
+    //   * hide the "Pop out" button (we're already popped out),
+    //   * force `chatVisibility` to true so the audience-side toggle
+    //     that hides this card on the main stage doesn't also hide
+    //     it in the standalone view (where it IS the whole UI),
+    //   * skip the collapse / minimise affordance (no reason to
+    //     collapse a window that is dedicated to chat).
+    const isStandalone = inject("isChatStandalone", false);
+    const replaying = inject("replaying", false);
+    const chatVisibility = computed(() => isStandalone || stageStore.settings.chatVisibility);
+    const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
 
-    store.dispatch("stage/loadPermission");
+    const popOut = () => {
+      // Reuse the same named window per stage so a second click
+      // focuses the existing pop-out instead of opening a duplicate.
+      // We deliberately do not pass `noopener` because the parent
+      // tab benefits from being able to reach the popped-out window
+      // (e.g., a future "close pop-out" affordance); the cookie /
+      // auth session is shared regardless.
+      const stageUrl = stageStore.url;
+      if (!stageUrl) return;
+      window.open(
+        `/chat/${stageUrl}`,
+        `upstage-chat-${stageUrl}`,
+        "width=420,height=720,resizable=yes,scrollbars=yes",
+      );
+    };
 
-    const messages = computed(() => store.state.stage.chat.messages);
-    const loadingUser = computed(() => store.state.user.loadingUser);
+    // Free-form chat drag (session-scoped, per player). Position is
+    // stored in the Pinia stage store so it survives toggling
+    // collapse / settings but resets on stage re-entry via
+    // CLEAN_STAGE. When `chatDragPosition` is null we fall through
+    // to the existing left/right `chatPosition` toggle behaviour.
+    // Suppressed inside the standalone /chat/<stage> window because
+    // there the chat IS the whole viewport — host OS window
+    // manager handles positioning instead.
+    const chatDragPosition = computed(() => publicChatPosition.value);
+    const { startDrag: startChatDrag } = useDraggablePanel({
+      panelEl: theChatbox,
+      setPosition: (pos) => stageStore.setPublicChatPosition(pos),
+      disabled: () => !!isStandalone,
+    });
+    const resetChatPosition = () => stageStore.setPublicChatPosition(null);
+
+    stageStore.loadPermission();
+
+    const messages = computed(() => chat.value.messages);
+    // `store.state.user.loadingUser` was a broken read after the user
+    // module moved to Pinia; Pinia user store has the real flag.
+    const loadingUser = computed(() => userStore.loadingUser);
     const message = ref("");
     const collapsed = ref(false);
     const scrollToEnd = () => {
@@ -103,14 +79,34 @@ export default {
         ease: "inOutQuad",
       });
     };
+    /** Keeps newest messages pinned when mobile browsers reflow / zoom for the keyboard. */
+    const scrollContentToBottomInstant = () => {
+      const el = theContent.value;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    };
     const sendChat = () => {
       if (message.value.trim() && !loadingUser.value) {
-        store.dispatch("stage/sendChat", { message: message.value });
+        stageStore.sendChat({ message: message.value });
         message.value = "";
         scrollToEnd();
       }
     };
-    onMounted(scrollToEnd);
+    onMounted(() => {
+      scrollToEnd();
+      if (isStandalone && window.visualViewport) {
+        window.visualViewport.addEventListener("resize", scrollContentToBottomInstant);
+        window.visualViewport.addEventListener("scroll", scrollContentToBottomInstant);
+      }
+    });
+    onUnmounted(() => {
+      if (!isStandalone) return;
+      const vv = window.visualViewport;
+      if (!vv) return;
+      vv.removeEventListener("resize", scrollContentToBottomInstant);
+      vv.removeEventListener("scroll", scrollContentToBottomInstant);
+    });
     watch(messages.value, scrollToEnd);
     watch(collapsed, (val) => {
       if (!val) {
@@ -121,12 +117,12 @@ export default {
     });
 
     const openChatSetting = () =>
-      store.dispatch("stage/openSettingPopup", {
+      stageStore.openSettingPopup({
         type: "ChatParameters",
       });
 
-    const opacity = computed(() => store.state.stage.chat.opacity);
-    const fontSize = computed(() => store.state.stage.chat.fontSize);
+    const opacity = computed(() => stageStore.chat.opacity);
+    const fontSize = computed(() => stageStore.chat.fontSize);
 
     const enter = (el, complete) => {
       animate(el, {
@@ -147,27 +143,23 @@ export default {
       let incValue = fontSize.value?.replace("px", "");
       incValue++;
       const parameters = {
-        opacity: store.state.stage.chat.opacity,
+        opacity: stageStore.chat.opacity,
         fontSize: `${incValue}px`,
       };
-      store.commit("stage/SET_CHAT_PARAMETERS", parameters);
-      setTimeout(
-        () => (theContent.value.scrollTop = theContent.value.scrollHeight),
-      );
+      stageStore.SET_CHAT_PARAMETERS(parameters);
+      setTimeout(() => (theContent.value.scrollTop = theContent.value.scrollHeight));
     };
 
     const decreaseFontSize = () => {
       let decValue = fontSize.value?.replace("px", "");
       decValue > 1 && decValue--;
       const parameters = {
-        opacity: store.state.stage.chat.opacity,
+        opacity: stageStore.chat.opacity,
         fontSize: `${decValue}px`,
       };
-      store.commit("stage/SET_CHAT_PARAMETERS", parameters);
+      stageStore.SET_CHAT_PARAMETERS(parameters);
     };
-    const chatPosition = computed(() => store.state.stage.chatPosition);
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+    const canPlay = computed(() => storeCanPlay.value && !replaying);
 
     watchEffect(() => {
       if (!collapsed.value) {
@@ -178,9 +170,7 @@ export default {
         });
       }
     });
-    const unreadMessages = computed(
-      () => messages.value.filter((message) => !message.read).length,
-    );
+    const unreadMessages = computed(() => messages.value.filter((message) => !message.read).length);
     const bounceUnread = (el) => {
       {
         animate(el, {
@@ -195,6 +185,7 @@ export default {
       message,
       sendChat,
       theContent,
+      theChatbox,
       loadingUser,
       openChatSetting,
       collapsed,
@@ -207,14 +198,185 @@ export default {
       increateFontSize,
       decreaseFontSize,
       chatPosition,
+      chatDragPosition,
+      startChatDrag,
+      resetChatPosition,
       canPlay,
       stageSize,
       unreadMessages,
       bounceUnread,
+      isStandalone,
+      popOut,
+      replaying,
     };
   },
 };
 </script>
+
+<template>
+  <transition :css="false" @enter="enter" @leave="leave">
+    <div
+      v-show="chatVisibility"
+      id="chatbox"
+      ref="theChatbox"
+      :key="chatPosition"
+      class="card is-light"
+      :class="{
+        collapsed,
+        dark: chatDarkMode,
+        'is-positioned': chatDragPosition,
+        'chat-standalone-host': isStandalone,
+      }"
+      :style="{
+        opacity,
+        fontSize,
+        width: `calc(20% + 3*${fontSize}`,
+        height: `calc(100vh - ${stageSize.height}px - 64px)`,
+        ...(chatDragPosition
+          ? {
+              left: chatDragPosition.x + 'px',
+              top: chatDragPosition.y + 'px',
+              right: 'auto',
+              bottom: 'auto',
+            }
+          : {
+              left: chatPosition === 'left' ? (canPlay ? '48px' : '16px') : 'unset',
+            }),
+      }"
+    >
+      <transition @enter="bounceUnread">
+        <a-tooltip :title="`${unreadMessages} new message${unreadMessages > 1 ? 's' : ''}`">
+          <span
+            v-if="collapsed && unreadMessages"
+            :key="unreadMessages"
+            class="unread clickable tag is-danger is-small"
+            style="position: absolute; left: 12px; top: 6px; background-color: #f14668 !important"
+            @click="collapsed = false"
+            >{{ unreadMessages }}</span
+          >
+        </a-tooltip>
+      </transition>
+      <div class="actions">
+        <Reaction v-if="collapsed && !replaying" />
+        <a-tooltip v-if="!isStandalone" :title="collapsed ? 'Maximise' : 'Minimise'">
+          <button
+            :key="collapsed"
+            class="chat-setting button is-rounded is-outlined"
+            @click="collapsed = !collapsed"
+          >
+            <span class="icon">
+              <Icon v-if="collapsed" src="maximise.svg" size="20" />
+              <Icon v-else src="minimise.svg" size="24" class="mt-4" />
+            </span>
+          </button>
+        </a-tooltip>
+        <!--
+          Drag handle (mouse + touch) for free-form repositioning.
+          Position is stored in the Pinia stage store and resets on
+          stage re-entry via CLEAN_STAGE. Suppressed in the standalone
+          /chat/<stage> window where the chat fills its own host
+          browser window.
+        -->
+        <a-tooltip v-if="!isStandalone" :title="$t('drag_panel') || 'Drag panel'">
+          <button
+            class="chat-setting button is-rounded is-outlined drag-icon-button"
+            @mousedown.prevent="startChatDrag"
+            @touchstart.prevent="startChatDrag"
+          >
+            <span class="icon">
+              <Icon src="movement-slider.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
+        <!--
+          Reset to the default left/right (chatPosition toggle)
+          layout. Only shown after the player has actually dragged
+          the chat, so the button doesn't sit dead in the UI for
+          players who never use the drag affordance.
+        -->
+        <a-tooltip
+          v-if="!isStandalone && chatDragPosition"
+          :title="$t('reset_panel_position') || 'Reset position'"
+        >
+          <button class="chat-setting button is-rounded is-outlined" @click="resetChatPosition">
+            <span class="icon">
+              <Icon src="refresh.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
+        <!--
+          Pop-out into the standalone /chat/<stage> window. Only
+          rendered in the main-stage instance of this component;
+          the standalone view sets isStandalone=true via provide()
+          so the popped-out window doesn't show its own pop-out
+          button.
+        -->
+        <a-tooltip v-if="!isStandalone" :title="$t('pop_out_chat') || 'Pop out chat'">
+          <button class="chat-setting button is-rounded is-outlined" @click="popOut">
+            <span class="icon">
+              <Icon src="bring-to-front.svg" size="20" />
+            </span>
+          </button>
+        </a-tooltip>
+        <a-tooltip v-if="!isStandalone" title="Settings">
+          <button class="chat-setting button is-rounded is-outlined" @click="openChatSetting">
+            <span class="icon">
+              <Icon src="setting.svg" size="32" />
+            </span>
+          </button>
+        </a-tooltip>
+        <ClearChat v-if="!replaying" option="public-chat" />
+      </div>
+      <div
+        ref="theContent"
+        class="card-content"
+        :class="{ 'card-content--standalone-anchor': isStandalone }"
+      >
+        <div
+          class="chat-messages-scroll-inner"
+          :class="{ 'chat-messages-scroll-inner--standalone': isStandalone }"
+        >
+          <Messages :messages="messages" :style="{ fontSize }" />
+        </div>
+      </div>
+      <footer v-if="!replaying" class="card-footer">
+        <div class="card-footer-item">
+          <div v-if="!collapsed" class="is-fullwidth my-1 reaction-bar">
+            <Reaction :custom-emoji="true" />
+            <div class="font-size-controls">
+              <a-tooltip title="Increase font size">
+                <button
+                  class="button is-small is-rounded mx-1"
+                  style="width: 24px; height: 24px; padding: 0px; padding-top: 4px"
+                  @click="increateFontSize()"
+                >
+                  ➕
+                </button>
+              </a-tooltip>
+              <a-tooltip title="Decrease font size">
+                <button
+                  class="button is-small is-rounded mx-1"
+                  style="width: 24px; height: 24px; padding: 0px; padding-top: 4px"
+                  @click="decreaseFontSize()"
+                >
+                  ➖
+                </button>
+              </a-tooltip>
+            </div>
+          </div>
+          <div class="control has-icons-right is-fullwidth">
+            <ChatInput
+              v-model="message"
+              placeholder="Type message"
+              :loading="loadingUser"
+              @submit="sendChat"
+            />
+          </div>
+        </div>
+      </footer>
+    </div>
+  </transition>
+</template>
 
 <style lang="scss" scoped>
 #chatbox {
@@ -231,16 +393,22 @@ export default {
     height: calc(100% - 135px) !important;
   }
 
+  /*
+   * On-stage mobile (portrait stage viewport): enlarge chat content for
+   * touch. The popped-out /chat/<stage> window is often portrait too,
+   * but zoom:3 is wrong there — it should match the desktop in-stage
+   * panel. `chat-standalone-host` is set when isChatStandalone is true.
+   */
   @media only screen and (orientation: portrait) {
     width: calc(100vw - 32px) !important;
 
-    .actions,
-    .card-content,
-    .card-footer {
+    &:not(.chat-standalone-host) .actions,
+    &:not(.chat-standalone-host) .card-content,
+    &:not(.chat-standalone-host) .card-footer {
       zoom: 3;
     }
 
-    .actions {
+    &:not(.chat-standalone-host) .actions {
       button:first-child {
         display: none;
       }
@@ -252,6 +420,20 @@ export default {
     overflow-y: auto;
     overflow-x: hidden;
     padding-top: 36px;
+  }
+
+  /* Popped-out /chat/: short threads stay above the sticky input so the first
+     lines are not stranded under the OS keyboard on phones. */
+  .card-content.card-content--standalone-anchor {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+
+    .chat-messages-scroll-inner--standalone {
+      margin-top: auto;
+      width: 100%;
+      min-width: 0;
+    }
   }
 
   .card-footer-item {
@@ -299,7 +481,7 @@ export default {
       padding: 0;
       height: 0;
 
-      >div {
+      > div {
         display: none;
       }
     }
@@ -350,6 +532,14 @@ export default {
     .button.is-rounded {
       width: 16px;
     }
+  }
+}
+
+.drag-icon-button {
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
   }
 }
 </style>

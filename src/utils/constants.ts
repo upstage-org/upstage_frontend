@@ -64,14 +64,12 @@ export const MEDIA_COPYRIGHT_LEVELS = [
   {
     value: 0,
     name: "✅ Copyright free",
-    description:
-      "Can be used by other players in any way without need for permission",
+    description: "Can be used by other players in any way without need for permission",
   },
   {
     value: 1,
     name: "👌 Use with acknowledgement",
-    description:
-      "Other players can use the media item as long as the owner is acknowledged",
+    description: "Other players can use the media item as long as the owner is acknowledged",
   },
   {
     value: 2,
@@ -88,8 +86,7 @@ export const MEDIA_COPYRIGHT_LEVELS = [
 ];
 
 export const imageExtensions = ".svg,.jpg,.jpeg,.png,.gif";
-export const audioExtensions =
-  ".wav,.mpeg,.mp3,.aac,.aacp,.ogg,.webm,.flac,.m4a";
+export const audioExtensions = ".wav,.mpeg,.mp3,.aac,.aacp,.ogg,.webm,.flac,.m4a";
 export const videoExtensions = ".mp4,.webm,.opgg,.3gp,.flv";
 export const orderTitle = [
   {
@@ -135,3 +132,6 @@ export const orderTitle = [
     },
   },
 ];
+
+/** Ant Design Vue `message` key for oversized uploads (`Dropzone.vue`); router clears it on navigate. */
+export const UPLOAD_LIMIT_MESSAGE_KEY = "upstage-upload-limit";

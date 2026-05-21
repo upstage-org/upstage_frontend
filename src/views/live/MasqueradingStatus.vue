@@ -1,35 +1,29 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import { useStageStore } from "@stores/pinia/stage";
+import Icon from "components/Icon.vue";
+
+const stageStore = useStageStore();
+const masquerading = computed<boolean>(() => stageStore.masquerading);
+const exitAudienceView = () => {
+  stageStore.TOGGLE_MASQUERADING();
+};
+</script>
+
 <template>
-  <a-tooltip v-if="masquerading" title="You are masquerading as audience. Click to go back to the player mode!">
+  <a-tooltip
+    v-if="masquerading"
+    title="You are masquerading as audience. Click to go back to the player mode!"
+  >
     <div id="masquerading-status" class="clickable has-tooltip-left" @click="exitAudienceView">
       <Icon src="incognito.svg" :size="36" />
     </div>
   </a-tooltip>
 </template>
 
-<script>
-import { computed } from "vue";
-import { useStore } from "vuex";
-import Icon from "components/Icon.vue";
-
-export default {
-  components: { Icon },
-  setup: () => {
-    const store = useStore();
-    const masquerading = computed(() => store.state.stage.masquerading);
-    const exitAudienceView = () => {
-      store.commit("stage/TOGGLE_MASQUERADING");
-    };
-
-    return { masquerading, exitAudienceView };
-  },
-};
-</script>
-
 <style scoped lang="scss">
 #masquerading-status {
-  position: absolute;
-  z-index: 10;
-  top: 76px;
-  right: 16px;
+  flex: 0 0 auto;
+  line-height: 0;
 }
 </style>

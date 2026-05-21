@@ -1,31 +1,23 @@
-<template>
-  <div style="width: 500px">
-    <ChatInput
-      v-model="message"
-      placeholder="Type message"
-      @keyup.enter="sendChat"
-    />
-  </div>
-</template>
-
 <script>
 import ChatInput from "components/form/ChatInput.vue";
 import { ref } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 export default {
   components: { ChatInput },
   emits: ["close"],
   setup: (props, { emit }) => {
-    const store = useStore();
+    const stageStore = useStageStore();
     const message = ref("");
     const sendChat = () => {
       if (message.value.trim()) {
-        store
-          .dispatch("stage/sendChat", { message: message.value })
-          .then(() => {
-            message.value = "";
-            emit("close");
-          });
+        // `sendChat` fires off the MQTT publish but doesn't await it
+        // (true in both Vuex and Pinia); the previous `.then(...)` here
+        // was just queued onto a Promise.resolve() inside Vuex's
+        // dispatch wrapper. Running the reset inline is functionally
+        // identical and avoids an unnecessary microtask hop.
+        stageStore.sendChat({ message: message.value });
+        message.value = "";
+        emit("close");
       }
     };
 
@@ -33,5 +25,11 @@ export default {
   },
 };
 </script>
+
+<template>
+  <div style="width: 500px">
+    <ChatInput v-model="message" placeholder="Type message" @keyup.enter="sendChat" />
+  </div>
+</template>
 
 <style></style>

@@ -1,9 +1,11 @@
+<script>
+export default {
+  props: { loading: Boolean },
+};
+</script>
+
 <template>
-  <button
-    class="button is-primary"
-    :class="{ 'is-loading': loading }"
-    v-bind="$attrs"
-  >
+  <button class="button is-primary" :class="{ 'is-loading': loading }" v-bind="$attrs">
     <slot>
       <span class="icon is-small">
         <i class="fas fa-download"></i>
@@ -12,12 +14,6 @@
     </slot>
   </button>
 </template>
-
-<script>
-export default {
-  props: ["loading"],
-};
-</script>
 
 <style scoped>
 .button {

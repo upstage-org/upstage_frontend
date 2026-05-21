@@ -1,7 +1,8 @@
 <script lang="ts" setup>
-import { PropType, computed, ref } from "vue";
+import { PropType, computed } from "vue";
 import { Media, MediaAttributes } from "models/studio";
 import { absolutePath } from "utils/common";
+import VideoFirstFrameThumb from "./VideoFirstFrameThumb.vue";
 
 const props = defineProps({
   media: {
@@ -13,8 +14,6 @@ const props = defineProps({
 const attributes = computed<MediaAttributes>(() => {
   return JSON.parse(props.media.description || "{}");
 });
-
-const showStreamInstruction = ref(false);
 </script>
 
 <template>
@@ -23,16 +22,12 @@ const showStreamInstruction = ref(false);
     Your browser does not support the audio element.
   </audio>
   <template v-else-if="props.media.assetType.name === 'video'">
-    <video class="w-48" preload="auto">
-      <source :src="absolutePath(props.media.fileLocation)" />
-      Your browser does not support the video tag.
-    </video>
+    <div class="video-preview-frame">
+      <VideoFirstFrameThumb :media="props.media" />
+    </div>
   </template>
   <template v-else>
-    <a-image
-      :src="absolutePath(props.media.fileLocation)"
-      class="w-24 max-h-24 object-contain"
-    />
+    <a-image :src="absolutePath(props.media.fileLocation)" class="w-24 max-h-24 object-contain" />
     <a-popover v-if="attributes.multi" placement="right">
       <template #title>
         <b>{{ $t("multiframes") }}</b>
@@ -46,16 +41,20 @@ const showStreamInstruction = ref(false);
           </div>
         </div>
       </template>
-      <img
-        src="assets/multi-frame.svg"
-        alt="Multiframe"
-        class="absolute left-4 bottom-4"
-      />
+      <img src="assets/multi-frame.svg" alt="Multiframe" class="absolute left-4 bottom-4" />
     </a-popover>
   </template>
 </template>
 
 <style scoped>
+.video-preview-frame {
+  width: 192px;
+  height: 96px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
 .ant-carousel :deep(.slick-dots) {
   position: relative;
   height: auto;

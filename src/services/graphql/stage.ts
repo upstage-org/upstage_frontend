@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { gql } from "graphql-request";
-import { stageGraph, studioClient } from ".";
+import { gql } from "@apollo/client/core";
+import { deriveActiveRecording } from "@utils/stageRecording";
 import { studioClient } from "../graphql";
 
 export const stageFragment = gql`
@@ -63,7 +63,6 @@ export const assetFragment = gql`
       userId
       assetId
       approved
-      seen
       note
       user {
         username
@@ -81,7 +80,7 @@ export const sceneFragment = gql`
   }
 `;
 
-export default {
+const stageOps = {
   createStage: async (variables) => {
     let result = await studioClient.request(
       gql`
@@ -89,21 +88,27 @@ export default {
           $name: String
           $fileLocation: String
           $status: String
-          $owner: ID,
+          $owner: ID
           $playerAccess: String
         ) {
           createStage(
-            input: { name: $name, fileLocation: $fileLocation, status: $status, owner: $owner, playerAccess: $playerAccess }
+            input: {
+              name: $name
+              fileLocation: $fileLocation
+              status: $status
+              owner: $owner
+              playerAccess: $playerAccess
+            }
           ) {
             id
           }
         }
       `,
-      variables
+      variables,
     );
     if (result) {
       variables.id = result.createStage.id;
-      result = await stageGraph.updateStage(variables);
+      result = await stageOps.updateStage(variables);
       return result.updateStage;
     }
   },
@@ -139,7 +144,7 @@ export default {
         }
         ${stageFragment}
       `,
-      variables
+      variables,
     ),
   updateStatus: (stageId) =>
     studioClient.request(gql`
@@ -175,7 +180,7 @@ export default {
           }
         }
       `,
-      variables
+      variables,
     ),
   stageList: (variables) =>
     studioClient.request(
@@ -190,7 +195,7 @@ export default {
         }
         ${stageFragment}
       `,
-      variables
+      variables,
     ),
   getStage: (id) =>
     studioClient.request(
@@ -224,21 +229,22 @@ export default {
         }
         ${stageFragment}
       `,
-      { id }
+      { id },
     ),
-  loadStage: (fileLocation, performanceId) =>
+  loadStage: (fileLocation, performanceId?) =>
     studioClient
       .request(
         gql`
           query ListStage($fileLocation: String, $performanceId: ID) {
-            stageList(
-              input: {
-                fileLocation: $fileLocation
-                performanceId: $performanceId
-              }
-            ) {
+            stageList(input: { fileLocation: $fileLocation, performanceId: $performanceId }) {
               ...stageFragment
               permission
+              performances {
+                id
+                name
+                createdOn
+                recording
+              }
               scenes {
                 ...sceneFragment
               }
@@ -249,29 +255,31 @@ export default {
                 mqttTimestamp
                 performanceId
               }
+              chats {
+                payload
+                performanceId
+              }
             }
           }
           ${stageFragment}
           ${sceneFragment}
         `,
-        { fileLocation, performanceId }
+        { fileLocation, performanceId },
       )
-      .then((response) => {
-        return {
-          stage: response.stageList[0],
-        };
-      }),
+      .then((response) => ({
+        stage: deriveActiveRecording(response.stageList[0]),
+      })),
   loadPermission: (fileLocation) =>
     studioClient
       .request(
         gql`
           query ListStage($fileLocation: String) {
-            stageList(input: s{fileLocation: $fileLocation}) {
+            stageList(input: { fileLocation: $fileLocation }) {
               permission
             }
           }
         `,
-        { fileLocation }
+        { fileLocation },
       )
       .then((response) => response.stageList[0]?.permission),
   loadScenes: (fileLocation) =>
@@ -287,7 +295,7 @@ export default {
           }
           ${sceneFragment}
         `,
-        { fileLocation }
+        { fileLocation },
       )
       .then((response) => response.stageList[0]?.scenes),
   loadEvents: (fileLocation, cursor) =>
@@ -305,7 +313,7 @@ export default {
             }
           }
         `,
-        { fileLocation, ...(cursor ? { cursor: parseInt(cursor) } : {}) }
+        { fileLocation, ...(cursor ? { cursor: parseInt(cursor) } : {}) },
       )
       .then((response) => response.stageList[0]?.events),
   uploadMedia: (variables) =>
@@ -318,19 +326,14 @@ export default {
           $filename: String!
         ) {
           uploadMedia(
-            input: {
-              name: $name
-              base64: $base64
-              mediaType: $mediaType
-              filename: $filename
-            }
+            input: { name: $name, base64: $base64, mediaType: $mediaType, filename: $filename }
           ) {
             ...assetFragment
           }
         }
         ${assetFragment}
       `,
-      variables
+      variables,
     ),
   mediaList: (variables) =>
     studioClient.request(
@@ -360,7 +363,7 @@ export default {
         }
         ${assetFragment}
       `,
-      variables
+      variables,
     ),
   mediaTypeList: (variables) =>
     studioClient.request(
@@ -372,7 +375,7 @@ export default {
           }
         }
       `,
-      variables
+      variables,
     ),
   saveStageMedia: (id, mediaIds) =>
     studioClient.request(
@@ -384,7 +387,7 @@ export default {
         }
         ${stageFragment}
       `,
-      { id, mediaIds }
+      { id, mediaIds },
     ),
   assignStages: (id, stageIds) =>
     studioClient.request(
@@ -395,7 +398,7 @@ export default {
           }
         }
       `,
-      { id, stageIds }
+      { id, stageIds },
     ),
   saveStageConfig: (id, config) =>
     studioClient.request(
@@ -407,7 +410,7 @@ export default {
         }
         ${stageFragment}
       `,
-      { id, config }
+      { id, config },
     ),
   assignableMedia: () =>
     studioClient.request(gql`
@@ -464,7 +467,7 @@ export default {
           }
         }
       `,
-      variables
+      variables,
     ),
   deleteMedia: (id) =>
     studioClient.request(
@@ -476,7 +479,7 @@ export default {
           }
         }
       `,
-      { id }
+      { id },
     ),
   deleteStage: (id) =>
     studioClient.request(
@@ -487,30 +490,20 @@ export default {
           }
         }
       `,
-      { id }
+      { id },
     ),
   saveScene: (variables) =>
     studioClient.request(
       gql`
-        mutation SaveScene(
-          $stageId: ID
-          $payload: String
-          $preview: String
-          $name: String
-        ) {
+        mutation SaveScene($stageId: ID, $payload: String, $preview: String, $name: String) {
           saveScene(
-            input: {
-              stageId: $stageId
-              payload: $payload
-              preview: $preview
-              name: $name
-            }
+            input: { stageId: $stageId, payload: $payload, preview: $preview, name: $name }
           ) {
             id
           }
         }
       `,
-      variables
+      variables,
     ),
   deleteScene: (id) =>
     studioClient.request(
@@ -522,7 +515,7 @@ export default {
           }
         }
       `,
-      { id }
+      { id },
     ),
   duplicateStage: ({ id, name }) =>
     studioClient.request(
@@ -535,72 +528,72 @@ export default {
           }
         }
       `,
-      { id, name }
+      { id, name },
     ),
   deletePerformance: (id) =>
     studioClient.request(
       gql`
-        mutation DeletePerformance($id: Int!) {
+        mutation DeletePerformance($id: ID!) {
           deletePerformance(id: $id) {
             success
+            message
           }
         }
       `,
-      { id }
+      { id: String(id) },
     ),
   updatePerformance: (id, name, description) =>
     studioClient.request(
       gql`
-        mutation updatePerformance(
-          $id: ID!
-          $name: String!
-          $description: String
-        ) {
-          updatePerformance(
-            input: { id: $id, name: $name, description: $description }
-          ) {
+        mutation updatePerformance($id: ID!, $name: String!, $description: String) {
+          updatePerformance(input: { id: $id, name: $name, description: $description }) {
             success
           }
         }
       `,
-      { id, name, description }
+      { id, name, description },
+    ),
+  duplicatePerformanceWithTrimmedPauses: (variables) =>
+    studioClient.request(
+      gql`
+        mutation DuplicatePerformanceWithTrimmedPauses($input: DuplicatePerformanceTrimInput!) {
+          duplicatePerformanceWithTrimmedPauses(input: $input) {
+            id
+            name
+          }
+        }
+      `,
+      variables,
     ),
   startRecording: (stageId, name, description) =>
     studioClient.request(
       gql`
-        mutation startRecording(
-          $stageId: ID!
-          $name: String
-          $description: String
-        ) {
-          startRecording(
-            stageId: $stageId
-            name: $name
-            description: $description
-          ) {
-            recording {
-              id
-            }
+        mutation startRecording($input: RecordInput!) {
+          startRecording(input: $input) {
+            id
+            name
+            createdOn
+            recording
           }
         }
       `,
-      { stageId, name, description }
+      { input: { stageId: String(stageId), name, description } },
     ),
   saveRecording: (id) =>
     studioClient.request(
       gql`
-        mutation saveRecording($id: Int!) {
+        mutation saveRecording($id: ID!) {
           saveRecording(id: $id) {
-            recording {
-              id
-            }
+            id
+            name
+            recording
           }
         }
       `,
-      { id }
+      { id: String(id) },
     ),
   getStreamSign: (key) =>
-    client
+    studioClient
       .request(
         gql`
           query StreamSign($key: String) {
@@ -613,7 +606,7 @@ export default {
             }
           }
         `,
-        { key }
+        { key },
       )
       .then((response) => response.assetList.edges[0]?.node?.sign),
   getSearchOption: () =>
@@ -641,10 +634,10 @@ export default {
           }
         }
         getAllStages {
-            id
-            name
-            permission
-          }
+          id
+          name
+          permission
+        }
         tags {
           id
           name
@@ -658,3 +651,5 @@ export default {
       }
     `),
 };
+
+export default stageOps;

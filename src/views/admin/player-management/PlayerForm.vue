@@ -94,9 +94,7 @@ export default {
               });
               visible.value = false;
             } catch (error) {
-              message.error(
-                error instanceof Error ? error.message : (error as string),
-              );
+              message.error(error instanceof Error ? error.message : (error as string));
             }
           },
           okButtonProps: {
@@ -120,8 +118,7 @@ export default {
                 () => [
                   h(Input, {
                     value: values.firstName ?? "",
-                    "onUpdate:value": (value: string) =>
-                      (values.firstName = value),
+                    "onUpdate:value": (value: string) => (values.firstName = value),
                   }),
                 ],
               ),
@@ -133,8 +130,7 @@ export default {
                 () => [
                   h(Input, {
                     value: values.lastName ?? "",
-                    "onUpdate:value": (value: string) =>
-                      (values.lastName = value),
+                    "onUpdate:value": (value: string) => (values.lastName = value),
                   }),
                 ],
               ),
@@ -147,23 +143,21 @@ export default {
                 () => [
                   h(Input, {
                     value: values.displayName ?? "",
-                    "onUpdate:value": (value: string) =>
-                      (values.displayName = value),
+                    "onUpdate:value": (value: string) => (values.displayName = value),
                   }),
                 ],
               ),
               h(
                 Form.Item,
                 {
-                  label: 'Username',
+                  label: "Username",
                   help: "Your username cannot be changed.",
                 },
                 () => [
                   h(Input, {
                     disabled: true,
                     value: values.username ?? "",
-                    "onUpdate:value": (value: string) =>
-                      (values.username = value),
+                    "onUpdate:value": (value: string) => (values.username = value),
                   }),
                 ],
               ),
@@ -175,8 +169,7 @@ export default {
                 () => [
                   h(Input, {
                     value: values.email ?? "",
-                    "onUpdate:value": (value: string) =>
-                      (values.email = value.trim()),
+                    "onUpdate:value": (value: string) => (values.email = value.trim()),
                   }),
                 ],
               ),
@@ -195,164 +188,147 @@ export default {
                 ],
               ),
               !props.noPasswordChange &&
-              h(Fragment, [
+                h(Fragment, [
+                  h(
+                    Form.Item,
+                    {
+                      label: t("password"),
+                    },
+                    () => [
+                      h(
+                        Button,
+                        {
+                          onClick: () => {
+                            visible.value = false;
+                            changingPassword.value = true;
+                          },
+                        },
+                        [h(KeyOutlined), t("change_password")],
+                      ),
+                    ],
+                  ),
+                  h(
+                    Modal,
+                    {
+                      title: t("change_password"),
+                      visible: changingPassword.value,
+                      "onUpdate:visible": (value) => (changingPassword.value = value),
+                      onOk: () => {
+                        changePassword({
+                          id: props.player.id,
+                          newPassword: passwords.new,
+                          oldPassword: passwords.old,
+                        });
+                      },
+                      okButtonProps: {
+                        loading: savingNewPassword.value,
+                        disabled:
+                          !passwords.old.length ||
+                          !passwords.new.length ||
+                          !passwords.confirm.length ||
+                          passwords.new !== passwords.confirm,
+                      },
+                    },
+                    [
+                      h(
+                        Form.Item,
+                        {
+                          label: "Old password",
+                          labelCol: { span: 8 },
+                          wrapperCol: { span: 16 },
+                        },
+                        () =>
+                          h(Input, {
+                            type: "password",
+                            value: passwords.old,
+                            "onUpdate:value": (value) => (passwords.old = value),
+                          }),
+                      ),
+                      h(
+                        Form.Item,
+                        {
+                          label: "New password",
+                          labelCol: { span: 8 },
+                          wrapperCol: { span: 16 },
+                        },
+                        () =>
+                          h(Input, {
+                            type: "password",
+                            value: passwords.new,
+                            "onUpdate:value": (value) => (passwords.new = value),
+                          }),
+                      ),
+                      h(
+                        Form.Item,
+                        {
+                          label: "Confirm password",
+                          labelCol: { span: 8 },
+                          wrapperCol: { span: 16 },
+                          validateStatus: passwords.new !== passwords.confirm ? "error" : undefined,
+                          help:
+                            passwords.new !== passwords.confirm
+                              ? "Confirm password does not match"
+                              : "",
+                        },
+                        () =>
+                          h(Input, {
+                            type: "password",
+                            value: passwords.confirm,
+                            "onUpdate:value": (value) => (passwords.confirm = value),
+                          }),
+                      ),
+                    ],
+                  ),
+                ]),
+              !props.noUploadLimit &&
                 h(
                   Form.Item,
                   {
-                    label: t("password"),
+                    label: t("upload_limit"),
                   },
                   () => [
-                    h(
-                      Button,
-                      {
-                        onClick: () => {
-                          visible.value = false;
-                          changingPassword.value = true;
-                        },
+                    h(Select, {
+                      class: "w-full",
+                      dropdownMatchSelectWidth: false,
+                      showSearch: true,
+                      value: humanFileSize(Number(values.uploadLimit), false, 0),
+                      onSearch: (value) => {
+                        customLimit.value = Math.min(Number(value), 999).toString();
                       },
-                      [h(KeyOutlined), t("change_password")],
-                    ),
+                      options: ["2", "3", "5", "10", "100", "300"]
+                        .map((value) => ({
+                          value: `${value} MB`,
+                        }))
+                        .concat(
+                          customLimit.value
+                            ? [
+                                {
+                                  value: `${customLimit.value} MB`,
+                                },
+                              ]
+                            : [],
+                        ),
+                      onChange: async (value) => {
+                        const limit = Number((value as string).replace(" MB", ""));
+                        const bytes = limit * 1024 * 1024;
+                        values.uploadLimit = bytes;
+                      },
+                    }),
                   ],
                 ),
-                h(
-                  Modal,
-                  {
-                    title: t("change_password"),
-                    visible: changingPassword.value,
-                    "onUpdate:visible": (value) =>
-                      (changingPassword.value = value),
-                    onOk: () => {
-                      changePassword({
-                        id: props.player.id,
-                        newPassword: passwords.new,
-                        oldPassword: passwords.old,
-                      });
-                    },
-                    okButtonProps: {
-                      loading: savingNewPassword.value,
-                      disabled:
-                        !passwords.old.length ||
-                        !passwords.new.length ||
-                        !passwords.confirm.length ||
-                        passwords.new !== passwords.confirm,
-                    },
-                  },
-                  [
-                    h(
-                      Form.Item,
-                      {
-                        label: "Old password",
-                        labelCol: { span: 8 },
-                        wrapperCol: { span: 16 },
-                      },
-                      () =>
-                        h(Input, {
-                          type: "password",
-                          value: passwords.old,
-                          "onUpdate:value": (value) =>
-                            (passwords.old = value),
-                        }),
-                    ),
-                    h(
-                      Form.Item,
-                      {
-                        label: "New password",
-                        labelCol: { span: 8 },
-                        wrapperCol: { span: 16 },
-                      },
-                      () =>
-                        h(Input, {
-                          type: "password",
-                          value: passwords.new,
-                          "onUpdate:value": (value) =>
-                            (passwords.new = value),
-                        }),
-                    ),
-                    h(
-                      Form.Item,
-                      {
-                        label: "Confirm password",
-                        labelCol: { span: 8 },
-                        wrapperCol: { span: 16 },
-                        validateStatus:
-                          passwords.new !== passwords.confirm
-                            ? "error"
-                            : undefined,
-                        help:
-                          passwords.new !== passwords.confirm
-                            ? "Confirm password does not match"
-                            : "",
-                      },
-                      () =>
-                        h(Input, {
-                          type: "password",
-                          value: passwords.confirm,
-                          "onUpdate:value": (value) =>
-                            (passwords.confirm = value),
-                        }),
-                    ),
-                  ],
-                ),
-              ]),
-              !props.noUploadLimit &&
-              h(
-                Form.Item,
-                {
-                  label: t("upload_limit"),
-                },
-                () => [
-                  h(Select, {
-                    class: "w-full",
-                    dropdownMatchSelectWidth: false,
-                    showSearch: true,
-                    value: humanFileSize(
-                      Number(values.uploadLimit),
-                      false,
-                      0,
-                    ),
-                    onSearch: (value) => {
-                      customLimit.value = Math.min(
-                        Number(value),
-                        999,
-                      ).toString();
-                    },
-                    options: ["2", "3", "5", "10", "100", "300"]
-                      .map((value) => ({
-                        value: `${value} MB`,
-                      }))
-                      .concat(
-                        customLimit.value
-                          ? [
-                            {
-                              value: `${customLimit.value} MB`,
-                            },
-                          ]
-                          : [],
-                      ),
-                    onChange: async (value) => {
-                      const limit = Number(
-                        (value as string).replace(" MB", ""),
-                      );
-                      const bytes = limit * 1024 * 1024;
-                      values.uploadLimit = bytes;
-                    },
-                  }),
-                ],
-              ),
               !props.noStatusToggle &&
-              h(
-                Form.Item,
-                {
-                  label: t("status"),
-                },
-                () => [
-                  h(Switch, {
-                    checked: values.active,
-                    "onUpdate:checked": (value) =>
-                      (values.active = value as boolean),
-                  }),
-                ],
-              ),
+                h(
+                  Form.Item,
+                  {
+                    label: t("status"),
+                  },
+                  () => [
+                    h(Switch, {
+                      checked: values.active,
+                      "onUpdate:checked": (value) => (values.active = value as boolean),
+                    }),
+                  ],
+                ),
             ],
           ),
         ],
@@ -360,24 +336,23 @@ export default {
       slots.default
         ? slots.default({ onClick: () => (visible.value = true) })
         : h(
-          Tooltip,
-          {
-            title: t("profile_title", { name: props.player.username }),
-          },
-          () => [
-            h(
-              Button,
-              {
-                type: "primary",
-                onClick: () => (visible.value = true),
-              },
-              {
-                icon: () => h(EditOutlined),
-              },
-            ),
-            ,
-          ],
-        ),
+            Tooltip,
+            {
+              title: t("profile_title", { name: props.player.username }),
+            },
+            () => [
+              h(
+                Button,
+                {
+                  type: "primary",
+                  onClick: () => (visible.value = true),
+                },
+                {
+                  icon: () => h(EditOutlined),
+                },
+              ),
+            ],
+          ),
     ];
   },
 };

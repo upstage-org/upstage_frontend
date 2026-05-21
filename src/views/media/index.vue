@@ -1,6 +1,6 @@
 <script setup lang="ts">
-  import { ref } from 'vue';
-  const isReplace = ref<boolean>(false);
+import { ref } from "vue";
+const isReplace = ref<boolean>(false);
 </script>
 
 <template>

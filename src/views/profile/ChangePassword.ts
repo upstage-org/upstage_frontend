@@ -10,7 +10,7 @@ export const ChangePassword = defineComponent({
       },
     },
   },
-  setup(props, ctx) {
+  setup() {
     return () => h("div", ["Hi"]);
   },
 });

@@ -1,0 +1,105 @@
+// WebKit / iOS Safari compatibility utilities (imported from studio.less).
+
+.safe-area-top(@extra: 0px) {
+  padding-top: calc(max(8px, env(safe-area-inset-top, 0px)) + @extra);
+}
+
+.safe-area-bottom(@extra: 0px) {
+  padding-bottom: calc(max(8px, env(safe-area-inset-bottom, 0px)) + @extra);
+}
+
+.safe-area-inset-fixed-bottom(@offset: 16px) {
+  bottom: calc(@offset + env(safe-area-inset-bottom, 0px));
+}
+
+.safe-area-inset-fixed-top(@offset: 8px) {
+  top: calc(@offset + env(safe-area-inset-top, 0px));
+}
+
+// Full viewport height with WebKit fill-available fallback (chat / live shells).
+.min-viewport-height() {
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+.touch-no-scroll {
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+// Range input styling aligned with bulma_slider.css for native scrub sliders.
+.webkit-range-input() {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  margin: 4px 0 0;
+  background: transparent;
+  touch-action: none;
+  width: 100%;
+  min-height: calc((1rem + 2px) * 1.25);
+
+  &:focus {
+    outline: 0;
+  }
+
+  &::-webkit-slider-runnable-track {
+    cursor: pointer;
+    background: #dbdbdb;
+    border-radius: 4px;
+    border: 0 solid #7a7a7a;
+    height: 0.5rem;
+    width: 100%;
+  }
+
+  &::-moz-range-track {
+    cursor: pointer;
+    background: #dbdbdb;
+    border-radius: 4px;
+    border: 0 solid #7a7a7a;
+    height: 0.5rem;
+    width: 100%;
+  }
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    box-shadow: none;
+    border: 1px solid #b5b5b5;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    height: 1rem;
+    width: 1rem;
+    margin-top: -0.25rem;
+  }
+
+  &::-moz-range-thumb {
+    box-shadow: none;
+    border: 1px solid #b5b5b5;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    height: 1rem;
+    width: 1rem;
+  }
+
+  &:active::-webkit-slider-thumb {
+    transform: scale(1.25);
+  }
+
+  &:active::-moz-range-thumb {
+    transform: scale(1.25);
+  }
+}
+
+input[type="range"].webkit-range,
+input[type="range"].scrub-slider {
+  .webkit-range-input();
+}
+
+#replay-controls {
+  .safe-area-inset-fixed-bottom(16px);
+  left: calc(16px + env(safe-area-inset-left, 0px));
+}
+

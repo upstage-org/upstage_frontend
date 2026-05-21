@@ -1,5 +1,61 @@
+<script>
+import dayjs from "@utils/dayjs";
+import Linkify from "components/Linkify.vue";
+import Divider from "components/Divider.vue";
+import ContextMenu from "components/ContextMenu.vue";
+import Icon from "components/Icon.vue";
+import { useStageStore } from "@stores/pinia/stage";
+import { computed, inject } from "vue";
+
+export default {
+  components: { Linkify, Divider, ContextMenu, Icon },
+  props: {
+    messages: Array,
+    style: [String, Object],
+  },
+  setup: () => {
+    const isChatStandalone = inject("isChatStandalone", false);
+    const stageStore = useStageStore();
+    const messageClass = {
+      think: "has-text-info has-background-info-light",
+      shout: "has-text-danger",
+      highlighted: "has-background-warning",
+    };
+    const canPlay = computed(() => stageStore.canPlay);
+    const session = computed(() => stageStore.session);
+
+    const time = (value) => {
+      return dayjs(value).fromNow();
+    };
+
+    // `removeChat` / `highlightChat` are synchronous in Pinia (the
+    // mqtt.sendMessage call is not awaited inside the action). The
+    // previous `.then(closeMenu)` chained onto Vuex's dispatch result
+    // ran on the next microtask; running the callback inline is
+    // equivalent.
+    const removeChat = (item, closeMenu) => {
+      stageStore.removeChat(item.id);
+      closeMenu();
+    };
+
+    const highlightChat = (item, closeMenu) => {
+      if (canPlay.value) {
+        stageStore.highlightChat(item.id);
+        closeMenu();
+      }
+    };
+
+    return { messageClass, time, removeChat, highlightChat, canPlay, session, isChatStandalone };
+  },
+};
+</script>
+
 <template>
-  <div v-if="!messages.length" class="columns is-vcentered is-fullheight">
+  <div
+    v-if="!messages.length"
+    class="columns is-vcentered"
+    :class="{ 'is-fullheight': !isChatStandalone, 'chat-empty-standalone': isChatStandalone }"
+  >
     <div class="column has-text-centered has-text-light">
       <i class="fas fa-comments fa-4x"></i>
       <p class="subtitle has-text-light">No messages yet!</p>
@@ -16,17 +72,27 @@
       <template v-else>
         <ContextMenu>
           <template #trigger>
-            <div style="position: relative">
-              <small style="font-size: 1em">
+            <div class="chat-line">
+              <small class="chat-line-author">
                 <b v-if="item.isPlayer">{{ item.user }}:</b>
                 <span v-else>{{ item.user }}:</span>
               </small>
-              <span class="tag message" :style="{
-    'font-size': '1em',
-  }" :class="messageClass[item.highlighted ? 'highlighted' : item.behavior]
-    " :title="time(item.at)">
-                <a-tooltip :title="canPlay ? 'Click to remove highlight' : 'This is a highlight message'">
-                  <span v-if="item.highlighted" class="highlight-star has-tooltip-left" @click="highlightChat(item)">
+              <span
+                class="tag message"
+                :style="{
+                  'font-size': '1em',
+                }"
+                :class="messageClass[item.highlighted ? 'highlighted' : item.behavior]"
+                :title="time(item.at)"
+              >
+                <a-tooltip
+                  :title="canPlay ? 'Click to remove highlight' : 'This is a highlight message'"
+                >
+                  <span
+                    v-if="item.highlighted"
+                    class="highlight-star has-tooltip-left"
+                    @click="highlightChat(item)"
+                  >
                     <i class="far fa-star has-text-warning"></i>
                   </span>
                 </a-tooltip>
@@ -56,13 +122,21 @@
                 <span>{{ $t("remove") }}</span>
               </a>
               <template v-if="canPlay">
-                <a v-if="item.highlighted" class="panel-block" @click="highlightChat(item, closeMenu)">
+                <a
+                  v-if="item.highlighted"
+                  class="panel-block"
+                  @click="highlightChat(item, closeMenu)"
+                >
                   <span class="panel-icon">
                     <Icon src="object-drawing.svg" />
                   </span>
                   <span>{{ $t("unhighlight") }}</span>
                 </a>
-                <a v-else class="panel-block has-text-primary" @click="highlightChat(item, closeMenu)">
+                <a
+                  v-else
+                  class="panel-block has-text-primary"
+                  @click="highlightChat(item, closeMenu)"
+                >
                   <span class="panel-icon">
                     <Icon src="object-drawing.svg" />
                   </span>
@@ -74,8 +148,7 @@
               <span class="panel-icon">
                 <Icon src="clear.svg" />
               </span>
-              <small>Sorry but no actions can be performed against these legacy
-                messages!</small>
+              <small>Sorry but no actions can be performed against these legacy messages!</small>
             </div>
           </template>
         </ContextMenu>
@@ -84,51 +157,24 @@
   </div>
 </template>
 
-<script>
-import moment from "moment";
-import Linkify from "components/Linkify.vue";
-import Divider from "components/Divider.vue";
-import ContextMenu from "components/ContextMenu.vue";
-import Icon from "components/Icon.vue";
-import { useStore } from "vuex";
-import { computed } from "vue";
-
-export default {
-  props: ["messages", "style"],
-  components: { Linkify, Divider, ContextMenu, Icon },
-  setup: () => {
-    const store = useStore();
-    const messageClass = {
-      think: "has-text-info has-background-info-light",
-      shout: "has-text-danger",
-      highlighted: "has-background-warning",
-    };
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
-    const session = computed(() => store.state.stage.session);
-
-    const time = (value) => {
-      return moment(value).fromNow();
-    };
-
-    const removeChat = (item, closeMenu) => {
-      store.dispatch("stage/removeChat", item.id).then(closeMenu);
-    };
-
-    const highlightChat = (item, closeMenu) => {
-      if (canPlay.value) {
-        store.dispatch("stage/highlightChat", item.id).then(closeMenu);
-      }
-    };
-
-    return { messageClass, time, removeChat, highlightChat, canPlay, session };
-  },
-};
-</script>
-
 <style lang="scss">
+.chat-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chat-line-author {
+  font-size: 1em;
+  line-height: 1;
+}
+
 .tag.message {
   white-space: break-spaces;
   height: unset;
+  line-height: 1.25;
 
   .highlight-star {
     position: absolute;
@@ -138,5 +184,13 @@ export default {
 
 .guest {
   opacity: 0.8;
+}
+
+/* Avoid stretching to the full scroll viewport in /chat/:url — that defeats
+   bottom-anchoring of the message list near the composer on mobile. */
+.chat-empty-standalone {
+  flex-grow: 0 !important;
+  min-height: 0 !important;
+  padding-bottom: 0.5rem;
 }
 </style>

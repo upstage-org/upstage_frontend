@@ -1,54 +1,7 @@
-<template>
-  <div v-for="(audio, i) in audios" :key="audio" class="audio has-text-centered"
-    :class="{ 'is-playing': audio.isPlaying }" @mouseenter="i > audios.length - 3 ? scrollToEnd() : null">
-    <div>
-      <div class="audio-name">
-        <span v-if="i < 10">{{ i + 1 }}.</span>
-        <span :title="audio.file">{{ audio.name }}</span>
-      </div>
-      <div class="buttons">
-        <template v-if="audio.isPlaying">
-          <div class="icon" @click="togglePlaying(audio, audioPlayers[i]?.currentTime)">
-            <Icon size="24" src="pause.svg" />
-          </div>
-          <div class="icon" @click="stopAudio(audio)">
-            <Icon size="24" src="clear.svg" />
-          </div>
-        </template>
-        <template v-else>
-          <div class="icon play-button" @click="togglePlaying(audio, audioPlayers[i]?.currentTime)">
-            <Icon size="24" src="play.svg" />
-          </div>
-        </template>
-        <div class="icon" :class="{ grayscale: !audio.loop }" @click="toggleLoop(audio, audioPlayers[i]?.currentTime)">
-          <Icon size="24" src="loop.svg" />
-        </div>
-      </div>
-      <div class="sliders">
-        <div class="addon volume">
-          <div class="icon">
-            <Icon size="24" src="voice-setting.svg" />
-          </div>
-          <input class="slider is-fullwidth is-dark my-0" step="0.01" min="0" max="1" v-model="audio.volume"
-            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)" type="range" />
-        </div>
-        <input class="slider is-fullwidth is-primary mt-0" min="0" :max="audioPlayers[i]?.duration"
-          :value="audioPlayers[i]?.currentTime ?? 0" @change="seek(audio, $event)" type="range" />
-        <div class="addon">
-          <span v-if="audio.isPlaying">{{
-            displayTimestamp(audioPlayers[i]?.currentTime ?? 0)
-          }}</span>
-          <span v-else>{{ displayTimestamp(audioPlayers[i]?.duration) }}</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script>
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
-import { computed, ref, onMounted } from "vue";
+import { computed, ref } from "vue";
 import { useShortcut } from "../../composable";
 import { displayTimestamp } from "utils/common";
 import { animate } from "animejs";
@@ -56,35 +9,35 @@ import { animate } from "animejs";
 export default {
   components: { Icon },
   setup: () => {
-    const store = useStore();
-    const audios = ref(store.getters["stage/audios"] || []);
-    const audioPlayers = computed(() => store.state.stage.audioPlayers);
+    const stageStore = useStageStore();
+    const audios = ref(stageStore.audios || []);
+    const audioPlayers = computed(() => stageStore.audioPlayers);
 
     const togglePlaying = (audio, currentTime) => {
       audio.isPlaying = !audio.isPlaying;
       audio.currentTime = currentTime;
       audio.saken = true;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
     const stopAudio = (audio) => {
       audio.currentTime = 0;
       audio.saken = true;
       audio.isPlaying = false;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
     const toggleLoop = (audio, currentTime) => {
       audio.loop = !audio.loop;
       audio.currentTime = currentTime;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
     const seek = (audio, e) => {
       audio.currentTime = e.target.value;
       audio.saken = true;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
-    const setVolume = (audio, e) => {
+    const setVolume = (audio, _e) => {
       //audio.volume = e.target.value;
-      store.dispatch("stage/updateAudioStatus", audio);
+      stageStore.updateAudioStatus(audio);
     };
 
     useShortcut((e) => {
@@ -120,6 +73,75 @@ export default {
 };
 </script>
 
+<template>
+  <div
+    v-for="(audio, i) in audios"
+    :key="audio"
+    class="audio has-text-centered"
+    :class="{ 'is-playing': audio.isPlaying }"
+    @mouseenter="i > audios.length - 3 ? scrollToEnd() : null"
+  >
+    <div>
+      <div class="audio-name">
+        <span v-if="i < 10">{{ i + 1 }}.</span>
+        <span :title="audio.file">{{ audio.name }}</span>
+      </div>
+      <div class="buttons">
+        <template v-if="audio.isPlaying">
+          <div class="icon" @click="togglePlaying(audio, audioPlayers[i]?.currentTime)">
+            <Icon size="24" src="pause.svg" />
+          </div>
+          <div class="icon" @click="stopAudio(audio)">
+            <Icon size="24" src="clear.svg" />
+          </div>
+        </template>
+        <template v-else>
+          <div class="icon play-button" @click="togglePlaying(audio, audioPlayers[i]?.currentTime)">
+            <Icon size="24" src="play.svg" />
+          </div>
+        </template>
+        <div
+          class="icon"
+          :class="{ grayscale: !audio.loop }"
+          @click="toggleLoop(audio, audioPlayers[i]?.currentTime)"
+        >
+          <Icon size="24" src="loop.svg" />
+        </div>
+      </div>
+      <div class="sliders">
+        <div class="addon volume">
+          <div class="icon">
+            <Icon size="24" src="voice-setting.svg" />
+          </div>
+          <input
+            v-model="audio.volume"
+            class="slider is-fullwidth is-dark my-0"
+            step="0.01"
+            min="0"
+            max="1"
+            type="range"
+            @change="setVolume(audio, $event, audioPlayers[i]?.currentTime)"
+          />
+        </div>
+        <input
+          class="slider is-fullwidth is-primary mt-0"
+          min="0"
+          :max="audioPlayers[i]?.duration"
+          :value="audioPlayers[i]?.currentTime ?? 0"
+          type="range"
+          @change="seek(audio, $event)"
+        />
+        <div class="addon">
+          <span v-if="audio.isPlaying">{{
+            displayTimestamp(audioPlayers[i]?.currentTime ?? 0)
+          }}</span>
+          <span v-else>{{ displayTimestamp(audioPlayers[i]?.duration) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
 <style scoped lang="scss">
 .audio-name {
   font-weight: bold;
@@ -136,7 +158,7 @@ export default {
   margin-top: -6px;
   height: 86px !important;
 
-  >div {
+  > div {
     width: 100%;
   }
 
@@ -155,7 +177,7 @@ export default {
       }
     }
 
-    >* {
+    > * {
       margin: 4px 8px;
       display: none;
 
@@ -189,9 +211,19 @@ export default {
         transform-origin: left top;
       }
 
+      // The slider thumb pseudo-element is vendor-prefixed: target each so
+      // Firefox (-moz) and IE (-ms) get the same green theming as Chromium.
       .slider::-webkit-slider-thumb {
         background-color: #007011;
-        border-color: #F5F5F5;
+        border-color: #f5f5f5;
+      }
+      .slider::-moz-range-thumb {
+        background-color: #007011;
+        border-color: #f5f5f5;
+      }
+      .slider::-ms-thumb {
+        background-color: #007011;
+        border-color: #f5f5f5;
       }
     }
   }
@@ -218,7 +250,7 @@ export default {
     }
 
     .buttons {
-      >* {
+      > * {
         display: block;
       }
 

@@ -1,47 +1,38 @@
-<template>
-  <teleport to="body">
-    <div class="avatar-topping" :style="{
-      left: stageSize.left + object.x + object.w / 2 + 'px',
-      top:
-        stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',
-    }" @click="openChatBox">
-      <a-tooltip :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname
-        }`">
-        <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
-          <Icon src="my-avatar.svg" style="width: 16px; height: 16px" />
-        </span>
-      </a-tooltip>
-      <transition @enter="enter" @leave="leave" :css="false" appear>
-        <blockquote v-if="shouldShowBubble" class="bubble" tabindex="-1" :key="object.speak"
-          :class="object.speak.behavior ?? 'speak'" :style="bubbleStyle">
-          <div class="py-2 px-4">
-            <Linkify>{{ object.speak.message }}</Linkify>
-          </div>
-        </blockquote>
-      </transition>
-    </div>
-  </teleport>
-</template>
-
 <script>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Linkify from "components/Linkify.vue";
 import { outOfViewportPosition } from "utils/common";
 
 export default {
-  props: ["object", "active"],
   components: { Icon, Linkify },
+  props: {
+    object: Object,
+    active: Boolean,
+  },
   setup: (props) => {
-    const store = useStore();
-    const isHolding = computed(
-      () => props.object.id === store.state.user.avatarId
-    );
-    const canPlay = computed(() => store.getters["stage/canPlay"]);
+    const stageStore = useStageStore();
+    // Use the canonical "holder.id === local session" check rather
+    // than `userStore.avatarId`. The local user store's `avatarId`
+    // ref drifts out of sync in several normal flows:
+    //   * placeObjectOnStage sets it to whichever avatar was last
+    //     dropped on stage, so dropping multiple avatars leaves the
+    //     ref pointing at the most recent one, not the one currently
+    //     being held.
+    //   * a page refresh resets it to null, so the holder marker
+    //     stays grey on the holder's own screen until they re-grab.
+    //   * handleCounterMessage overwrites it from echoed presence
+    //     payloads, which can stomp on the locally-set value.
+    // `object.holder` is derived from the MQTT-broadcast sessions
+    // list (see `objects` getter in stage.ts) and `stageStore.session`
+    // is the stable per-browser session id, so this comparison is
+    // the same one Object.vue and ContextMenuAvatar.vue already use.
+    const isHolding = computed(() => props.object.holder?.id === stageStore.session);
+    const canPlay = computed(() => stageStore.canPlay);
 
-    const config = computed(() => store.getters["stage/config"]);
+    const config = computed(() => stageStore.config);
 
     const now = ref(Date.now());
     let timer = null;
@@ -87,7 +78,7 @@ export default {
         pos = outOfViewportPosition(el);
         count++;
       }
-      const duration = config.value?.animations?.bubbleSpeed ?? 1000;
+      const duration = config.value?.animations?.bubbleSpeed ?? 1800;
       console.log(config.value?.animations?.bubbleSpeed);
       switch (config.value?.animations?.bubble) {
         case "fade":
@@ -115,7 +106,7 @@ export default {
     };
 
     const leave = (el, complete) => {
-      const duration = config.value?.animations?.bubbleSpeed ?? 1000;
+      const duration = config.value?.animations?.bubbleSpeed ?? 1800;
       switch (config.value?.animations?.bubble) {
         case "fade":
           animate(el, {
@@ -142,13 +133,13 @@ export default {
 
     const openChatBox = () => {
       if (isHolding.value) {
-        store.dispatch("stage/openSettingPopup", {
+        stageStore.openSettingPopup({
           type: "ChatBox",
           simple: true,
         });
       }
     };
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
+    const stageSize = computed(() => stageStore.stageSize);
     const bubbleStyle = computed(() => {
       if (!props.object.speak?.message) {
         return {};
@@ -168,7 +159,7 @@ export default {
     const shouldShowBubble = computed(() => {
       if (!props.object.speak?.message) return false;
 
-      const isReplayMode = window.location.pathname.includes('/replay/');
+      const isReplayMode = window.location.pathname.includes("/replay/");
 
       if (isReplayMode) {
         return true;
@@ -196,6 +187,42 @@ export default {
 };
 </script>
 
+<template>
+  <teleport to="body">
+    <div
+      class="avatar-topping"
+      :data-testid="object?.name ? `speech-topping-${object.name}` : undefined"
+      :style="{
+        left: stageSize.left + object.x + object.w / 2 + 'px',
+        top: stageSize.top + object.y - (object.holder && canPlay ? 30 : 0) + 'px',
+      }"
+      @click="openChatBox"
+    >
+      <a-tooltip
+        :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname}`"
+      >
+        <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
+          <Icon src="my-avatar.svg" style="width: 16px; height: 16px" />
+        </span>
+      </a-tooltip>
+      <transition :css="false" appear @enter="enter" @leave="leave">
+        <blockquote
+          v-if="shouldShowBubble"
+          :key="object.speak"
+          class="bubble"
+          tabindex="-1"
+          :class="object.speak.behavior ?? 'speak'"
+          :style="bubbleStyle"
+        >
+          <div class="py-2 px-4">
+            <Linkify>{{ object.speak.message }}</Linkify>
+          </div>
+        </blockquote>
+      </transition>
+    </div>
+  </teleport>
+</template>
+
 <style scoped lang="scss">
 .avatar-topping {
   position: fixed;
@@ -209,5 +236,15 @@ export default {
 
 .inactive {
   filter: grayscale(1);
+}
+
+.bubble.shout {
+  color: hsl(348, 100%, 61%);
+  font-weight: 700;
+}
+
+.bubble.think {
+  color: hsl(207, 61%, 53%);
+  font-style: italic;
 }
 </style>

@@ -1,58 +1,8 @@
-<template>
-  <div
-    v-for="assetType in types"
-    :key="assetType"
-    class="columns is-vcentered has-text-centered"
-  >
-    <div class="column is-1">
-      <h4 class="subtitle">
-        <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px;" />
-        <br />
-        {{ assetType }}
-        <br />
-        <small>({{ mediaGroups[assetType]?.length }})</small>
-      </h4>
-    </div>
-    <div class="column is-11">
-      <div class="toolbox">
-        <div class="scroller">
-          <div
-            v-for="item in mediaGroups[assetType]"
-            :key="item.id"
-            :id="item.id"
-            class="media-preview"
-            draggable="true"
-            @dragstart="dragstart"
-            @dragend="dragend"
-            @dragenter.prevent
-            @dragover.prevent="dragover"
-            @dragleave.prevent="dragleave"
-            @drop.prevent="drop"
-          >
-            <div style="pointer-events: none">
-              <div v-if="assetType === 'audio'">
-                <Icon src="audio.svg" />
-                <br />
-                <b>{{ item.name }}</b>
-              </div>
-              <div v-else-if="assetType === 'video'">
-                <Icon src="stream.svg" />
-                <br />
-                <b>{{ item.name }}</b>
-              </div>
-              <Asset v-else :asset="item" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
-import { defineProps, defineEmits, computed, watch } from "vue";
+import { computed } from "vue";
 import Icon from "components/Icon.vue";
 import Asset from "components/Asset.vue";
+import VideoFirstFrameThumb from "@components/media/VideoFirstFrameThumb.vue";
 
 const props = defineProps({
   modelValue: {
@@ -61,15 +11,22 @@ const props = defineProps({
   },
 });
 
+const emit = defineEmits(["update:modelValue"]);
 
-const types = computed(() => [
-  ...new Set(props.modelValue.map((media) => media.assetType)),
-]);
+/** GraphQL returns `assetType: { name }`; older code may still use a string. */
+function assetTypeName(media) {
+  const t = media?.assetType;
+  if (t && typeof t === "object") return t.name ?? "";
+  return t ?? "";
+}
+
+const types = computed(() => [...new Set(props.modelValue.map((m) => assetTypeName(m)).filter(Boolean))]);
 
 const mediaGroups = computed(() => {
   const res = {};
   props.modelValue.forEach((item) => {
-    res[item.assetType] = (res[item.assetType] ?? []).concat(item);
+    const key = assetTypeName(item) || "unknown";
+    res[key] = (res[key] ?? []).concat(item);
   });
   return res;
 });
@@ -99,24 +56,91 @@ const drop = (e) => {
   const fromIndex = props.modelValue.findIndex((t) => t.id === fromId);
   const toIndex = props.modelValue.findIndex((t) => t.id === toId);
   if (fromIndex > -1 && toIndex > -1) {
-    const media = props.modelValue.splice(fromIndex, 1)[0];
+    // Clone first; splice() on props.modelValue would mutate the parent's
+    // array (vue/no-mutating-props). The new ordering is communicated via
+    // update:modelValue below — the parent owns the canonical array.
+    const next = props.modelValue.slice();
+    const media = next.splice(fromIndex, 1)[0];
     emit(
       "update:modelValue",
-      props.modelValue
-        .slice(0, toIndex)
-        .concat(media)
-        .concat(props.modelValue.slice(toIndex)),
+      next.slice(0, toIndex).concat(media).concat(next.slice(toIndex)),
     );
   }
 };
 </script>
 
+<template>
+  <div v-for="assetType in types" :key="assetType" class="columns is-vcentered is-mobile">
+    <div class="column is-narrow has-text-left media-type-label-col">
+      <h4 class="subtitle">
+        <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px" />
+        <span class="type-caption">{{ assetType }} ({{ mediaGroups[assetType]?.length }})</span>
+      </h4>
+    </div>
+    <div class="column">
+      <div class="toolbox">
+        <div class="scroller">
+          <div
+            v-for="item in mediaGroups[assetType]"
+            :id="item.id"
+            :key="item.id"
+            class="media-preview"
+            draggable="true"
+            @dragstart="dragstart"
+            @dragend="dragend"
+            @dragenter.prevent
+            @dragover.prevent="dragover"
+            @dragleave.prevent="dragleave"
+            @drop.prevent="drop"
+          >
+            <div style="pointer-events: none">
+              <div v-if="assetType === 'audio'">
+                <Icon src="audio.svg" />
+                <br />
+                <b>{{ item.name }}</b>
+              </div>
+              <div v-else-if="assetType === 'video'" class="video-reorder-cell">
+                <div class="video-reorder-thumb">
+                  <VideoFirstFrameThumb :media="item" />
+                </div>
+                <b class="video-reorder-name">{{ item.name }}</b>
+              </div>
+              <Asset v-else :asset="item" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
 <style scoped lang="scss">
+.media-type-label-col {
+  /* was Bulma `is-1` (~8%); too narrow → mid-word wraps. */
+  flex: none;
+  min-width: 11rem;
+
+  &.column {
+    width: auto;
+  }
+}
 
 .subtitle {
   text-transform: capitalize;
   margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
 }
+
+.type-caption {
+  display: block;
+  font-size: 0.925em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
 .toolbox {
   background-color: #fdedf6;
   border-radius: 8px;
@@ -145,25 +169,53 @@ const drop = (e) => {
     }
     &:hover {
       img {
-        -webkit-filter: drop-shadow(0 0 4px #F5F5F5);
-        filter: drop-shadow(0 0 4px #F5F5F5);
+        -webkit-filter: drop-shadow(0 0 4px #f5f5f5);
+        filter: drop-shadow(0 0 4px #f5f5f5);
       }
     }
   }
   .dropzone {
-    background: repeating-radial-gradient(
-      circle,
-      green,
-      green 10px,
-      #007011 10px,
-      #007011 20px
-    );
+    background: repeating-radial-gradient(circle, green, green 10px, #007011 10px, #007011 20px);
     > * {
       transform: translateX(50%) !important;
     }
   }
   .dragging {
     opacity: 0.5;
+  }
+
+  .video-reorder-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    height: 100%;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .video-reorder-thumb {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    max-height: 58px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #1a1a1a;
+  }
+
+  .video-reorder-name {
+    flex: 0 0 auto;
+    font-size: 11px;
+    line-height: 1.15;
+    word-break: break-word;
+    max-height: 2.6em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
   }
 }
 </style>

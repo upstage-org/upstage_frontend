@@ -1,3 +1,77 @@
+<script>
+import { computed, onMounted, onUnmounted, watch } from "vue";
+import { useStageStore } from "@stores/pinia/stage";
+import ColorPicker from "components/form/ColorPicker.vue";
+import Icon from "components/Icon.vue";
+import { useDrawable } from "./Draw/composable";
+
+export default {
+  components: { ColorPicker, Icon },
+  setup: () => {
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
+    const isDrawing = computed(() => {
+      return stageStore.preferences.isDrawing;
+    });
+    const { el, cursor, toggleErase, color, size, alpha, mode, history, clearCanvas } =
+      useDrawable();
+
+    onMounted(() => {
+      stageStore.UPDATE_IS_DRAWING(true);
+    });
+
+    onUnmounted(() => {
+      stageStore.UPDATE_IS_DRAWING(false);
+    });
+
+    watch(history, (val) => {
+      if (history.length) {
+        let command = val[0];
+        const ratio = 1 / stageSize.value.height;
+        command = {
+          ...command,
+          size: command.size * ratio,
+          x: command.x * ratio,
+          y: command.y * ratio,
+          lines: command.lines.map((line) => ({
+            x: line.x * ratio,
+            y: line.y * ratio,
+            fromX: line.fromX * ratio,
+            fromY: line.fromY * ratio,
+          })),
+        };
+        stageStore.sendDrawWhiteboard(command);
+        clearCanvas(true);
+      }
+    });
+
+    const undo = () => {
+      stageStore.sendUndoWhiteboard();
+      clearCanvas(true);
+    };
+
+    const clear = () => {
+      stageStore.sendClearWhiteboard();
+      clearCanvas(true);
+    };
+
+    return {
+      isDrawing,
+      color,
+      size,
+      alpha,
+      el,
+      clear,
+      undo,
+      toggleErase,
+      mode,
+      cursor,
+      stageSize,
+    };
+  },
+};
+</script>
+
 <template>
   <canvas
     ref="el"
@@ -8,7 +82,6 @@
       cursor,
       top: stageSize.top + 'px',
       left: stageSize.left + 'px',
-      'pointer-events': none,
     }"
   >
     Your browser does not support the HTML5 canvas tag.
@@ -32,20 +105,44 @@
       />
     </div>
     <input
+      v-model="size"
       class="slider is-fullwidth m-0 is-dark"
       step="1"
       min="1"
       max="200"
       type="range"
-      v-model="size"
     />
+    <span class="tag is-light is-block">{{ $t("size") }}</span>
+  </div>
+  <div class="drawing-tool" style="width: 200px">
+    <div class="size-preview">
+      <div
+        class="dot"
+        :style="{
+          width: size + 'px',
+          height: size + 'px',
+          'background-color': color,
+          opacity: alpha,
+        }"
+        @click="mode = 'draw'"
+      />
+    </div>
+    <input
+      v-model.number="alpha"
+      class="slider is-fullwidth m-0 is-dark"
+      step="0.05"
+      min="0"
+      max="1"
+      type="range"
+    />
+    <span class="tag is-light is-block">{{ $t("opacity") }}</span>
   </div>
   <div
     class="drawing-tool"
-    @click="toggleErase"
     :class="{
       active: mode === 'erase',
     }"
+    @click="toggleErase"
   >
     <div class="icon is-large">
       <Icon size="36" src="erase.svg" />
@@ -66,83 +163,16 @@
   </div>
 </template>
 
-<script>
-import { computed, onMounted, onUnmounted, watch } from "vue";
-import { useStore } from "vuex";
-import ColorPicker from "components/form/ColorPicker.vue";
-import Icon from "components/Icon.vue";
-import { useDrawable } from "./Draw/composable";
-
-export default {
-  components: { ColorPicker, Icon },
-  setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const isDrawing = computed(() => {
-      return store.state.stage.preferences.isDrawing;
-    });
-    const { el, cursor, toggleErase, color, size, mode, history, clearCanvas } =
-      useDrawable();
-
-    onMounted(() => {
-      store.commit("stage/UPDATE_IS_DRAWING", true);
-    });
-
-    onUnmounted(() => {
-      store.commit("stage/UPDATE_IS_DRAWING", false);
-    });
-
-    watch(history, (val) => {
-      if (history.length) {
-        let command = val[0];
-        const ratio = 1 / stageSize.value.height;
-        command = {
-          ...command,
-          size: command.size * ratio,
-          x: command.x * ratio,
-          y: command.y * ratio,
-          lines: command.lines.map((line) => ({
-            x: line.x * ratio,
-            y: line.y * ratio,
-            fromX: line.fromX * ratio,
-            fromY: line.fromY * ratio,
-          })),
-        };
-        store.dispatch("stage/sendDrawWhiteboard", command);
-        clearCanvas(true);
-      }
-    });
-
-    const undo = () => {
-      store.dispatch("stage/sendUndoWhiteboard");
-      clearCanvas(true);
-    };
-
-    const clear = () => {
-      store.dispatch("stage/sendClearWhiteboard");
-      clearCanvas(true);
-    };
-
-    return {
-      isDrawing,
-      color,
-      size,
-      el,
-      clear,
-      undo,
-      toggleErase,
-      mode,
-      cursor,
-      stageSize,
-    };
-  },
-};
-</script>
-
 <style lang="scss" scoped>
 .drawing {
   position: fixed;
   z-index: 1000;
+  /* Tells the browser this element handles its own gestures.
+     Without this, iOS Safari and Chrome on Android interpret the
+     first touchmove on the canvas as a page-pan or pinch-zoom,
+     so the pointer events never fire and the player only ever
+     gets a single dot from the initial touchstart. */
+  touch-action: none;
 }
 .drawing-tool {
   z-index: 1001;

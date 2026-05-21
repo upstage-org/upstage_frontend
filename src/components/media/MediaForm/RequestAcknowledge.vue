@@ -12,7 +12,7 @@ const props = defineProps({
 });
 
 const refresh = inject("refresh", () => {});
-const { mutate, loading } = useRequestPermission();
+const { mutate } = useRequestPermission();
 const sendAcknowledge = async () => {
   const response = await mutate({
     assetId: props.media.id,
@@ -27,8 +27,7 @@ const sendAcknowledge = async () => {
 <template>
   <a-tooltip placement="left">
     <template #title>
-      By clicking the button, you acknowledge that you are using the media
-      created by
+      By clicking the button, you acknowledge that you are using the media created by
       <DName :user="media.owner" />
     </template>
     <smart-button type="dashed" :action="sendAcknowledge">

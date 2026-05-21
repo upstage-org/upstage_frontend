@@ -73,11 +73,13 @@ input[type=range].slider:not([orient=vertical]).has-output-tooltip+output {
 }
 
 input[type=range].slider[orient=vertical] {
-    -webkit-appearance: slider-vertical;
-    -moz-appearance: slider-vertical;
-    appearance: slider-vertical;
-    -ms-writing-mode: bt-lr;
-    writing-mode: bt-lr
+    /* Avoid deprecated non-standard `appearance: slider-vertical` (Chromium warning). */
+    -webkit-appearance: none;
+    appearance: none;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    height: 100%;
+    width: auto;
 }
 
 input[type=range].slider[orient=vertical]::-webkit-slider-runnable-track {

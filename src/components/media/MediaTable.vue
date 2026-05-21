@@ -1,29 +1,14 @@
 <script lang="ts" setup>
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
-import gql from "graphql-tag";
-import {
-  computed,
-  reactive,
-  watch,
-  provide,
-  ref,
-  inject,
-  Ref,
-  ComputedRef,
-  onMounted
-} from "vue";
+import { gql } from "@apollo/client/core";
+import { computed, reactive, watch, provide, inject, Ref, ComputedRef, onMounted } from "vue";
 import { editingMediaVar, inquiryVar } from "apollo";
 import configs from "config";
 import { permissionFragment } from "models/fragment";
-import {
-  Media,
-  MediaAttributes,
-  StudioGraph,
-  UploadFile,
-  User,
-} from "models/studio";
+import { Media, MediaAttributes, StudioGraph, UploadFile } from "models/studio";
 import { absolutePath } from "utils/common";
+import { tagChipColor } from "utils/tagChipColor";
 import MediaPreview from "./MediaPreview.vue";
 import RequestPermission from "./MediaForm/RequestPermission.vue";
 import RequestAcknowledge from "./MediaForm/RequestAcknowledge.vue";
@@ -31,11 +16,10 @@ import { ColumnType, TablePaginationConfig } from "ant-design-vue/lib/table";
 import { SorterResult } from "ant-design-vue/lib/table/interface";
 import QuickStageAssignment from "./QuickStageAssignment.vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 
-const store = useStore();
-const whoami = computed(() => store.getters["user/whoami"]);
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { whoami, isAdmin } = storeToRefs(useUserStore());
 
 const { t } = useI18n();
 const files = inject<Ref<UploadFile[]>>("files");
@@ -69,18 +53,20 @@ const { result, loading, fetchMore, refetch } = useQuery(
       $sort: [AssetSortEnum]
       $dormant: Boolean
     ) {
-      media(input:{
-        page: $page
-        limit: $limit
-        name: $name
-        createdBetween: $createdBetween
-        mediaTypes: $mediaTypes
-        owners: $owners
-        stages: $stages
-        tags: $tags
-        sort: $sort
-        dormant: $dormant
-      }) {
+      media(
+        input: {
+          page: $page
+          limit: $limit
+          name: $name
+          createdBetween: $createdBetween
+          mediaTypes: $mediaTypes
+          owners: $owners
+          stages: $stages
+          tags: $tags
+          sort: $sort
+          dormant: $dormant
+        }
+      ) {
         totalCount
         edges {
           id
@@ -213,25 +199,15 @@ interface Pagination {
   total: number;
 }
 
-interface Sorter {
-  column: any;
-  columnKey: string;
-  field: string;
-  order: "ascend" | "descend";
-}
-
 const handleTableChange = (
   { current = 1, pageSize = 10 }: TablePaginationConfig,
   _: any,
   sorter: SorterResult<Media> | SorterResult<Media>[],
 ) => {
   const sort = (Array.isArray(sorter) ? sorter : [sorter])
-    .sort(
-      (a, b) =>
-        (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple,
-    )
+    .sort((a, b) => (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple)
     .map(({ columnKey, order }) =>
-      `${columnKey == 'copyrightLevel' ? 'COPYRIGHT_LEVEL' : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
+      `${columnKey == "copyrightLevel" ? "COPYRIGHT_LEVEL" : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
     );
   Object.assign(tableParams, {
     page: current,
@@ -239,15 +215,9 @@ const handleTableChange = (
     sort,
   });
 };
-const dataSource = computed(() =>
-  result.value ? result.value.media.edges : [],
-);
+const dataSource = computed(() => (result.value ? result.value.media.edges : []));
 
-const {
-  loading: deleting,
-  mutate: deleteMedia,
-  onDone,
-} = useMutation(gql`
+const { onDone } = useMutation(gql`
   mutation deleteMedia($id: ID!) {
     deleteMedia(id: $id) {
       success
@@ -309,19 +279,25 @@ const filterTag = (tag: string) => {
     tags: [tag],
   });
 };
-
-
 </script>
 
 <template>
   <a-layout class="w-full shadow rounded-xl bg-white overflow-hidden">
-    <a-table class="w-full overflow-auto" :columns="columns as ColumnType<Media>[]" :data-source="dataSource"
-      rowKey="id" :loading="loading" @change="handleTableChange" :pagination="{
-        showQuickJumper: true,
-        showSizeChanger: true,
-        total: result ? result.media.totalCount : 0,
-      } as Pagination
-        ">
+    <a-table
+      class="w-full overflow-auto"
+      :columns="columns as ColumnType<Media>[]"
+      :data-source="dataSource"
+      row-key="id"
+      :loading="loading"
+      :pagination="
+        {
+          showQuickJumper: true,
+          showSizeChanger: true,
+          total: result ? result.media.totalCount : 0,
+        } as Pagination
+      "
+      @change="handleTableChange"
+    >
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'preview'">
           <MediaPreview v-if="record.assetType" :media="record as Media" />
@@ -340,12 +316,23 @@ const filterTag = (tag: string) => {
           </span>
         </template>
         <template v-if="column.key === 'stages'">
-          <a v-for="(stage, i) in text" :key="i" :href="`${configs.UPSTAGE_URL}/${stage.fileLocation}`" target="_blank">
+          <a
+            v-for="(stage, i) in text"
+            :key="i"
+            :href="`${configs.UPSTAGE_URL}/${stage.fileLocation}`"
+            target="_blank"
+          >
             <a-tag color="#007011">{{ stage.name }}</a-tag>
           </a>
         </template>
         <template v-if="column.key === 'tags'">
-          <a-tag v-for="(tag, i) in text" :key="i" :color="tag" @click="filterTag(tag)" class="cursor-pointer">{{ tag }}
+          <a-tag
+            v-for="(tag, i) in text"
+            :key="i"
+            :color="tagChipColor(tag)"
+            class="cursor-pointer mb-1 mr-1 inline-block"
+            @click="filterTag(tag)"
+            >{{ tag }}
           </a-tag>
         </template>
         <template v-if="column.key === 'size'">
@@ -356,9 +343,7 @@ const filterTag = (tag: string) => {
         </template>
         <template v-if="column.key === 'copyrightLevel'">
           <span class="leading-4">{{
-            configs.MEDIA_COPYRIGHT_LEVELS.find(
-              (l) => l.value === record.copyrightLevel,
-            )?.name
+            configs.MEDIA_COPYRIGHT_LEVELS.find((l) => l.value === record.copyrightLevel)?.name
           }}</span>
         </template>
         <template v-if="column.key === 'created_on'">
@@ -387,8 +372,7 @@ const filterTag = (tag: string) => {
           <template v-else>
             <a-space v-if="record.privilege === 0">
               <a-tooltip>
-                <template #title>You don't have permission to access this media
-                </template>
+                <template #title>You don't have permission to access this media </template>
                 🙅‍♀️🙅‍♂️
               </a-tooltip>
             </a-space>

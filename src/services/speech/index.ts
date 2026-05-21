@@ -19,7 +19,7 @@ export const avatarSpeak = (avatar, message: string) => {
     }
     params.pitch = pitch;
     params.speed = speed;
-    
+
     const callback = () => speak(cleanEmoji(message), params); // voice got loaded assynchronous
     if (isValidVoice(voice)) {
       loadVoice(voice, callback);

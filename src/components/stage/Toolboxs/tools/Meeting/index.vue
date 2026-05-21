@@ -1,5 +1,24 @@
+<script setup>
+defineOptions({ name: "Meeting" });
+
+import { useStageStore } from "@stores/pinia/stage";
+import Icon from "components/Icon.vue";
+import Skeleton from "../../Skeleton.vue";
+import { computed } from "vue";
+import Yourself from "components/objects/MeetingObject/Yourself.vue";
+
+const stageStore = useStageStore();
+const rooms = computed(() => stageStore.tools.meetings);
+
+const createRoom = () => {
+  stageStore.openSettingPopup({
+    type: "CreateRoom",
+  });
+};
+</script>
+
 <template>
-  <div @click="createRoom" class="is-pulled-left room-skeleton">
+  <div class="is-pulled-left room-skeleton" @click="createRoom">
     <div class="icon is-large">
       <Icon src="new.svg" size="36" />
     </div>
@@ -13,23 +32,6 @@
     </div>
   </Skeleton>
 </template>
-
-<script setup>
-import { useStore } from "vuex";
-import Icon from "components/Icon.vue";
-import Skeleton from "../../Skeleton.vue";
-import { computed } from "vue";
-import Yourself from "components/objects/MeetingObject/Yourself.vue";
-
-const store = useStore();
-const rooms = computed(() => store.state.stage.tools.meetings);
-
-const createRoom = () => {
-  store.dispatch("stage/openSettingPopup", {
-    type: "CreateRoom",
-  });
-};
-</script>
 
 <style lang="scss" scoped>
 .room-skeleton {

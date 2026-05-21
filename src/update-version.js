@@ -1,14 +1,14 @@
-import fs from "fs"
-import { execSync } from 'child_process'
+import fs from "fs";
+import { execSync } from "child_process";
 
 let version;
 try {
-  version = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
-} catch (error) {
+  version = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
+} catch {
   version = `unknown-${Date.now()}`;
-  console.warn('Git commit hash unavailable, using fallback version:', version);
+  console.warn("Git commit hash unavailable, using fallback version:", version);
 }
 
 const versionData = { version };
-fs.writeFileSync('public/version.json', JSON.stringify(versionData, null, 2));
+fs.writeFileSync("public/version.json", JSON.stringify(versionData, null, 2));
 console.log(`Generated version.json with version: ${version}`);

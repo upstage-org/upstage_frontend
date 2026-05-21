@@ -1,8 +1,8 @@
 <script lang="ts" setup>
 import { useMutation, useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { gql } from "@apollo/client/core";
 import { computed, reactive, watch, provide, onMounted, ComputedRef } from "vue";
-import type { Media, Stage, StudioGraph } from "models/studio";
+import type { Media, Stage } from "models/studio";
 import { absolutePath } from "utils/common";
 import { ColumnType, TablePaginationConfig } from "ant-design-vue/lib/table";
 import { SorterResult } from "ant-design-vue/lib/table/interface";
@@ -10,31 +10,38 @@ import { useI18n } from "vue-i18n";
 import { capitalize } from "utils/common";
 import { message } from "ant-design-vue";
 import { FetchResult } from "@apollo/client/core";
-import store from "store";
+import { useUserStore } from "@stores/pinia/user";
+import { storeToRefs } from "pinia";
 import PlayerAudienceCounter from "components/stage/PlayerAudienceCounter.vue";
+import { normalizeStageAccess } from "utils/studioInquiry";
 
 const { t } = useI18n();
-const isAdmin = computed(() => store.getters["user/isAdmin"]);
+const { isAdmin } = storeToRefs(useUserStore());
 const enterStage = (stage: Stage) => {
   window.open(`/${stage.fileLocation}`, "_blank");
 };
+const DEFAULT_SORT = ["LAST_ACCESS_DESC"] as const;
+
 const tableParams = reactive({
   page: 1,
   limit: 10,
-  sort: ["LAST_ACCESS_DESC"],
-  access: []
+  sort: [...DEFAULT_SORT],
 });
 const { result: inquiryResult } = useQuery(gql`
   {
     inquiry @client
   }
 `);
-const params = computed(() => ({
-  ...tableParams,
-  ...inquiryResult.value.inquiry,
-}));
+const params = computed(() => {
+  const inquiry = inquiryResult.value?.inquiry ?? {};
+  return {
+    ...tableParams,
+    ...inquiry,
+    access: normalizeStageAccess(inquiry.access),
+  };
+});
 
-const { result, loading, fetchMore, refetch } = useQuery(
+const { result, loading, refetch } = useQuery(
   gql`
     query StageTable(
       $page: Int
@@ -45,36 +52,38 @@ const { result, loading, fetchMore, refetch } = useQuery(
       $sort: [StageSortEnum]
       $access: [String]
     ) {
-      stages(input:{
-        page: $page
-        limit: $limit
-        name: $name
-        createdBetween: $createdBetween
-        owners: $owners
-        sort: $sort
-        access: $access
-      }) {
+      stages(
+        input: {
+          page: $page
+          limit: $limit
+          name: $name
+          createdBetween: $createdBetween
+          owners: $owners
+          sort: $sort
+          access: $access
+        }
+      ) {
         totalCount
         edges {
+          id
+          name
+          fileLocation
+          status
+          visibility
+          cover
+          description
+          playerAccess
+          permission
+          lastAccess
+          owner {
+            username
+            displayName
+          }
+          assets {
             id
             name
-            fileLocation
-            status
-            visibility
-            cover
-            description
-            playerAccess
-            permission
-            lastAccess
-            owner {
-              username
-              displayName
-            }
-            assets {
-              id
-              name
-            }
-            createdOn
+          }
+          createdOn
         }
       }
     }
@@ -86,6 +95,23 @@ const { result, loading, fetchMore, refetch } = useQuery(
 onMounted(() => {
   refetch();
 });
+
+// Changing filters while on page 2+ often shows an empty table even though
+// matches exist on page 1 — reset pagination when inquiry filters change.
+watch(
+  () => {
+    const inquiry = inquiryResult.value?.inquiry ?? {};
+    return [
+      inquiry.name,
+      inquiry.createdBetween,
+      inquiry.owners,
+      inquiry.access,
+    ];
+  },
+  () => {
+    tableParams.page = 1;
+  },
+);
 
 watch(params, () => {
   refetch();
@@ -156,7 +182,7 @@ const columns: ComputedRef<ColumnType<Stage>[]> = computed((): ColumnType<Stage>
     key: "permission",
     sorter: {
       multiple: 1,
-    }
+    },
   },
   {
     title: `${t("manage")} ${t("stage")}`,
@@ -174,23 +200,14 @@ interface Pagination {
   total: number;
 }
 
-interface Sorter {
-  column: any;
-  columnKey: string;
-  field: string;
-  order: "ascend" | "descend";
-}
-
 const handleTableChange = (
   { current = 1, pageSize = 10 }: TablePaginationConfig,
   _: any,
   sorter: SorterResult<Media> | SorterResult<Media>[],
 ) => {
   const sort = (Array.isArray(sorter) ? sorter : [sorter])
-    .sort(
-      (a, b) =>
-        (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple,
-    )
+    .filter((entry) => entry?.order && entry?.columnKey)
+    .sort((a, b) => (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple)
     .map(({ columnKey, order }) =>
       `${columnKey == "permission" ? "access" : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
     );
@@ -198,11 +215,11 @@ const handleTableChange = (
   Object.assign(tableParams, {
     page: current,
     limit: pageSize,
-    sort,
+    sort: sort.length ? sort : [...DEFAULT_SORT],
   });
 };
 const dataSource = computed(() => {
-  return result.value ? result.value.stages.edges : []
+  return result.value ? result.value.stages.edges : [];
 });
 
 provide("refresh", () => {
@@ -230,15 +247,13 @@ const {
   mutate: updateVisibility,
   loading: loadingUpdateVisibility,
   onDone: onVisibilityUpdated,
-} = useMutation<{ updateVisibility: { result: string } }, { id: string }>(
-  gql`
-    mutation UpdateVisibility($id: ID!) {
-      updateVisibility(id: $id) {
-        result
-      }
+} = useMutation<{ updateVisibility: { result: string } }, { id: string }>(gql`
+  mutation UpdateVisibility($id: ID!) {
+    updateVisibility(id: $id) {
+      result
     }
-  `,
-);
+  }
+`);
 const handleChangeVisibility = async (record: Stage) => {
   await updateVisibility({
     id: record.id,
@@ -260,16 +275,27 @@ onVisibilityUpdated(handleUpdate);
 
 <template>
   <a-layout class="w-full rounded-xl bg-white overflow-hidden">
-    <a-table class="w-full shadow overflow-auto" :columns="columns as ColumnType<Stage>[]" :data-source="dataSource"
-      rowKey="id" :loading="loading" @change="handleTableChange" :pagination="{
-        showQuickJumper: true,
-        showSizeChanger: true,
-        total: result ? result.stages.totalCount : 0,
-      } as Pagination
-        ">
+    <a-table
+      class="w-full shadow overflow-auto"
+      :columns="columns as ColumnType<Stage>[]"
+      :data-source="dataSource"
+      row-key="id"
+      :loading="loading"
+      :pagination="
+        {
+          showQuickJumper: true,
+          showSizeChanger: true,
+          total: result ? result.stages.totalCount : 0,
+        } as Pagination
+      "
+      @change="handleTableChange"
+    >
       <template #bodyCell="{ column, record, text }">
         <template v-if="column.key === 'cover'">
-          <a-image :src="text ? absolutePath(text) : '/img/greencurtain.jpg'" class="w-24 max-h-24 object-contain" />
+          <a-image
+            :src="text ? absolutePath(text) : '/img/greencurtain.jpg'"
+            class="w-24 max-h-24 object-contain"
+          />
         </template>
         <template v-if="column.key === 'owner_id'">
           <span v-if="text.displayName">
@@ -282,11 +308,14 @@ onVisibilityUpdated(handleUpdate);
           </span>
         </template>
         <template v-if="['created_on', 'last_access'].includes(column.key as string)">
-          <div style="text-align: center;">
+          <div style="text-align: center">
             <d-date v-if="text" :value="text" />
             <br />
-            <PlayerAudienceCounter v-if="column.key == 'last_access'" :stage-url="record.fileLocation"
-              class="counter" />
+            <PlayerAudienceCounter
+              v-if="column.key == 'last_access'"
+              :stage-url="record.fileLocation"
+              class="counter"
+            />
           </div>
         </template>
         <template v-if="column.key === 'permission'">
@@ -297,18 +326,36 @@ onVisibilityUpdated(handleUpdate);
             {{ capitalize(text) }}
           </a-tag>
           <a-tooltip v-else :title="capitalize(text)">
-            <a-switch checked-children="L" un-checked-children="R" :checked="text === 'live'"
-              :loading="loadingUpdateStatus" @change="handleChangeStatus(record as Stage)" />
+            <a-switch
+              checked-children="L"
+              un-checked-children="R"
+              :checked="text === 'live'"
+              :loading="loadingUpdateStatus"
+              @change="handleChangeStatus(record as Stage)"
+            />
           </a-tooltip>
         </template>
         <template v-if="column.key === 'visibility'">
-          <a-switch :checked="!!text" :loading="loadingUpdateVisibility"
-            @change="handleChangeVisibility(record as Stage)" />
+          <a-switch
+            :checked="!!text"
+            :loading="loadingUpdateVisibility"
+            @change="handleChangeVisibility(record as Stage)"
+          />
         </template>
         <template v-if="column.key === 'actions'">
-          <a-space class="flex" style="justify-content: flex-end;">
-            <router-link v-if="isAdmin || record.permission == 'editor' || record.permission == 'owner'"
-              :to="`/stages/stage-management/${record.id}/`">
+          <!--
+            width: 100% so the flex container spans the full cell;
+            otherwise `justify-content: flex-end` has nothing to push
+            against when only the Enter button is rendered (no Manage
+            for non-editor/non-owner players), and the lone button
+            collapses toward the start of the cell instead of staying
+            right-aligned with the multi-button rows above/below.
+          -->
+          <a-space class="flex" style="width: 100%; justify-content: flex-end">
+            <router-link
+              v-if="isAdmin || record.permission == 'editor' || record.permission == 'owner'"
+              :to="`/stages/stage-management/${record.id}/`"
+            >
               <a-button>
                 <setting-outlined />
                 Manage

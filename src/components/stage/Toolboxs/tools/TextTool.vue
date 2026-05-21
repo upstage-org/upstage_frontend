@@ -1,88 +1,3 @@
-<template>
-  <section v-show="isWriting" class="writing" @click="onClickWriting" :style="{
-    width: stageSize.width + 'px',
-    height: stageSize.height + 'px',
-    top: stageSize.top + 'px',
-    left: stageSize.left + 'px',
-  }">
-    <p ref="el" :style="options" contenteditable="true">
-      Write or paste
-      <br />your text here
-    </p>
-  </section>
-  <template v-if="!isWriting">
-    <div @click="createText" class="text-tool">
-      <div class="icon is-large">
-        <Icon size="36" src="new.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("new_text") }}</span>
-    </div>
-    <div v-for="text in savedTexts" :key="text" class="is-pulled-left saved-text">
-      <ContextMenu>
-        <template #trigger>
-          <Skeleton :data="text" />
-        </template>
-        <template #context>
-          <a class="panel-block has-text-danger" @click="deleteTextPermanently(text)">
-            <span class="panel-icon">
-              <Icon src="remove.svg" />
-            </span>
-            <span>{{ $t("delete_permanently") }}</span>
-          </a>
-        </template>
-      </ContextMenu>
-    </div>
-  </template>
-  <template v-else>
-    <div class="text-tool" style="width: 200px; z-index: 1005">
-      <span class="tag muted is-block">{{ $t("font") }}</span>
-      <Dropdown class="font-dropdown" v-model="options.fontFamily" :data="fontFamilies" @open="fontDropdownOpen">
-        <template #option="{ label }">
-          <span :style="{ 'font-family': label }">{{ label }}</span>
-        </template>
-      </Dropdown>
-    </div>
-    <div class="text-tool" style="z-index: 1004">
-      <span class="tag muted is-block">Size (px)</span>
-      <Field :modelValue="options.fontSize.slice(0, -2)" @update:modelValue="changeFontSize" type="number" />
-    </div>
-    <div class="text-tool" style="z-index: 1003">
-      <span class="tag muted is-block">{{ $t("colour") }}</span>
-      <ColorPicker v-model="options.color" />
-    </div>
-    <div class="text-tool" :class="{ active: options.fontWeight }" @click="toggleBold">
-      <div class="icon is-large">
-        <Icon size="36" src="bold.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("bold") }}</span>
-    </div>
-    <div class="text-tool" :class="{ active: options.fontStyle }" @click="toggleItalic">
-      <div class="icon is-large">
-        <Icon size="36" src="italic.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("italic") }}</span>
-    </div>
-    <div class="text-tool" :class="{ active: options.textDecoration }" @click="toggleUnderline">
-      <div class="icon is-large">
-        <Icon size="36" src="underline.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("underline") }}</span>
-    </div>
-    <div class="text-tool has-tooltip-bottom" @click="saveText">
-      <div class="icon is-large">
-        <Icon size="40" src="check.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("save") }}</span>
-    </div>
-    <div class="text-tool" @click="cancelWriting">
-      <div class="icon is-large">
-        <Icon size="32" src="cancel.svg" />
-      </div>
-      <span class="tag is-block">{{ $t("cancel") }}</span>
-    </div>
-  </template>
-</template>
-
 <script>
 import Dropdown from "components/form/Dropdown.vue";
 import Field from "components/form/Field.vue";
@@ -90,17 +5,17 @@ import ColorPicker from "components/form/ColorPicker.vue";
 import ContextMenu from "components/ContextMenu.vue";
 import Skeleton from "../Skeleton.vue";
 import Icon from "components/Icon.vue";
-import { useStore } from "vuex";
+import { useStageStore } from "@stores/pinia/stage";
 import { computed, onUnmounted, ref } from "vue";
 import { v4 as uuidv4 } from "uuid";
 
 export default {
   components: { Dropdown, Field, ColorPicker, Skeleton, Icon, ContextMenu },
   setup: () => {
-    const store = useStore();
-    const stageSize = computed(() => store.getters["stage/stageSize"]);
-    const isWriting = computed(() => store.state.stage.preferences.isWriting);
-    const options = store.state.stage.preferences.text;
+    const stageStore = useStageStore();
+    const stageSize = computed(() => stageStore.stageSize);
+    const isWriting = computed(() => stageStore.preferences.isWriting);
+    const options = stageStore.preferences.text;
     const fontFamilies = [
       "Josefin Sans",
       "Arial",
@@ -150,8 +65,8 @@ export default {
     };
 
     const createText = () => {
-      store.commit("stage/UPDATE_IS_WRITING", true);
-      store.commit("stage/SET_ACTIVE_MOVABLE", null);
+      stageStore.UPDATE_IS_WRITING(true);
+      stageStore.SET_ACTIVE_MOVABLE(null);
       onClickWriting({
         clientX: window.innerWidth / 2 - 200,
         clientY: window.innerHeight / 2 - 50,
@@ -159,7 +74,7 @@ export default {
     };
 
     const cancelWriting = () => {
-      store.commit("stage/UPDATE_IS_WRITING", false);
+      stageStore.UPDATE_IS_WRITING(false);
     };
 
     const el = ref();
@@ -167,7 +82,7 @@ export default {
       const { width, height } = el.value.getBoundingClientRect() ?? {};
       const x = e.clientX - stageSize.value.left - width / 2;
       const y = e.clientY - stageSize.value.top - height / 2;
-      store.commit("stage/UPDATE_TEXT_OPTIONS", {
+      stageStore.UPDATE_TEXT_OPTIONS({
         left: x + "px",
         top: y + "px",
         x,
@@ -178,9 +93,9 @@ export default {
 
     const saveText = async () => {
       const { width, height } = el.value.getBoundingClientRect() ?? {};
-      store.commit("stage/UPDATE_IS_WRITING", false);
+      stageStore.UPDATE_IS_WRITING(false);
       const textId = uuidv4();
-      store.dispatch("stage/addText", {
+      stageStore.addText({
         ...options,
         content: el.value.innerHTML,
         w: width + 10,
@@ -194,7 +109,7 @@ export default {
       if (!options.fontWeight) {
         fontWeight = "bold";
       }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { fontWeight });
+      stageStore.UPDATE_TEXT_OPTIONS({ fontWeight });
     };
 
     const toggleItalic = () => {
@@ -202,7 +117,7 @@ export default {
       if (!options.fontStyle) {
         fontStyle = "italic";
       }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { fontStyle });
+      stageStore.UPDATE_TEXT_OPTIONS({ fontStyle });
     };
 
     const toggleUnderline = () => {
@@ -210,16 +125,14 @@ export default {
       if (!options.textDecoration) {
         textDecoration = "underline";
       }
-      store.commit("stage/UPDATE_TEXT_OPTIONS", { textDecoration });
+      stageStore.UPDATE_TEXT_OPTIONS({ textDecoration });
     };
 
-    const savedTexts = computed(() => store.state.stage.board.texts);
+    const savedTexts = computed(() => stageStore.board.texts);
     const fontDropdownOpen = (visible) => {
       const topbar = document.querySelector("#topbar");
       if (topbar) {
-        topbar.style.overflow = visible
-          ? "visible"
-          : "auto";
+        topbar.style.overflow = visible ? "visible" : "auto";
       }
     };
 
@@ -231,17 +144,16 @@ export default {
     });
 
     const deleteTextPermanently = (text) => {
-      store.commit("stage/POP_TEXT", text.textId);
-      store.getters["stage/objects"]
+      stageStore.POP_TEXT(text.textId);
+      stageStore.objects
         .filter((o) => o.textId === text.textId)
         .forEach((o) => {
-          store.dispatch("stage/deleteObject", o);
+          stageStore.deleteObject(o);
         });
     };
     onUnmounted(() => {
       const topbar = document.querySelector("#topbar");
-      if (topbar)
-        topbar.style.overflow = "auto";
+      if (topbar) topbar.style.overflow = "auto";
     });
 
     return {
@@ -266,13 +178,112 @@ export default {
 };
 </script>
 
+<template>
+  <section
+    v-show="isWriting"
+    class="writing"
+    :style="{
+      width: stageSize.width + 'px',
+      height: stageSize.height + 'px',
+      top: stageSize.top + 'px',
+      left: stageSize.left + 'px',
+    }"
+    @click="onClickWriting"
+  >
+    <p ref="el" :style="options" contenteditable="true">
+      Write or paste
+      <br />your text here
+    </p>
+  </section>
+  <template v-if="!isWriting">
+    <div class="text-tool" @click="createText">
+      <div class="icon is-large">
+        <Icon size="36" src="new.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("new_text") }}</span>
+    </div>
+    <div v-for="text in savedTexts" :key="text" class="is-pulled-left saved-text">
+      <ContextMenu>
+        <template #trigger>
+          <Skeleton :data="text" />
+        </template>
+        <template #context>
+          <a class="panel-block has-text-danger" @click="deleteTextPermanently(text)">
+            <span class="panel-icon">
+              <Icon src="remove.svg" />
+            </span>
+            <span>{{ $t("delete_permanently") }}</span>
+          </a>
+        </template>
+      </ContextMenu>
+    </div>
+  </template>
+  <template v-else>
+    <div class="text-tool" style="width: 200px; z-index: 1005">
+      <span class="tag muted is-block">{{ $t("font") }}</span>
+      <Dropdown
+        v-model="options.fontFamily"
+        class="font-dropdown"
+        :data="fontFamilies"
+        @open="fontDropdownOpen"
+      >
+        <template #option="{ label }">
+          <span :style="{ 'font-family': label }">{{ label }}</span>
+        </template>
+      </Dropdown>
+    </div>
+    <div class="text-tool" style="z-index: 1004">
+      <span class="tag muted is-block">Size (px)</span>
+      <Field
+        :model-value="options.fontSize.slice(0, -2)"
+        type="number"
+        @update:model-value="changeFontSize"
+      />
+    </div>
+    <div class="text-tool" style="z-index: 1003">
+      <span class="tag muted is-block">{{ $t("colour") }}</span>
+      <ColorPicker v-model="options.color" />
+    </div>
+    <div class="text-tool" :class="{ active: options.fontWeight }" @click="toggleBold">
+      <div class="icon is-large">
+        <Icon size="36" src="bold.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("bold") }}</span>
+    </div>
+    <div class="text-tool" :class="{ active: options.fontStyle }" @click="toggleItalic">
+      <div class="icon is-large">
+        <Icon size="36" src="italic.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("italic") }}</span>
+    </div>
+    <div class="text-tool" :class="{ active: options.textDecoration }" @click="toggleUnderline">
+      <div class="icon is-large">
+        <Icon size="36" src="underline.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("underline") }}</span>
+    </div>
+    <div class="text-tool has-tooltip-bottom" @click="saveText">
+      <div class="icon is-large">
+        <Icon size="40" src="check.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("save") }}</span>
+    </div>
+    <div class="text-tool" @click="cancelWriting">
+      <div class="icon is-large">
+        <Icon size="32" src="cancel.svg" />
+      </div>
+      <span class="tag is-block">{{ $t("cancel") }}</span>
+    </div>
+  </template>
+</template>
+
 <style lang="scss">
 .writing {
   position: fixed;
   z-index: 1000;
   background-color: rgba($color: white, $alpha: 0.8);
 
-  >p {
+  > p {
     position: absolute;
   }
 }
@@ -284,7 +295,7 @@ export default {
 }
 
 .saved-text {
-  >div {
+  > div {
     width: 100%;
     overflow: hidden;
     p {
