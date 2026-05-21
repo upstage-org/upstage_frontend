@@ -222,12 +222,11 @@ export default {
       :class="{ 'is-compact': compact }"
       @wheel="horizontalScroll"
     >
-      <!-- Keep the Meeting panel (and its Yourself preview / local
-           WebRTC tracks) alive while switching toolbox tabs so a
-           published stream on the board behaves like any other avatar:
-           it stays up when you open Audio, Props, etc. Without this,
-           unmounting Meeting ran Yourself's onUnmounted, which disposed
-           camera/mic tracks and froze the tile for everyone. -->
+      <!-- Keep the Meeting panel UI alive while switching toolbox tabs.
+           Local WebRTC tracks are owned by LocalStreamPublisher in the
+           live layout (session-scoped), not by this panel — so closing
+           the topbar or switching to Audio/Props does not dispose camera
+           tracks while jitsi tiles remain on the board. -->
       <keep-alive include="Meeting">
         <component :is="tool" />
       </keep-alive>

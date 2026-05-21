@@ -7,6 +7,7 @@ import StageToolbox from "components/stage/Toolboxs/index.vue";
 import Board from "components/stage/Board.vue";
 import AudioPlayer from "components/stage/AudioPlayer.vue";
 import Shell from "components/objects/MeetingObject/Shell.vue";
+import LocalStreamPublisher from "components/objects/MeetingObject/LocalStreamPublisher.vue";
 import Preloader from "./Preloader.vue";
 import LoginPrompt from "./LoginPrompt.vue";
 import ConnectionStatus from "./ConnectionStatus.vue";
@@ -33,11 +34,12 @@ export default {
     ConnectionStatus,
     MasqueradingStatus,
     Shell,
+    LocalStreamPublisher,
   },
   setup: () => {
     const stageStore = useStageStore();
     const authStore = useAuthStore();
-    const { ready, canPlay } = storeToRefs(stageStore);
+    const { ready, canPlay, enabledLiveStreaming } = storeToRefs(stageStore);
 
     const route = useRoute();
     stageStore.loadStage({ url: route.params.url }).then(() => {
@@ -102,6 +104,7 @@ export default {
     return {
       ready,
       canPlay,
+      enabledLiveStreaming,
       loggedIn,
       studioEndpoint: "/stages/",
     };
@@ -121,6 +124,7 @@ export default {
     </div>
   </div>
   <Shell id="main-content">
+    <LocalStreamPublisher v-if="ready && canPlay && enabledLiveStreaming" />
     <Preloader />
     <template v-if="ready">
       <Board />

@@ -573,6 +573,89 @@ test.describe("streaming: performer streams, audience views @full", () => {
     }
   });
 
+  test("jitsi tile on board persists after closing Streams toolbox panel", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `persist-stream-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      const performerLive = new LiveStagePage(performerPage);
+      await performerLive.goto(runtime.stageSlug);
+
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      const meetingTab = performerPage
+        .locator('nav#toolbox .panel-block:has(img[src$="meeting.svg"])')
+        .first();
+      await meetingTab.waitFor({ state: "visible", timeout: 15_000 });
+      await meetingTab.click();
+
+      const yourselfVideo = performerPage.locator("#topbar video[playsinline][muted]").first();
+      await yourselfVideo.waitFor({ state: "attached", timeout: 30_000 });
+      await performerPage.waitForFunction(
+        () => {
+          const v = document.querySelector(
+            "#topbar video[playsinline][muted]",
+          ) as HTMLVideoElement | null;
+          return Boolean(v && v.videoWidth > 0);
+        },
+        { timeout: 20_000 },
+      );
+
+      await performerPage.evaluate(
+        async ({ name }) => {
+          type BoardObject = Record<string, unknown> & { id: string };
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            placeObjectOnStage: (p: unknown) => BoardObject;
+            shapeObject: (p: unknown) => unknown | Promise<unknown>;
+            board: { objects: BoardObject[] };
+          };
+          const placed = stage.placeObjectOnStage({
+            type: "jitsi",
+            name,
+            w: 200,
+            h: 150,
+            x: 220,
+            y: 180,
+            liveAction: true,
+            published: true,
+          });
+          const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
+          await Promise.resolve(stage.shapeObject({ ...fromBoard, liveAction: true }));
+        },
+        { name: streamName },
+      );
+
+      const boardTile = performerPage.locator(`[data-testid="object-${streamName}"]`);
+      await boardTile.waitFor({ state: "visible", timeout: 15_000 });
+      const boardVideo = boardTile.locator("video").first();
+      await boardVideo.waitFor({ state: "attached", timeout: 30_000 });
+
+      const closePanel = performerPage.locator("#topbar .topbar-close").first();
+      await closePanel.waitFor({ state: "visible", timeout: 10_000 });
+      await closePanel.click();
+      await performerPage.locator("#topbar").waitFor({ state: "hidden", timeout: 10_000 });
+
+      await expect(boardTile).toBeVisible();
+      await expect(boardVideo).toBeVisible();
+      await expect(boardTile.locator(".loading")).toHaveCount(0, { timeout: 10_000 });
+
+      await performerPage.screenshot({
+        path: path.join(SCREENSHOT_DIR, "jitsi-persist-after-close-panel.png"),
+        fullPage: true,
+      });
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
   /**
    * Cross-client WebRTC publish — performer drags Yourself onto the
    * board, audience renders a `Jitsi.vue` tile that subscribes to the
