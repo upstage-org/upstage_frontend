@@ -446,9 +446,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
       // Scope to OUR meeting object's frame so any stale meeting
       // iframes on the board (left over from prior runs by retained
       // MQTT messages) can't satisfy or break this assertion.
-      const ourFrame = performerPage
-        .locator(`.frame:has(iframe.room[src*="${roomName}"])`)
-        .first();
+      const ourFrame = performerPage.locator(`.frame:has(iframe.room[src*="${roomName}"])`).first();
       await ourFrame.waitFor({ state: "attached", timeout: 30_000 });
 
       // .failed overlay shows up after the component's 15s loadTimer
@@ -573,6 +571,235 @@ test.describe("streaming: performer streams, audience views @full", () => {
     }
   });
 
+  test("jitsi tile on board persists after closing Streams toolbox panel", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `persist-stream-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      const performerLive = new LiveStagePage(performerPage);
+      await performerLive.goto(runtime.stageSlug);
+
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      const meetingTab = performerPage
+        .locator('nav#toolbox .panel-block:has(img[src$="meeting.svg"])')
+        .first();
+      await meetingTab.waitFor({ state: "visible", timeout: 15_000 });
+      await meetingTab.click();
+
+      const yourselfVideo = performerPage.locator("#topbar video[playsinline][muted]").first();
+      await yourselfVideo.waitFor({ state: "attached", timeout: 30_000 });
+      await performerPage.waitForFunction(
+        () => {
+          const v = document.querySelector(
+            "#topbar video[playsinline][muted]",
+          ) as HTMLVideoElement | null;
+          return Boolean(v && v.videoWidth > 0);
+        },
+        { timeout: 20_000 },
+      );
+
+      await performerPage.evaluate(
+        async ({ name }) => {
+          type BoardObject = Record<string, unknown> & { id: string };
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            placeObjectOnStage: (p: unknown) => BoardObject;
+            shapeObject: (p: unknown) => unknown | Promise<unknown>;
+            board: { objects: BoardObject[] };
+          };
+          const placed = stage.placeObjectOnStage({
+            type: "jitsi",
+            name,
+            w: 200,
+            h: 150,
+            x: 220,
+            y: 180,
+            liveAction: true,
+            published: true,
+          });
+          const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
+          await Promise.resolve(stage.shapeObject({ ...fromBoard, liveAction: true }));
+        },
+        { name: streamName },
+      );
+
+      const boardTile = performerPage.locator(`[data-testid="object-${streamName}"]`);
+      await boardTile.waitFor({ state: "visible", timeout: 15_000 });
+      const boardVideo = boardTile.locator("video").first();
+      await boardVideo.waitFor({ state: "attached", timeout: 30_000 });
+
+      const closePanel = performerPage.locator("#topbar .topbar-close").first();
+      await closePanel.waitFor({ state: "visible", timeout: 10_000 });
+      await closePanel.click();
+      await performerPage.locator("#topbar").waitFor({ state: "hidden", timeout: 10_000 });
+
+      await expect(boardTile).toBeVisible();
+      await expect(boardVideo).toBeVisible();
+      await expect(boardTile.locator(".loading")).toHaveCount(0, { timeout: 10_000 });
+
+      await performerPage.screenshot({
+        path: path.join(SCREENSHOT_DIR, "jitsi-persist-after-close-panel.png"),
+        fullPage: true,
+      });
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * MQTT status flap regression — performer's local WebRTC tracks must
+   * NOT be torn down when MQTT briefly goes back to "CONNECTING" (which
+   * happens on every mqtt.js auto-reconnect: idle timeouts, network
+   * blips, mobile network handoff, etc.).
+   *
+   * The previous build of `useLocalStreamPublisher` carried:
+   *   watch(() => stageStore.status, (status) => {
+   *     if (status !== "LIVE") releaseLocalTracks();
+   *   });
+   * which disposed the published `JitsiTrack`s on every MQTT bounce.
+   * Outgoing RTP stopped, JVB forwarded nothing to the audience, the
+   * on-stage <Jitsi> tile spun forever, and the top-right refresh
+   * button became a no-op (`republishLocalTracks` short-circuits on
+   * `tracks.length === 0`). This test would have caught it: the
+   * Yourself preview `<video>` would drop `videoWidth` back to 0 the
+   * moment we force-set `status = "CONNECTING"`.
+   *
+   * The fix is to NOT watch MQTT status for WebRTC track lifecycle.
+   * Track lifecycle belongs to:
+   *   * the component (onUnmounted releases),
+   *   * `publishingAllowed()` (canPlay flipping off),
+   *   * the board state (own-tile removed).
+   * MQTT status is none of the above.
+   */
+  test("performer tracks survive MQTT status flap (CONNECTING blip)", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      const performerLive = new LiveStagePage(performerPage);
+      await performerLive.goto(runtime.stageSlug);
+
+      // Open Meeting tab so Yourself.vue mounts and the publisher's
+      // `jitsi.localTracks` is bound to a visible <video> element we
+      // can poll on for `videoWidth`.
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+      const meetingTab = performerPage
+        .locator('nav#toolbox .panel-block:has(img[src$="meeting.svg"])')
+        .first();
+      await meetingTab.waitFor({ state: "visible", timeout: 15_000 });
+      await meetingTab.click();
+
+      const yourselfVideo = performerPage.locator("#topbar video[playsinline][muted]").first();
+      await yourselfVideo.waitFor({ state: "attached", timeout: 30_000 });
+      // First frame proves createLocalTracks → publisher.syncLocalTracksRef
+      // → Yourself.vue attachPreview() ran end-to-end. `videoWidth > 0` is
+      // our liveness indicator throughout this test.
+      await performerPage.waitForFunction(
+        () => {
+          const v = document.querySelector(
+            "#topbar video[playsinline][muted]",
+          ) as HTMLVideoElement | null;
+          return Boolean(v && v.videoWidth > 0);
+        },
+        { timeout: 20_000 },
+      );
+
+      // Force the MQTT status flap. We call the mutations directly via
+      // the dev hook to avoid actually severing the broker socket — the
+      // bug under test is the SPA's reaction to `status` changing, not
+      // any broker-side behaviour. The mutations are the same the
+      // `client.on("reconnect")` / `client.on("connect")` handlers in
+      // stage.ts use.
+      await performerPage.evaluate(() => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          SET_STATUS: (s: string) => void;
+        };
+        stage.SET_STATUS("CONNECTING");
+      });
+
+      // The bug was synchronous: the watcher fired, releaseLocalTracks()
+      // called dispose() on each track, the MediaStream went inert, and
+      // the <video> reverted to videoWidth 0 within a frame or two.
+      // Give the renderer a couple of animation frames to surface any
+      // disposal, then assert the track is still live.
+      await performerPage.waitForTimeout(500);
+
+      const stillLiveAfterFlap = await performerPage.evaluate(() => {
+        const v = document.querySelector(
+          "#topbar video[playsinline][muted]",
+        ) as HTMLVideoElement | null;
+        // Sample currentTime, sleep a beat, sample again — a disposed
+        // track stops decoding so currentTime stops advancing. A still-
+        // live track keeps advancing.
+        if (!v || v.videoWidth === 0) {
+          return Promise.resolve({ alive: false, reason: "no-video", delta: 0 });
+        }
+        const before = v.currentTime;
+        return new Promise<{ alive: boolean; reason: string; delta: number }>((resolve) => {
+          setTimeout(() => {
+            const after = v.currentTime;
+            resolve({
+              alive: after > before,
+              reason: after > before ? "ok" : "frozen",
+              delta: after - before,
+            });
+          }, 800);
+        });
+      });
+      expect(
+        stillLiveAfterFlap.alive,
+        `Performer <video> must still be decoding new frames after MQTT CONNECTING flap (reason=${stillLiveAfterFlap.reason}, delta=${stillLiveAfterFlap.delta})`,
+      ).toBe(true);
+
+      // Restore status to LIVE — same as the broker's "connect" event
+      // does on reconnect. Track lifecycle should be untouched.
+      await performerPage.evaluate(() => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          SET_STATUS: (s: string) => void;
+        };
+        stage.SET_STATUS("LIVE");
+      });
+
+      // Belt and braces: also poke jitsi.localTracks via the same
+      // composable surface a future regression would touch. The
+      // publisher exposes `jitsi.localTracks` through Shell.vue's
+      // provide. We can't reach the provide map from Playwright, but
+      // the <video> already proves the track is bound; this final
+      // check just confirms post-LIVE recovery state is stable.
+      await performerPage.waitForFunction(
+        () => {
+          const v = document.querySelector(
+            "#topbar video[playsinline][muted]",
+          ) as HTMLVideoElement | null;
+          return Boolean(v && v.videoWidth > 0 && !v.paused);
+        },
+        { timeout: 5_000 },
+      );
+
+      await performerPage.screenshot({
+        path: path.join(SCREENSHOT_DIR, "yourself-after-mqtt-flap.png"),
+        fullPage: true,
+      });
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
   /**
    * Cross-client WebRTC publish — performer drags Yourself onto the
    * board, audience renders a `Jitsi.vue` tile that subscribes to the
@@ -587,8 +814,17 @@ test.describe("streaming: performer streams, audience views @full", () => {
    * Even with all of that, ICE negotiation on a CI runner behind NAT is
    * notoriously flaky; treat this as an opt-in deep-integration test
    * rather than part of the smoke loop.
+   *
+   * This is the regression net for the publisher-inject bug:
+   * `LocalStreamPublisher` was provided from a leaf sibling component so
+   * `Yourself.vue#inject("localStreamPublisher")` resolved to null,
+   * `publisher.join()` was a no-op, `room.addTrack()` was never called,
+   * and JVB reported `bitrate.upload: 0` for every "publisher".
+   * Audience tiles appeared (MQTT delivered the placement) but carried
+   * no media — `<video>` stayed at `videoWidth === 0`. Asserting
+   * `videoWidth > 0` here is the test that would have caught it.
    */
-  test("WebRTC: performer publishes Yourself, audience sees jitsi tile @live", async ({
+  test("WebRTC: performer publishes Yourself, audience sees video frames @live", async ({
     browser,
   }) => {
     test.skip(
@@ -599,6 +835,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     const runtime = readRuntime();
     const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `stream-frames-${runtime.runId}-${Date.now().toString(36)}`;
 
     let performerCtx: BrowserContext | null = null;
     let audienceCtx: BrowserContext | null = null;
@@ -612,60 +849,55 @@ test.describe("streaming: performer streams, audience views @full", () => {
       audienceCtx = await browser.newContext();
       const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
 
-      // Wait for the performer's Jitsi `joined` flag to flip true. Until
-      // then `Yourself.vue#join()` is a no-op (it iterates `tracks` and
-      // calls `jitsi.room.addTrack(t)`, but `jitsi.room` is null).
-      await performerPage
-        .waitForFunction(
-          () => {
-            // Yourself.vue uses `inject("joined")`. The provider is in
-            // Shell.vue which is rendered at the live layout level; we
-            // peek at its underlying ref via the global jitsi composable
-            // module's exposed state if available, or by polling the
-            // performer's published board for any jitsi-typed object as a
-            // proxy signal.
-            const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
-              board: { objects: Array<{ type?: string }> };
-            };
-            return Boolean(stage.board.objects.find((o) => o.type === "jitsi"));
-          },
-          { timeout: 60_000 },
-        )
-        .catch(() => {
-          /* fall through; the next assertion will surface a meaningful failure */
-        });
+      // Open the Meeting toolbox tab. This mounts Yourself.vue, whose
+      // onMounted calls publisher.ensureTracks() — but the publisher
+      // also acquires tracks on its own (Shell.vue → useLocalStream-
+      // Publisher) regardless of Yourself.vue, so this step is
+      // belt-and-braces. With Chromium fake-media flags the camera
+      // prompt auto-grants and createLocalTracks resolves to a
+      // synthetic feed.
+      const meetingTab = performerPage
+        .locator('nav#toolbox .panel-block:has(img[src$="meeting.svg"])')
+        .first();
+      await meetingTab.waitFor({ state: "visible", timeout: 15_000 });
+      await meetingTab.click();
+      await waitForPerformerJoinedAndTracks(performerPage);
 
-      // Drive the publish: place a jitsi-typed object on the board and
-      // broadcast it. This is the same code path Yourself.vue's
-      // `join()` triggers when the performer drags the tile out of the
-      // toolbox onto the board.
-      await performerPage.evaluate(async () => {
-        type BoardObject = Record<string, unknown> & { id: string };
-        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
-          placeObjectOnStage: (p: unknown) => BoardObject;
-          shapeObject: (p: unknown) => unknown | Promise<unknown>;
-          board: { objects: BoardObject[] };
-        };
-        const placed = stage.placeObjectOnStage({
-          type: "jitsi",
-          name: "performer-stream",
-          w: 200,
-          h: 150,
-          x: 250,
-          y: 200,
-        });
-        const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
-        await Promise.resolve(
-          stage.shapeObject({ ...fromBoard, liveAction: true, published: false }),
-        );
+      // Drive the publish: place a jitsi tile on the board and
+      // broadcast it. The publisher's board-state watcher picks this
+      // up, calls room.addTrack, and tracks start flowing to JVB.
+      await placeJitsiTileFromPerformer(performerPage, streamName, {
+        x: 250,
+        y: 200,
       });
 
-      // Audience receives the broadcast and renders Jitsi.vue, which
-      // mounts a <video> element to bind the remote MediaStream to.
-      const audienceJitsiTile = audience.page
-        .locator('[data-testid^="object-performer-stream"]')
-        .or(audience.page.locator("video").nth(0));
-      await audienceJitsiTile.first().waitFor({ state: "attached", timeout: 60_000 });
+      // Audience receives the placement via MQTT and renders Jitsi.vue.
+      const audienceTile = audience.page.locator(`[data-testid="object-${streamName}"]`).first();
+      await audienceTile.waitFor({ state: "attached", timeout: 60_000 });
+      const audienceVideo = audienceTile.locator("video").first();
+      await audienceVideo.waitFor({ state: "attached", timeout: 60_000 });
+
+      // The critical assertion: actual decoded frames reach the
+      // audience. `videoWidth` stays at 0 until the first frame is
+      // decoded, so a non-zero value proves the entire pipeline
+      // worked end-to-end:
+      //   performer createLocalTracks
+      //     → publisher.publishLocalTracksToRoom
+      //     → room.addTrack (the no-op before the fix)
+      //     → JVB receives RTP, forwards to audience
+      //     → audience TRACK_ADDED → Jitsi.vue#loadTrack → attach
+      //     → <video> decodes
+      // Pre-fix this assertion fails because JVB never received any
+      // RTP at all (`bitrate.upload: 0`).
+      await audience.page.waitForFunction(
+        (testid) => {
+          const tile = document.querySelector(`[data-testid="object-${testid}"]`);
+          const v = tile?.querySelector("video") as HTMLVideoElement | null;
+          return Boolean(v && v.videoWidth > 0);
+        },
+        streamName,
+        { timeout: 60_000 },
+      );
 
       await audience.page.screenshot({
         path: path.join(SCREENSHOT_DIR, "audience-receives-stream.png"),
@@ -676,4 +908,272 @@ test.describe("streaming: performer streams, audience views @full", () => {
       await audienceCtx?.close().catch(() => {});
     }
   });
+
+  /**
+   * Navigate-back regression — the second half of the same bug.
+   *
+   * Even after the inject is repaired, a performer who navigates away
+   * from the live page and back must re-publish the tracks for the
+   * persisted on-board jitsi tile, otherwise the audience sees a stale
+   * frozen frame (or nothing). Two failure modes are covered:
+   *
+   *   • `pendingPublish` is set only by `Yourself.vue#join()`, so a
+   *     fresh `LocalStreamPublisher` instance on remount sat with
+   *     `pendingPublish=false` and never re-published. Fix: the
+   *     board-state watcher now triggers publish whenever an own-jitsi
+   *     tile exists.
+   *
+   *   • lib-jitsi-meet assigns a fresh `myUserId` on every
+   *     CONFERENCE_JOINED, so the persisted tile's `participantId` is
+   *     orphaned after rejoin and `Jitsi.vue#isOwnTile` returns false
+   *     for the performer (and remote-track lookups by participantId
+   *     also fail on the audience side). Fix: `placeObjectOnStage`
+   *     stamps `hostId = session.value` on jitsi tiles, and
+   *     `syncLocalJitsiParticipantId` rewrites stale participantIds
+   *     where `hostId === session.value`.
+   *
+   * Same `@live` gating as the publish test — needs the real Jitsi
+   * server to verify cross-peer media flow.
+   */
+  test("WebRTC: persisted jitsi tile re-publishes after performer navigates away/back @live", async ({
+    browser,
+  }) => {
+    test.skip(
+      process.env.JITSI_E2E_LIVE !== "1",
+      "JITSI_E2E_LIVE=1 required (real Jitsi server + JVB reachable)",
+    );
+
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `stream-navback-${runtime.runId}-${Date.now().toString(36)}`;
+
+    let performerCtx: BrowserContext | null = null;
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      // ---- 1. Performer joins, publishes, audience sees frames ----
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      const performerLive = new LiveStagePage(performerPage);
+      await performerLive.goto(runtime.stageSlug);
+
+      audienceCtx = await browser.newContext();
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      const meetingTab = performerPage
+        .locator('nav#toolbox .panel-block:has(img[src$="meeting.svg"])')
+        .first();
+      await meetingTab.waitFor({ state: "visible", timeout: 15_000 });
+      await meetingTab.click();
+      await waitForPerformerJoinedAndTracks(performerPage);
+
+      await placeJitsiTileFromPerformer(performerPage, streamName, {
+        x: 260,
+        y: 210,
+      });
+
+      // Verify the initial publish works — both performer self-tile
+      // AND audience receive frames. If this fails, the navigate-back
+      // assertion later would be misleading; we'd be testing recovery
+      // of a state we never reached in the first place.
+      await waitForAudienceVideoFrames(audience.page, streamName, 60_000);
+
+      // ---- 2. Performer navigates AWAY from the live route ----
+      // Going to "/" tears down Layout.vue → Shell.vue → useJitsi()
+      // disconnect path and (pre-fix) loses the publisher state.
+      // Wait for the live layout to actually unmount before navigating
+      // back so we exercise the full teardown/setup cycle.
+      await performerPage.goto("/");
+      await performerPage.waitForLoadState("domcontentloaded");
+      await performerPage.waitForFunction(
+        () => document.querySelector('#board, [data-testid="board"]') == null,
+        { timeout: 10_000 },
+      );
+
+      // ---- 3. Performer navigates BACK to the live stage ----
+      // loadStage replays board events and re-populates the persisted
+      // jitsi tile. Pre-fix: tile is on the board with a stale
+      // participantId, no publish was triggered, no tracks flow.
+      // Post-fix: hostId-match heals participantId; board-state
+      // watcher triggers re-publish; audience video resumes.
+      await performerLive.goto(runtime.stageSlug);
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      // Confirm the persisted tile is back on the performer's board
+      // (sanity — persistence itself is a precondition of this test).
+      await performerPage.waitForFunction(
+        (name) =>
+          Boolean(
+            window.__UPSTAGE_PINIA__!.stage.board.objects.find(
+              (o: { name?: string; type?: string }) => o.type === "jitsi" && o.name === name,
+            ),
+          ),
+        streamName,
+        { timeout: 30_000 },
+      );
+
+      await waitForPerformerJoinedAndTracks(performerPage);
+
+      // The audience side never navigated, but the JitsiTracks it
+      // held for the performer's previous JID are orphaned by the
+      // performer's `leave()` on navigate-away. The fresh re-publish
+      // arrives with a NEW track id under the performer's NEW
+      // myUserId; the audience tile's `participantId` is healed by
+      // the performer's syncLocalJitsiParticipantId broadcast so the
+      // tile re-binds to the new tracks and frames resume.
+      //
+      // We poll with a per-iteration freshness check rather than just
+      // `videoWidth > 0`: the OLD <video> element may still report
+      // its last frozen frame's dimensions even though no new RTP is
+      // arriving. The `currentTime` of an attached MediaStream-backed
+      // <video> advances as new frames are decoded, so we sample it
+      // and require it to advance over the polling window.
+      await waitForAudienceVideoFreshFrames(audience.page, streamName, 90_000);
+
+      await performerPage.screenshot({
+        path: path.join(SCREENSHOT_DIR, "performer-after-navback.png"),
+        fullPage: true,
+      });
+      await audience.page.screenshot({
+        path: path.join(SCREENSHOT_DIR, "audience-after-performer-navback.png"),
+        fullPage: true,
+      });
+    } finally {
+      await performerCtx?.close().catch(() => {});
+      await audienceCtx?.close().catch(() => {});
+    }
+  });
 });
+
+// ============================================================================
+// Streaming-specific helpers (used by the @live tests above).
+// ============================================================================
+
+/**
+ * Wait for the performer to be fully wired into the Jitsi conference
+ * with local tracks acquired. The publisher requires three async
+ * preconditions before `room.addTrack` is meaningful:
+ *
+ *   1. CONFERENCE_JOINED has fired (lib-jitsi-meet has a `myUserId`).
+ *   2. `createLocalTracks` has resolved (camera/mic granted).
+ *   3. `jitsi.localTracks` has been written by the publisher.
+ *
+ * Polling all three from the performer Pinia store + DOM keeps the
+ * subsequent `placeObjectOnStage` from racing the publisher.
+ */
+async function waitForPerformerJoinedAndTracks(performerPage: Page): Promise<void> {
+  await performerPage.waitForFunction(
+    () => {
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as { status: string };
+      if (stage.status !== "LIVE") return false;
+      // Yourself.vue's <video ref="el"> is bound the moment
+      // `jitsi.localTracks` is populated by the publisher.
+      const v = document.querySelector(
+        "#topbar video[playsinline][muted]",
+      ) as HTMLVideoElement | null;
+      return Boolean(v && v.videoWidth > 0);
+    },
+    { timeout: 60_000 },
+  );
+}
+
+/**
+ * Place a jitsi-typed tile on the performer's board. Uses the same
+ * Pinia store path the real drag-from-Yourself handler triggers.
+ * Returns the placed object's `id` for downstream lookups.
+ */
+async function placeJitsiTileFromPerformer(
+  performerPage: Page,
+  name: string,
+  pos: { x: number; y: number },
+): Promise<string> {
+  return performerPage.evaluate(
+    async ({ name: n, pos: p }) => {
+      type BoardObject = Record<string, unknown> & {
+        id: string;
+        participantId?: string | null;
+      };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        placeObjectOnStage: (p: unknown) => BoardObject;
+        shapeObject: (p: unknown) => unknown | Promise<unknown>;
+        board: { objects: BoardObject[] };
+      };
+      const placed = stage.placeObjectOnStage({
+        type: "jitsi",
+        name: n,
+        w: 200,
+        h: 150,
+        x: p.x,
+        y: p.y,
+      });
+      const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
+      if (!fromBoard) {
+        throw new Error(`streaming: placeObjectOnStage did not push ${n} to board.objects`);
+      }
+      await Promise.resolve(
+        stage.shapeObject({ ...fromBoard, liveAction: true, published: false }),
+      );
+      return placed.id;
+    },
+    { name, pos },
+  );
+}
+
+/**
+ * Audience-side assertion: a <video> for the given stream name
+ * eventually reports `videoWidth > 0`, i.e. decoded at least one
+ * frame. Pre-fix this never happened because JVB received no RTP.
+ */
+async function waitForAudienceVideoFrames(
+  audiencePage: Page,
+  streamName: string,
+  timeoutMs: number,
+): Promise<void> {
+  await audiencePage.waitForFunction(
+    (testid) => {
+      const tile = document.querySelector(`[data-testid="object-${testid}"]`);
+      const v = tile?.querySelector("video") as HTMLVideoElement | null;
+      return Boolean(v && v.videoWidth > 0);
+    },
+    streamName,
+    { timeout: timeoutMs },
+  );
+}
+
+/**
+ * Stronger audience-side assertion used after the performer navigates
+ * away and back: the <video> must not just have *had* frames at some
+ * point but must be receiving NEW frames now. A frozen <video> that
+ * stopped decoding keeps its last `videoWidth`, so a static check is
+ * not enough — sample `currentTime` and require it to advance.
+ */
+async function waitForAudienceVideoFreshFrames(
+  audiencePage: Page,
+  streamName: string,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const advanced = await audiencePage
+      .evaluate(
+        async ({ testid, sampleWindowMs }) => {
+          const tile = document.querySelector(`[data-testid="object-${testid}"]`);
+          const v = tile?.querySelector("video") as HTMLVideoElement | null;
+          if (!v || v.videoWidth === 0) return false;
+          const t0 = v.currentTime;
+          await new Promise((r) => setTimeout(r, sampleWindowMs));
+          return v.currentTime > t0;
+        },
+        { testid: streamName, sampleWindowMs: 1500 },
+      )
+      .catch(() => false);
+    if (advanced) return;
+    await audiencePage.waitForTimeout(500);
+  }
+  throw new Error(
+    `[streaming] audience <video> for "${streamName}" did not advance currentTime within ${timeoutMs}ms`,
+  );
+}

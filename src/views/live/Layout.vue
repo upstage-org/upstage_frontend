@@ -15,7 +15,7 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useAuthStore } from "@stores/pinia/auth";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import { isJwtExpired, loggedIn } from "utils/auth";
 
@@ -122,6 +122,15 @@ export default {
   </div>
   <Shell id="main-content">
     <Preloader />
+    <!--
+      LocalStreamPublisher used to live here as a sibling of
+      StageToolbox, but provide/inject only flows to descendants —
+      Yourself.vue (inside StageToolbox) couldn't see it, so
+      publisher.join() was a silent no-op and tracks were never
+      published to the conference. The publisher now lives inside
+      Shell.vue's setup so its API is in the same provide-tree as
+      `jitsi`/`joined` and reaches every descendant.
+    -->
     <template v-if="ready">
       <Board />
       <StageToolbox v-if="canPlay" />

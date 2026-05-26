@@ -1748,6 +1748,18 @@ export const useStageStore = defineStore("stage", () => {
     ) {
       object.participantId = inferredJitsiId;
     }
+    // Stamp the placing-tab's session id on jitsi tiles so we can heal
+    // their stale `participantId` after a navigate-away/back. lib-jitsi-
+    // meet assigns a fresh `myUserId` on every CONFERENCE_JOINED, so a
+    // persisted tile that was published as participant `abc123` is
+    // orphaned the next time the same performer rejoins as `xyz789`.
+    // `session.value` is per-tab and survives in sessionStorage across
+    // intra-tab navigation, so it's the right key for "this tile is
+    // mine" — `syncLocalJitsiParticipantId` uses it to re-bind on the
+    // next join.
+    if (isJitsiBoardType(object.type) && session.value) {
+      object.hostId = session.value;
+    }
     if (isStreamPlaybackBoardType(object.type)) {
       object.hostId = session.value;
       // Start playing as soon as the video is placed on stage so the
@@ -1775,13 +1787,24 @@ export const useStageStore = defineStore("stage", () => {
   /**
    * Set when lib-jitsi-meet reports CONFERENCE_JOINED / left. With a non-null
    * id, back-fills `participantId` on jitsi objects placed before myUserId
-   * existed (drag racing the conference handshake).
+   * existed (drag racing the conference handshake) AND re-binds any
+   * persisted own-tile whose `participantId` is stale from a previous
+   * conference membership. Own-tiles are identified by `hostId ===
+   * session.value` (set in `placeObjectOnStage`); we cannot rely on the
+   * persisted participantId itself because lib-jitsi-meet assigns a
+   * fresh `myUserId` on every CONFERENCE_JOINED, so the tile placed as
+   * `abc123` last navigation is orphaned the next time we rejoin as
+   * `xyz789` unless we proactively rewrite it.
    */
   function syncLocalJitsiParticipantId(id: string | null) {
     localJitsiParticipantId.value = id;
     if (id == null) return;
+    const mySession = session.value;
     for (const o of board.value.objects) {
-      if (isJitsiBoardType(o.type) && (o.participantId == null || o.participantId === "")) {
+      if (!isJitsiBoardType(o.type)) continue;
+      const missing = o.participantId == null || o.participantId === "";
+      const staleOwn = mySession != null && o.hostId === mySession && o.participantId !== id;
+      if (missing || staleOwn) {
         UPDATE_OBJECT({ ...o, participantId: id } as BoardObject);
       }
     }
