@@ -23,7 +23,7 @@ export default {
     const emojiPicker = ref();
     const stageStore = useStageStore();
     const canPlay = computed(() => stageStore.canPlay);
-    const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
+    const chatDarkMode = computed(() => stageStore.effectiveChatDarkMode);
 
     const isHoldingShift = useHoldingShift();
 

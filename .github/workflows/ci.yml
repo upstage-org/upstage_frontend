@@ -1,0 +1,42 @@
+name: CI
+
+# Mirrors the local pre-push gate (`pnpm verify`) so a `--no-verify`
+# bypass on a developer machine is still caught server-side. Keep this
+# in sync with `.husky/pre-push` — if a step is added there, add it
+# here, and vice versa.
+on:
+  push:
+  pull_request:
+
+# Avoid wasting CI minutes when a branch is force-pushed mid-run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck + tests + audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm must be installed BEFORE setup-node so setup-node's pnpm
+      # cache can find the binary. Version is pinned to match the
+      # `packageManager` field in package.json.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify (typecheck + tests + audit)
+        run: pnpm run verify

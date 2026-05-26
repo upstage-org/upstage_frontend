@@ -139,6 +139,8 @@ export default {
   audience_view: "Publikens synpunkt",
   light_mode_chat: "Chatt i ljusläge",
   dark_mode_chat: "Chatt i mörkt läge",
+  chat_switch_to_light_mode: "Byt chatt till ljust läge",
+  chat_switch_to_dark_mode: "Byt chatt till mörkt läge",
   new_text: "Ny Text",
   create_a_account_with_upstage: "Skapa ett konto med UpStage",
   email_subject_prefix: "Prefix för e-postämne",

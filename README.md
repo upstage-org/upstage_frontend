@@ -55,3 +55,63 @@ PWHEADLESS=0 E2E_PHASES=rehearsal,replay pnpm e2e:perform # rare; replay against
 PWHEADLESS=0 E2E_PHASES=live E2E_BEATS=smoke pnpm e2e:perform
 
 E2E_REPLAY still works as a fallback default when E2E_PHASES is unset.
+
+## Local protections (git hooks)
+
+This repo uses [husky](https://typicode.github.io/husky) to run a small
+suite of local protections against the same checks that run in CI. They
+exist so problems are caught at the developer's machine — before they
+hit `main` — and so a `git push --no-verify` bypass is still caught
+server-side by `.github/workflows/ci.yml`.
+
+### One-time install
+
+```bash
+pnpm install
+```
+
+The `prepare` script runs `husky` automatically and installs the hooks
+into `.husky/`. If pnpm 10/11 prompts about build scripts, run
+`pnpm approve-builds husky` once.
+
+### What runs and when
+
+| Hook         | What it does                                                                             | Typical time |
+| ------------ | ---------------------------------------------------------------------------------------- | ------------ |
+| `pre-commit` | `lint-staged`: ESLint `--fix` + Prettier `--write` on staged JS/TS/Vue/JSON/MD/SCSS only | < 5 s        |
+| `commit-msg` | Light gate: rejects empty / `wip` / `fixup!` / messages shorter than 10 characters       | instant      |
+| `pre-push`   | `pnpm typecheck` + `pnpm test` + `pnpm audit:ci` (production deps, fail on `high`+)      | ~30–35 s     |
+
+The `pre-push` hook is intentionally identical to the `verify` script
+and to the CI workflow, so a clean local push is a strong signal that
+CI will pass.
+
+### Manual run
+
+```bash
+pnpm run verify        # typecheck + tests + audit
+pnpm run typecheck     # vue-tsc only
+pnpm run audit:ci      # production audit, fail on high+
+```
+
+### Bypassing for emergencies
+
+Both hooks honour git's standard escape hatch:
+
+```bash
+git commit --no-verify -m "hotfix: ..."
+git push --no-verify
+```
+
+Use sparingly. CI will still run the full verify suite on the pushed
+branch and on the PR, so a bypass only delays the failure — it does not
+hide it.
+
+### Adding a new check
+
+1. Add a script to `package.json` so it can be run standalone (e.g.
+   `pnpm run my-check`).
+2. Add the same script to `.husky/pre-push` (and update the `verify`
+   script if it should be part of the bundle).
+3. Add the matching step to `.github/workflows/ci.yml` so the local
+   gate and the server-side gate stay in lockstep.
