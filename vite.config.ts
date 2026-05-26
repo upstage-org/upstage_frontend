@@ -90,9 +90,7 @@ function localStaticContentPlugin(opts: { dir: string; urlPrefix: string }): Plu
         );
         return;
       }
-      server.config.logger.info(
-        `[upstage] dev: serving ${mount}/* from ${absDir}`,
-      );
+      server.config.logger.info(`[upstage] dev: serving ${mount}/* from ${absDir}`);
       server.middlewares.use(mount, (req, res, next) => {
         if (req.method !== "GET" && req.method !== "HEAD") {
           return next();
@@ -144,8 +142,13 @@ export default defineConfig(({ mode, command }) => {
   // to serve uploaded media ourselves. Refuse to start the dev server if the
   // operator hasn't said where it lives — silently 404ing every image and
   // audio file in the UI is far worse than failing loudly here.
+  //
+  // Vitest also invokes Vite with `command === "serve"` to build its module
+  // graph, but defaults `mode` to "test"; CI runs `pnpm run test` without an
+  // .env file, so we must skip the guard there. The local static-content
+  // plugin is `apply: "serve"`-scoped and harmless under Vitest.
   const localServeStaticContent = env.LOCAL_SERVE_STATIC_CONTENT;
-  if (command === "serve" && !localServeStaticContent) {
+  if (command === "serve" && mode !== "test" && !localServeStaticContent) {
     throw new Error(
       "[upstage] LOCAL_SERVE_STATIC_CONTENT is not set in .env.\n" +
         "  This var is required for `vite dev` (run_front_end_*.sh --serve) so the\n" +
@@ -163,13 +166,7 @@ export default defineConfig(({ mode, command }) => {
       VueDevTools(),
       tsconfigPaths(),
       AutoImport({
-        imports: [
-          "vue",
-          "vue-router",
-          "pinia",
-          "@vueuse/core",
-          { "vue-i18n": ["useI18n"] },
-        ],
+        imports: ["vue", "vue-router", "pinia", "@vueuse/core", { "vue-i18n": ["useI18n"] }],
         dts: "src/auto-imports.d.ts",
         eslintrc: { enabled: true },
       }),
