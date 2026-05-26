@@ -1,27 +1,53 @@
-# UpStage Front End Installation
+# UpStage Installation
 
-Do This After Back End Installation and Configuration. See the upstage_backend repo README for details.
-https://github.com/upstage-org/upstage_backend
+Both repos now follow the same shape: a per-site env file plus a `_dev` / `_prod` run script. Install order is **backend first, then frontend** — the frontend's `.env` points at the backend's GraphQL and MQTT endpoints, so the backend has to exist before the frontend bundle is built.
 
-## Setup and Startup Instructions
+### Prerequisites
 
-To generate the necessary environment scripts and start up the application using Docker, follow these steps:
+- Docker + `docker compose` (v2). The run scripts call compose for you; you never invoke `docker` directly.
+- `sudo` (the run scripts create `/frontend_app_<site>/` and `/app_code_<site>/` and chown them).
+- `pnpm` only if you intend to use `run_front_end_*.sh --serve`.
 
-1. Open your terminal and navigate to upstage_frontend
+## 1. Backend (`upstage_backend`)
 
-1. Run the following command to generate the environment scripts:
+Clone https://github.com/upstage-org/upstage_backend and follow its README. The short version:
 
+1. `./initial_scripts/environments/generate_environments_script.sh` — generates Postgres / MQTT / FastAPI secrets, fills `src/global_config/load_env.py`, `container_scripts/mqtt_server/pw.txt`, and the service-containers run script.
+2. `cd service_containers && ./run_docker_compose_dev.sh` (or `_prod.sh`) — brings up Postgres + Mosquitto.
+3. `cd ../app_containers && ./run_docker_compose_dev.sh` (or `_prod.sh`) — brings up the FastAPI app.
+
+## 2. Frontend (this repo)
+
+1. Create a per-site env file by copying [`env.template`](env.template):
+
+   ```bash
+   cp env.template env_backup_dev    # or env_backup_prod
    ```
-   ./initial_scripts/generate_environments_script.sh
+
+   Edit it to match your backend. The values that almost always need changing:
+   - `VITE_GRAPHQL_ENDPOINT` — must point at the backend you brought up in step 1 (e.g. `https://dev.your-domain/api/`).
+   - `VITE_MQTT_ENDPOINT`, `VITE_MQTT_USERNAME`, `VITE_MQTT_PASSWORD` — match the Mosquitto password you set in the backend's MQTT password file.
+   - `VITE_JITSI_ENDPOINT` — your streaming host (or `http://localhost/` for local-only).
+   - `VITE_CLOUDFLARE_CAPTCHA_SITEKEY`, `VITE_STRIPE_KEY` — set if you're enabling those integrations.
+   - `VITE_ENV_TYPE=Production` for hardened deploys; anything else disables CAPTCHA + CORS for local dev.
+
+2. Run the matching script:
+
+   ```bash
+   ./run_front_end_dev.sh         # writes a built dist/ to /frontend_app_dev/dist
+   ./run_front_end_prod.sh        # same, for /frontend_app_prod/dist
+   ./run_front_end_dev.sh --serve # Vite dev server on :3001 with HMR (host-side, no build)
+   ./run_front_end_prod.sh --serve # same, on :3002
    ```
 
-1. Once the scripts are generated, start up the application using Docker Compose:
+   The script copies `env_backup_<site>` to both `/frontend_app_<site>/.env` and `./.env`, then either produces a built `dist/` at `/frontend_app_<site>/dist/` for host nginx to serve (default `--build`), or runs Vite directly on the host (`--serve`).
 
-   ```
-   ./run_front_end.sh
-   ```
+   The dev/prod distinction only changes `${SITE}` — the per-site output dir and the per-site env file. `--build` vs `--serve` is independent of that.
 
-1. The application should now be running. You can access it by navigating to `https://{YOUR_DOMAIN}` in your web browser.
+## 3. Verify
+
+- `--build` mode: point your host nginx alias at `/frontend_app_<site>/dist/` and open `https://<your-domain>`.
+- `--serve` mode: open `http://localhost:3001` (dev) or `http://localhost:3002` (prod).
 
 Testing:
 
