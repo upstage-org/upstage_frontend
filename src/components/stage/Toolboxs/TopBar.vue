@@ -223,8 +223,9 @@ export default {
       @wheel="horizontalScroll"
     >
       <!-- Keep the Meeting panel UI alive while switching toolbox tabs.
-           Local WebRTC tracks are owned by LocalStreamPublisher in the
-           live layout (session-scoped), not by this panel — so closing
+           Local WebRTC tracks are owned by useLocalStreamPublisher() in
+           Shell.vue (session-scoped, providered alongside `jitsi` so
+           Yourself.vue can inject it), not by this panel — so closing
            the topbar or switching to Audio/Props does not dispose camera
            tracks while jitsi tiles remain on the board. -->
       <keep-alive include="Meeting">

@@ -7,7 +7,6 @@ import StageToolbox from "components/stage/Toolboxs/index.vue";
 import Board from "components/stage/Board.vue";
 import AudioPlayer from "components/stage/AudioPlayer.vue";
 import Shell from "components/objects/MeetingObject/Shell.vue";
-import LocalStreamPublisher from "components/objects/MeetingObject/LocalStreamPublisher.vue";
 import Preloader from "./Preloader.vue";
 import LoginPrompt from "./LoginPrompt.vue";
 import ConnectionStatus from "./ConnectionStatus.vue";
@@ -16,7 +15,7 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useAuthStore } from "@stores/pinia/auth";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import { isJwtExpired, loggedIn } from "utils/auth";
 
@@ -34,12 +33,11 @@ export default {
     ConnectionStatus,
     MasqueradingStatus,
     Shell,
-    LocalStreamPublisher,
   },
   setup: () => {
     const stageStore = useStageStore();
     const authStore = useAuthStore();
-    const { ready, canPlay, enabledLiveStreaming } = storeToRefs(stageStore);
+    const { ready, canPlay } = storeToRefs(stageStore);
 
     const route = useRoute();
     stageStore.loadStage({ url: route.params.url }).then(() => {
@@ -104,7 +102,6 @@ export default {
     return {
       ready,
       canPlay,
-      enabledLiveStreaming,
       loggedIn,
       studioEndpoint: "/stages/",
     };
@@ -124,8 +121,16 @@ export default {
     </div>
   </div>
   <Shell id="main-content">
-    <LocalStreamPublisher v-if="ready && canPlay && enabledLiveStreaming" />
     <Preloader />
+    <!--
+      LocalStreamPublisher used to live here as a sibling of
+      StageToolbox, but provide/inject only flows to descendants —
+      Yourself.vue (inside StageToolbox) couldn't see it, so
+      publisher.join() was a silent no-op and tracks were never
+      published to the conference. The publisher now lives inside
+      Shell.vue's setup so its API is in the same provide-tree as
+      `jitsi`/`joined` and reaches every descendant.
+    -->
     <template v-if="ready">
       <Board />
       <StageToolbox v-if="canPlay" />

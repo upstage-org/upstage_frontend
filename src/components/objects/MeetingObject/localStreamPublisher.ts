@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { inject, onMounted, onUnmounted, ref, watch, type Ref } from "vue";
+import { onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { isJitsiBoardType } from "@utils/common";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
@@ -28,6 +28,15 @@ export const blockedReason = (err: unknown): string => {
   }
 };
 
+type JitsiRefs = {
+  room: {
+    myUserId?: () => string;
+    addTrack: (t: unknown) => Promise<void>;
+    removeTrack: (t: unknown) => Promise<void>;
+  } | null;
+  localTracks: Ref<unknown[]>;
+};
+
 export type LocalStreamPublisherApi = {
   join: () => Promise<void>;
   ensureTracks: () => Promise<void>;
@@ -37,16 +46,26 @@ export type LocalStreamPublisherApi = {
 };
 
 /**
- * Session-scoped local WebRTC track lifecycle. Mounted from Layout via
- * LocalStreamPublisher.vue so closing the Meeting toolbox does not dispose
- * tracks while jitsi tiles remain on the board.
+ * Session-scoped local WebRTC track lifecycle.
+ *
+ * IMPORTANT: must be invoked from Shell.vue (alongside `useJitsi()`) and
+ * its API `provide()`d so it reaches `Yourself.vue`. The previous
+ * sibling-component design (`<LocalStreamPublisher>` next to
+ * `<StageToolbox>` under `<Shell>`) silently broke the inject — sibling
+ * components do not see each other's `provide` — so `Yourself.vue#join`
+ * was a no-op and `room.addTrack()` was never called. Confirmed via
+ * JVB telemetry: `forwardedSources: []`, `bitrate.upload: 0` for every
+ * publisher.
+ *
+ * Takes `jitsi` and `joined` as parameters (rather than `inject`ing
+ * them) so the call order from Shell.setup is deterministic — Shell
+ * creates both pieces in the same setup and provides everything to
+ * descendants in one shot.
  */
-export function useLocalStreamPublisher(): LocalStreamPublisherApi {
-  const jitsi = inject("jitsi") as {
-    room: { myUserId?: () => string; addTrack: (t: unknown) => Promise<void>; removeTrack: (t: unknown) => Promise<void> } | null;
-    localTracks: Ref<unknown[]>;
-  };
-  const joined = inject("joined") as Ref<boolean>;
+export function useLocalStreamPublisher(
+  jitsi: JitsiRefs,
+  joined: Ref<boolean>,
+): LocalStreamPublisherApi {
   const JitsiMeetJS = useLowLevelAPI();
   const stageStore = useStageStore();
 
@@ -96,6 +115,9 @@ export function useLocalStreamPublisher(): LocalStreamPublisherApi {
     ).length;
   };
 
+  const publishingAllowed = (): boolean =>
+    Boolean(stageStore.canPlay) && Boolean(stageStore.enabledLiveStreaming);
+
   const publishLocalTracksToRoom = async () => {
     if (!joined.value || !jitsi?.room) return;
     for (const t of tracks) {
@@ -131,6 +153,13 @@ export function useLocalStreamPublisher(): LocalStreamPublisherApi {
   };
 
   const acquireLocalTracks = async () => {
+    if (!publishingAllowed()) {
+      // Audience or live-streaming disabled: never touch the camera.
+      // The composable is mounted from Shell for ALL viewers because
+      // Shell hosts the jitsi conference object — we just no-op here
+      // when the user is not a publisher.
+      return;
+    }
     if (typeof window !== "undefined" && !window.isSecureContext) {
       setBlocked(
         "Camera/mic require an HTTPS connection. Reload this page over https:// and try again.",
@@ -191,6 +220,10 @@ export function useLocalStreamPublisher(): LocalStreamPublisherApi {
   };
 
   const join = async () => {
+    // Compatibility shim for Yourself.vue's drag/click handlers. The
+    // canonical publish trigger is the board-state watcher below
+    // (covers first drag + navigate-back with persisted tiles), but
+    // we keep this hook so any direct caller still works.
     await ensureTracks();
     pendingPublish.value = true;
     await tryPublishWhenReady("join-action");
@@ -211,6 +244,20 @@ export function useLocalStreamPublisher(): LocalStreamPublisherApi {
     }
   });
 
+  // If `canPlay` flips on after mount (e.g. permission upgrades mid-
+  // session, or `loadStage` resolves asynchronously), kick the
+  // acquire path again so we don't sit in a silent unconfigured state.
+  watch(
+    () => publishingAllowed(),
+    (allowed, prev) => {
+      if (allowed && !prev) {
+        void acquireLocalTracks();
+      } else if (!allowed && prev) {
+        releaseLocalTracks();
+      }
+    },
+  );
+
   usePageWakeRecovery(() => {
     if (joined.value && tracks.length > 0) {
       void acquireLocalTracks();
@@ -226,10 +273,25 @@ export function useLocalStreamPublisher(): LocalStreamPublisherApi {
 
   watch(joined, async (isJoined) => {
     if (isJoined) {
+      // Conference is back online — if a persisted own-tile is already
+      // on the board, kick the canonical board-driven publish.
+      if (publishingAllowed() && countOwnJitsiOnBoard() > 0 && !published.value) {
+        pendingPublish.value = true;
+      }
       await tryPublishWhenReady("joined-watch");
     }
   });
 
+  // Board-state watcher: the canonical signal for "publisher should
+  // publish" is "an own-jitsi tile exists on the board". This covers:
+  //   * first drag from the Yourself preview (Yourself.vue calls
+  //     placeObjectOnStage which appends a tile),
+  //   * navigate-back with persisted tiles (loadStage replays events
+  //     and re-populates board.objects),
+  //   * programmatic placement (tests, future flows).
+  // The previous `pendingPublish`-only design required Yourself.vue to
+  // explicitly call publisher.join(), which silently broke when the
+  // inject chain regressed. Driving off the board removes that gap.
   let prevOwnJitsiCount = 0;
   watch(
     () => countOwnJitsiOnBoard(),
@@ -240,20 +302,34 @@ export function useLocalStreamPublisher(): LocalStreamPublisherApi {
       }
       if (prevOwnJitsiCount > 0 && count === 0) {
         releaseLocalTracks();
+      } else if (count > 0 && !published.value && publishingAllowed()) {
+        pendingPublish.value = true;
+        void tryPublishWhenReady("own-jitsi-on-board");
       }
       prevOwnJitsiCount = count;
     },
     { immediate: true },
   );
 
-  watch(
-    () => stageStore.status,
-    (status) => {
-      if (status !== "LIVE") {
-        releaseLocalTracks();
-      }
-    },
-  );
+  // NOTE: there is deliberately NO watcher on `stageStore.status` here.
+  //
+  // `stageStore.status` reflects the **MQTT** broker connection
+  // ("OFFLINE"/"CONNECTING"/"LIVE") and is independent of the Jitsi
+  // conference health (which is `joined.value`). MQTT.js auto-reconnects
+  // on idle timeouts, network blips, mobile network handoff, etc., and
+  // every reconnect flips `status` to "CONNECTING" before settling back
+  // to "LIVE". A previous version of this file disposed local tracks on
+  // any non-"LIVE" status transition — which silently tore down the
+  // performer's published WebRTC tracks on every MQTT keepalive bounce,
+  // stopping outgoing RTP. The audience side then saw the on-stage
+  // <Jitsi> tile but never received frames, and the refresh-streams
+  // button was a no-op because `republishLocalTracks()` short-circuits
+  // on `tracks.length === 0`. WebRTC track lifecycle must NOT be tied
+  // to MQTT status. The legitimate release paths are already covered:
+  //   * `onUnmounted` below (route teardown).
+  //   * The `publishingAllowed` watcher (canPlay / enabledLiveStreaming
+  //     flipping off mid-session).
+  //   * The board-state watcher above (own-jitsi tile removed from board).
 
   onUnmounted(() => {
     if (deviceEvents && mediaDevicesAPI?.removeEventListener) {
