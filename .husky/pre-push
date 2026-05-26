@@ -1,0 +1,13 @@
+# Slow gate, run only on push (not on every commit). Mirrors
+# `pnpm verify` and the CI workflow exactly so a clean local push
+# means the CI build will pass for the same reasons.
+#
+# Order is cheapest-first so failures fail fast:
+#   1. typecheck   ~22s
+#   2. unit tests  ~10s
+#   3. audit       <2s (network)
+#
+# `set -e` is implicit in husky v9 — any non-zero exit aborts the push.
+pnpm run typecheck
+pnpm run test
+pnpm run audit:ci

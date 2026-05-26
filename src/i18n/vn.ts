@@ -115,6 +115,8 @@ export default {
   audience_view: "Đối tượng xem",
   light_mode_chat: "Trò chuyện ở chế độ ánh sáng",
   dark_mode_chat: "Trò chuyện ở chế độ tối",
+  chat_switch_to_light_mode: "Chuyển trò chuyện sang chế độ sáng",
+  chat_switch_to_dark_mode: "Chuyển trò chuyện sang chế độ tối",
   new_text: "Văn bản mới",
   create_a_account_with_upstage: "Tạo tài khoản với UpStage",
   email_subject_prefix: "Tiền tố chủ đề email",

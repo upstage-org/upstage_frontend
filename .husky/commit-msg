@@ -1,0 +1,36 @@
+# Light commit-message gate. We deliberately do NOT enforce
+# Conventional Commits here — the repo history is informal and the
+# team has not opted in. The intent of this hook is just to stop
+# accidental empty / "wip" / "fix" / "fixup!" commits from landing
+# on shared branches. Anyone who really needs to bypass can use
+# `git commit --no-verify` for the rare emergency, and CI will still
+# run the rest of the verify suite server-side.
+#
+# We only inspect the SUBJECT line (the first non-comment, non-blank
+# line). Body paragraphs and machine-generated trailers like
+# `Co-authored-by:`, `Signed-off-by:`, etc. are intentionally ignored
+# — they would otherwise smuggle a bare `fix` message past the length
+# gate just because of an auto-appended trailer.
+msg_file="$1"
+
+# Pick the first line that is neither a git comment (`# …`) nor blank.
+# This is the "subject" git itself uses for `git log --oneline` etc.
+subject=$(grep -v '^#' "$msg_file" | grep -v '^[[:space:]]*$' | head -n 1)
+
+# Trim leading/trailing whitespace from the subject for the
+# substantive checks, but keep the original around for the length
+# count so a subject of "          " is still rejected as empty.
+subject_trimmed=$(printf '%s' "$subject" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+subject_compact=$(printf '%s' "$subject_trimmed" | tr -d '[:space:]')
+
+case "$subject_compact" in
+  '' | wip | WIP* | fixup* | squash*)
+    echo "[commit-msg] subject looks empty / WIP / fixup. Use a real subject line, or pass --no-verify for an explicit emergency bypass."
+    exit 1
+    ;;
+esac
+
+if [ "${#subject_compact}" -lt 10 ]; then
+  echo "[commit-msg] subject must be at least 10 non-whitespace characters (got ${#subject_compact}: \"$subject_trimmed\")."
+  exit 1
+fi

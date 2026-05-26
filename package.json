@@ -38,7 +38,20 @@
     "codegen": "graphql-codegen --config codegen.ts",
     "codegen:watch": "graphql-codegen --config codegen.ts --watch",
     "depcheck": "depcheck --ignores=\"@types/*,eslint-*,@vue/eslint-config-*,@typescript-eslint/*,vue-eslint-parser,jsdom,postcss,autoprefixer,vite-tsconfig-paths,@playwright/test,@vitest/ui,@vue/test-utils,@graphql-codegen/*\"",
-    "serve:localhost": "vite --mode localhost --port=3000"
+    "serve:localhost": "vite --mode localhost --port=3000",
+    "prepare": "husky",
+    "typecheck": "vue-tsc --noEmit --skipLibCheck",
+    "audit:ci": "pnpm audit --prod --audit-level=high",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run audit:ci"
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx,vue}": [
+      "eslint --fix --max-warnings=999999",
+      "prettier --write"
+    ],
+    "*.{json,md,scss,css,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
@@ -66,7 +79,7 @@
     "html2canvas": "1.4.1",
     "humanize-duration": "^3.33.2",
     "jquery": "4.0.0",
-    "js-cookie": "3.0.5",
+    "js-cookie": "^3.0.6",
     "less": "^4.6.4",
     "lodash": "4.18.1",
     "mobile-drag-drop": "3.0.0-rc.0",
@@ -114,7 +127,9 @@
     "eslint": "^10.3.0",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-vue": "^10.9.1",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "lint-staged": "^17.0.5",
     "postcss": "^8.5.14",
     "prettier": "^3.8.3",
     "sass": "^1.99.0",
@@ -152,6 +167,7 @@
       "qs@<6.14.2": "6.14.2",
       "rollup@>=4.0.0 <4.59.0": "4.59.0",
       "undici@<6.24.0": "6.24.0",
+      "ws": "^8.20.1",
       "yaml@>=2.0.0 <2.8.3": "2.8.3"
     }
   }
