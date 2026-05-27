@@ -89,5 +89,11 @@ services:
       # Host path is created + chowned by the run_front_end_*.sh script before
       # `docker compose run`. The container clears it and refills with the
       # freshly-built dist on each invocation.
-      - /frontend_app_${SITE}/dist:/output
+      # `:z` tells Docker to relabel the host directory to the shared SELinux
+      # `container_file_t` type so the container (running as ${HOST_UID}:${HOST_GID})
+      # can write into it on Fedora/RHEL with SELinux enforcing. Without this,
+      # the in-container `cp -a` is denied by policy before UID/GID is even
+      # checked, and /frontend_app_${SITE}/dist stays empty. `:z` (shared) lets
+      # host nginx read the files afterwards; `:Z` (private) would lock them.
+      - /frontend_app_${SITE}/dist:/output:z
     restart: "no"
