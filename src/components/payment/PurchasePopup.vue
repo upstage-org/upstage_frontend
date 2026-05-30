@@ -30,23 +30,6 @@ export default {
     const captcha = ref(null);
 
     const resetPaymentState = () => {
-      // #region agent log
-      fetch("http://127.0.0.1:7376/ingest/6f614e54-efe4-4702-8a5c-49b5a1e358df", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "40ed5e",
-        },
-        body: JSON.stringify({
-          sessionId: "40ed5e",
-          hypothesisId: "H5",
-          location: "PurchasePopup.vue:resetPaymentState",
-          message: "donation popup payment state reset",
-          data: { hadClientSecret: !!clientSecret.value, hadToken: !!captchaToken.value },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       clientSecret.value = undefined;
       captchaToken.value = "";
       captcha.value?.reset();
@@ -106,23 +89,6 @@ export default {
       async ([active, token]) => {
         if (!active) return;
         if (isProduction && siteKey && !token) {
-          // #region agent log
-          fetch("http://127.0.0.1:7376/ingest/6f614e54-efe4-4702-8a5c-49b5a1e358df", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "40ed5e",
-            },
-            body: JSON.stringify({
-              sessionId: "40ed5e",
-              hypothesisId: "H1",
-              location: "PurchasePopup.vue:watch",
-              message: "paymentSecret blocked until captcha in Production",
-              data: { isProduction, hasSiteKey: !!siteKey, hasToken: !!token },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
           return;
         }
 
@@ -131,27 +97,6 @@ export default {
           amount: parseFloat(amount.value) * 100,
           ...(token ? { token } : {}),
         };
-        // #region agent log
-        fetch("http://127.0.0.1:7376/ingest/6f614e54-efe4-4702-8a5c-49b5a1e358df", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "40ed5e",
-          },
-          body: JSON.stringify({
-            sessionId: "40ed5e",
-            hypothesisId: "H4",
-            location: "PurchasePopup.vue:watch",
-            message: "calling paymentSecret",
-            data: {
-              isProduction,
-              hasToken: !!payload.token,
-              amount: payload.amount,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         try {
           const res = await paymentSecret(payload);
           if (res.paymentSecret) {
