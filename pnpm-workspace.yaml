@@ -35,3 +35,10 @@ overrides:
   undici@5: 6.24.0
   ws: ^8.20.1
   yaml@>=2.0.0 <2.8.3: 2.8.3
+
+# Upstream peer ranges lag behind our pinned toolchain (eslint 10, typescript 6, tailwindcss 4).
+peerDependencyRules:
+  allowedVersions:
+    eslint: "10"
+    typescript: "6"
+    tailwindcss: "4"
