@@ -16,6 +16,10 @@ const { t } = useI18n();
 
 const { foyer, system } = storeToRefs(configStore);
 
+const refreshConfig = async () => {
+  await configStore.fetchConfig();
+};
+
 const foyerConfigs = () =>
   foyer.value && system.value
     ? [
@@ -47,14 +51,18 @@ About
           ]),
         }),
         h(Entry, {
+          key: "SHOW_REGISTRATION",
           label: t("registration_button"),
           name: "SHOW_REGISTRATION",
           defaultValue: foyer.value.showRegistration?.value ?? false,
+          refresh: refreshConfig,
         }),
         h(Entry, {
+          key: "ENABLE_DONATE",
           label: t("enable_upstage_donate"),
           name: "ENABLE_DONATE",
           defaultValue: system.value.enableDonate?.value ?? false,
+          refresh: refreshConfig,
         }),
       ]
     : [h(Skeleton)];
