@@ -1,86 +1,120 @@
-# UpStage Installation
+# UpStage Frontend
 
-Both repos now follow the same shape: a per-site env file plus a `_dev` / `_prod` run script. Install order is **backend first, then frontend** — the frontend's `.env` points at the backend's GraphQL and MQTT endpoints, so the backend has to exist before the frontend bundle is built.
+Vue 3 SPA for UpStage players and audience. Production deploys serve a static `dist/` bundle from host nginx.
+
+**Install is not run from this repo directly.** The backend single-host installer (phase `90_frontend`) invokes `run_front_end_{dev,prod}.sh` here. See the [backend README](../upstage_backend/README.md).
+
+## Installation
+
+From the backend installer:
+
+```sh
+cd upstage_backend/installation
+./install_single_host.sh --all
+```
+
+Before running (or before re-running phase `90_frontend`), prepare your per-site env files in this repo — see [Configuration](#configuration) below.
 
 ### Prerequisites
 
-- Docker + `docker compose` (v2). The run scripts call compose for you; you never invoke `docker` directly.
-- `sudo` (the run scripts create `/frontend_app_<site>/` and `/app_code_<site>/` and chown them).
-- `pnpm` only if you intend to use `run_front_end_*.sh --serve`.
+- The single-host installer handles Docker; you do not invoke `docker compose` directly for production installs.
+- `pnpm` is only needed if you use `run_front_end_*.sh --serve` for optional local dev (see [Run scripts](#run-scripts)).
 
-## 1. Backend (`upstage_backend`)
+## Configuration
 
-Clone https://github.com/upstage-org/upstage_backend and follow its README. The short version:
+Each site has a gitignored env backup plus a matching run script:
 
-1. `./initial_scripts/environments/generate_environments_script.sh` — generates Postgres / MQTT / FastAPI secrets, fills `src/global_config/load_env.py`, `container_scripts/mqtt_server/pw.txt`, and the service-containers run script.
-2. `cd service_containers && ./run_docker_compose_dev.sh` (or `_prod.sh`) — brings up Postgres + Mosquitto.
-3. `cd ../app_containers && ./run_docker_compose_dev.sh` (or `_prod.sh`) — brings up the FastAPI app.
+```bash
+cp env.template env_backup_dev     # or env_backup_prod
+# edit values, then run the installer (or re-run phase 90_frontend)
+```
 
-## 2. Frontend (this repo)
+- Only [`env.template`](env.template) is committed. `env_backup*` files are gitignored and live on the host.
+- Create `env_backup_prod` the same way as `env_backup_dev`.
 
-1. Create a per-site env file by copying [`env.template`](env.template):
+### Variables
 
-   ```bash
-   cp env.template env_backup_dev    # or env_backup_prod
-   ```
+| Variable                                              | Purpose                                                              |
+| ----------------------------------------------------- | -------------------------------------------------------------------- |
+| `VITE_GRAPHQL_ENDPOINT`                               | Backend API URL (baked at build time)                                |
+| `VITE_STATIC_ASSETS_ENDPOINT`                         | Upload URL prefix (default `/resources/`)                            |
+| `VITE_MQTT_NAMESPACE`                                 | MQTT topic prefix                                                    |
+| `VITE_MQTT_ENDPOINT`                                  | WebSocket MQTT URL                                                   |
+| `VITE_MQTT_USERNAME` / `VITE_MQTT_PASSWORD`           | Match backend Mosquitto `performance` user                           |
+| `VITE_JITSI_ENDPOINT`                                 | Streaming host from installer `state.env`                            |
+| `VITE_CLOUDFLARE_CAPTCHA_SITEKEY`                     | Turnstile site key                                                   |
+| `VITE_STRIPE_KEY`                                     | Stripe publishable key                                               |
+| `VITE_RELEASE_VERSION` / `VITE_ALIAS_RELEASE_VERSION` | Display version strings                                              |
+| `VITE_ENV_TYPE`                                       | `Production` → CAPTCHA + CORS; anything else → relaxed dev           |
+| `VITE_E2E`                                            | Exposes Pinia for Playwright (dev/test)                              |
+| `LOCAL_SERVE_STATIC_CONTENT`                          | **Required for `--serve` only** — path to `/app_code_<site>/uploads` |
 
-   Edit it to match your backend. The values that almost always need changing:
-   - `VITE_GRAPHQL_ENDPOINT` — must point at the backend you brought up in step 1 (e.g. `https://dev.your-domain/api/`).
-   - `VITE_MQTT_ENDPOINT`, `VITE_MQTT_USERNAME`, `VITE_MQTT_PASSWORD` — match the Mosquitto password you set in the backend's MQTT password file.
-   - `VITE_JITSI_ENDPOINT` — your streaming host (or `http://localhost/` for local-only).
-   - `VITE_CLOUDFLARE_CAPTCHA_SITEKEY`, `VITE_STRIPE_KEY` — set if you're enabling those integrations.
-   - `VITE_ENV_TYPE=Production` for hardened deploys; anything else disables CAPTCHA + CORS for local dev.
+See also [`.env.example`](.env.example) for inline comments (including optional Jitsi XMPP overrides).
 
-2. Run the matching script:
+### Dev vs prod example values
 
-   ```bash
-   ./run_front_end_dev.sh         # writes a built dist/ to /frontend_app_dev/dist
-   ./run_front_end_prod.sh        # same, for /frontend_app_prod/dist
-   ./run_front_end_dev.sh --serve # Vite dev server on :3001 with HMR (host-side, no build)
-   ./run_front_end_prod.sh --serve # same, on :3002
-   ```
+Use your actual domain; placeholders shown below:
 
-   The script copies `env_backup_<site>` to both `/frontend_app_<site>/.env` and `./.env`, then either produces a built `dist/` at `/frontend_app_<site>/dist/` for host nginx to serve (default `--build`), or runs Vite directly on the host (`--serve`).
+|                              | dev                           | prod                      |
+| ---------------------------- | ----------------------------- | ------------------------- |
+| `VITE_GRAPHQL_ENDPOINT`      | `https://dev.<domain>/api/`   | `https://<domain>/api/`   |
+| `VITE_MQTT_ENDPOINT`         | `wss://mqtt-dev.<domain>:443` | `wss://mqtt.<domain>:443` |
+| `LOCAL_SERVE_STATIC_CONTENT` | `/app_code_dev/uploads`       | `/app_code_prod/uploads`  |
 
-   The dev/prod distinction only changes `${SITE}` — the per-site output dir and the per-site env file. `--build` vs `--serve` is independent of that.
+## Run scripts
 
-## 3. Verify
+[`run_front_end_dev.sh`](run_front_end_dev.sh) and [`run_front_end_prod.sh`](run_front_end_prod.sh) are invoked by the installer (default **`--build`**). Re-run them manually after config changes if needed.
 
-- `--build` mode: point your host nginx alias at `/frontend_app_<site>/dist/` and open `https://<your-domain>`.
-- `--serve` mode: open `http://localhost:3001` (dev) or `http://localhost:3002` (prod).
+| Mode                            | Flag                 | Behavior                                                                                         |
+| ------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
+| **Build** (default, production) | `--build` or no flag | One-shot Docker compose build → `dist/` at `/frontend_app_<site>/dist/` for nginx                |
+| **Serve** (local dev only)      | `--serve`            | Host Vite HMR on `:3001` (dev) or `:3002` (prod); requires `pnpm` + `LOCAL_SERVE_STATIC_CONTENT` |
 
-Testing:
+- **`SITE`** (dev vs prod) and **`--build` vs `--serve`** are independent choices.
+- The script copies `env_backup_<site>` → `/frontend_app_<site>/.env` and `./.env`.
+- `--serve` is not used by the production installer.
 
+Host paths:
+
+| Path                                               | Purpose                                      |
+| -------------------------------------------------- | -------------------------------------------- |
+| `/frontend_app_dev/` / `/frontend_app_prod/`       | `.env` + built `dist/`                       |
+| `/app_code_dev/uploads` / `/app_code_prod/uploads` | Backend media (for `--serve` static serving) |
+
+## Verify
+
+- **Production (`--build`):** nginx serves `/frontend_app_<site>/dist/` at your app domain.
+- **`--serve` only:** open `http://localhost:3001` (dev) or `http://localhost:3002` (prod).
+
+## Testing
+
+End-to-end tests use Playwright. See [`tests/e2e/README.md`](tests/e2e/README.md) for full setup.
+
+```bash
 pnpm e2e:features
 
-# Default (today's behavior): all three phases headed, no replay headless.
-
+# Default: all three phases headed, no replay headless.
 PWHEADLESS=0 pnpm e2e:perform
 
 # Just rehearsal: cast walks the script in rehearsal mode, no audience.
-
 PWHEADLESS=0 pnpm e2e:perform:rehearsal
 
 # Just live: cast performs while audience watches; no rehearsal, no replay.
-
 PWHEADLESS=0 pnpm e2e:perform:live
 
 # Just replay: no cast logins. Audience watches the most recent recording.
-
 # Errors clearly if no Performance exists for the stage yet.
-
 PWHEADLESS=0 pnpm e2e:perform:replay
 
 # Arbitrary combos via the env var:
-
-PWHEADLESS=0 E2E_PHASES=live,replay pnpm e2e:perform # skip rehearsal
-PWHEADLESS=0 E2E_PHASES=rehearsal,replay pnpm e2e:perform # rare; replay against latest existing recording
+PWHEADLESS=0 E2E_PHASES=live,replay pnpm e2e:perform
+PWHEADLESS=0 E2E_PHASES=rehearsal,replay pnpm e2e:perform
 
 # Smoke beats still works on top of any phase selection:
-
 PWHEADLESS=0 E2E_PHASES=live E2E_BEATS=smoke pnpm e2e:perform
+```
 
-E2E_REPLAY still works as a fallback default when E2E_PHASES is unset.
+`E2E_REPLAY` still works as a fallback default when `E2E_PHASES` is unset.
 
 ## Local protections (git hooks)
 

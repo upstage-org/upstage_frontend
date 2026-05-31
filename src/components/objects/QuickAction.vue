@@ -1,6 +1,8 @@
 <script>
 import { computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { isHoldableBoardObject, isLocalHoldOfBoardObject } from "@utils/common";
+import { useUserStore } from "@stores/pinia/user";
 export default {
   props: {
     object: Object,
@@ -9,14 +11,16 @@ export default {
   emits: ["update:active"],
   setup: (props, { emit }) => {
     const stageStore = useStageStore();
-    // Compare the object's MQTT-derived holder session to the local
-    // session, NOT to `userStore.avatarId`. The local user store's
-    // `avatarId` ref drifts out of sync in normal flows (multi-avatar
-    // placement, page refresh, echoed counter messages), which made
-    // the QuickAction toolbar render for the wrong performer. See the
-    // matching comment in Topping.vue and the canonical check already
-    // used by Object.vue / ContextMenuAvatar.vue.
-    const isHolding = computed(() => props.object.holder?.id === stageStore.session);
+    const userStore = useUserStore();
+    const isHolding = computed(() =>
+      stageStore.canPlay
+        ? isLocalHoldOfBoardObject(props.object, {
+            localAvatarId: userStore.avatarId,
+            localSessionId: stageStore.session,
+            holder: props.object.holder,
+          })
+        : false,
+    );
 
     const keepActive = () => {
       emit("update:active", true);
@@ -40,7 +44,7 @@ export default {
       });
     };
 
-    const holdable = computed(() => ["avatar"].includes(props.object.type));
+    const holdable = computed(() => isHoldableBoardObject(props.object));
     const activeMovable = computed(() => stageStore.activeMovable);
     const showQuickActions = computed(
       () => (isHolding.value || !holdable.value) && activeMovable.value === props.object.id,

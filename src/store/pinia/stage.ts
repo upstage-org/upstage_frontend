@@ -283,6 +283,8 @@ export interface Session {
   nickname?: string;
   at: number;
   avatarId?: ObjectId | null;
+  /** Logged-in performer's user id; distinct from `id` (per-tab session). */
+  userId?: string | number | null;
   leaving?: boolean;
   [k: string]: unknown;
 }
@@ -472,6 +474,8 @@ export const useStageStore = defineStore(
 
     /** Set when lib-jitsi-meet reports CONFERENCE_JOINED; used to fill jitsi board objects dragged before myUserId existed. */
     const localJitsiParticipantId = ref<string | null>(null);
+    /** Jitsi tile ids waiting for CONFERENCE_JOINED before first MQTT PLACE. */
+    const pendingJitsiPublish = new Set<ObjectId>();
 
     const tools = ref<ToolsState>({
       avatars: [],
@@ -589,7 +593,9 @@ export const useStageStore = defineStore(
     const objects = computed(() =>
       board.value.objects.map((o) => ({
         ...o,
-        holder: sessions.value.find((s) => s.avatarId === o.id),
+        holder: sessions.value.find(
+          (s) => s.isPlayer && s.avatarId != null && s.avatarId !== "" && s.avatarId === o.id,
+        ),
       })),
     );
 
@@ -853,6 +859,7 @@ export const useStageStore = defineStore(
       _config.value = getDefaultStageConfig() as StageConfig;
       settings.value = getDefaultStageSettings() as StageSettings;
       board.value.objects = [];
+      board.value.tracks = [];
       board.value.drawings = [];
       board.value.texts = [];
       board.value.whiteboard = [];
@@ -863,6 +870,7 @@ export const useStageStore = defineStore(
       topbarCollapsed.value = false;
       publicChatPosition.value = null;
       localJitsiParticipantId.value = null;
+      pendingJitsiPublish.clear();
       // Masquerading is a player-only "preview as audience" affordance.
       // If we leave it true across CLEAN_STAGE, a player who navigates
       // away mid-masquerade and returns to a stage would be silently
@@ -986,6 +994,7 @@ export const useStageStore = defineStore(
       if (isJitsiBoardType(object.type) && object.participantId) {
         pruneJitsiTracksForParticipant(String(object.participantId));
       }
+      reconcileAvatarHolds();
     }
 
     /** Drop WebRTC tracks when no on-stage tile still references the participant. */
@@ -1079,6 +1088,24 @@ export const useStageStore = defineStore(
       }
     }
 
+    /** Reconcile `board.objects` paint order with the performer's stack index. */
+    function setObjectStackIndex(objectId: ObjectId, targetIndex: number) {
+      const current = board.value.objects.findIndex((o) => o.id === objectId);
+      if (current < 0) return;
+      const [obj] = board.value.objects.splice(current, 1);
+      const idx = Math.max(0, Math.min(targetIndex, board.value.objects.length));
+      board.value.objects.splice(idx, 0, obj);
+    }
+
+    function boardStackIndexFor(objectId: ObjectId): number {
+      return board.value.objects.findIndex((o) => o.id === objectId);
+    }
+
+    /** True when audience should receive a board side-effect (not local-only ghosts). */
+    function shouldSyncBoardMutationToAudience(object: BoardObject): boolean {
+      return Boolean(object.liveAction || object.published);
+    }
+
     function SET_PREFERENCES(prefs: Partial<Preferences>) {
       Object.assign(preferences.value, prefs);
     }
@@ -1146,6 +1173,7 @@ export const useStageStore = defineStore(
     }
 
     function UPDATE_SESSIONS_COUNTER(s: Session) {
+      const beforeLen = sessions.value.length;
       // Session ids can arrive as either string (anonymous uuidv4) or as a
       // numeric DB user id depending on whether the publisher is logged in;
       // dedupe by stringified value so the same human never doubles up.
@@ -1156,6 +1184,17 @@ export const useStageStore = defineStore(
           return sessions.value.splice(index, 1);
         } else {
           Object.assign(sessions.value[index], s);
+          // Explicit null/undefined in the payload means "no avatar held".
+          // Object.assign alone cannot clear a field when the key is
+          // omitted from the wire message, so we only force-clear when
+          // the publisher included avatarId (joinStage always does).
+          if ("avatarId" in s && (s.avatarId === null || s.avatarId === undefined)) {
+            sessions.value[index].avatarId = null;
+          }
+          // Audience sessions must never carry a hold.
+          if (!sessions.value[index].isPlayer) {
+            sessions.value[index].avatarId = null;
+          }
         }
       } else {
         sessions.value.push(s);
@@ -1164,6 +1203,150 @@ export const useStageStore = defineStore(
         (x) => dayjs().diff(dayjs(new Date(x.at)), "minute") < 60,
       );
       sessions.value.sort((a, b) => b.at - a.at);
+      reconcileAvatarHolds();
+      if (canPlay.value) {
+        pruneOrphanJitsiTilesFromOldSessions();
+      }
+      if (subscribeSuccess.value && sessions.value.length !== beforeLen) {
+        void sendStatistics();
+      }
+    }
+
+    /**
+     * Keep this tab's row in `sessions` aligned with `userStore.avatarId`.
+     * The teardrop reads `object.holder` from sessions, not from the user
+     * store — if we clear `userStore.avatarId` on release but the local
+     * session row still lists an `avatarId`, the red teardrop stays up even
+     * though the performer has let go.
+     */
+    function syncLocalSessionAvatarHold() {
+      const sid = session.value;
+      if (sid == null || !canPlay.value) return;
+      const userStore = useUserStore();
+      const desired = userStore.avatarId ?? null;
+      const index = sessions.value.findIndex(
+        (x) => (x.id != null ? String(x.id) : x.id) === String(sid),
+      );
+      if (index < 0) return;
+      if (sessions.value[index].avatarId !== desired) {
+        sessions.value[index].avatarId = desired;
+      }
+    }
+
+    /**
+     * One avatar → one player session; one session → one avatar; one logged-in
+     * user (`userId`) → one holding tab across browsers. Clears duplicate/stale
+     * holds and syncs local `userStore.avatarId` when this tab lost the claim.
+     */
+    function reconcileAvatarHolds() {
+      syncLocalSessionAvatarHold();
+      const objectIds = new Set(board.value.objects.map((o) => o.id));
+      for (const s of sessions.value) {
+        if (s.avatarId != null && s.avatarId !== "" && !objectIds.has(s.avatarId)) {
+          s.avatarId = null;
+        }
+      }
+
+      const winnerByAvatar = new Map<ObjectId, Session>();
+      for (const s of sessions.value) {
+        if (!s.isPlayer || s.avatarId == null || s.avatarId === "") {
+          if (s.avatarId != null && s.avatarId !== "" && !s.isPlayer) {
+            s.avatarId = null;
+          }
+          continue;
+        }
+        const prev = winnerByAvatar.get(s.avatarId);
+        if (!prev || s.at >= prev.at) {
+          if (prev) prev.avatarId = null;
+          winnerByAvatar.set(s.avatarId, s);
+        } else {
+          s.avatarId = null;
+        }
+      }
+
+      // Same account in multiple tabs: only the newest player session (by `at`)
+      // may hold any avatar. Without this, two tabs could each hold a different
+      // avatar and both show a red teardrop for one human.
+      const winnerByUserId = new Map<string, Session>();
+      for (const s of sessions.value) {
+        if (!s.isPlayer || s.avatarId == null || s.avatarId === "") continue;
+        const uid = s.userId;
+        if (uid == null || uid === "") continue;
+        const key = String(uid);
+        const prev = winnerByUserId.get(key);
+        if (!prev || s.at >= prev.at) {
+          if (prev) prev.avatarId = null;
+          winnerByUserId.set(key, s);
+        } else {
+          s.avatarId = null;
+        }
+      }
+
+      const userStore = useUserStore();
+      const sid = session.value;
+      if (sid != null && userStore.avatarId != null) {
+        const stillHeld = sessions.value.some(
+          (s) => s.isPlayer && String(s.id) === String(sid) && s.avatarId === userStore.avatarId,
+        );
+        if (!stillHeld) {
+          userStore.$patch({ avatarId: null });
+          SET_ACTIVE_MOVABLE(null);
+          if (canPlay.value) {
+            void publishSessionCounter(buildSessionCounterPayload({ avatarId: null }));
+          }
+        }
+      }
+      syncLocalSessionAvatarHold();
+    }
+
+    function buildSessionCounterPayload(overrides: Partial<Session> = {}): Session {
+      const userStore = useUserStore();
+      const isPlayer = Boolean(canPlay.value);
+      const id = session.value!;
+      const payload = {
+        at: +new Date(),
+        nickname: userStore.nickname,
+        avatarId: isPlayer ? (userStore.avatarId ?? null) : null,
+        userId: isPlayer ? (userStore.currentUserId ?? null) : null,
+        isPlayer,
+        ...overrides,
+        id,
+      } as Session;
+      if (overrides.isPlayer === undefined) {
+        payload.isPlayer = isPlayer;
+      }
+      return payload;
+    }
+
+    function publishSessionCounter(payload: Session, sync = false) {
+      UPDATE_SESSIONS_COUNTER(payload);
+      if (sync) {
+        mqtt.sendMessageSync(TOPICS.COUNTER, payload);
+      } else {
+        void mqtt.sendMessage(TOPICS.COUNTER, payload);
+      }
+    }
+
+    /**
+     * Release the avatar this tab is holding: clear user store, local session
+     * row, and broadcast `avatarId: null` so teardrops drop everywhere.
+     */
+    function releaseAvatarHold(sync = false) {
+      if (!canPlay.value || session.value == null) return;
+      const userStore = useUserStore();
+      if (userStore.avatarId == null) {
+        syncLocalSessionAvatarHold();
+        return;
+      }
+      userStore.$patch({ avatarId: null });
+      SET_ACTIVE_MOVABLE(null);
+      syncLocalSessionAvatarHold();
+      publishSessionCounter(buildSessionCounterPayload({ avatarId: null }), sync);
+    }
+
+    /** Drop avatar hold on peers before leave so teardrops cannot orphan. */
+    function releaseAvatarBeforeLeave(sync: boolean) {
+      releaseAvatarHold(sync);
     }
 
     function SET_CHAT_VISIBILITY(visible: boolean) {
@@ -1830,37 +2013,11 @@ export const useStageStore = defineStore(
         }
       }
       PUSH_OBJECT(serializeObject(object));
-      if (object.type === "avatar") {
+      if (object.type === "avatar" && canPlay.value) {
         useUserStore().setAvatarId(object.id);
         SET_ACTIVE_MOVABLE(null);
       }
       return object;
-    }
-
-    /**
-     * Set when lib-jitsi-meet reports CONFERENCE_JOINED / left. With a non-null
-     * id, back-fills `participantId` on jitsi objects placed before myUserId
-     * existed (drag racing the conference handshake) AND re-binds any
-     * persisted own-tile whose `participantId` is stale from a previous
-     * conference membership. Own-tiles are identified by `hostId ===
-     * session.value` (set in `placeObjectOnStage`); we cannot rely on the
-     * persisted participantId itself because lib-jitsi-meet assigns a
-     * fresh `myUserId` on every CONFERENCE_JOINED, so the tile placed as
-     * `abc123` last navigation is orphaned the next time we rejoin as
-     * `xyz789` unless we proactively rewrite it.
-     */
-    function syncLocalJitsiParticipantId(id: string | null) {
-      localJitsiParticipantId.value = id;
-      if (id == null) return;
-      const mySession = session.value;
-      for (const o of board.value.objects) {
-        if (!isJitsiBoardType(o.type)) continue;
-        const missing = o.participantId == null || o.participantId === "";
-        const staleOwn = mySession != null && o.hostId === mySession && o.participantId !== id;
-        if (missing || staleOwn) {
-          UPDATE_OBJECT({ ...o, participantId: id } as BoardObject);
-        }
-      }
     }
 
     /** MQTT board tracing for individual Jitsi stream tiles (not video bytes). */
@@ -1882,6 +2039,113 @@ export const useStageStore = defineStore(
       });
     }
 
+    function jitsiParticipantIdMissing(object: BoardObject): boolean {
+      return object.participantId == null || object.participantId === "";
+    }
+
+    function stampJitsiParticipantId(object: BoardObject): BoardObject {
+      if (!isJitsiBoardType(object.type) || !jitsiParticipantIdMissing(object)) {
+        return object;
+      }
+      const inferred = localJitsiParticipantId.value;
+      if (!inferred) return object;
+      return { ...object, participantId: inferred };
+    }
+
+    /** Push jitsi tile metadata to audience when participantId is known. */
+    function mqttBroadcastJitsiTile(object: BoardObject, note?: string) {
+      if (!canPlay.value || !isJitsiBoardType(object.type) || jitsiParticipantIdMissing(object)) {
+        return;
+      }
+      if (object.published) {
+        diagMqttJitsiBoard("out", BOARD_ACTIONS.MOVE_TO, object, note ? { note } : undefined);
+        mqtt.sendMessage(TOPICS.BOARD, {
+          type: BOARD_ACTIONS.MOVE_TO,
+          object: serializeForBroadcast(object),
+          zIndex: boardStackIndexFor(object.id),
+        });
+        return;
+      }
+      const payload = {
+        ...object,
+        published: true,
+        displayName: object.displayName ?? useUserStore().nickname ?? "",
+      } as BoardObject;
+      UPDATE_OBJECT(serializeObject(payload));
+      diagMqttJitsiBoard(
+        "out",
+        BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
+        payload,
+        note ? { note } : undefined,
+      );
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
+        object: serializeForBroadcast(payload),
+      });
+    }
+
+    function flushPendingJitsiPublish(participantId: string) {
+      const ids = [...pendingJitsiPublish];
+      pendingJitsiPublish.clear();
+      for (const objectId of ids) {
+        const o = board.value.objects.find((obj) => obj.id === objectId);
+        if (!o || !isJitsiBoardType(o.type) || !o.liveAction) continue;
+        shapeObject({ ...o, participantId });
+      }
+    }
+
+    /**
+     * After tracks are published, ensure every own on-stage jitsi tile
+     * carries the current myUserId and audience has received it over MQTT.
+     */
+    function ensureJitsiTileParticipantBroadcast(myUserId: string) {
+      if (!canPlay.value || !myUserId) return;
+      const mySession = session.value;
+      for (const o of board.value.objects) {
+        if (!isJitsiBoardType(o.type)) continue;
+        const isOwnTile =
+          (mySession != null && o.hostId === mySession) || o.participantId === myUserId;
+        if (!isOwnTile) continue;
+        if (o.participantId === myUserId && o.published) continue;
+        const healed = { ...o, participantId: myUserId } as BoardObject;
+        UPDATE_OBJECT(healed);
+        if (healed.liveAction || healed.published) {
+          mqttBroadcastJitsiTile(healed, "post-publish participantId safety net");
+        }
+      }
+    }
+
+    /**
+     * Set when lib-jitsi-meet reports CONFERENCE_JOINED / left. With a non-null
+     * id, back-fills `participantId` on jitsi objects placed before myUserId
+     * existed (drag racing the conference handshake) AND re-binds any
+     * persisted own-tile whose `participantId` is stale from a previous
+     * conference membership. Own-tiles are identified by `hostId ===
+     * session.value` (set in `placeObjectOnStage`); we cannot rely on the
+     * persisted participantId itself because lib-jitsi-meet assigns a
+     * fresh `myUserId` on every CONFERENCE_JOINED, so the tile placed as
+     * `abc123` last navigation is orphaned the next time we rejoin as
+     * `xyz789` unless we proactively rewrite it.
+     */
+    function syncLocalJitsiParticipantId(id: string | null) {
+      localJitsiParticipantId.value = id;
+      if (id == null) return;
+      const mySession = session.value;
+      for (const o of board.value.objects) {
+        if (!isJitsiBoardType(o.type)) continue;
+        const missing = jitsiParticipantIdMissing(o);
+        const staleOwn = mySession != null && o.hostId === mySession && o.participantId !== id;
+        if (missing || staleOwn) {
+          const healed = { ...o, participantId: id } as BoardObject;
+          UPDATE_OBJECT(healed);
+          if ((healed.published || healed.liveAction) && canPlay.value) {
+            mqttBroadcastJitsiTile(healed, "participantId heal after CONFERENCE_JOINED");
+          }
+        }
+      }
+      flushPendingJitsiPublish(id);
+    }
+
     function shapeObject(object: BoardObject) {
       // Sender always reflects their own change locally. This used to live
       // only in the `else` branch and the live branch relied on the broker
@@ -1890,27 +2154,45 @@ export const useStageStore = defineStore(
       // safe round-trip for sender-local UI state — so apply locally first
       // unconditionally. UPDATE_OBJECT is idempotent, so the echo from the
       // broker is a harmless no-op for the sender.
-      UPDATE_OBJECT(serializeObject(object));
-      if (object.liveAction) {
-        if (object.published) {
-          diagMqttJitsiBoard("out", BOARD_ACTIONS.MOVE_TO, object);
-          mqtt.sendMessage(TOPICS.BOARD, {
-            type: BOARD_ACTIONS.MOVE_TO,
-            object: serializeForBroadcast(object),
-          });
+      let payload = object;
+      if (isJitsiBoardType(object.type)) {
+        payload = stampJitsiParticipantId(object);
+      }
+      UPDATE_OBJECT(serializeObject(payload));
+      if (payload.liveAction) {
+        const isJitsi = isJitsiBoardType(payload.type);
+        if (isJitsi && jitsiParticipantIdMissing(payload)) {
+          pendingJitsiPublish.add(payload.id);
         } else {
-          object.published = true;
-          object.displayName = useUserStore().nickname ?? "";
-          diagMqttJitsiBoard("out", BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE, object, {
-            note: "first publish — remote clients get tile metadata only; video uses Jitsi WebRTC",
-          });
-          mqtt.sendMessage(TOPICS.BOARD, {
-            type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
-            object: serializeForBroadcast(object),
-          });
+          if (isJitsi) {
+            pendingJitsiPublish.delete(payload.id);
+            mqttBroadcastJitsiTile(
+              payload,
+              payload.published
+                ? undefined
+                : "first publish — remote clients get tile metadata only; video uses Jitsi WebRTC",
+            );
+          } else if (payload.published) {
+            mqtt.sendMessage(TOPICS.BOARD, {
+              type: BOARD_ACTIONS.MOVE_TO,
+              object: serializeForBroadcast(payload),
+              zIndex: boardStackIndexFor(payload.id),
+            });
+          } else {
+            const toPublish = {
+              ...payload,
+              published: true,
+              displayName: payload.displayName ?? useUserStore().nickname ?? "",
+            } as BoardObject;
+            UPDATE_OBJECT(serializeObject(toPublish));
+            mqtt.sendMessage(TOPICS.BOARD, {
+              type: BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE,
+              object: serializeForBroadcast(toPublish),
+            });
+          }
         }
         board.value.objects
-          .filter((o) => o.wornBy === object.id)
+          .filter((o) => o.wornBy === payload.id)
           .forEach((costume) => {
             if (!costume.published) {
               costume.published = true;
@@ -1935,17 +2217,29 @@ export const useStageStore = defineStore(
     // the bulb is off, the audience was still seeing frame switches, z-order
     // changes, autoplay toggles, and deletes happen live. Each wrapper below
     // now applies the change locally first (so the performer always sees
-    // their own action), and only publishes if `liveAction` is on.
+    // their own action). Depth changes publish when the object is already on
+    // observers' boards (`published`), not only while the green bulb is on;
+    // `MOVE_TO` also carries `zIndex` so a drag after reorder cannot leave
+    // audience paint order stale if a depth message was missed.
     function deleteObject(object: BoardObject) {
+      const userStore = useUserStore();
+      if (userStore.avatarId === object.id) {
+        userStore.setAvatarId(null);
+      }
       const localPayload = serializeObject(object);
       if (localPayload.drawingId) {
         // is drawing
         delete localPayload.commands;
       }
       DELETE_OBJECT(localPayload);
+      pendingJitsiPublish.delete(object.id);
       // Only performers publish board deletes; audience-side orphan cleanup
       // (e.g. Jitsi.vue when a remote peer leaves) must stay local.
-      if (object.liveAction && canPlay.value) {
+      // Jitsi tiles must always emit DESTROY when removed by a performer so
+      // the event archive and remote clients drop metadata-only ghosts.
+      const shouldBroadcastDestroy =
+        canPlay.value && (isJitsiBoardType(object.type) || object.liveAction || object.published);
+      if (shouldBroadcastDestroy) {
         const wirePayload = serializeForBroadcast(object);
         if (wirePayload.drawingId) {
           delete wirePayload.commands;
@@ -1955,10 +2249,6 @@ export const useStageStore = defineStore(
           object: wirePayload,
         });
       }
-      // Full-gate-with-delete caveat: if the bulb is off, the delete is
-      // sender-local. The object disappears from the performer's view (and
-      // so does the bulb), so this session has no way to re-broadcast the
-      // deletion to the audience. Documented intent of "full gate".
     }
 
     function switchFrame(object: BoardObject) {
@@ -2061,7 +2351,10 @@ export const useStageStore = defineStore(
           }
           break;
         case BOARD_ACTIONS.DESTROY:
-          if (message.object) DELETE_OBJECT(message.object);
+          if (message.object) {
+            pendingJitsiPublish.delete(message.object.id);
+            DELETE_OBJECT(message.object);
+          }
           break;
         case BOARD_ACTIONS.SWITCH_FRAME:
           if (message.object) UPDATE_OBJECT(message.object);
@@ -2336,6 +2629,130 @@ export const useStageStore = defineStore(
       mqtt.sendMessage(TOPICS.REACTION, reaction);
     }
 
+    function boardMessageFromEvent(event: ReplayEvent): BoardMessage | null {
+      if (unnamespaceTopic(event.topic ?? "") !== TOPICS.BOARD) return null;
+      const raw = event.payload;
+      if (raw == null) return null;
+      return (typeof raw === "string" ? JSON.parse(raw) : { ...raw }) as BoardMessage;
+    }
+
+    /**
+     * Derive the authoritative set of jitsi tiles from archived board events.
+     * Applies PLACE / MOVE_TO / DESTROY in timestamp order. When multiple
+     * tiles share a `hostId` (same browser tab), only the latest placement
+     * survives — this clears ghost tiles left behind when an old stream was
+     * replaced but its DESTROY never reached the event archive.
+     */
+    function computeFinalJitsiObjectsFromEvents(events: ReplayEvent[]): BoardObject[] {
+      const byId = new Map<ObjectId, BoardObject>();
+      const hostIdToId = new Map<string, ObjectId>();
+      const sorted = [...events].sort((a, b) => (a.mqttTimestamp ?? 0) - (b.mqttTimestamp ?? 0));
+      for (const event of sorted) {
+        const msg = boardMessageFromEvent(event);
+        if (!msg?.object?.id || !isJitsiBoardType(msg.object.type)) continue;
+        const { id } = msg.object;
+        switch (msg.type) {
+          case BOARD_ACTIONS.DESTROY:
+            byId.delete(id);
+            pendingJitsiPublish.delete(id);
+            for (const [hostId, objectId] of hostIdToId) {
+              if (objectId === id) hostIdToId.delete(hostId);
+            }
+            break;
+          case BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE: {
+            const hostId = msg.object.hostId != null ? String(msg.object.hostId) : null;
+            if (hostId) {
+              const prevId = hostIdToId.get(hostId);
+              if (prevId && prevId !== id) {
+                byId.delete(prevId);
+                pendingJitsiPublish.delete(prevId);
+              }
+              hostIdToId.set(hostId, id);
+            }
+            byId.set(id, { ...msg.object, liveAction: true, published: true });
+            break;
+          }
+          case BOARD_ACTIONS.MOVE_TO: {
+            const prev = byId.get(id);
+            if (prev) {
+              byId.set(id, { ...prev, ...msg.object });
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+      return [...byId.values()];
+    }
+
+    /** Replace jitsi tiles on the board with the event-log final state. */
+    function reconcileJitsiBoardFromEvents(events: ReplayEvent[]) {
+      if (replay.value.isReplaying) return;
+      const finalTiles = computeFinalJitsiObjectsFromEvents(events);
+      const keepIds = new Set(finalTiles.map((o) => o.id));
+      board.value.objects = board.value.objects.filter(
+        (o) => !isJitsiBoardType(o.type) || keepIds.has(o.id),
+      );
+      for (const obj of finalTiles) {
+        const payload = { ...obj, liveAction: true, published: true };
+        const existing = board.value.objects.find((o) => o.id === payload.id);
+        if (existing) {
+          UPDATE_OBJECT(serializeObject({ ...existing, ...payload }));
+        } else {
+          PUSH_OBJECT(payload);
+        }
+      }
+      const activeParticipantIds = new Set(
+        board.value.objects
+          .filter((o) => isJitsiBoardType(o.type) && o.participantId)
+          .map((o) => String(o.participantId)),
+      );
+      board.value.tracks = board.value.tracks.filter((t) => {
+        const pid = t.getParticipantId?.();
+        return pid != null && activeParticipantIds.has(String(pid));
+      });
+    }
+
+    /**
+     * Drop jitsi tiles whose publisher tab is no longer in the live session
+     * roster (`hostId` not present in `sessions`). Crashed/closed tabs stop
+     * sending COUNTER heartbeats and are removed on `leaving:true` or the
+     * 60-minute trim, leaving metadata-only tiles that cannot receive tracks.
+     *
+     * Performer-only (audience `hostId` is always the publisher's tab id).
+     * Do not treat `hostId !== mySession` as orphan — that deleted every
+     * remote stream on reconnect and when navigating back before the roster
+     * repopulated. Only prune when the publisher session id is absent.
+     */
+    function pruneOrphanJitsiTilesFromOldSessions() {
+      if (replay.value.isReplaying) return;
+      if (!canPlay.value) return;
+      const liveSessionIds = new Set(
+        sessions.value
+          .filter((s) => !s.leaving)
+          .map((s) => (s.id != null ? String(s.id) : ""))
+          .filter((id) => id.length > 0),
+      );
+      // Roster not hydrated yet (e.g. right after connect) — avoid wiping tiles.
+      if (liveSessionIds.size === 0) return;
+      for (const o of [...board.value.objects]) {
+        if (!isJitsiBoardType(o.type)) continue;
+        if (o.hostId == null || o.hostId === "") continue;
+        const hostId = String(o.hostId);
+        if (liveSessionIds.has(hostId)) continue;
+        pendingJitsiPublish.delete(o.id);
+        const wirePayload = serializeForBroadcast(o);
+        DELETE_OBJECT(serializeObject(o));
+        if (canPlay.value && (o.published || o.liveAction)) {
+          mqtt.sendMessage(TOPICS.BOARD, {
+            type: BOARD_ACTIONS.DESTROY,
+            object: wirePayload,
+          });
+        }
+      }
+    }
+
     async function loadStage({ url, recordId }: { url: string; recordId?: string }) {
       CLEAN_STAGE(true);
       SET_PRELOADING_STATUS(true);
@@ -2355,7 +2772,9 @@ export const useStageStore = defineStore(
               },
             });
           } else {
-            (events ?? []).forEach((event: ReplayEvent) => replayEvent(event));
+            const archivedEvents = events ?? [];
+            archivedEvents.forEach((event: ReplayEvent) => replayEvent(event));
+            reconcileJitsiBoardFromEvents(archivedEvents);
           }
           await stageGraph.updateLastAccess(stage.id);
         } else {
@@ -2403,6 +2822,7 @@ export const useStageStore = defineStore(
       if (events && model.value.events) {
         events.forEach((event: ReplayEvent) => replicateEvent(event));
         model.value.events = model.value.events.concat(events);
+        reconcileJitsiBoardFromEvents(model.value.events);
       }
     }
 
@@ -2622,7 +3042,8 @@ export const useStageStore = defineStore(
 
     async function joinStage() {
       const userStore = useUserStore();
-      const isPlayer = useAuthStore().loggedIn;
+      const isPlayer = Boolean(canPlay.value);
+      syncLocalSessionAvatarHold();
       // Every browser tab gets its own opaque session id, persisted in
       // sessionStorage so refreshes within the tab keep the same id (no
       // stale "ghost viewer" left behind in other clients' sessions
@@ -2646,10 +3067,15 @@ export const useStageStore = defineStore(
       }
       const id = session.value;
       const nickname = userStore.nickname;
-      const avatarId = userStore.avatarId;
+      if (!isPlayer && userStore.avatarId != null) {
+        userStore.$patch({ avatarId: null });
+      }
+      const avatarId = isPlayer ? (userStore.avatarId ?? null) : null;
       SET_ACTIVE_MOVABLE(avatarId);
-      const at = +new Date();
-      const payload = { id, isPlayer, nickname, at, avatarId };
+      const payload = buildSessionCounterPayload({ avatarId });
+      // Apply locally before the broker round-trip so teardrop / holder
+      // state updates immediately on release (avatarId: null) and claim.
+      UPDATE_SESSIONS_COUNTER(payload);
       await mqtt.sendMessage(TOPICS.COUNTER, payload);
       await sendStatistics();
     }
@@ -2659,13 +3085,13 @@ export const useStageStore = defineStore(
     }
 
     async function sendStatisticsBeforeDisconnect() {
-      const isPlayer = useAuthStore().loggedIn;
+      const isPlayer = Boolean(canPlay.value);
       let playerCount = players.value.length;
       let audienceCount = audiences.value.length;
       if (isPlayer) {
-        playerCount = playerCount - 1;
+        playerCount = Math.max(0, playerCount - 1);
       } else {
-        audienceCount = audienceCount - 1;
+        audienceCount = Math.max(0, audienceCount - 1);
       }
       await mqtt.sendMessage(
         TOPICS.STATISTICS,
@@ -2675,7 +3101,26 @@ export const useStageStore = defineStore(
       );
     }
 
+    function sendStatisticsBeforeDisconnectSync() {
+      if (!subscribeSuccess.value) return;
+      const isPlayer = Boolean(canPlay.value);
+      let playerCount = players.value.length;
+      let audienceCount = audiences.value.length;
+      if (isPlayer) {
+        playerCount = Math.max(0, playerCount - 1);
+      } else {
+        audienceCount = Math.max(0, audienceCount - 1);
+      }
+      mqtt.sendMessageSync(
+        TOPICS.STATISTICS,
+        { players: playerCount, audiences: audienceCount },
+        false,
+        true,
+      );
+    }
+
     async function sendCounterLeave() {
+      releaseAvatarBeforeLeave(true);
       const id = session.value;
       session.value = null;
       CLEAN_STAGE();
@@ -2684,7 +3129,9 @@ export const useStageStore = defineStore(
       // race the page tear-down and the leave message would never reach
       // the wire. The fallback to retry on dropped sockets is the 60-min
       // client-side trim in UPDATE_SESSIONS_COUNTER.
-      mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
+      if (id != null) {
+        mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
+      }
     }
 
     // Synchronous unload path used from beforeunload / pagehide. Skips the
@@ -2692,6 +3139,8 @@ export const useStageStore = defineStore(
     // emits the leave message + clears local state.
     function disconnectSync() {
       stopHeartbeat();
+      releaseAvatarBeforeLeave(true);
+      sendStatisticsBeforeDisconnectSync();
       const id = session.value;
       if (id != null) {
         mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
@@ -3012,6 +3461,8 @@ export const useStageStore = defineStore(
       handleChatMessage,
       placeObjectOnStage,
       syncLocalJitsiParticipantId,
+      ensureJitsiTileParticipantBroadcast,
+      reconcileJitsiBoardFromEvents,
       shapeObject,
       deleteObject,
       switchFrame,
@@ -3057,6 +3508,8 @@ export const useStageStore = defineStore(
       seekForwardReplay,
       seekBackwardReplay,
       handleCounterMessage,
+      syncLocalSessionAvatarHold,
+      releaseAvatarHold,
       joinStage,
       leaveStage,
       sendStatisticsBeforeDisconnect,

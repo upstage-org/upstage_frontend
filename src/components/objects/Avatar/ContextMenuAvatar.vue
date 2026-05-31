@@ -7,6 +7,7 @@ import {
   coerceNumber,
   isIOS,
   isJitsiBoardType,
+  isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "utils/common";
 
@@ -116,8 +117,14 @@ export default {
     };
 
     const holdable = inject("holdable") ?? ref();
-    const isHolding = computed(
-      () => props.object.holder && props.object.holder.id === stageStore.session,
+    const isHolding = computed(() =>
+      stageStore.canPlay
+        ? isLocalHoldOfBoardObject(props.object, {
+            localAvatarId: userStore.avatarId,
+            localSessionId: stageStore.session,
+            holder: props.object.holder,
+          })
+        : false,
     );
 
     const openVoiceSetting = () => {
@@ -291,11 +298,7 @@ export default {
         </span>
         <span>{{ $t("remove_from_avatar") }}</span>
       </a>
-      <a
-        v-else-if="currentAvatar && !isStreamBoardObject"
-        class="panel-block"
-        @click="wearCostume"
-      >
+      <a v-else-if="currentAvatar && !isStreamBoardObject" class="panel-block" @click="wearCostume">
         <span class="panel-icon">
           <Icon src="prop.svg" />
         </span>
@@ -401,7 +404,10 @@ export default {
           </button>
         </a-tooltip>
       </p>
-      <p v-if="isJitsiBoardType(object.type) && supportsPerStreamVolume" class="control menu-group-item">
+      <p
+        v-if="isJitsiBoardType(object.type) && supportsPerStreamVolume"
+        class="control menu-group-item"
+      >
         <a-tooltip title="Volume" placement="bottom">
           <button
             class="button is-light"
@@ -505,9 +511,7 @@ export default {
           <Icon
             size="24"
             src="loop.svg"
-            :style="
-              object.frameLoop === false ? { filter: 'grayscale(1)', opacity: 0.55 } : {}
-            "
+            :style="object.frameLoop === false ? { filter: 'grayscale(1)', opacity: 0.55 } : {}"
           />
         </button>
       </p>

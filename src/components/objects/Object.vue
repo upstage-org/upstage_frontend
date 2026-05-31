@@ -3,7 +3,11 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 import { computed, inject, provide, reactive, ref, watch } from "vue";
-import { isStreamPlaybackBoardType } from "@utils/common";
+import {
+  isHoldableBoardObject,
+  isLocalHoldOfBoardObject,
+  isStreamPlaybackBoardType,
+} from "@utils/common";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
@@ -28,13 +32,22 @@ export default {
     const video = ref();
     const stageStore = useStageStore();
     const replaying = inject("replaying", false);
-    const { stageSize, session, canPlay: storeCanPlay } = storeToRefs(stageStore);
+    const { stageSize, canPlay: storeCanPlay } = storeToRefs(stageStore);
 
+    const userStore = useUserStore();
     const active = ref(false);
     const sliderMode = ref("opacity");
     const beforeDragPosition = ref();
-    const isHolding = computed(() => props.object.holder?.id === session.value);
-    const holdable = computed(() => ["avatar"].includes(props.object.type));
+    const isHolding = computed(() =>
+      canPlay.value
+        ? isLocalHoldOfBoardObject(props.object, {
+            localAvatarId: userStore.avatarId,
+            localSessionId: stageStore.session,
+            holder: props.object.holder,
+          })
+        : false,
+    );
+    const holdable = computed(() => isHoldableBoardObject(props.object));
     const canPlay = computed(() => storeCanPlay.value && !replaying);
     const controlable = computed(() => {
       if (replaying) return false;
@@ -63,31 +76,28 @@ export default {
             frameAnimation.currentFrame = src;
             const intervalMs = parseFloat(String(autoplayFrames)) * 1000;
             if (!(intervalMs > 0) || !frames?.length) return;
-            frameAnimation.interval = setInterval(
-              () => {
-                const fr = props.object.frames;
-                if (!fr?.length) return;
-                const idx = fr.indexOf(frameAnimation.currentFrame);
-                let next = idx + 1;
-                if (next >= fr.length) {
-                  if (props.object.frameLoop !== false) {
-                    next = 0;
-                  } else {
-                    clearInterval(frameAnimation.interval);
-                    frameAnimation.interval = null;
-                    stageStore.toggleAutoplayFrames({
-                      ...props.object,
-                      autoplayFrames: null,
-                      lastAutoplayFrames: props.object.autoplayFrames,
-                      src: frameAnimation.currentFrame ?? fr[fr.length - 1],
-                    });
-                    return;
-                  }
+            frameAnimation.interval = setInterval(() => {
+              const fr = props.object.frames;
+              if (!fr?.length) return;
+              const idx = fr.indexOf(frameAnimation.currentFrame);
+              let next = idx + 1;
+              if (next >= fr.length) {
+                if (props.object.frameLoop !== false) {
+                  next = 0;
+                } else {
+                  clearInterval(frameAnimation.interval);
+                  frameAnimation.interval = null;
+                  stageStore.toggleAutoplayFrames({
+                    ...props.object,
+                    autoplayFrames: null,
+                    lastAutoplayFrames: props.object.autoplayFrames,
+                    src: frameAnimation.currentFrame ?? fr[fr.length - 1],
+                  });
+                  return;
                 }
-                frameAnimation.currentFrame = fr[next];
-              },
-              intervalMs,
-            );
+              }
+              frameAnimation.currentFrame = fr[next];
+            }, intervalMs);
           }
         },
         {

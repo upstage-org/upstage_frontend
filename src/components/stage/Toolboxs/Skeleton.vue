@@ -6,6 +6,7 @@ import { computed, ref } from "vue";
 import AppImage from "components/Image.vue";
 import Icon from "components/Icon.vue";
 import SavedDrawing from "./tools/Draw/SavedDrawing.vue";
+import { isHoldableBoardObject, isLocalHoldOfBoardObject } from "@utils/common";
 
 export default {
   components: { AppImage, Icon, SavedDrawing },
@@ -64,17 +65,21 @@ export default {
     // `touchend` here was missing `touchstart` (so position was NaN on
     // first move) and bypassed the actual drop target.
 
-    const holdable = computed(() => ["avatar"].includes(props.data.type));
+    const holdable = computed(() => isHoldableBoardObject(props.data));
     const hold = () => {
-      if (props.real && holdable.value && !props.data.holder) {
+      if (props.real && holdable.value && stageStore.canPlay && !props.data.holder) {
         useUserStore().setAvatarId(props.data.id);
       }
     };
+    const userStore = useUserStore();
+    const isLocalHolder = () =>
+      isLocalHoldOfBoardObject(props.data, {
+        localAvatarId: userStore.avatarId,
+        localSessionId: stageStore.session,
+        holder: props.data.holder,
+      });
     const showMovable = () => {
-      if (
-        props.real &&
-        (!props.data.holder || !holdable.value || props.data.holder.id === stageStore.session)
-      ) {
+      if (props.real && (!props.data.holder || !holdable.value || isLocalHolder())) {
         stageStore.SET_ACTIVE_MOVABLE(props.data.id);
       }
     };

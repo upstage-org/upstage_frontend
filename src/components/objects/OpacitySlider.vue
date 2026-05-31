@@ -1,6 +1,8 @@
 <script>
 import { computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { isHoldableBoardObject, isLocalHoldOfBoardObject } from "@utils/common";
+import { useUserStore } from "@stores/pinia/user";
 export default {
   props: {
     active: Boolean,
@@ -10,6 +12,7 @@ export default {
   emits: ["update:active"],
   setup: (props, { emit }) => {
     const stageStore = useStageStore();
+    const userStore = useUserStore();
     const maxMoveSpeed = 1000;
     const value = computed(() => {
       switch (props.sliderMode) {
@@ -64,14 +67,16 @@ export default {
       }
     };
 
-    // Same canonical "is the local session the holder of this object"
-    // check used by Topping.vue, QuickAction.vue, Object.vue, and
-    // ContextMenuAvatar.vue. The previous `userStore.avatarId`
-    // comparison drifts out of sync in normal flows (see Topping.vue
-    // for the full rationale) and could leave the slider showing on
-    // the wrong performer's screen.
-    const isHolding = computed(() => props.object.holder?.id === stageStore.session);
-    const holdable = computed(() => ["avatar"].includes(props.object.type));
+    const isHolding = computed(() =>
+      stageStore.canPlay
+        ? isLocalHoldOfBoardObject(props.object, {
+            localAvatarId: userStore.avatarId,
+            localSessionId: stageStore.session,
+            holder: props.object.holder,
+          })
+        : false,
+    );
+    const holdable = computed(() => isHoldableBoardObject(props.object));
     const activeMovable = computed(() => stageStore.activeMovable);
     const showSlider = computed(
       () => (isHolding.value || !holdable.value) && activeMovable.value === props.object.id,

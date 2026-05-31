@@ -22,7 +22,6 @@ export default {
     // jitsi.room may be null until CONFERENCE_JOINED has fired; the
     // computed handles that with optional chaining.
     const jitsi = inject("jitsi");
-    const joined = inject("joined");
     const videoEl = ref();
     const audioEl = ref();
     const loading = ref(true);
@@ -51,7 +50,9 @@ export default {
         storeJitsiTracksLen: stageStore.jitsiTracks.length,
         storeJitsiTracksParticipantIds: stageStore.jitsiTracks.map((t) => t.getParticipantId?.()),
         roomLocalTracksLen: jitsi?.room?.getLocalTracks?.()?.length,
-        roomLocalTracksParticipantIds: jitsi?.room?.getLocalTracks?.()?.map((t) => t.getParticipantId?.()),
+        roomLocalTracksParticipantIds: jitsi?.room
+          ?.getLocalTracks?.()
+          ?.map((t) => t.getParticipantId?.()),
         composableLocalLen: composableLocal.length,
         remoteMatchLen: remote.length,
       });
@@ -144,22 +145,6 @@ export default {
     });
 
     watch(
-      joined,
-      (val) => {
-        if (val) {
-          const participants = jitsi.room
-            .getParticipants()
-            .map((p) => p.getId())
-            .concat(jitsi.room.myUserId());
-          if (!participants.some((p) => p === props.object.participantId)) {
-            stageStore.removeObjectLocally(props.object);
-          }
-        }
-      },
-      { immediate: true },
-    );
-
-    watch(
       reloadStreams,
       (val) => {
         if (val) {
@@ -181,6 +166,11 @@ export default {
     // has applied the conditional swap before we read `videoEl.value`.
     onMounted(loadTrack);
     watch(tracks, loadTrack, { flush: "post" });
+    watch(
+      () => props.object.participantId,
+      () => loadTrack(),
+      { flush: "post" },
+    );
 
     // Independent of track attach: any time the <video> ref settles on
     // a new element (initial mount or after the no-track / has-track

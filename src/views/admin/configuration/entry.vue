@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useLoading } from "hooks/mutations";
-import { VNode } from "vue";
-import { ref } from "vue";
+import { VNode, ref, watch } from "vue";
 import RichTextEditor from "components/editor/RichTextEditor.vue";
 import { configGraph } from "services/graphql";
 
@@ -18,13 +17,40 @@ const props = defineProps<{
 const editing = ref(false);
 const value = ref(props.defaultValue);
 
-const { loading, proceed } = useLoading(async () =>
-  configGraph.saveConfig(props.name, !value.value ? "" : value.value),
+watch(
+  () => props.defaultValue,
+  (next) => {
+    value.value = next;
+  },
 );
 
-const save = async () => {
+const { loading, proceed } = useLoading(
+  async () => configGraph.saveConfig(props.name, value.value),
+  {
+    loading: "Saving configuration…",
+    success: () => "Configuration saved",
+    error: (error) => {
+      const maybe = error as
+        | { response?: { errors?: Array<{ message?: string }> }; message?: string }
+        | undefined;
+      return (
+        maybe?.response?.errors?.[0]?.message ?? maybe?.message ?? "Failed to save configuration"
+      );
+    },
+  },
+);
+
+const save = async (checked?: boolean) => {
+  const previous = value.value;
+  if (typeof checked === "boolean") {
+    value.value = checked;
+  }
   editing.value = false;
-  await proceed();
+  const result = await proceed();
+  if (result === undefined) {
+    value.value = previous;
+    return;
+  }
   if (props.refresh) {
     await props.refresh();
   }

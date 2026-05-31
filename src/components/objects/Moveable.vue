@@ -3,7 +3,9 @@ import { ref, inject } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
 import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 import { animate } from "animejs";
+import { isHoldableBoardObject } from "@utils/common";
 
 export default {
   props: {
@@ -17,6 +19,7 @@ export default {
     const isDragging = ref(false);
 
     const stageStore = useStageStore();
+    const userStore = useUserStore();
     const replaying = inject("replaying", false);
     const canPlay = computed(() => stageStore.canPlay && !replaying);
     const config = stageStore.config;
@@ -158,6 +161,12 @@ export default {
       if (replaying) return;
       if ((!e || e.target.id === "board") && props.controlable && canPlay.value) {
         stageStore.SET_ACTIVE_MOVABLE(null);
+        // Deselecting by clicking the empty stage is how performers
+        // "let go" of an avatar; without this the session counter still
+        // lists the avatar and the red teardrop never clears.
+        if (isHoldableBoardObject(props.object) && props.object.id === userStore.avatarId) {
+          stageStore.releaseAvatarHold();
+        }
       }
     };
     watch(

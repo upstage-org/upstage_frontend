@@ -129,7 +129,7 @@ function localStaticContentPlugin(opts: { dir: string; urlPrefix: string }): Plu
 }
 
 /** Studio REST/GraphQL for same-origin `/api` in dev and when serving a built app via `pnpm serve:dist`. */
-const studioApiTarget = process.env.VITE_STUDIO_API_PROXY ?? "http://127.0.0.1:3001";
+const studioApiTarget = process.env.VITE_STUDIO_API_PROXY ?? "http://127.0.0.1:9090";
 
 /** Port for `vite preview` / `pnpm serve:dist` (e.g. `FRONTEND_PORT` from docker compose). */
 const previewPort = Number(process.env.FRONTEND_PORT) || 4173;
@@ -188,6 +188,14 @@ export default defineConfig(({ mode, command }) => {
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
+      },
+    },
+    server: {
+      proxy: {
+        "/api": {
+          target: studioApiTarget,
+          changeOrigin: true,
+        },
       },
     },
     preview: {

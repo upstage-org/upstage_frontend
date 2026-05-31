@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { storeToRefs } from "pinia";
 import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 import { isStreamPlaybackBoardType } from "@utils/common";
 import Avatar from "components/objects/Avatar/index.vue";
 import Drawing from "components/objects/Drawing.vue";
@@ -93,6 +94,14 @@ export default {
     const backdropColor = computed(() => stageStore.backdropColor);
     const meetingRefreshKey = computed(() => stageStore.meetingRefreshKey);
 
+    const onBoardPointerDown = (e) => {
+      if (!canPlay.value || e.target.id !== "board") return;
+      stageStore.SET_ACTIVE_MOVABLE(null);
+      if (useUserStore().avatarId != null) {
+        stageStore.releaseAvatarHold();
+      }
+    };
+
     // Remount embedded conference tiles when the user hits "Refresh
     // meeting" so a stuck/failed iframe reloads from scratch.
     const boardObjectKey = (object) =>
@@ -108,6 +117,7 @@ export default {
       canPlay,
       resolveType,
       boardObjectKey,
+      onBoardPointerDown,
     };
   },
 };
@@ -130,6 +140,7 @@ export default {
       @dragenter.prevent
       @dragover.prevent
       @drop.prevent="drop"
+      @mousedown="onBoardPointerDown"
     >
       <Backdrop />
       <transition-group name="stage-avatars" :css="false" @enter="avatarEnter" @leave="avatarLeave">

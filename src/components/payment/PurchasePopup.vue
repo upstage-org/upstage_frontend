@@ -7,10 +7,11 @@ import { useMutation } from "services/graphql/composable";
 import { message } from "ant-design-vue";
 import { loadStripe } from "@stripe/stripe-js";
 import { StripeElements, StripeElement } from "vue-stripe-js";
+import Turnstile from "vue-turnstile";
 import config from "config";
 
 export default {
-  components: { Icon, StripeElements, StripeElement },
+  components: { Icon, StripeElements, StripeElement, Turnstile },
   setup() {
     const stageStore = useStageStore();
     const isActive = computed(() => stageStore.purchasePopup.isActive);
@@ -23,8 +24,20 @@ export default {
     const isReceiptFormActive = ref(false);
     const donorName = ref("");
     const generating = ref(false);
+    const isProduction = config.MODE === "Production";
+    const siteKey = config.CLOUDFLARE_CAPTCHA_SITEKEY;
+    const captchaToken = ref("");
+    const captcha = ref(null);
+
+    const resetPaymentState = () => {
+      clientSecret.value = undefined;
+      captchaToken.value = "";
+      captcha.value?.reset();
+      loading.value = false;
+    };
 
     const close = () => {
+      resetPaymentState();
       stageStore.closePurchasePopup();
     };
 
@@ -64,19 +77,41 @@ export default {
 
     watch(
       () => isActive.value,
-      async (newValue) => {
-        if (newValue) {
-          loading.value = true;
-          await paymentSecret({
-            amount: parseFloat(amount.value) * 100,
-          }).then((res) => {
-            if (res.paymentSecret) {
-              clientSecret.value = res.paymentSecret;
-              loading.value = false;
-            } else {
-              message.error("Stripe Error!");
-            }
-          });
+      (active) => {
+        if (!active) {
+          resetPaymentState();
+        }
+      },
+    );
+
+    watch(
+      () => [isActive.value, captchaToken.value],
+      async ([active, token]) => {
+        if (!active) return;
+        if (isProduction && siteKey && !token) {
+          return;
+        }
+
+        loading.value = true;
+        const payload = {
+          amount: parseFloat(amount.value) * 100,
+          ...(token ? { token } : {}),
+        };
+        try {
+          const res = await paymentSecret(payload);
+          if (res.paymentSecret) {
+            clientSecret.value = res.paymentSecret;
+          } else {
+            message.error("Stripe Error!");
+            captcha.value?.reset();
+            captchaToken.value = "";
+          }
+        } catch (error) {
+          captcha.value?.reset();
+          captchaToken.value = "";
+          message.error(error.message || "Failed to initialize payment");
+        } finally {
+          loading.value = false;
         }
       },
     );
@@ -181,6 +216,11 @@ export default {
       closeReceiptForm,
       generateReceipt,
       generating,
+      isProduction,
+      siteKey,
+      captchaToken,
+      captcha,
+      clientSecret,
     };
   },
 };
@@ -202,7 +242,14 @@ export default {
           </div>
           <div class="card-content">
             <form v-if="isActive" @submit.prevent="donateToUpstage">
+              <Turnstile
+                v-if="isProduction"
+                ref="captcha"
+                v-model="captchaToken"
+                :site-key="siteKey"
+              />
               <StripeElements
+                v-if="clientSecret"
                 ref="elementsComponent"
                 :stripe-key="stripeKey"
                 :instance-options="stripeOptions"
@@ -220,7 +267,9 @@ export default {
                   class="button is-primary"
                   type="submit"
                   :class="{ 'is-loading': loading }"
-                  :disabled="loading"
+                  :disabled="
+                    loading || !clientSecret || (isProduction && !!siteKey && !captchaToken)
+                  "
                 >
                   <span>Donate USD$ {{ amount }}</span>
                 </button>

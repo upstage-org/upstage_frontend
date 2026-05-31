@@ -801,6 +801,451 @@ test.describe("streaming: performer streams, audience views @full", () => {
   });
 
   /**
+   * Navigate-back regression (store-level) — persisted own-tiles must
+   * survive participantId heal without being deleted from the board.
+   *
+   * Pre-fix race: CONFERENCE_JOINED set `joined=true` before
+   * `syncLocalJitsiParticipantId`, so Jitsi.vue's orphan watcher saw
+   * a stale participantId, called removeObjectLocally, and the tile
+   * vanished before heal could run. `countOwnJitsiOnBoard` also returned
+   * 0 (only matched participantId === myUserId), so re-publish never
+   * fired.
+   */
+  test("syncLocalJitsiParticipantId heals stale own-tile without deleting it", async ({
+    browser,
+  }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `heal-stream-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      const performerLive = new LiveStagePage(performerPage);
+      await performerLive.goto(runtime.stageSlug);
+
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      const healed = await performerPage.evaluate(
+        async ({ name }) => {
+          type BoardObject = Record<string, unknown> & {
+            id: string;
+            participantId?: string | null;
+            hostId?: string | null;
+          };
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            placeObjectOnStage: (p: unknown) => BoardObject;
+            shapeObject: (p: unknown) => unknown | Promise<unknown>;
+            syncLocalJitsiParticipantId: (id: string | null) => void;
+            board: { objects: BoardObject[] };
+            session: string | null;
+          };
+          const placed = stage.placeObjectOnStage({
+            type: "jitsi",
+            name,
+            w: 200,
+            h: 150,
+            x: 220,
+            y: 180,
+          });
+          const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
+          await Promise.resolve(stage.shapeObject({ ...fromBoard, liveAction: true }));
+          const hostIdBefore = fromBoard?.hostId ?? null;
+          // Simulate navigate-back: tile restored from events with an
+          // orphaned participantId from a previous conference membership.
+          const staleId = "stale-jitsi-participant-id";
+          const afterPlace = stage.board.objects.find((o) => o.id === placed.id);
+          if (!afterPlace) {
+            return { ok: false, reason: "missing-after-place" };
+          }
+          afterPlace.participantId = staleId;
+          // Fresh myUserId after CONFERENCE_JOINED on re-entry.
+          const freshId = "fresh-jitsi-participant-id";
+          stage.syncLocalJitsiParticipantId(freshId);
+          const afterHeal = stage.board.objects.find((o) => o.id === placed.id);
+          if (!afterHeal) {
+            return { ok: false, reason: "missing-after-heal" };
+          }
+          return {
+            ok:
+              afterHeal.participantId === freshId &&
+              afterHeal.hostId === hostIdBefore &&
+              afterHeal.hostId === stage.session,
+            participantId: afterHeal.participantId,
+            hostId: afterHeal.hostId,
+            session: stage.session,
+          };
+        },
+        { name: streamName },
+      );
+
+      expect(healed.ok, JSON.stringify(healed)).toBe(true);
+      expect(healed.participantId).toBe("fresh-jitsi-participant-id");
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Audience orphan regression — a jitsi tile received over MQTT with
+   * `participantId: null` must NOT be deleted while waiting for a heal
+   * MOVE_TO. Pre-fix: Jitsi.vue's orphan watcher removed such tiles
+   * after 1.5s even though WebRTC tracks were still arriving.
+   */
+  test("audience keeps jitsi tile with null participantId until heal arrives", async ({
+    browser,
+  }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      audienceCtx = await browser.newContext();
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      const result = await audience.page.evaluate(async () => {
+        type BoardObject = Record<string, unknown> & {
+          id: string;
+          participantId?: string | null;
+        };
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          handleBoardMessage: (p: { message: { type: string; object: BoardObject } }) => void;
+          board: { objects: BoardObject[]; tracks: Array<{ getParticipantId?: () => string }> };
+          ADD_TRACK: (t: {
+            getParticipantId: () => string;
+            type: string;
+            getId: () => string;
+          }) => void;
+        };
+
+        const objectId = "orphan-jitsi-tile-test";
+        stage.handleBoardMessage({
+          message: {
+            type: "placeObjectOnStage",
+            object: {
+              id: objectId,
+              type: "jitsi",
+              name: "orphan-stream",
+              participantId: null,
+              w: 200,
+              h: 150,
+              x: 100,
+              y: 100,
+            },
+          },
+        });
+
+        const afterPlace = stage.board.objects.find((o) => o.id === objectId);
+        if (!afterPlace) {
+          return { ok: false, reason: "missing-after-place" };
+        }
+
+        await new Promise<void>((r) => setTimeout(r, 2000));
+
+        const afterWait = stage.board.objects.find((o) => o.id === objectId);
+        if (!afterWait) {
+          return { ok: false, reason: "deleted-during-wait" };
+        }
+
+        const healedId = "healed-audience-participant-id";
+        stage.handleBoardMessage({
+          message: {
+            type: "moveTo",
+            object: { ...afterWait, participantId: healedId },
+          },
+        });
+
+        const afterHeal = stage.board.objects.find((o) => o.id === objectId);
+        if (!afterHeal || afterHeal.participantId !== healedId) {
+          return { ok: false, reason: "heal-failed", participantId: afterHeal?.participantId };
+        }
+
+        const mockTrack = {
+          getParticipantId: () => healedId,
+          getId: () => "mock-track-id",
+          type: "video",
+        };
+        stage.ADD_TRACK(mockTrack);
+
+        const matchingTracks = stage.board.tracks.filter(
+          (t) => t.getParticipantId?.() === afterHeal.participantId,
+        );
+
+        return {
+          ok: matchingTracks.length === 1,
+          matchingTracksLen: matchingTracks.length,
+          participantId: afterHeal.participantId,
+        };
+      });
+
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+      expect(result.participantId).toBe("healed-audience-participant-id");
+    } finally {
+      await audienceCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Performer defer regression — shapeObject must not MQTT-publish a jitsi
+   * tile until participantId is known; syncLocalJitsiParticipantId flushes
+   * the pending publish with a valid join key.
+   */
+  test("shapeObject defers jitsi MQTT until participantId then flushes on sync", async ({
+    browser,
+  }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `defer-publish-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      const performerLive = new LiveStagePage(performerPage);
+      await performerLive.goto(runtime.stageSlug);
+
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      const result = await performerPage.evaluate(
+        async ({ name }) => {
+          type BoardObject = Record<string, unknown> & {
+            id: string;
+            participantId?: string | null;
+            published?: boolean;
+            liveAction?: boolean;
+          };
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            placeObjectOnStage: (p: unknown) => BoardObject;
+            shapeObject: (p: unknown) => unknown | Promise<unknown>;
+            syncLocalJitsiParticipantId: (id: string | null) => void;
+            board: { objects: BoardObject[] };
+          };
+
+          stage.syncLocalJitsiParticipantId(null);
+          const placed = stage.placeObjectOnStage({
+            type: "jitsi",
+            name,
+            w: 200,
+            h: 150,
+            x: 220,
+            y: 180,
+          });
+          const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
+          if (!fromBoard) {
+            return { ok: false, reason: "missing-after-place" };
+          }
+          fromBoard.participantId = null;
+
+          await Promise.resolve(
+            stage.shapeObject({ ...fromBoard, liveAction: true, published: false }),
+          );
+
+          const afterShape = stage.board.objects.find((o) => o.id === placed.id);
+          if (!afterShape) {
+            return { ok: false, reason: "missing-after-shape" };
+          }
+          const deferredOk =
+            afterShape.liveAction === true &&
+            (afterShape.published === false || afterShape.published == null) &&
+            (afterShape.participantId == null || afterShape.participantId === "");
+
+          await new Promise<void>((r) => setTimeout(r, 2000));
+
+          const afterWait = stage.board.objects.find((o) => o.id === placed.id);
+          if (!afterWait) {
+            return { ok: false, reason: "deleted-during-wait" };
+          }
+
+          const freshId = "fresh-deferred-participant-id";
+          stage.syncLocalJitsiParticipantId(freshId);
+
+          const afterHeal = stage.board.objects.find((o) => o.id === placed.id);
+          if (!afterHeal) {
+            return { ok: false, reason: "missing-after-heal" };
+          }
+
+          return {
+            ok:
+              deferredOk &&
+              afterHeal.participantId === freshId &&
+              afterHeal.published === true &&
+              afterHeal.liveAction === true,
+            deferredOk,
+            participantId: afterHeal.participantId,
+            published: afterHeal.published,
+          };
+        },
+        { name: streamName },
+      );
+
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+      expect(result.participantId).toBe("fresh-deferred-participant-id");
+      expect(result.published).toBe(true);
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Delete regression — removing a published-but-paused jitsi tile
+   * (red bulb: published:true, liveAction:false) must MQTT-broadcast
+   * DESTROY so the audience drops the tile too.
+   *
+   * Pre-fix: deleteObject only published when liveAction was true, so
+   * X-ing a paused stream cleared it locally but left the audience
+   * staring at a stale frozen tile.
+   */
+  test("paused-bulb jitsi delete removes tile on audience via MQTT", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `paused-delete-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      const performerLive = new LiveStagePage(performerPage);
+      await performerLive.goto(runtime.stageSlug);
+
+      audienceCtx = await browser.newContext();
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      await performerPage.evaluate(
+        async ({ name }) => {
+          type BoardObject = Record<string, unknown> & { id: string };
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            placeObjectOnStage: (p: unknown) => BoardObject;
+            shapeObject: (p: unknown) => unknown | Promise<unknown>;
+            deleteObject: (p: unknown) => unknown | Promise<unknown>;
+            board: { objects: BoardObject[] };
+          };
+          const placed = stage.placeObjectOnStage({
+            type: "jitsi",
+            name,
+            w: 200,
+            h: 150,
+            x: 220,
+            y: 180,
+          });
+          const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
+          await Promise.resolve(stage.shapeObject({ ...fromBoard, liveAction: true }));
+          // Pause broadcast (red bulb).
+          await Promise.resolve(
+            stage.shapeObject({ ...fromBoard, liveAction: false, published: true }),
+          );
+          const paused = stage.board.objects.find((o) => o.id === placed.id);
+          await Promise.resolve(stage.deleteObject({ ...paused }));
+        },
+        { name: streamName },
+      );
+
+      await performerPage.waitForFunction(
+        (name) =>
+          !window.__UPSTAGE_PINIA__!.stage.board.objects.some(
+            (o: { name?: string; type?: string }) => o.type === "jitsi" && o.name === name,
+          ),
+        streamName,
+        { timeout: 15_000 },
+      );
+
+      await audience.page.waitForFunction(
+        (name) =>
+          !window.__UPSTAGE_PINIA__!.stage.board.objects.some(
+            (o: { name?: string; type?: string }) => o.type === "jitsi" && o.name === name,
+          ),
+        streamName,
+        { timeout: 15_000 },
+      );
+    } finally {
+      await performerCtx?.close().catch(() => {});
+      await audienceCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Refresh-stream regression — triggerReloadStreams must bump the
+   * reloadStreams tick while an own jitsi tile is on the board so
+   * localStreamPublisher.republishLocalTracks and Jitsi.vue loadTrack
+   * have a signal to re-attach.
+   */
+  test("triggerReloadStreams bumps reload tick with jitsi tile on board", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `reload-tick-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      const performerLive = new LiveStagePage(performerPage);
+      await performerLive.goto(runtime.stageSlug);
+
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      const result = await performerPage.evaluate(
+        async ({ name }) => {
+          type BoardObject = Record<string, unknown> & { id: string };
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            placeObjectOnStage: (p: unknown) => BoardObject;
+            shapeObject: (p: unknown) => unknown | Promise<unknown>;
+            triggerReloadStreams: () => void;
+            board: { objects: BoardObject[] };
+            reloadStreams: Date | null;
+          };
+          const before = stage.reloadStreams;
+          stage.placeObjectOnStage({
+            type: "jitsi",
+            name,
+            w: 200,
+            h: 150,
+            x: 220,
+            y: 180,
+            liveAction: true,
+            published: true,
+          });
+          stage.triggerReloadStreams();
+          const after = stage.reloadStreams;
+          const hasTile = stage.board.objects.some(
+            (o) => o.type === "jitsi" && (o as { name?: string }).name === name,
+          );
+          return {
+            hasTile,
+            tickChanged: after != null && after !== before,
+            afterMs: after instanceof Date ? after.getTime() : null,
+          };
+        },
+        { name: streamName },
+      );
+
+      expect(result.hasTile).toBe(true);
+      expect(result.tickChanged).toBe(true);
+      expect(result.afterMs).toBeGreaterThan(0);
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
    * Cross-client WebRTC publish — performer drags Yourself onto the
    * board, audience renders a `Jitsi.vue` tile that subscribes to the
    * remote track. This needs:
@@ -1043,6 +1488,249 @@ test.describe("streaming: performer streams, audience views @full", () => {
       });
     } finally {
       await performerCtx?.close().catch(() => {});
+      await audienceCtx?.close().catch(() => {});
+    }
+  });
+
+  test("reconcileJitsiBoardFromEvents drops destroyed tiles and latest hostId wins", async ({
+    browser,
+  }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      audienceCtx = await browser.newContext();
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      const result = await audience.page.evaluate(() => {
+        type BoardObject = Record<string, unknown> & {
+          id: string;
+          type?: string;
+          hostId?: string;
+        };
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          url: string;
+          board: { objects: BoardObject[] };
+          PUSH_OBJECT: (p: unknown) => void;
+          reconcileJitsiBoardFromEvents: (
+            events: Array<{ topic: string; payload: unknown; mqttTimestamp: number }>,
+          ) => void;
+        };
+
+        const boardTopic = `dev/${stage.url}/board`;
+        const hostId = "tab-session-host-a";
+        const ghostA = "ghost-jitsi-a";
+        const ghostB = "ghost-jitsi-b";
+        const removed = "ghost-jitsi-removed";
+
+        stage.PUSH_OBJECT({
+          id: ghostA,
+          type: "jitsi",
+          hostId,
+          name: "old stream",
+          x: 10,
+          y: 10,
+          w: 100,
+          h: 80,
+        });
+        stage.PUSH_OBJECT({
+          id: ghostB,
+          type: "jitsi",
+          hostId,
+          name: "newer stream",
+          x: 200,
+          y: 200,
+          w: 100,
+          h: 80,
+        });
+        stage.PUSH_OBJECT({
+          id: removed,
+          type: "jitsi",
+          hostId: "other-tab",
+          name: "deleted stream",
+          x: 400,
+          y: 100,
+          w: 100,
+          h: 80,
+        });
+
+        const events = [
+          {
+            topic: boardTopic,
+            mqttTimestamp: 100,
+            payload: {
+              type: "placeObjectOnStage",
+              object: { id: ghostA, type: "jitsi", hostId, name: "old stream" },
+            },
+          },
+          {
+            topic: boardTopic,
+            mqttTimestamp: 200,
+            payload: {
+              type: "placeObjectOnStage",
+              object: { id: ghostB, type: "jitsi", hostId, name: "newer stream" },
+            },
+          },
+          {
+            topic: boardTopic,
+            mqttTimestamp: 250,
+            payload: {
+              type: "destroy",
+              object: { id: removed, type: "jitsi", hostId: "other-tab" },
+            },
+          },
+        ];
+
+        stage.reconcileJitsiBoardFromEvents(events);
+
+        const ids = stage.board.objects.filter((o) => o.type === "jitsi").map((o) => o.id);
+        return {
+          ids,
+          hasGhostA: ids.includes(ghostA),
+          hasGhostB: ids.includes(ghostB),
+          hasRemoved: ids.includes(removed),
+        };
+      });
+
+      expect(result.hasGhostA).toBe(false);
+      expect(result.hasGhostB).toBe(true);
+      expect(result.hasRemoved).toBe(false);
+    } finally {
+      await audienceCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Audience prune regression — `pruneOrphanJitsiTilesFromOldSessions` is
+   * performer-only (clears this tab's stale hostId tiles). Pre-fix it ran
+   * on every audience `joinStage` / MQTT reconnect and deleted every remote
+   * jitsi tile because publisher `hostId` never equals the viewer's tab id.
+   */
+  test("audience joinStage keeps remote jitsi tiles with foreign hostId", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      audienceCtx = await browser.newContext();
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      const result = await audience.page.evaluate(async () => {
+        type BoardObject = Record<string, unknown> & {
+          id: string;
+          hostId?: string;
+          participantId?: string;
+        };
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          canPlay: boolean;
+          session: string | null;
+          handleBoardMessage: (p: { message: { type: string; object: BoardObject } }) => void;
+          joinStage: () => Promise<void>;
+          board: { objects: BoardObject[] };
+        };
+
+        const objectId = "audience-remote-jitsi-prune-test";
+        const publisherHostId = "performer-tab-session-not-audience";
+        stage.handleBoardMessage({
+          message: {
+            type: "placeObjectOnStage",
+            object: {
+              id: objectId,
+              type: "jitsi",
+              name: "remote-stream",
+              hostId: publisherHostId,
+              participantId: "remote-jitsi-participant",
+              w: 200,
+              h: 150,
+              x: 120,
+              y: 140,
+            },
+          },
+        });
+
+        const beforeJoin = stage.board.objects.find((o) => o.id === objectId);
+        if (!beforeJoin) {
+          return { ok: false, reason: "missing-after-place" };
+        }
+
+        await stage.joinStage();
+
+        const afterJoin = stage.board.objects.find((o) => o.id === objectId);
+        return {
+          ok: Boolean(afterJoin),
+          canPlay: stage.canPlay,
+          audienceSession: stage.session,
+          hostId: afterJoin?.hostId,
+          participantId: afterJoin?.participantId,
+        };
+      });
+
+      expect(result.canPlay).toBe(false);
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+      expect(result.hostId).toBe("performer-tab-session-not-audience");
+      expect(result.participantId).toBe("remote-jitsi-participant");
+    } finally {
+      await audienceCtx?.close().catch(() => {});
+    }
+  });
+
+  test("counter leave refreshes retained player statistics for stage preview", async ({
+    browser,
+  }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      audienceCtx = await browser.newContext();
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      const result = await audience.page.evaluate(async () => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          sessions: Array<{ id: string; isPlayer?: boolean; at: number }>;
+          UPDATE_SESSIONS_COUNTER: (s: {
+            id: string;
+            isPlayer?: boolean;
+            at: number;
+            leaving?: boolean;
+          }) => void;
+          players: Array<{ id: string }>;
+          sendStatistics: () => Promise<void>;
+          subscribeSuccess: boolean;
+        };
+
+        // Drop live roster from MQTT so counts reflect only the synthetic leave below.
+        stage.sessions = [];
+
+        stage.UPDATE_SESSIONS_COUNTER({
+          id: "preview-player-a",
+          isPlayer: true,
+          at: Date.now(),
+        });
+        stage.UPDATE_SESSIONS_COUNTER({
+          id: "preview-player-b",
+          isPlayer: true,
+          at: Date.now(),
+        });
+        await stage.sendStatistics();
+
+        stage.UPDATE_SESSIONS_COUNTER({
+          id: "preview-player-a",
+          leaving: true,
+          isPlayer: true,
+          at: Date.now(),
+        });
+
+        return {
+          playerCount: stage.players.length,
+          subscribeSuccess: stage.subscribeSuccess,
+        };
+      });
+
+      expect(result.subscribeSuccess).toBe(true);
+      expect(result.playerCount).toBe(1);
+    } finally {
       await audienceCtx?.close().catch(() => {});
     }
   });

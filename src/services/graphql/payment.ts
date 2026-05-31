@@ -19,13 +19,14 @@ export default {
       }
     }`),
   paymentSecret: (input) =>
-    studioClient.request(gql`
-      mutation{
-        paymentSecret(
-          input: {
-            amount:${input.amount}
-          })
-      }`),
+    studioClient.request(
+      gql`
+        mutation PaymentSecret($amount: Int!, $token: String) {
+          paymentSecret(input: { amount: $amount, token: $token })
+        }
+      `,
+      { amount: input.amount, token: input.token ?? null },
+    ),
   generateReceipt: (input) =>
     studioClient.request(gql`
       mutation{

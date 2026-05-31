@@ -4,6 +4,7 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import Skeleton from "../Skeleton.vue";
 import Icon from "components/Icon.vue";
+import { isHoldableBoardObject } from "@utils/common";
 
 export default {
   components: { Skeleton, Icon },
@@ -18,7 +19,7 @@ export default {
     // both correct and reactive.
     const currentAvatar = computed(() => userStore.avatarId);
 
-    return { objects, currentAvatar };
+    return { objects, currentAvatar, isHoldableBoardObject };
   },
 };
 </script>
@@ -26,10 +27,11 @@ export default {
 <template>
   <div v-for="object in objects" :key="object.id">
     <Icon
-      v-if="object.holder"
+      v-if="object.holder && isHoldableBoardObject(object)"
       class="current-avatar"
-      :style="{
-        filter: `grayscale(${object.id === currentAvatar ? 0 : 1})`,
+      :class="{
+        'current-avatar--mine': object.id === currentAvatar,
+        'current-avatar--taken': object.id !== currentAvatar,
       }"
       src="my-avatar.svg"
     />
@@ -44,5 +46,13 @@ export default {
   transform: translate(-50%, -65%);
   width: 16px;
   height: 16px;
+}
+
+.current-avatar--mine {
+  filter: hue-rotate(88deg) saturate(1.15) brightness(0.92);
+}
+
+.current-avatar--taken {
+  filter: none;
 }
 </style>
