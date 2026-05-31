@@ -715,6 +715,103 @@ test.describe("features: drawing + opacity + depth @features", () => {
     await popDrawingAdmin(admin, drawingId);
   });
 
+  test("releasing an avatar clears holder teardrop on all clients", async () => {
+    await showBanner(admin.page, "Test 2b — Release avatar", "placing then releasing an avatar");
+    await showBanner(audience.page, "Test 2b — Release avatar", "watching teardrop clear");
+    await settle(admin.page);
+
+    const avatarKey = Object.keys(runtime.mediaByPersona)[0];
+    if (!avatarKey) test.skip(true, "runtime.json has no avatars — re-run pnpm e2e:setup");
+
+    const avatarRef = runtime.mediaByPersona[avatarKey];
+    const placedId = await admin.page.evaluate(
+      async ({ mediaId, mediaName, to }) => {
+        type ToolboxAvatar = {
+          id: string | number;
+          name?: string;
+          src?: string;
+          type?: string;
+        };
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          tools: { avatars: ToolboxAvatar[] };
+          board: { objects: Array<{ id: string }> };
+          placeObjectOnStage: (p: unknown) => { id: string };
+          shapeObject: (p: unknown) => unknown | Promise<unknown>;
+        };
+
+        const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+        let avatar: ToolboxAvatar | undefined;
+        for (let i = 0; i < 40; i += 1) {
+          const candidates = stage.tools.avatars ?? [];
+          avatar =
+            candidates.find((a) => a.name === mediaName) ??
+            candidates.find((a) => String(a.id) === String(mediaId));
+          if (avatar) break;
+          await sleep(250);
+        }
+        if (!avatar) {
+          throw new Error(`avatar ${mediaName} (${mediaId}) not in toolbox`);
+        }
+
+        const placed = stage.placeObjectOnStage({
+          ...avatar,
+          type: "avatar",
+          name: mediaName,
+          x: to.x,
+          y: to.y,
+        });
+        const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
+        if (!fromBoard) throw new Error("placeObjectOnStage did not push into board.objects");
+        await Promise.resolve(
+          stage.shapeObject({
+            ...fromBoard,
+            liveAction: true,
+            published: false,
+          }),
+        );
+        return placed.id;
+      },
+      { mediaId: avatarRef.id, mediaName: avatarRef.name, to: { x: 300, y: 280 } },
+    );
+
+    await admin.page.evaluate((id) => {
+      window.__UPSTAGE_PINIA__!.user.setAvatarId(id);
+    }, placedId);
+
+    await pollUntil<BoardObject[]>(
+      `audience sees holder for avatar ${placedId}`,
+      async () => (await audience.live.getStageState<BoardObject[]>("objects")) ?? [],
+      (objs) => {
+        const o = objs.find((x) => x.id === placedId);
+        return Boolean(o?.holder);
+      },
+    );
+
+    await admin.page.evaluate(() => {
+      window.__UPSTAGE_PINIA__!.stage.releaseAvatarHold();
+    });
+
+    await pollUntil<BoardObject[]>(
+      `admin board clears holder for avatar ${placedId}`,
+      async () => (await admin.live.getStageState<BoardObject[]>("objects")) ?? [],
+      (objs) => {
+        const o = objs.find((x) => x.id === placedId);
+        return Boolean(o && !o.holder);
+      },
+    );
+
+    await pollUntil<BoardObject[]>(
+      `audience board clears holder for avatar ${placedId}`,
+      async () => (await audience.live.getStageState<BoardObject[]>("objects")) ?? [],
+      (objs) => {
+        const o = objs.find((x) => x.id === placedId);
+        return Boolean(o && !o.holder);
+      },
+    );
+
+    await deleteObjectAdmin(admin, placedId);
+  });
+
   // ---------------------------------------------------------------------
   // 3. Opacity — the OpacitySlider component calls `stage.shapeObject`
   //    with a new opacity. Verify that change reaches the audience seat
@@ -930,5 +1027,343 @@ test.describe("features: drawing + opacity + depth @features", () => {
     await deleteObjectAdmin(admin, id1);
     await deleteObjectAdmin(admin, id2);
     await deleteObjectAdmin(admin, id3);
+  });
+
+  // ---------------------------------------------------------------------
+  // 5. Avatar holds — player-only, session-scoped, no orphans after delete
+  //    or competing claims (including same account in two browser tabs).
+  // ---------------------------------------------------------------------
+  test("reconcileAvatarHolds keeps one winner per avatar and strips audience holds", async () => {
+    const result = await admin.page.evaluate(() => {
+      type SessionRow = {
+        id: string;
+        isPlayer?: boolean;
+        avatarId?: string | null;
+        at: number;
+      };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        sessions: SessionRow[];
+        board: { objects: Array<{ id: string; type?: string }> };
+        PUSH_OBJECT: (p: unknown) => void;
+        UPDATE_SESSIONS_COUNTER: (s: SessionRow) => void;
+        objects: Array<{ id: string; holder?: SessionRow }>;
+      };
+
+      // Isolate from live MQTT session rows (admin tab, stale holds).
+      stage.sessions = [];
+
+      const avatarId = "avatar-hold-reconcile-test";
+      const now = Date.now();
+      stage.PUSH_OBJECT({
+        id: avatarId,
+        type: "avatar",
+        name: "Hold test",
+        x: 120,
+        y: 120,
+        w: 120,
+        h: 120,
+      });
+
+      stage.UPDATE_SESSIONS_COUNTER({
+        id: "player-tab-a",
+        isPlayer: true,
+        at: now - 2000,
+        avatarId,
+      });
+      stage.UPDATE_SESSIONS_COUNTER({
+        id: "player-tab-b",
+        isPlayer: true,
+        at: now - 1000,
+        avatarId,
+      });
+      stage.UPDATE_SESSIONS_COUNTER({
+        id: "audience-tab",
+        isPlayer: false,
+        at: now,
+        avatarId,
+      });
+
+      const sessions = stage.sessions;
+      const tabA = sessions.find((s) => s.id === "player-tab-a");
+      const tabB = sessions.find((s) => s.id === "player-tab-b");
+      const audienceTab = sessions.find((s) => s.id === "audience-tab");
+      const holder = stage.objects.find((o) => o.id === avatarId)?.holder;
+
+      return {
+        tabACleared: tabA?.avatarId == null,
+        tabBWins: tabB?.avatarId === avatarId,
+        audienceCleared: audienceTab?.avatarId == null,
+        holderSessionId: holder?.id ?? null,
+      };
+    });
+
+    expect(result.tabACleared).toBe(true);
+    expect(result.tabBWins).toBe(true);
+    expect(result.audienceCleared).toBe(true);
+    expect(result.holderSessionId).toBe("player-tab-b");
+  });
+
+  test("audience cannot claim an avatar hold", async () => {
+    const result = await audience.page.evaluate(() => {
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        canPlay: boolean;
+        PUSH_OBJECT: (p: unknown) => void;
+      };
+      const user = window.__UPSTAGE_PINIA__!.user as unknown as {
+        setAvatarId: (id: string | null) => void;
+        avatarId: string | null;
+      };
+
+      const avatarId = "avatar-audience-hold-blocked";
+      stage.PUSH_OBJECT({
+        id: avatarId,
+        type: "avatar",
+        name: "Audience block",
+        x: 80,
+        y: 80,
+        w: 100,
+        h: 100,
+      });
+
+      user.setAvatarId(avatarId);
+
+      return {
+        canPlay: stage.canPlay,
+        avatarId: user.avatarId,
+      };
+    });
+
+    expect(result.canPlay).toBe(false);
+    expect(result.avatarId).toBeNull();
+  });
+
+  test("deleting a held avatar clears holder on all clients", async () => {
+    const avatarKey = Object.keys(runtime.mediaByPersona)[0];
+    if (!avatarKey) test.skip(true, "runtime.json has no avatars — re-run pnpm e2e:setup");
+
+    const avatarRef = runtime.mediaByPersona[avatarKey];
+    const placedId = await admin.page.evaluate(
+      async ({ mediaId, mediaName, to }) => {
+        type ToolboxAvatar = {
+          id: string | number;
+          name?: string;
+          src?: string;
+          type?: string;
+        };
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          tools: { avatars: ToolboxAvatar[] };
+          board: { objects: Array<{ id: string }> };
+          placeObjectOnStage: (p: unknown) => { id: string };
+          shapeObject: (p: unknown) => unknown | Promise<unknown>;
+        };
+
+        const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+        let avatar: ToolboxAvatar | undefined;
+        for (let i = 0; i < 40; i += 1) {
+          const candidates = stage.tools.avatars ?? [];
+          avatar =
+            candidates.find((a) => a.name === mediaName) ??
+            candidates.find((a) => String(a.id) === String(mediaId));
+          if (avatar) break;
+          await sleep(250);
+        }
+        if (!avatar) {
+          throw new Error(`avatar ${mediaName} (${mediaId}) not in toolbox`);
+        }
+
+        const placed = stage.placeObjectOnStage({
+          ...avatar,
+          type: "avatar",
+          name: mediaName,
+          x: to.x,
+          y: to.y,
+        });
+        const fromBoard = stage.board.objects.find((o) => o.id === placed.id);
+        if (!fromBoard) throw new Error("placeObjectOnStage did not push into board.objects");
+        await Promise.resolve(
+          stage.shapeObject({
+            ...fromBoard,
+            liveAction: true,
+            published: false,
+          }),
+        );
+        return placed.id;
+      },
+      { mediaId: avatarRef.id, mediaName: avatarRef.name, to: { x: 320, y: 260 } },
+    );
+
+    await admin.page.evaluate((id) => {
+      window.__UPSTAGE_PINIA__!.user.setAvatarId(id);
+    }, placedId);
+
+    await pollUntil<BoardObject[]>(
+      `audience sees holder for avatar ${placedId}`,
+      async () => (await audience.live.getStageState<BoardObject[]>("objects")) ?? [],
+      (objs) => Boolean(objs.find((x) => x.id === placedId)?.holder),
+    );
+
+    await deleteObjectAdmin(admin, placedId);
+
+    await pollUntil<BoardObject[]>(
+      `audience has no stale holder after avatar ${placedId} deleted`,
+      async () => (await audience.live.getStageState<BoardObject[]>("board.objects")) ?? [],
+      (objs) => {
+        const o = objs.find((x) => x.id === placedId);
+        return o == null;
+      },
+    );
+
+    const staleSessionHold = await admin.page.evaluate(() => {
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        sessions: Array<{ avatarId?: string | null }>;
+      };
+      return stage.sessions.some((s) => s.avatarId != null && s.avatarId !== "");
+    });
+    expect(staleSessionHold).toBe(false);
+  });
+
+  test("losing tab clears local avatarId when another session claims the same avatar", async () => {
+    const result = await admin.page.evaluate(() => {
+      type SessionRow = {
+        id: string;
+        isPlayer?: boolean;
+        avatarId?: string | null;
+        at: number;
+        userId?: string | number | null;
+      };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        session: string | null;
+        sessions: SessionRow[];
+        board: { objects: Array<{ id: string; type?: string }> };
+        PUSH_OBJECT: (p: unknown) => void;
+        UPDATE_SESSIONS_COUNTER: (s: SessionRow) => void;
+      };
+      const user = window.__UPSTAGE_PINIA__!.user as unknown as {
+        avatarId: string | null;
+        currentUserId?: string | number;
+        $patch: (p: { avatarId: string | null }) => void;
+      };
+
+      const avatarId = "avatar-same-account-tab-fight";
+      stage.PUSH_OBJECT({
+        id: avatarId,
+        type: "avatar",
+        name: "Tab fight",
+        x: 200,
+        y: 200,
+        w: 100,
+        h: 100,
+      });
+
+      const now = Date.now();
+      stage.session = "local-tab-a";
+      user.$patch({ avatarId });
+      stage.UPDATE_SESSIONS_COUNTER({
+        id: "local-tab-a",
+        isPlayer: true,
+        userId: user.currentUserId ?? "same-user",
+        at: now - 2000,
+        avatarId,
+      });
+
+      stage.UPDATE_SESSIONS_COUNTER({
+        id: "local-tab-b",
+        isPlayer: true,
+        userId: user.currentUserId ?? "same-user",
+        at: now - 1000,
+        avatarId,
+      });
+
+      return {
+        localAvatarId: user.avatarId,
+        localSession: stage.session,
+        winner: stage.sessions.find((s) => s.avatarId === avatarId)?.id ?? null,
+      };
+    });
+
+    expect(result.localSession).toBe("local-tab-a");
+    expect(result.localAvatarId).toBeNull();
+    expect(result.winner).toBe("local-tab-b");
+  });
+
+  test("reconcileAvatarHolds keeps one hold per userId across different avatars", async () => {
+    const result = await admin.page.evaluate(() => {
+      type SessionRow = {
+        id: string;
+        isPlayer?: boolean;
+        avatarId?: string | null;
+        at: number;
+        userId?: string | number | null;
+      };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        sessions: SessionRow[];
+        board: { objects: Array<{ id: string; type?: string }> };
+        PUSH_OBJECT: (p: unknown) => void;
+        UPDATE_SESSIONS_COUNTER: (s: SessionRow) => void;
+        objects: Array<{ id: string; holder?: SessionRow }>;
+      };
+
+      const avatarA = "avatar-user-dedupe-a";
+      const avatarB = "avatar-user-dedupe-b";
+      const sharedUserId = "logged-in-user-42";
+
+      stage.sessions = [];
+
+      const now = Date.now();
+      stage.PUSH_OBJECT({
+        id: avatarA,
+        type: "avatar",
+        name: "A",
+        x: 10,
+        y: 10,
+        w: 80,
+        h: 80,
+      });
+      stage.PUSH_OBJECT({
+        id: avatarB,
+        type: "avatar",
+        name: "B",
+        x: 200,
+        y: 10,
+        w: 80,
+        h: 80,
+      });
+
+      stage.UPDATE_SESSIONS_COUNTER({
+        id: "tab-older",
+        isPlayer: true,
+        userId: sharedUserId,
+        at: now - 2000,
+        avatarId: avatarA,
+      });
+      stage.UPDATE_SESSIONS_COUNTER({
+        id: "tab-newer",
+        isPlayer: true,
+        userId: sharedUserId,
+        at: now - 1000,
+        avatarId: avatarB,
+      });
+
+      const older = stage.sessions.find((s) => s.id === "tab-older");
+      const newer = stage.sessions.find((s) => s.id === "tab-newer");
+      const holderA = stage.objects.find((o) => o.id === avatarA)?.holder;
+      const holderB = stage.objects.find((o) => o.id === avatarB)?.holder;
+
+      return {
+        olderCleared: older?.avatarId == null,
+        newerHoldsB: newer?.avatarId === avatarB,
+        holderAId: holderA?.id ?? null,
+        holderBId: holderB?.id ?? null,
+        holdingSessionCount: stage.sessions.filter(
+          (s) => s.isPlayer && s.userId === sharedUserId && s.avatarId != null,
+        ).length,
+      };
+    });
+
+    expect(result.olderCleared).toBe(true);
+    expect(result.newerHoldsB).toBe(true);
+    expect(result.holderAId).toBeNull();
+    expect(result.holderBId).toBe("tab-newer");
+    expect(result.holdingSessionCount).toBe(1);
   });
 });

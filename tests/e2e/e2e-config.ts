@@ -26,6 +26,8 @@ export interface E2eConfig {
   readonly adminUsername: string;
   readonly adminPassword: string;
   readonly playerPassword: string;
+  /** Cloudflare Turnstile token for GraphQL login when backend captcha is enabled. */
+  readonly captchaToken: string | undefined;
   readonly runIdExplicit: boolean;
   readonly runId: string | undefined;
   readonly forceFreshSetup: boolean;
@@ -96,6 +98,7 @@ export function loadE2eConfig(): E2eConfig {
     adminUsername: process.env.E2E_ADMIN_USERNAME ?? "admin",
     adminPassword: process.env.E2E_ADMIN_PASSWORD ?? "12345678",
     playerPassword: process.env.E2E_PLAYER_PASSWORD ?? "e2e-pw",
+    captchaToken: process.env.E2E_CAPTCHA_TOKEN?.trim() || undefined,
     runIdExplicit: Boolean(process.env.E2E_RUN_ID),
     runId: process.env.E2E_RUN_ID,
     forceFreshSetup: parsedBoolUnsetFalse(process.env.E2E_FORCE_FRESH_SETUP),
@@ -132,6 +135,7 @@ export function formatE2eConfigSummary(cfg: E2eConfig): string {
     `  · admin user         ${cfg.adminUsername}`,
     `  · admin password     ${maskSecret(cfg.adminPassword, 2)}`,
     `  · player password    ${maskSecret(cfg.playerPassword)}`,
+    `  · captcha token      ${cfg.captchaToken ? maskSecret(cfg.captchaToken, 4) : "(unset — browser login fallback may apply)"}`,
     `  · E2E_RUN_ID         ${cfg.runIdExplicit ? cfg.runId : "(unset — global-setup assigns)"}`,
     `  · force fresh setup  ${cfg.forceFreshSetup}`,
     `  · beats mode         ${cfg.beatsSmoke ? "smoke" : "full"}`,

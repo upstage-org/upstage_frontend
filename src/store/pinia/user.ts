@@ -162,11 +162,21 @@ export const useUserStore = defineStore("user", () => {
 
   /**
    * Claim the given board object as the user's avatar and (re-)join
-   * the stage so other clients see the new ownership.
+   * the stage so other clients see the new ownership. Audience members
+   * cannot hold avatars (`canPlay` is false for audience permission).
    */
   const setAvatarId = (id: string | number | null): void => {
+    const stage = useStageStore();
+    if (id != null && !stage.canPlay) {
+      return;
+    }
     avatarId.value = id;
-    void Promise.resolve(useStageStore().joinStage());
+    if (id == null) {
+      stage.releaseAvatarHold();
+      return;
+    }
+    stage.syncLocalSessionAvatarHold();
+    void Promise.resolve(stage.joinStage());
   };
 
   const checkIsAdmin = async (): Promise<boolean | undefined> => {

@@ -21,9 +21,25 @@ export class LoginPage {
     await this.goto();
     await this.page.locator('input[name="username"]').first().fill(username);
     await this.page.locator('input[type="password"]').first().fill(password);
+
+    // Production builds render Cloudflare Turnstile; wait for a response token
+    // before submit so the backend captcha check passes.
+    const turnstileInput = this.page.locator('input[name="cf-turnstile-response"]');
+    if ((await turnstileInput.count()) > 0) {
+      await this.page.waitForFunction(
+        () => {
+          const el = document.querySelector(
+            'input[name="cf-turnstile-response"]',
+          ) as HTMLInputElement | null;
+          return Boolean(el?.value && el.value.length > 5);
+        },
+        { timeout: 60_000 },
+      );
+    }
+
     await Promise.all([
       this.page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 15_000,
+        timeout: 30_000,
       }),
       this.page.locator('button[type="submit"]').first().click(),
     ]);

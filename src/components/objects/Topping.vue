@@ -1,10 +1,15 @@
 <script>
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { useUserStore } from "@stores/pinia/user";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Linkify from "components/Linkify.vue";
-import { outOfViewportPosition } from "utils/common";
+import {
+  isHoldableBoardObject,
+  isLocalHoldOfBoardObject,
+  outOfViewportPosition,
+} from "utils/common";
 
 export default {
   components: { Icon, Linkify },
@@ -14,23 +19,23 @@ export default {
   },
   setup: (props) => {
     const stageStore = useStageStore();
-    // Use the canonical "holder.id === local session" check rather
-    // than `userStore.avatarId`. The local user store's `avatarId`
-    // ref drifts out of sync in several normal flows:
-    //   * placeObjectOnStage sets it to whichever avatar was last
-    //     dropped on stage, so dropping multiple avatars leaves the
-    //     ref pointing at the most recent one, not the one currently
-    //     being held.
-    //   * a page refresh resets it to null, so the holder marker
-    //     stays grey on the holder's own screen until they re-grab.
-    //   * handleCounterMessage overwrites it from echoed presence
-    //     payloads, which can stomp on the locally-set value.
-    // `object.holder` is derived from the MQTT-broadcast sessions
-    // list (see `objects` getter in stage.ts) and `stageStore.session`
-    // is the stable per-browser session id, so this comparison is
-    // the same one Object.vue and ContextMenuAvatar.vue already use.
-    const isHolding = computed(() => props.object.holder?.id === stageStore.session);
+    const userStore = useUserStore();
     const canPlay = computed(() => stageStore.canPlay);
+    const holderPresent = computed(
+      () => canPlay.value && isHoldableBoardObject(props.object) && Boolean(props.object.holder),
+    );
+    // Green teardrop on this tab when we hold the avatar; red when someone else
+    // holds it so other players know they cannot claim it.
+    const isHolding = computed(() =>
+      holderPresent.value
+        ? isLocalHoldOfBoardObject(props.object, {
+            localAvatarId: userStore.avatarId,
+            localSessionId: stageStore.session,
+            holder: props.object.holder,
+          })
+        : false,
+    );
+    const isHeldByOther = computed(() => holderPresent.value && !isHolding.value);
 
     const config = computed(() => stageStore.config);
 
@@ -176,6 +181,8 @@ export default {
       enter,
       leave,
       isHolding,
+      isHeldByOther,
+      holderPresent,
       canPlay,
       openChatBox,
       stageSize,
@@ -201,7 +208,11 @@ export default {
       <a-tooltip
         :title="`${object.name ? object.name + ' held by' : 'Held by'} ${object.holder?.nickname}`"
       >
-        <span v-if="object.holder && canPlay" class="icon marker" :class="{ inactive: !isHolding }">
+        <span
+          v-if="holderPresent"
+          class="icon marker"
+          :class="{ 'marker--mine': isHolding, 'marker--taken': isHeldByOther }"
+        >
           <Icon src="my-avatar.svg" style="width: 16px; height: 16px" />
         </span>
       </a-tooltip>
@@ -234,8 +245,13 @@ export default {
   left: -12px;
 }
 
-.inactive {
-  filter: grayscale(1);
+/* Icon SVG is red (#DB3737); shift hue for "I hold this" (green). */
+.marker--mine {
+  filter: hue-rotate(88deg) saturate(1.15) brightness(0.92);
+}
+
+.marker--taken {
+  filter: none;
 }
 
 .bubble.shout {

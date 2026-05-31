@@ -365,7 +365,11 @@ export const useJitsi = () => {
           const str = typeof s === "string" ? s : "(non-string frame)";
           return str.length > 800 ? `${str.slice(0, 800)}…(+${str.length - 800})` : str;
         };
-        const PatchedWebSocket = function (this: WebSocket, url: string, protocols?: string | string[]) {
+        const PatchedWebSocket = function (
+          this: WebSocket,
+          url: string,
+          protocols?: string | string[],
+        ) {
           const sock = new OriginalWebSocket(url, protocols);
           // Log EVERY ws creation so we know whether lib-jitsi-meet
           // even reached the WebSocket transport. If we only see MQTT
@@ -428,10 +432,12 @@ export const useJitsi = () => {
             ...rest: unknown[]
           ) {
             (this as unknown as { __upstageUrl?: string }).__upstageUrl = String(url);
-            // eslint-disable-next-line prefer-rest-params
+
             return OriginalOpen.apply(this, arguments as any);
           };
-          XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
+          XMLHttpRequest.prototype.send = function (
+            body?: Document | XMLHttpRequestBodyInit | null,
+          ) {
             const url = (this as unknown as { __upstageUrl?: string }).__upstageUrl ?? "";
             const isBosh = url.indexOf("/http-bind") !== -1;
             if (isBosh) {
@@ -442,7 +448,11 @@ export const useJitsi = () => {
               }
               this.addEventListener("load", () => {
                 try {
-                  console.log("[diag] bosh ⇐ in ", "status=" + this.status, truncate(this.responseText));
+                  console.log(
+                    "[diag] bosh ⇐ in ",
+                    "status=" + this.status,
+                    truncate(this.responseText),
+                  );
                 } catch (_) {
                   /* logging must not break recv */
                 }
@@ -451,7 +461,7 @@ export const useJitsi = () => {
                 console.warn("[diag] bosh xhr ERROR", { status: this.status, ev });
               });
             }
-            // eslint-disable-next-line prefer-rest-params
+
             return OriginalSend.apply(this, arguments as any);
           };
           wXhr.__upstageXhrHooked = true;
@@ -522,11 +532,11 @@ export const useJitsi = () => {
           myUserId: jitsi.room?.myUserId?.(),
           e,
         });
-        joined.value = true;
         const myId = jitsi.room?.myUserId?.();
         if (myId != null) {
           stageStore.syncLocalJitsiParticipantId(String(myId));
         }
+        joined.value = true;
       });
       jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (...args) => {
         console.warn("[diag] composable CONFERENCE_FAILED", ...args);
@@ -566,7 +576,10 @@ export const useJitsi = () => {
           } catch (_) {
             role = "throw";
           }
-          const w = window as unknown as { WebSocket: typeof WebSocket; __upstageWsHooked?: boolean };
+          const w = window as unknown as {
+            WebSocket: typeof WebSocket;
+            __upstageWsHooked?: boolean;
+          };
           console.error(`[diag] composable JOIN_WATCHDOG joined=false after ${afterMs}ms`, {
             hasRoom: !!r,
             myUserId: r?.myUserId?.(),
@@ -588,7 +601,8 @@ export const useJitsi = () => {
             },
             patch: {
               wsHooked: !!w.__upstageWsHooked,
-              wsConstructorName: typeof w.WebSocket === "function" ? w.WebSocket.name : typeof w.WebSocket,
+              wsConstructorName:
+                typeof w.WebSocket === "function" ? w.WebSocket.name : typeof w.WebSocket,
             },
           });
         }, afterMs);
@@ -667,7 +681,8 @@ export const useJitsi = () => {
       const w = window as unknown as { WebSocket: typeof WebSocket; __upstageWsHooked?: boolean };
       console.log("[diag] composable about to connect()", {
         wsHooked: !!w.__upstageWsHooked,
-        wsConstructorName: typeof w.WebSocket === "function" ? w.WebSocket.name : typeof w.WebSocket,
+        wsConstructorName:
+          typeof w.WebSocket === "function" ? w.WebSocket.name : typeof w.WebSocket,
       });
     }
     jitsi.connection.connect();
@@ -678,8 +693,7 @@ export const useJitsi = () => {
   // conference connect with the *resolved* URL. The watcher self-stops
   // after the first non-placeholder value so a transient model refresh
   // can't tear down and re-create the conference mid-session.
-  const isPlaceholderStageUrl = (u: unknown) =>
-    u == null || u === "" || u === "demo";
+  const isPlaceholderStageUrl = (u: unknown) => u == null || u === "" || u === "demo";
   onMounted(() => {
     const initialUrl = stageStore.url;
     if (!isPlaceholderStageUrl(initialUrl)) {

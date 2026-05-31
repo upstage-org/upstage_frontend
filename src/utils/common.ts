@@ -46,6 +46,46 @@ export function isJitsiBoardType(type: unknown): boolean {
   return JITSI_BOARD_TYPE_ALIASES.has(String(type).trim().toLowerCase());
 }
 
+/**
+ * Board objects a performer can claim as their speaking presence (teardrop,
+ * chat, voice). Regular avatars, stream-playback clips (`video`), and
+ * individual Jitsi tiles — not props, text, meeting embeds, etc.
+ */
+export function isHoldableBoardObject(obj: { type?: unknown } | null | undefined): boolean {
+  if (obj?.type == null) return false;
+  const t = String(obj.type).trim().toLowerCase();
+  return t === "avatar" || isStreamPlaybackBoardType(t) || isJitsiBoardType(t);
+}
+
+/**
+ * True when this browser tab is the holder of `object` (green teardrop).
+ * Uses `localAvatarId` first — set synchronously on claim — then falls back
+ * to matching the MQTT session row so multi-tab logins stay distinct per tab.
+ */
+export function isLocalHoldOfBoardObject(
+  object: { id?: unknown } | null | undefined,
+  options: {
+    localAvatarId?: string | number | null;
+    localSessionId?: string | null;
+    holder?: { id?: unknown } | null;
+  },
+): boolean {
+  const objectId = object?.id;
+  if (objectId == null) return false;
+  const { localAvatarId, localSessionId, holder } = options;
+  if (localAvatarId != null && String(localAvatarId) === String(objectId)) {
+    return true;
+  }
+  if (
+    holder?.id != null &&
+    localSessionId != null &&
+    String(holder.id) === String(localSessionId)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 // `upstage-auth` is the key written by `pinia-plugin-persistedstate` for the
 // Pinia auth store (see `src/store/pinia/auth.ts`). After the Phase 5 cutover
 // from Vuex this is the single source of truth for the persisted access /

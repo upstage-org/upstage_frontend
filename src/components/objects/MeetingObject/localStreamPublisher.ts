@@ -109,10 +109,12 @@ export function useLocalStreamPublisher(
 
   const countOwnJitsiOnBoard = (): number => {
     const myId = jitsi?.room?.myUserId?.();
-    if (!myId) return 0;
-    return stageStore.board.objects.filter(
-      (o) => isJitsiBoardType(o.type) && o.participantId === myId,
-    ).length;
+    const mySession = stageStore.session;
+    return stageStore.board.objects.filter((o) => {
+      if (!isJitsiBoardType(o.type)) return false;
+      if (myId != null && o.participantId === myId) return true;
+      return mySession != null && o.hostId === mySession;
+    }).length;
   };
 
   const publishingAllowed = (): boolean =>
@@ -150,6 +152,10 @@ export function useLocalStreamPublisher(
     pendingPublish.value = false;
     await publishLocalTracksToRoom();
     published.value = true;
+    const myUserId = jitsi?.room?.myUserId?.();
+    if (myUserId) {
+      stageStore.ensureJitsiTileParticipantBroadcast(myUserId);
+    }
   };
 
   const acquireLocalTracks = async () => {
@@ -211,6 +217,10 @@ export function useLocalStreamPublisher(
       }
     }
     syncLocalTracksRef();
+    const myUserId = jitsi?.room?.myUserId?.();
+    if (myUserId) {
+      stageStore.ensureJitsiTileParticipantBroadcast(myUserId);
+    }
   };
 
   const ensureTracks = async () => {
