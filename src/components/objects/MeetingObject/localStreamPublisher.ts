@@ -70,6 +70,7 @@ export function useLocalStreamPublisher(
   const stageStore = useStageStore();
 
   let tracks: unknown[] = [];
+  let acquiring = false;
   const blocked = ref(false);
   const blockedMessage = ref("");
   const pendingPublish = ref(false);
@@ -158,6 +159,9 @@ export function useLocalStreamPublisher(
     }
   };
 
+  const tracksAreHealthy = (): boolean =>
+    tracks.length > 0 && tracks.every((t) => !(t as { isEnded?: () => boolean }).isEnded?.());
+
   const acquireLocalTracks = async () => {
     if (!publishingAllowed()) {
       // Audience or live-streaming disabled: never touch the camera.
@@ -166,6 +170,22 @@ export function useLocalStreamPublisher(
       // when the user is not a publisher.
       return;
     }
+    // Re-entrancy guard: acquire is async (awaits getUserMedia). A second
+    // acquire firing mid-flight would dispose the tracks the first one is
+    // still publishing, drifting `tracks` out of sync with the conference.
+    if (acquiring) return;
+    // Spurious re-acquire guard. Chromium (Brave) re-fires DEVICE_LIST_CHANGED
+    // immediately after getUserMedia (camera labels populate), and wake/focus
+    // events fire on tab activation. Each one lands here. If we already hold
+    // live, published tracks, disposing+recreating them tears down a working
+    // publish and races the conference into a storm of
+    // "Cannot add second audio/video track" / "does not belong to this
+    // conference" — observed in Brave as the on-stage tile never sticking and
+    // even the FIRST track not landing. Firefox doesn't re-fire these events,
+    // so it acquires once and stays put; this makes Chromium behave the same.
+    // A genuine device removal ends the track (isEnded → true), so real
+    // device changes still fall through and re-acquire.
+    if (published.value && tracksAreHealthy()) return;
     if (typeof window !== "undefined" && !window.isSecureContext) {
       setBlocked(
         "Camera/mic require an HTTPS connection. Reload this page over https:// and try again.",
@@ -173,6 +193,7 @@ export function useLocalStreamPublisher(
       return;
     }
 
+    acquiring = true;
     try {
       const newTracks = await JitsiMeetJS.createLocalTracks({ devices: ["audio", "video"] });
       for (const old of tracks) {
@@ -194,15 +215,36 @@ export function useLocalStreamPublisher(
 
       clearBlocked();
       syncLocalTracksRef();
+      // Re-acquire (e.g. a mid-session "media devices changed" event, which
+      // Brave/Chromium fire after the performer is already live) disposes the
+      // live tracks and reset `published` above. If an own tile is already on
+      // the board we MUST re-arm `pendingPublish` here — otherwise
+      // `tryPublishWhenReady` no-ops (it bails when `pendingPublish` is false,
+      // which it is after the first publish), the fresh tracks never reach the
+      // conference (`room.getLocalTracks()` goes empty), and the performer
+      // silently stops sending to everyone. Mirrors the board-watcher's
+      // publish condition.
+      if (publishingAllowed() && countOwnJitsiOnBoard() > 0) {
+        pendingPublish.value = true;
+      }
       await tryPublishWhenReady("acquire-resolved");
     } catch (err) {
       console.error("Failed to create local tracks:", err);
       setBlocked(blockedReason(err));
+    } finally {
+      acquiring = false;
     }
   };
 
   const republishLocalTracks = async () => {
     if (!joined.value || !jitsi?.room || tracks.length === 0) return;
+    // Recovery is only meaningful when the publish has actually dropped. If we
+    // still hold live, published tracks there is nothing to re-send, and the
+    // remove+add dance below would race the conference into
+    // "Cannot add second track". Brave funnels repeated wake/focus events here
+    // via Layout's triggerReloadStreams(), so without this guard a working
+    // publish gets churned until a track is permanently lost. No-op instead.
+    if (published.value && tracksAreHealthy()) return;
     for (const t of tracks) {
       try {
         await jitsi.room.removeTrack(t);

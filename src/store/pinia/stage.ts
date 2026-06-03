@@ -2698,7 +2698,18 @@ export const useStageStore = defineStore(
         const payload = { ...obj, liveAction: true, published: true };
         const existing = board.value.objects.find((o) => o.id === payload.id);
         if (existing) {
-          UPDATE_OBJECT(serializeObject({ ...existing, ...payload }));
+          // `payload` carries the event-log's coordinates in WIRE (relative)
+          // form, exactly like `msg.object` on the live MQTT path. UPDATE_OBJECT
+          // already runs `deserializeObject` (toAbsolute) internally, so the
+          // payload must NOT be pre-serialized. The previous
+          // `serializeObject({...})` wrapper double-converted: toRelative then
+          // toAbsolute round-trips a relative 0.18 straight back to 0.18, which
+          // was then stored as if it were 0.18 *pixels* — collapsing the tile to
+          // a 0×0 box so its (playing) <video> was invisible on every receiver.
+          // PUSH_OBJECT (the else branch) was always correct (one toAbsolute),
+          // which is why a freshly-placed tile showed but one reconciled from
+          // the event log did not.
+          UPDATE_OBJECT({ ...existing, ...payload });
         } else {
           PUSH_OBJECT(payload);
         }

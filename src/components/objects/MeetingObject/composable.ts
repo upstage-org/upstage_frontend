@@ -279,9 +279,18 @@ export const useJitsi = () => {
     // suppressed exactly the lines we need to see when `room.join()`
     // returns but CONFERENCE_JOINED never fires (e.g. "ConferenceFocus
     // not found", "Could not allocate channels", presence rejections).
-    // TODO(streaming-diag): revert to logLevels.ERROR once the
-    // CONFERENCE_JOINED-never-fires root cause is identified.
-    JitsiMeetJS.setLogLevel(JitsiMeetJS.logLevels.WARN);
+    //
+    // INFO (not WARN) is required to surface the Colibri bridge-channel
+    // decision the audience-no-video bug hinges on. lib-jitsi-meet logs the
+    // choice at info level inside `_setBridgeChannel`:
+    //   "SCTP: offered=<bool>, prefered=<bool>"  (preferSctp default = true)
+    //   "Using colibri-ws url <wss…>" | "Falling back to <wss…>"
+    //   "Neither SCTP nor a websocket is available. Will not initialize bridge"
+    // plus "BridgeChannel ... Channel closed: 1006" when the ws fails. At WARN
+    // all of these are hidden, which is why prior diagnosis could only *infer*
+    // bridge state from a WebSocket counter. Keep INFO until the audience-video
+    // root cause is confirmed; then drop to WARN (keeping the [diag] lines).
+    JitsiMeetJS.setLogLevel(JitsiMeetJS.logLevels.INFO);
 
     // Transport selection. Modern Jitsi servers expose XMPP-over-WebSocket
     // at `/xmpp-websocket`, which is lower latency than BOSH (long-poll
@@ -499,11 +508,33 @@ export const useJitsi = () => {
         stageUrlEmpty: !stageUrl,
       });
       try {
-        jitsi.room = jitsi.connection.initJitsiConference(stageUrl, {});
+        // The second arg is the conference *config* object and is REQUIRED:
+        // this bundle's `JitsiConference._init` dereferences `config.statisticsId`,
+        // so passing no options throws "Cannot read properties of undefined".
+        // NOTE: this bundle does NOT read an `openBridgeChannel` option here
+        // (grep: 0 hits) — bridge transport is chosen in `_setBridgeChannel`.
+        //
+        // `p2p.enabled: false` is REQUIRED for an UpStage stage. This room is a
+        // one-to-many broadcast (one performer, many viewers), not a 2-party
+        // call. With P2P on (the lib default), as soon as the conference has
+        // exactly two participants Jitsi pairs them peer-to-peer and SUSPENDS
+        // the performer's JVB media ("Suspending media transfer over the JVB
+        // connection"). The viewer who happened to be present at that moment
+        // sees the stream over P2P, but the JVB copy the bridge forwards is
+        // dropped ("add remote JVB track, when in P2P - IGNORED"), so any
+        // viewer who joins LATER (becoming a 3rd participant while P2P stays
+        // pinned to the first pair) receives nothing. Forcing every session
+        // through the JVB SFU makes late and early joiners behave identically.
+        // Meetings ride the same room and are unaffected functionally — a
+        // 2-party meeting simply routes through the bridge instead of P2P.
+        jitsi.room = jitsi.connection.initJitsiConference(stageUrl, { p2p: { enabled: false } });
       } catch (initErr) {
         console.error("[diag] composable initJitsiConference threw", initErr);
         return;
       }
+      jitsi.room.on(JitsiMeetJS.events.conference.DATA_CHANNEL_OPENED, () => {
+        console.log("[diag] composable DATA_CHANNEL_OPENED (bridge channel up)");
+      });
       jitsi.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track) => {
         console.log("[diag] composable TRACK_ADDED", {
           type: track?.type,
@@ -537,6 +568,96 @@ export const useJitsi = () => {
           stageStore.syncLocalJitsiParticipantId(String(myId));
         }
         joined.value = true;
+
+        // Bridge-channel / ICE probe (independent of lib log level).
+        // The audience-no-video bug is "TRACK_ADDED + attach() succeed but
+        // videoWidth stays 0". The two frontend-visible causes are:
+        //   (a) the JVB peerconnection ICE never reaches connected/completed
+        //       => no media of any kind flows (audio would be dead too); or
+        //   (b) ICE is fine but the Colibri bridge channel never opens
+        //       => JVB forwards no video (audio still flows).
+        // Poll the raw RTCPeerConnection + bridge channel a few times so the
+        // next live test states which one it is, without inferring.
+        const probe = (afterMs: number) => {
+          setTimeout(() => {
+            try {
+              const room: any = jitsi.room;
+              const jvbPc = room?.jvbJingleSession?.peerconnection;
+              const rawPc = jvbPc?.peerconnection;
+              const rtc: any = room?.rtc;
+              // BridgeChannel manager stores the active channel on `_channel`.
+              const ch = rtc?._channel?._channel;
+              // Per-remote-participant advertised media sources. With
+              // sourceNameSignaling, a publisher announces its source in MUC
+              // presence; if a remote participant shows a video source here but
+              // no track arrives, JVB is withholding (subscribe-side). If it
+              // shows NO source, the publisher isn't announcing media at all
+              // (publish-side). getSources() returns a Map(mediaType -> Set).
+              const participants = (room?.getParticipants?.() || []).map((p) => {
+                let sources = null;
+                try {
+                  const m = p.getSources?.();
+                  if (m && typeof m.forEach === "function") {
+                    sources = {};
+                    m.forEach((set, mediaType) => {
+                      sources[mediaType] = [...(set?.keys?.() || [])];
+                    });
+                  }
+                } catch (_) {
+                  sources = "throw";
+                }
+                return {
+                  id: p.getId?.(),
+                  displayName: p.getDisplayName?.(),
+                  // muted/videoType distinguish "camera off / not sending"
+                  // (publish-side) from "JVB withholding live media".
+                  tracks: (p.getTracks?.() || []).map((t) => ({
+                    type: t.getType?.(),
+                    muted: t.isMuted?.(),
+                    videoType: t.getVideoType?.(),
+                    ssrc: t.getSSRC?.(),
+                  })),
+                  sources,
+                };
+              });
+              // Stringify so Playwright/console doesn't truncate the nested
+              // participants array in its object preview.
+              // LOCAL tracks (publisher side): are we actually sending, and
+              // is the camera muted? Empty here on a publisher = addTrack never
+              // ran. muted:true on the video = camera off / not sending RTP.
+              const localTracks = (room?.getLocalTracks?.() || []).map((t) => ({
+                type: t.getType?.(),
+                muted: t.isMuted?.(),
+                videoType: t.getVideoType?.(),
+                ended: t.isEnded?.(),
+                ssrc: t.getSSRC?.(),
+              }));
+              console.log(
+                `[diag] composable BRIDGE/ICE probe @${afterMs}ms ` +
+                  JSON.stringify({
+                    iceConnectionState: rawPc?.iceConnectionState ?? null,
+                    connectionState: rawPc?.connectionState ?? null,
+                    hasJvbSession: !!room?.jvbJingleSession,
+                    isP2PActive: room?.isP2PActive?.() ?? null,
+                    localTrackCount: localTracks.length,
+                    localTracks,
+                    // bridge channel: WebSocket readyState 0..3; RTCDataChannel
+                    // readyState "connecting|open|closing|closed".
+                    bridgeChannelType: ch ? ch.constructor?.name : null,
+                    bridgeChannelReadyState: ch?.readyState ?? null,
+                    lastN: room?.getLastN?.() ?? null,
+                    participantCount: participants.length,
+                    participants,
+                  }),
+              );
+            } catch (probeErr) {
+              console.warn("[diag] composable BRIDGE/ICE probe threw", probeErr);
+            }
+          }, afterMs);
+        };
+        probe(3000);
+        probe(10000);
+        probe(20000);
       });
       jitsi.room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (...args) => {
         console.warn("[diag] composable CONFERENCE_FAILED", ...args);
