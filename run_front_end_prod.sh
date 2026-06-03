@@ -89,9 +89,16 @@ compose=(docker compose -f docker-compose.yaml -p "upstage-frontend-${SITE}")
 
 "${compose[@]}" down --remove-orphans
 "${compose[@]}" rm -f
-# `run --rm` is the canonical one-shot invocation: builds the image,
-# runs the container in the foreground, removes it on exit.
-"${compose[@]}" run --rm --build upstage_frontend
+# Force a fully fresh image every run. --no-cache ignores ALL layer cache
+# (base image, pnpm install, COPY . ., vite build), so the built dist always
+# reflects the current working tree AND its files carry fresh mtimes. Without
+# this, an unchanged source tree leaves COPY . . / COPY --from=builder cache-hit;
+# the runtime stage then `cp -a`s the OLD cached layer into /output, which
+# preserves the original (days-old) timestamps even though the deploy "ran" ---
+# the source on display is correct, but the dist looks stale. --no-cache removes
+# that ambiguity at the cost of re-running pnpm install each build.
+"${compose[@]}" build --no-cache upstage_frontend
+"${compose[@]}" run --rm upstage_frontend
 
 echo "Built dist/ written to /frontend_app_${SITE}/dist — point your host nginx (alias /frontend_app_${SITE}/dist/) there." >&2
 
