@@ -11,13 +11,26 @@ export const useCounter = (stageUrl) => {
 
   const mqtt = buildClient();
   const client = mqtt.connect();
+  // `connect` also fires on every reconnect. If one lands after the component
+  // has unmounted (and `mqtt.disconnect()` has run), subscribing throws
+  // `client disconnecting` from mqtt.js `_checkDisconnecting` as an unhandled
+  // rejection. Skip the subscribe once unmounted, and catch the residual race
+  // where disconnect starts mid-subscribe.
+  let active = true;
   client.on("connect", () => {
+    if (!active) return;
     const topics = {
       [TOPICS.STATISTICS]: { qos: 2 },
     };
-    mqtt.subscribe(topics, stageUrl).then(() => {
-      loading.value = false;
-    });
+    mqtt
+      .subscribe(topics, stageUrl)
+      .then(() => {
+        loading.value = false;
+      })
+      .catch((e) => {
+        // Subscribe lost the race with a disconnect/reconnect — non-fatal.
+        console.log(e);
+      });
   });
   client.on("error", (e) => {
     console.log(e);
@@ -28,6 +41,7 @@ export const useCounter = (stageUrl) => {
   });
 
   onUnmounted(() => {
+    active = false;
     mqtt.disconnect();
   });
 

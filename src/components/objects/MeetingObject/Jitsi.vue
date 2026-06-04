@@ -25,7 +25,6 @@ export default {
     const videoEl = ref();
     const audioEl = ref();
     const loading = ref(true);
-    let geomLogged = false;
 
     const isOwnTile = computed(() => {
       const myId = jitsi?.room?.myUserId?.();
@@ -117,55 +116,6 @@ export default {
             // Yourself.vue's `el.value.disablePictureInPicture = true`
             // and its watcher.
             videoEl.value.disablePictureInPicture = true;
-            // One-shot geometry probe: the audience reports "renders in the
-            // log but I can't see it". Capture where/whether the <video>
-            // actually lands on screen so we can tell layout vs CSS vs frames.
-            if (!geomLogged) {
-              geomLogged = true;
-              setTimeout(() => {
-                const v = videoEl.value;
-                if (!v) return;
-                const r = v.getBoundingClientRect();
-                const cs = getComputedStyle(v);
-                // Walk ancestors to flag any zero-size / hidden / clipped wrapper.
-                const chain = [];
-                let n = v;
-                for (let i = 0; i < 8 && n; i++) {
-                  const nr = n.getBoundingClientRect();
-                  const ncs = getComputedStyle(n);
-                  chain.push({
-                    tag: n.tagName,
-                    cls: typeof n.className === "string" ? n.className : "",
-                    w: Math.round(nr.width),
-                    h: Math.round(nr.height),
-                    x: Math.round(nr.left),
-                    y: Math.round(nr.top),
-                    opacity: ncs.opacity,
-                    display: ncs.display,
-                    visibility: ncs.visibility,
-                    overflow: ncs.overflow,
-                    zIndex: ncs.zIndex,
-                  });
-                  n = n.parentElement;
-                }
-                console.log("[diag] Jitsi.vue video geometry", {
-                  objectId: props.object.id,
-                  videoWxH: `${v.videoWidth}x${v.videoHeight}`,
-                  paused: v.paused,
-                  readyState: v.readyState,
-                  rect: {
-                    w: Math.round(r.width),
-                    h: Math.round(r.height),
-                    x: Math.round(r.left),
-                    y: Math.round(r.top),
-                  },
-                  opacity: cs.opacity,
-                  display: cs.display,
-                  visibility: cs.visibility,
-                  ancestors: chain,
-                });
-              }, 600);
-            }
           }
           if (
             audioTrack.value &&

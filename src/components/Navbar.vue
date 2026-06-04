@@ -5,7 +5,7 @@ import logo from "assets/upstage.png";
 import StudioVersion from "./StudioVersion.vue";
 import PlayerForm from "views/admin/player-management/PlayerForm.vue";
 import { computed } from "vue";
-import { logout } from "utils/auth";
+import { logoutToHome } from "utils/auth";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 
@@ -64,7 +64,7 @@ const onSave = (payload: any) => {
           <RouterLink to="/">
             <a-menu-item>{{ $t("foyer") }}</a-menu-item>
           </RouterLink>
-          <a-menu-item @click="logout">{{ $t("logout") }}</a-menu-item>
+          <a-menu-item @click="logoutToHome">{{ $t("logout") }}</a-menu-item>
         </a-menu>
       </template>
     </a-dropdown>

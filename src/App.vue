@@ -65,39 +65,22 @@ const reloadPage = () => {
   }
 };
 
-const notifyServiceWorker = () => {
-  if (navigator.serviceWorker?.controller) {
-    navigator.serviceWorker.controller.postMessage({ type: "CHECK_UPDATE" });
-  }
-};
-
 onMounted(() => {
   caches
     .keys()
     .then((keyList) => Promise.all(keyList.map((key) => caches.delete(key))))
     .catch((err) => console.error("Cache clear failed:", err));
 
+  // Version checking is self-contained: poll /version.json on mount and every
+  // 3 minutes, and surface the reload prompt when it differs from the stored
+  // version. This no longer involves the (now removed) Service Worker.
   checkVersion();
   setInterval(
     () => {
-      checkVersion();
-      notifyServiceWorker();
+      void checkVersion();
     },
     3 * 60 * 1000,
   );
-
-  navigator.serviceWorker?.addEventListener("message", (event) => {
-    if (event.data?.type === "VERSION_UPDATE") {
-      latestVersion.value = event.data.version;
-      if (latestVersion.value !== currentVersion.value) {
-        showReloadPrompt.value = true;
-      }
-    }
-  });
-
-  window.addEventListener("newVersionAvailable", () => {
-    checkVersion();
-  });
 });
 </script>
 

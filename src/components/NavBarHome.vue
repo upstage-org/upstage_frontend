@@ -1,6 +1,6 @@
 <script>
 import { computed } from "vue";
-import { loggedIn, logout } from "utils/auth";
+import { loggedIn, logoutToHome } from "utils/auth";
 import { useUserStore } from "@stores/pinia/user";
 import { useConfigStore } from "@stores/pinia/config";
 import { storeToRefs } from "pinia";
@@ -25,7 +25,7 @@ export default {
 
     return {
       loggedIn,
-      logout,
+      logoutToHome,
       showRegistration,
       isShow,
       navigations,
@@ -95,7 +95,7 @@ export default {
           <RouterLink v-if="!isGuest" to="/stages" class="button is-primary m-2">
             <strong>{{ $t("studio") }}</strong>
           </RouterLink>
-          <button class="button m-2 mr-6" @click="logout">
+          <button class="button m-2 mr-6" @click="logoutToHome">
             <strong>{{ $t("logout") }}</strong>
           </button>
         </template>

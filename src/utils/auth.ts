@@ -31,6 +31,7 @@ export const removeRefreshToken = (): void => Cookies.remove(REFRESH_TOKEN);
 // uses ES-module live bindings to call `setToken`/`removeToken` exported here.
 export const loggedIn = computed<boolean>(() => useAuthStore().loggedIn);
 export const logout = (): void => useAuthStore().logout();
+export const logoutToHome = (): void => useAuthStore().logoutToHome();
 
 export function displayName(user: AuthUser | null | undefined): string {
   if (!user) return "";

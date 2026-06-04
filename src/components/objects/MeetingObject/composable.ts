@@ -274,23 +274,19 @@ export const useJitsi = () => {
         ssrcRewritingOnBridgeSupported: true,
       },
     });
-    // Temporarily downgrade from ERROR to WARN so the XMPP/MUC/focus
-    // handshake surfaces in the console. The previous ERROR-only filter
-    // suppressed exactly the lines we need to see when `room.join()`
-    // returns but CONFERENCE_JOINED never fires (e.g. "ConferenceFocus
-    // not found", "Could not allocate channels", presence rejections).
+    // WARN keeps the console quiet in production while still surfacing
+    // genuine XMPP/MUC/focus handshake failures (e.g. "ConferenceFocus not
+    // found", "Could not allocate channels", presence rejections).
     //
-    // INFO (not WARN) is required to surface the Colibri bridge-channel
-    // decision the audience-no-video bug hinges on. lib-jitsi-meet logs the
-    // choice at info level inside `_setBridgeChannel`:
-    //   "SCTP: offered=<bool>, prefered=<bool>"  (preferSctp default = true)
-    //   "Using colibri-ws url <wss…>" | "Falling back to <wss…>"
-    //   "Neither SCTP nor a websocket is available. Will not initialize bridge"
-    // plus "BridgeChannel ... Channel closed: 1006" when the ws fails. At WARN
-    // all of these are hidden, which is why prior diagnosis could only *infer*
-    // bridge state from a WebSocket counter. Keep INFO until the audience-video
-    // root cause is confirmed; then drop to WARN (keeping the [diag] lines).
-    JitsiMeetJS.setLogLevel(JitsiMeetJS.logLevels.INFO);
+    // This was temporarily raised to INFO while chasing the audience-no-video
+    // bug, because the Colibri bridge-channel decision lib-jitsi-meet logs at
+    // info level inside `_setBridgeChannel` ("SCTP: offered=…", "Using
+    // colibri-ws url …", "BridgeChannel … Channel closed: 1006") was needed to
+    // see bridge state directly. That root cause is now fixed, so we drop back
+    // to WARN. Our own explicit `[diag]` console.log taps below stay regardless
+    // of this level, so the stream lifecycle remains observable. If the bug
+    // ever recurs, bump this one line back to INFO to re-expose bridge logs.
+    JitsiMeetJS.setLogLevel(JitsiMeetJS.logLevels.WARN);
 
     // Transport selection. Modern Jitsi servers expose XMPP-over-WebSocket
     // at `/xmpp-websocket`, which is lower latency than BOSH (long-poll

@@ -77,30 +77,22 @@ if (import.meta.env.DEV || import.meta.env.VITE_E2E) {
   );
 }
 
+// The app used to register a no-op passthrough Service Worker
+// (public/service-worker.js). It cached nothing, added console noise, and
+// made cache-busting harder, so it has been removed. We no longer register a
+// worker; instead we proactively unregister any that a returning visitor
+// still has installed. The self-unregistering public/service-worker.js covers
+// browsers that re-check the file before this code runs. Version-update
+// notifications are unaffected — App.vue polls /version.json directly.
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/service-worker.js")
-      .then((registration: ServiceWorkerRegistration) => {
-        console.log("Service Worker registered:", registration);
-
-        // Check for updates
-        registration.onupdatefound = () => {
-          const installingWorker: ServiceWorker | null = registration.installing;
-          if (installingWorker) {
-            installingWorker.onstatechange = () => {
-              if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
-                // New content is available
-                window.dispatchEvent(new Event("newVersionAvailable"));
-              }
-            };
-          }
-        };
-      })
-      .catch((error: unknown) => {
-        console.error("Service Worker registration failed:", error);
-      });
-  });
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((registrations) => {
+      registrations.forEach((registration) => void registration.unregister());
+    })
+    .catch(() => {
+      /* best-effort: nothing to do if unregistering fails */
+    });
 }
 
 app.mount("#app");

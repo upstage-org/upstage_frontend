@@ -152,6 +152,21 @@ export const useAuthStore = defineStore(
     };
 
     /**
+     * Explicit user-initiated logout (the navbar "logout" menu item).
+     * Clears the local session and hard-navigates to the site root
+     * (the public Home / landing page on the current origin —
+     * dev.upstage.live in dev, upstage.live in prod) rather than the
+     * login page. The forced/automatic `logout()` above keeps bouncing
+     * to `/login?redirect=` so a user logged out by an expired token or
+     * auth failure can re-authenticate and land back where they were;
+     * a deliberate click should drop them on the home page instead.
+     */
+    const logoutToHome = (): void => {
+      logoutLocal();
+      window.location.href = `${window.location.origin}/`;
+    };
+
+    /**
      * Exchange the refresh token for a new access token. Used by the
      * Apollo error link on `Signature has expired` / `Authenticated
      * Failed` and by the proactive `scheduleRefresh()` timer below.
@@ -221,6 +236,7 @@ export const useAuthStore = defineStore(
       logoutLocal,
       login,
       logout,
+      logoutToHome,
       fetchRefreshToken,
     };
   },
