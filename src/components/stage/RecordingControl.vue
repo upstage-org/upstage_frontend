@@ -80,7 +80,12 @@ const discardRecording = async (complete: () => void) => {
   <div v-if="activeRecording" class="recording-control field has-addons">
     <p class="control">
       <a-tooltip :title="$t('recording_stop_save')">
-        <button class="button is-small is-light is-danger" type="button" :disabled="saving" @click="saveRecording">
+        <button
+          class="button is-small is-light is-danger"
+          type="button"
+          :disabled="saving"
+          @click="saveRecording"
+        >
           <Loading v-if="saving" height="20px" />
           <span v-else class="icon is-small"><i class="fas fa-stop"></i></span>
           <span>{{ durationLabel }}</span>
@@ -99,7 +104,12 @@ const discardRecording = async (complete: () => void) => {
     </p>
   </div>
   <CustomConfirm v-else :loading="loading" @confirm="startRecording">
-    <Field v-model="form.name" :label="$t('trim_replay_new_name')" :placeholder="$t('trim_replay_new_name')" required />
+    <Field
+      v-model="form.name"
+      :label="$t('trim_replay_new_name')"
+      :placeholder="$t('trim_replay_new_name')"
+      required
+    />
     <p class="is-size-7 mt-2">
       <i class="fas fa-exclamation-triangle has-text-warning"></i>
       {{ $t("recording_start_clears_stage") }}
@@ -110,7 +120,7 @@ const discardRecording = async (complete: () => void) => {
     </template>
     <template #trigger>
       <a-tooltip :title="$t('start_recording')">
-        <button type="button" class="button is-small is-light">
+        <button type="button" class="button is-small is-light record-icon">
           <i class="fas fa-video has-text-primary"></i>
         </button>
       </a-tooltip>
@@ -125,5 +135,16 @@ const discardRecording = async (complete: () => void) => {
 }
 .has-addons {
   flex-wrap: nowrap;
+}
+/* Match the 24x24 sizing of the ReloadStream refresh icons so the start
+   recording control lines up at the same height as the other icons. */
+.record-icon {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 4px;
+}
+.record-icon:hover {
+  transform: scale(1.2);
 }
 </style>

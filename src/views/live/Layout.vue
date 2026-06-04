@@ -111,13 +111,13 @@ export default {
 
 <template>
   <div id="live-top-bar">
-    <div v-if="ready" class="live-top-bar-controls">
-      <ConnectionStatus in-top-bar />
-      <MasqueradingStatus />
-    </div>
     <div id="live-logo">
       <Logo v-if="loggedIn" :link="studioEndpoint" />
       <Logo v-else to="/" />
+    </div>
+    <div v-if="ready" class="live-top-bar-controls">
+      <ConnectionStatus in-top-bar />
+      <MasqueradingStatus />
     </div>
   </div>
   <Shell id="main-content">
@@ -163,9 +163,8 @@ export default {
   right: 0;
   z-index: 5;
   display: flex;
-  flex-flow: row nowrap;
-  align-items: center;
-  justify-content: flex-end;
+  flex-flow: column nowrap;
+  align-items: flex-end;
   gap: 6px;
   max-width: calc(100vw - 8px);
   pointer-events: none;
@@ -185,7 +184,8 @@ export default {
     align-items: center;
     gap: 4px;
     min-width: 0;
-    flex: 0 1 auto;
+    max-width: 100%;
+    flex: 0 0 auto;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
@@ -201,15 +201,18 @@ export default {
   flex: 0 0 auto;
   max-width: 140px;
 
-  // The Logo component renders inside a Bulma .navbar-item, which is
-  // transparent at rest and only gains a light hover-background. On a
-  // dark backdrop/curtain the dark UpStage mark is invisible until the
-  // mouse hovers it. Force the hover-style background to be the default
-  // here so the mark is always legible regardless of the stage colour.
+  // The Logo component renders inside a Bulma .navbar-item. Keep it
+  // transparent so the UpStage mark sits directly on the stage with no
+  // background pill, and stop the Bulma hover-background from painting a
+  // light rectangle behind it on hover.
   .navbar-item {
-    background-color: rgba(255, 255, 255, 0.92);
-    border-bottom-left-radius: 8px;
+    background-color: transparent;
     padding: 4px 8px;
+
+    &:hover,
+    &:focus {
+      background-color: transparent;
+    }
   }
 
   img {
