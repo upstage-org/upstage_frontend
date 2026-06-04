@@ -43,20 +43,6 @@ export default {
       // registers the dependency and we recompute when Yourself.vue
       // swaps the array.
       const composableLocal = jitsi?.localTracks?.value ?? [];
-      console.log("[diag] Jitsi.vue tracks recompute", {
-        objectId: props.object.id,
-        objectParticipantId: props.object.participantId,
-        myUserId: jitsi?.room?.myUserId?.(),
-        isOwnTile: isOwnTile.value,
-        storeJitsiTracksLen: stageStore.jitsiTracks.length,
-        storeJitsiTracksParticipantIds: stageStore.jitsiTracks.map((t) => t.getParticipantId?.()),
-        roomLocalTracksLen: jitsi?.room?.getLocalTracks?.()?.length,
-        roomLocalTracksParticipantIds: jitsi?.room
-          ?.getLocalTracks?.()
-          ?.map((t) => t.getParticipantId?.()),
-        composableLocalLen: composableLocal.length,
-        remoteMatchLen: remote.length,
-      });
       if (!isOwnTile.value) return remote;
 
       // Local tile: combine
@@ -99,18 +85,26 @@ export default {
       return aTracks[0];
     });
     const loadTrack = () => {
-      console.log("[diag] Jitsi.vue loadTrack invoked", {
-        objectId: props.object.id,
-        tracksLen: tracks.value.length,
-        videoTrack: videoTrack.value?.type,
-        videoElExists: !!videoEl.value,
-        audioTrack: audioTrack.value?.type,
-        audioTrackIsLocal: audioTrack.value?.isLocal?.(),
-        audioElExists: !!audioEl.value,
-      });
       if (tracks.value.length) {
         try {
-          if (videoTrack.value && videoEl.value) {
+          // Idempotent attach: only (re)attach when the element isn't
+          // already showing this track's stream. After a successful
+          // lib-jitsi-meet `attach`, `el.srcObject` IS the track's
+          // MediaStream (the same `t.stream` read above), so a reference
+          // check is the correct "already attached" test. Without this
+          // guard, every spurious `loadTrack` re-fire — `watch(tracks)`
+          // when the `objects` computed re-clones board objects on any
+          // avatar move, `watch(reloadStreams)` on window refocus, the 3s
+          // polling tick — re-assigns `srcObject` and resets the media
+          // element, which is the visible whole-board flicker. The first
+          // attach (srcObject null), a track swap (different stream), and
+          // a fresh element after remount all still attach because the
+          // equality check fails in those cases.
+          if (
+            videoTrack.value &&
+            videoEl.value &&
+            videoEl.value.srcObject !== videoTrack.value.stream
+          ) {
             videoTrack.value.attach(videoEl.value);
             // Mirror the `disablePictureInPicture` HTML attribute as
             // an IDL property. Vue 3 patches some HTMLMediaElement
@@ -123,7 +117,6 @@ export default {
             // Yourself.vue's `el.value.disablePictureInPicture = true`
             // and its watcher.
             videoEl.value.disablePictureInPicture = true;
-            console.log("[diag] Jitsi.vue loadTrack attached video to <video ref=videoEl>");
             // One-shot geometry probe: the audience reports "renders in the
             // log but I can't see it". Capture where/whether the <video>
             // actually lands on screen so we can tell layout vs CSS vs frames.
@@ -174,9 +167,13 @@ export default {
               }, 600);
             }
           }
-          if (audioTrack.value && !audioTrack.value.isLocal() && audioEl.value) {
+          if (
+            audioTrack.value &&
+            !audioTrack.value.isLocal() &&
+            audioEl.value &&
+            audioEl.value.srcObject !== audioTrack.value.stream
+          ) {
             audioTrack.value.attach(audioEl.value);
-            console.log("[diag] Jitsi.vue loadTrack attached audio to <audio ref=audioEl>");
           }
         } catch (error) {
           console.log("Error on attaching track", error);

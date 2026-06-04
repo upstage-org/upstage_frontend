@@ -1,15 +1,6 @@
 <script>
 import Skeleton from "components/stage/Toolboxs/Skeleton.vue";
-import {
-  computed,
-  inject,
-  onActivated,
-  onDeactivated,
-  onMounted,
-  reactive,
-  ref,
-  watch,
-} from "vue";
+import { computed, inject, onActivated, onDeactivated, onMounted, reactive, ref, watch } from "vue";
 import { useUserStore } from "@stores/pinia/user";
 import { playMediaElement } from "@utils/mediaPlayback";
 
@@ -48,6 +39,12 @@ export default {
     const attachPreview = () => {
       const videoTrack = localTracks.value.find((t) => t.type === "video");
       if (!videoTrack || !el.value) return;
+      // Idempotent attach: skip when the preview <video> already shows this
+      // track's stream. attachPreview re-runs on watch(localTracks),
+      // watch(el), onMounted, and onActivated (window refocus); without this
+      // guard each re-run re-assigns srcObject and resets the element, which
+      // is the same whole-board flicker fixed in Jitsi.vue's loadTrack.
+      if (el.value.srcObject === videoTrack.stream) return;
       try {
         videoTrack.attach(el.value);
         el.value.disablePictureInPicture = true;
