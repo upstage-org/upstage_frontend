@@ -54,6 +54,7 @@ import {
   serializeObject,
 } from "@stores/modules/stage/reusable";
 import { unnamespaceTopic } from "@utils/mqttTopics";
+import { computeFinalJitsiObjectsFromEvents } from "@utils/jitsiBoardReconcile";
 import { useAttribute } from "@services/graphql/composable";
 import { avatarSpeak, stopSpeaking } from "@services/speech";
 import { useAuthStore } from "@stores/pinia/auth";
@@ -1996,6 +1997,25 @@ export const useStageStore = defineStore(
       if (isJitsiBoardType(object.type) && session.value) {
         object.hostId = session.value;
       }
+      // Stream tiles placed WITHOUT explicit coordinates (programmatic / future
+      // flows) all default to the origin and would stack invisibly on top of
+      // each other. Cascade each additional own jitsi tile by a small offset so
+      // concurrent streams are visibly distinct. The normal drag-from-preview
+      // path supplies real drop coordinates (Board.vue) and is left untouched.
+      if (isJitsiBoardType(object.type) && data.x == null && data.y == null) {
+        const ownJitsiCount = board.value.objects.filter(
+          (o) =>
+            isJitsiBoardType(o.type) &&
+            ((session.value != null && o.hostId === session.value) ||
+              (localJitsiParticipantId.value != null &&
+                o.participantId === localJitsiParticipantId.value)),
+        ).length;
+        if (ownJitsiCount > 0) {
+          const STREAM_CASCADE_PX = 30;
+          object.x = ownJitsiCount * STREAM_CASCADE_PX;
+          object.y = ownJitsiCount * STREAM_CASCADE_PX;
+        }
+      }
       if (isStreamPlaybackBoardType(object.type)) {
         object.hostId = session.value;
         // Start playing as soon as the video is placed on stage so the
@@ -2629,67 +2649,11 @@ export const useStageStore = defineStore(
       mqtt.sendMessage(TOPICS.REACTION, reaction);
     }
 
-    function boardMessageFromEvent(event: ReplayEvent): BoardMessage | null {
-      if (unnamespaceTopic(event.topic ?? "") !== TOPICS.BOARD) return null;
-      const raw = event.payload;
-      if (raw == null) return null;
-      return (typeof raw === "string" ? JSON.parse(raw) : { ...raw }) as BoardMessage;
-    }
-
-    /**
-     * Derive the authoritative set of jitsi tiles from archived board events.
-     * Applies PLACE / MOVE_TO / DESTROY in timestamp order. When multiple
-     * tiles share a `hostId` (same browser tab), only the latest placement
-     * survives — this clears ghost tiles left behind when an old stream was
-     * replaced but its DESTROY never reached the event archive.
-     */
-    function computeFinalJitsiObjectsFromEvents(events: ReplayEvent[]): BoardObject[] {
-      const byId = new Map<ObjectId, BoardObject>();
-      const hostIdToId = new Map<string, ObjectId>();
-      const sorted = [...events].sort((a, b) => (a.mqttTimestamp ?? 0) - (b.mqttTimestamp ?? 0));
-      for (const event of sorted) {
-        const msg = boardMessageFromEvent(event);
-        if (!msg?.object?.id || !isJitsiBoardType(msg.object.type)) continue;
-        const { id } = msg.object;
-        switch (msg.type) {
-          case BOARD_ACTIONS.DESTROY:
-            byId.delete(id);
-            pendingJitsiPublish.delete(id);
-            for (const [hostId, objectId] of hostIdToId) {
-              if (objectId === id) hostIdToId.delete(hostId);
-            }
-            break;
-          case BOARD_ACTIONS.PLACE_OBJECT_ON_STAGE: {
-            const hostId = msg.object.hostId != null ? String(msg.object.hostId) : null;
-            if (hostId) {
-              const prevId = hostIdToId.get(hostId);
-              if (prevId && prevId !== id) {
-                byId.delete(prevId);
-                pendingJitsiPublish.delete(prevId);
-              }
-              hostIdToId.set(hostId, id);
-            }
-            byId.set(id, { ...msg.object, liveAction: true, published: true });
-            break;
-          }
-          case BOARD_ACTIONS.MOVE_TO: {
-            const prev = byId.get(id);
-            if (prev) {
-              byId.set(id, { ...prev, ...msg.object });
-            }
-            break;
-          }
-          default:
-            break;
-        }
-      }
-      return [...byId.values()];
-    }
-
     /** Replace jitsi tiles on the board with the event-log final state. */
     function reconcileJitsiBoardFromEvents(events: ReplayEvent[]) {
       if (replay.value.isReplaying) return;
-      const finalTiles = computeFinalJitsiObjectsFromEvents(events);
+      const { tiles: finalTiles, destroyedIds } = computeFinalJitsiObjectsFromEvents(events);
+      for (const id of destroyedIds) pendingJitsiPublish.delete(id);
       const keepIds = new Set(finalTiles.map((o) => o.id));
       board.value.objects = board.value.objects.filter(
         (o) => !isJitsiBoardType(o.type) || keepIds.has(o.id),
