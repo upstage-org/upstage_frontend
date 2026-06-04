@@ -48,12 +48,30 @@ export default {
 
     const contextAppear = (el) => {
       const { width, height, right, bottom } = el?.getBoundingClientRect() ?? {};
+      if (width == null || height == null) return;
+      const margin = 8;
+      // Preferred placement: flip the menu left / up when it would spill past
+      // the right / bottom edges so it opens back towards the cursor.
       if (right > window.innerWidth - props.padRight) {
         position.x = position.x - width;
       }
       if (bottom > window.innerHeight - props.padBottom) {
         position.y = position.y - height;
       }
+      // Then clamp the whole menu into the viewport. Without this a tall menu
+      // — or one opened on an object high on the stage — could be pushed off
+      // the top (the up-flip above subtracts the full menu height) or left
+      // edge, leaving the upper menu items unreachable. Clamping the top/left
+      // to a small margin keeps those first items on screen even when the menu
+      // is taller than the area above the cursor.
+      position.x = Math.min(
+        Math.max(position.x, margin),
+        Math.max(margin, window.innerWidth - width - margin),
+      );
+      position.y = Math.min(
+        Math.max(position.y, margin),
+        Math.max(margin, window.innerHeight - height - margin),
+      );
     };
 
     return { isActive, openMenu, closeMenu, position, contextAppear };

@@ -194,6 +194,19 @@ export default {
       localMuted.value = !localMuted.value;
     };
 
+    // Re-apply volume whenever the board object's `volume` changes. The
+    // audioEl watcher below only fires when the <audio> element itself is
+    // (re)created, so without this a volume change broadcast by the
+    // performer (shapeObject -> MOVE_TO) would update `props.object.volume`
+    // in every viewer's store but never reach the already-mounted <audio>
+    // element — the audience would keep hearing the old level. This makes
+    // the per-stream volume control carry over to the audience session.
+    watch(volume, (v) => {
+      if (audioEl.value) {
+        audioEl.value.volume = (v || 0) / 100;
+      }
+    });
+
     watch(
       audioEl,
       (audio) => {
