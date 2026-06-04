@@ -7,6 +7,7 @@ import VoiceParameters from "./settings/VoiceParameters.vue";
 import SaveScene from "./settings/SaveScene.vue";
 import Icon from "components/Icon.vue";
 import VolumeParameters from "./settings/VolumeParameters.vue";
+import TransparencyParameters from "./settings/TransparencyParameters.vue";
 import CreateRoom from "./settings/CreateRoom.vue";
 
 export default {
@@ -17,6 +18,7 @@ export default {
     ChatBox,
     SaveScene,
     VolumeParameters,
+    TransparencyParameters,
     CreateRoom,
   },
   setup: () => {

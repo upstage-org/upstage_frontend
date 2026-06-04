@@ -228,6 +228,16 @@ export default {
       slotProps.closeMenu();
     };
 
+    // Transparency uses the same popup pattern as volume so the control is
+    // reachable from the right-click menu without first "holding" the tile
+    // (the inline OpacitySlider only renders for held holdable objects).
+    const openTransparencyPopup = (slotProps) => {
+      stageStore.openSettingPopup({
+        type: "TransparencyParameters",
+      });
+      slotProps.closeMenu();
+    };
+
     const loadeddata = () => {
       loading.value = false;
     };
@@ -260,6 +270,7 @@ export default {
       timeupdate,
       loadTrack,
       openVolumePopup,
+      openTransparencyPopup,
       loadeddata,
       loading,
     };
@@ -354,6 +365,12 @@ export default {
           <Icon src="voice-setting.svg" />
         </span>
         <span>{{ $t("volumn_setting") }}</span>
+      </a>
+      <a class="panel-block" @click="openTransparencyPopup(slotProps)">
+        <span class="panel-icon">
+          <Icon src="opacity-slider.svg" />
+        </span>
+        <span>{{ $t("transparency_setting") }}</span>
       </a>
       <AvatarContextMenu :object="object" v-bind="slotProps" />
     </template>
