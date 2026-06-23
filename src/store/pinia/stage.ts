@@ -579,6 +579,36 @@ export const useStageStore = defineStore(
       })),
     );
 
+    /**
+     * Participant ids that currently have media on the board — i.e. a jitsi
+     * tile for one of these ids actually renders (it is NOT a track-less
+     * ghost). Mirrors what `Jitsi.vue` needs to show video/audio:
+     *   - every participant id present on a `board.value.tracks` entry, plus
+     *   - the local participant when an *ownerless* track exists (a local
+     *     track added before lib-jitsi-meet assigned its participantId — see
+     *     ADD_TRACK), so the performer's own live tile still counts as live.
+     *
+     * Consumed by the Depth toolbar to hide stale, unbindable jitsi tiles from
+     * the list WITHOUT deleting the board object. Deletion is unsafe here: a
+     * performer may legitimately publish several concurrent stream tiles from
+     * one tab (see utils/jitsiBoardReconcile.ts), and a stale ghost is
+     * observationally identical to one of those in live state. Filtering the
+     * display is reversible — the tile reappears the moment it has media.
+     */
+    const liveJitsiParticipantIds = computed(() => {
+      const ids = new Set<string>();
+      let hasOwnerlessTrack = false;
+      for (const t of board.value.tracks) {
+        const pid = t.getParticipantId?.();
+        if (pid != null && pid !== "") ids.add(String(pid));
+        else hasOwnerlessTrack = true;
+      }
+      if (hasOwnerlessTrack && localJitsiParticipantId.value != null) {
+        ids.add(String(localJitsiParticipantId.value));
+      }
+      return ids;
+    });
+
     const config = computed(() => _config.value);
 
     const preloadableAssets = computed<string[]>(() => {
@@ -3295,6 +3325,7 @@ export const useStageStore = defineStore(
       unreadPrivateMessageCount,
       whiteboard,
       jitsiTracks,
+      liveJitsiParticipantIds,
       reloadStreams,
       meetingRefreshKey,
       activeObject,
