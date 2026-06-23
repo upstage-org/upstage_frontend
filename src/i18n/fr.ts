@@ -142,8 +142,6 @@ export default {
   audience_view: "Vue du public",
   light_mode_chat: "Chat en mode clair",
   dark_mode_chat: "Chat en thème sombre",
-  chat_switch_to_light_mode: "Passer le chat en mode clair",
-  chat_switch_to_dark_mode: "Passer le chat en mode sombre",
   new_text: "Nouveau texte",
   create_a_account_with_upstage: "Créer un compte avec UpStage",
   email_subject_prefix: "Préfixe du sujet de l’email",

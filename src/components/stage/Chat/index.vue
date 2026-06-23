@@ -36,13 +36,10 @@ export default {
     const isStandalone = inject("isChatStandalone", false);
     const replaying = inject("replaying", false);
     const chatVisibility = computed(() => isStandalone || stageStore.settings.chatVisibility);
-    // Use the effective flag so the chat reflects either the admin's
-    // broadcast setting OR the viewer's personal override (set via the
-    // sun/moon button at the top of the chat). Falling back to the
-    // broadcast value when the viewer has no override preserves the
-    // current "admin flips dark mode for everyone" behaviour.
-    const chatDarkMode = computed(() => stageStore.effectiveChatDarkMode);
-    const togglePersonalDarkMode = () => stageStore.togglePersonalChatDarkMode();
+    // Chat dark mode is a stage-wide setting controlled by the players
+    // via the settings toolbar and broadcast to everyone over MQTT, so
+    // the whole audience sees the same theme.
+    const chatDarkMode = computed(() => stageStore.settings.chatDarkMode);
 
     const popOut = () => {
       // Reuse the same named window per stage so a second click
@@ -204,7 +201,6 @@ export default {
       fontSize,
       chatVisibility,
       chatDarkMode,
-      togglePersonalDarkMode,
       enter,
       leave,
       increateFontSize,
@@ -270,33 +266,6 @@ export default {
       </transition>
       <div class="actions">
         <Reaction v-if="collapsed && !replaying" />
-        <!--
-          Per-viewer light/dark toggle. This is purely local — it
-          flips the chat-only colour scheme for the current user
-          without broadcasting over MQTT, so audience members and
-          players can pick whichever mode reads best for them
-          regardless of what the stage admin chose. Available in
-          both the in-stage chat and the popped-out /chat/<stage>
-          window so the standalone chat is also user-themable.
-        -->
-        <a-tooltip
-          :title="
-            chatDarkMode
-              ? $t('chat_switch_to_light_mode') || 'Switch chat to light mode'
-              : $t('chat_switch_to_dark_mode') || 'Switch chat to dark mode'
-          "
-        >
-          <button
-            class="chat-setting button is-rounded is-outlined chat-theme-toggle"
-            :class="{ 'is-dark-active': chatDarkMode }"
-            @click="togglePersonalDarkMode"
-          >
-            <span class="icon">
-              <i v-if="chatDarkMode" class="fas fa-sun has-text-warning"></i>
-              <i v-else class="fas fa-moon"></i>
-            </span>
-          </button>
-        </a-tooltip>
         <a-tooltip v-if="!isStandalone" :title="collapsed ? 'Maximise' : 'Minimise'">
           <button
             :key="collapsed"
@@ -587,27 +556,6 @@ export default {
 
   &:active {
     cursor: grabbing;
-  }
-}
-
-/*
- * The dark-mode block above flips images (`:deep(img) filter: invert`),
- * but the theme toggle uses Font Awesome <i> glyphs, not <img>, so they
- * keep their natural colour. Force a high-contrast colour explicitly
- * so the moon/sun is legible against #303030 (dark) or white (light).
- */
-.chat-theme-toggle {
-  .icon i.fa-moon {
-    color: #303030;
-  }
-  .icon i.fa-sun {
-    color: #ffd166;
-  }
-}
-
-#chatbox.dark .chat-theme-toggle {
-  .icon i.fa-moon {
-    color: #ffffff;
   }
 }
 </style>

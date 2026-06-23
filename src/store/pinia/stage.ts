@@ -536,27 +536,6 @@ export const useStageStore = defineStore(
     const topbarPosition = ref<{ x: number; y: number } | null>(null);
     const topbarCollapsed = ref<boolean>(false);
     const publicChatPosition = ref<{ x: number; y: number } | null>(null);
-    // Per-user override of the broadcast `settings.chatDarkMode`. The
-    // global flag is set by the stage admin and propagates to every
-    // viewer over MQTT; this lets each viewer (audience or player) flip
-    // their own chat into light or dark independently of the broadcast
-    // value. `null` means "no personal override — follow whatever the
-    // admin broadcast." Persisted to localStorage under
-    // `personalChatDarkMode` so the choice survives reloads and applies
-    // across stages, since dark mode is an accessibility / comfort
-    // preference, not a per-stage UI tweak.
-    const personalChatDarkMode = ref<boolean | null>(
-      (() => {
-        try {
-          const raw = localStorage.getItem("personalChatDarkMode");
-          if (raw === "true") return true;
-          if (raw === "false") return false;
-        } catch {
-          /* ignore */
-        }
-        return null;
-      })(),
-    );
     // Epoch ms of the last seen private message. localStorage returns
     // `string | null`; coerce to a number on load so the unread-count
     // comparator (`m.at > lastSeenPrivateMessage.value`) and the
@@ -657,21 +636,6 @@ export const useStageStore = defineStore(
         return null;
       }
       return _activeMovable.value;
-    });
-
-    /**
-     * Effective dark-mode flag for the local user's chat UI. When the
-     * viewer has set a personal override (`personalChatDarkMode` !==
-     * null) we honour that; otherwise we fall through to the broadcast
-     * `settings.chatDarkMode` chosen by the stage admin. Components
-     * read THIS, not `settings.chatDarkMode` directly, so the per-user
-     * toggle on the chat header doesn't affect anyone else.
-     */
-    const effectiveChatDarkMode = computed<boolean>(() => {
-      if (personalChatDarkMode.value !== null) {
-        return personalChatDarkMode.value;
-      }
-      return !!settings.value.chatDarkMode;
     });
 
     const stageSize = computed(() => {
@@ -878,8 +842,7 @@ export const useStageStore = defineStore(
       // stuck in audience view (canPlay=false → no toolbox, no player
       // chat) until they hunt the toggle down again. Reset it here so
       // re-entry always starts in player mode for users with the
-      // permission. `personalChatDarkMode` deliberately survives because
-      // it's a viewer accessibility preference, not stage state.
+      // permission.
       masquerading.value = false;
     }
 
@@ -3183,30 +3146,6 @@ export const useStageStore = defineStore(
       publicChatPosition.value = pos;
     }
 
-    /**
-     * Set the per-user chat dark-mode override. Pass `null` to clear
-     * the override and follow the admin-broadcast `settings.chatDarkMode`
-     * again. Persists to localStorage so the preference survives reloads
-     * and applies across stages.
-     */
-    function setPersonalChatDarkMode(value: boolean | null) {
-      personalChatDarkMode.value = value;
-      try {
-        if (value === null) {
-          localStorage.removeItem("personalChatDarkMode");
-        } else {
-          localStorage.setItem("personalChatDarkMode", value ? "true" : "false");
-        }
-      } catch {
-        /* ignore quota / private-mode errors */
-      }
-    }
-
-    /** Convenience flip used by the chat header sun/moon button. */
-    function togglePersonalChatDarkMode() {
-      setPersonalChatDarkMode(!effectiveChatDarkMode.value);
-    }
-
     function resetPaletteLayout() {
       topbarPosition.value = null;
       topbarCollapsed.value = false;
@@ -3333,7 +3272,6 @@ export const useStageStore = defineStore(
       topbarPosition,
       topbarCollapsed,
       publicChatPosition,
-      personalChatDarkMode,
       lastSeenPrivateMessage,
       masquerading,
       purchasePopup,
@@ -3350,7 +3288,6 @@ export const useStageStore = defineStore(
       audios,
       currentAvatar,
       activeMovable,
-      effectiveChatDarkMode,
       stageSize,
       canPlay,
       players,
@@ -3499,8 +3436,6 @@ export const useStageStore = defineStore(
       setTopbarPosition,
       setTopbarCollapsed,
       setPublicChatPosition,
-      setPersonalChatDarkMode,
-      togglePersonalChatDarkMode,
       resetPaletteLayout,
       autoFocusMoveable,
       handleDrawMessage,
