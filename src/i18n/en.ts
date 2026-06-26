@@ -28,6 +28,10 @@ export default {
   parameters: "Parameters",
   enter: "ENTER",
   clear: "Clear",
+  master: "Master",
+  stop_all_audio: "Stop all",
+  fade_out_audio: "Fade out",
+  master_volume: "Master volume",
   colour: "Colour",
   erase: "Erase",
   undo: "Undo",
@@ -197,6 +201,7 @@ export default {
   recording_discarded: "Recording discarded",
   recording_start_clears_stage:
     "Starting a recording clears the live stage. Save your scene first if needed.",
+  recording_clear_stage_on_start: "Clear the live stage when recording starts",
   save_stage: "Save Stage",
   delete_stage: "Delete Stage",
   create_stage: "Create Stage",

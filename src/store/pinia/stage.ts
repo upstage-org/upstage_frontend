@@ -521,6 +521,16 @@ export const useStageStore = defineStore(
       /* private mode / blocked storage */
     }
     const audioPlayers = ref<AudioPlayer[]>([]);
+    // Global "master" level applied on top of each track's own volume by
+    // AudioPlayer.vue. `masterAudioSignal` is replaced (not mutated) on every
+    // change so AudioPlayer re-applies even when the value repeats; it carries
+    // the fade `duration` so every client animates over the same span.
+    const masterAudioVolume = ref<number>(1);
+    const masterAudioSignal = ref<{ volume: number; duration: number; seq: number }>({
+      volume: 1,
+      duration: 0,
+      seq: 0,
+    });
     const isSavingScene = ref<boolean>(false);
     const isLoadingScenes = ref<boolean>(false);
     const showPlayerChat = ref<boolean>(false);
@@ -894,6 +904,19 @@ export const useStageStore = defineStore(
 
     function SET_STATUS(newStatus: string) {
       status.value = newStatus;
+    }
+
+    function refreshLiveStatus() {
+      // loadStage() flips status to OFFLINE via CLEAN_STAGE even when the broker
+      // socket never dropped (e.g. reloading the model after a recording
+      // mutation). If the socket is still connected we are still LIVE — restore
+      // it now instead of waiting for an unrelated reconnect to re-fire mqtt's
+      // `connect` event.
+      // `src/services/mqtt.ts` is @ts-nocheck and infers `.client = null`, so
+      // assert the connected flag we read here (mqtt.js exposes it at runtime).
+      if ((mqtt.client as { connected?: boolean } | null)?.connected) {
+        SET_STATUS("LIVE");
+      }
     }
 
     function SET_SUBSCRIBE_STATUS(s: boolean) {
@@ -1457,7 +1480,29 @@ export const useStageStore = defineStore(
           }
         }
         if (snapshot.audios !== undefined) {
-          tools.value.audios = snapshot.audios;
+          // Reconcile the audio library IN PLACE — never swap the array.
+          // AudioPlayer.vue captures `tools.audios` once at mount; its <audio>
+          // elements and `refs[]` are keyed to that array by index, so a
+          // wholesale reassignment detaches playback control — stale tracks
+          // keep playing and the new scene's state never reaches the elements.
+          // Matching incoming tracks by `src`, we restore each saved track's
+          // state and, crucially, STOP any track the new scene does not play
+          // (the bug: tracks absent from the scene got no stop message). The
+          // `changed`/`saken` flags drive AudioPlayer's watcher to
+          // play/pause/seek each element, on every client (this handler runs
+          // on the initiator and the audience alike).
+          const incoming = snapshot.audios;
+          const incomingPlayers = snapshot.audioPlayers ?? [];
+          tools.value.audios.forEach((track) => {
+            const idx = incoming.findIndex((a) => a.src === track.src);
+            const next = idx >= 0 ? incoming[idx] : undefined;
+            track.isPlaying = next?.isPlaying ?? false;
+            track.currentTime = incomingPlayers[idx]?.currentTime ?? next?.currentTime ?? 0;
+            if (next?.volume !== undefined) track.volume = next.volume;
+            if (next?.loop !== undefined) track.loop = next.loop;
+            track.saken = true;
+            track.changed = true;
+          });
         }
       }
     }
@@ -1749,6 +1794,7 @@ export const useStageStore = defineStore(
         [TOPICS.BOARD]: { qos: 2 },
         [TOPICS.BACKGROUND]: { qos: 2 },
         [TOPICS.AUDIO]: { qos: 2 },
+        [TOPICS.AUDIO_MASTER]: { qos: 2 },
         [TOPICS.REACTION]: { qos: 2 },
         [TOPICS.COUNTER]: { qos: 2 },
         [TOPICS.DRAW]: { qos: 2 },
@@ -1790,6 +1836,9 @@ export const useStageStore = defineStore(
           break;
         case TOPICS.AUDIO:
           handleAudioMessage({ message: message as ToolboxItem });
+          break;
+        case TOPICS.AUDIO_MASTER:
+          handleAudioMasterMessage({ message: message as { volume?: number; duration?: number } });
           break;
         case TOPICS.REACTION:
           handleReactionMessage({ message });
@@ -2614,6 +2663,70 @@ export const useStageStore = defineStore(
       UPDATE_AUDIO(message);
     }
 
+    // Duration of the graceful "fade out all" before tracks are stopped.
+    const MASTER_FADE_OUT_MS = 3000;
+    let masterFadeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function clearMasterFadeTimer() {
+      if (masterFadeTimer) {
+        clearTimeout(masterFadeTimer);
+        masterFadeTimer = null;
+      }
+    }
+
+    function applyMasterAudioVolume(volume: number, duration: number, broadcast: boolean) {
+      masterAudioVolume.value = volume;
+      masterAudioSignal.value = {
+        volume,
+        duration,
+        seq: masterAudioSignal.value.seq + 1,
+      };
+      if (broadcast) mqtt.sendMessage(TOPICS.AUDIO_MASTER, { volume, duration });
+    }
+
+    /** Master-volume slider. `broadcast=false` for purely-local drag feedback. */
+    function setMasterAudioVolume(volume: number, broadcast = true) {
+      clearMasterFadeTimer();
+      applyMasterAudioVolume(volume, 0, broadcast);
+    }
+
+    /** Instantly stop every currently-playing track and reset master to full. */
+    function stopAllAudio() {
+      clearMasterFadeTimer();
+      tools.value.audios.forEach((audio) => {
+        if (!audio.isPlaying) return;
+        audio.isPlaying = false;
+        audio.currentTime = 0;
+        audio.saken = true;
+        updateAudioStatus(audio);
+      });
+      if (masterAudioVolume.value !== 1) applyMasterAudioVolume(1, 0, true);
+    }
+
+    /**
+     * Ramp every playing track to silence over MASTER_FADE_OUT_MS, then stop
+     * them all and snap the master level back to full for the next cue. Only
+     * the initiating client schedules the stop; the fade and the resulting
+     * per-track stops both propagate to the audience over MQTT.
+     */
+    function fadeOutAllAudio() {
+      clearMasterFadeTimer();
+      applyMasterAudioVolume(0, MASTER_FADE_OUT_MS, true);
+      masterFadeTimer = setTimeout(() => {
+        masterFadeTimer = null;
+        stopAllAudio();
+      }, MASTER_FADE_OUT_MS);
+    }
+
+    function handleAudioMasterMessage({
+      message,
+    }: {
+      message: { volume?: number; duration?: number };
+    }) {
+      // Remote-driven: apply locally without re-broadcasting (avoid echo loop).
+      applyMasterAudioVolume(message.volume ?? 1, message.duration ?? 0, false);
+    }
+
     function closeSettingPopup() {
       SET_SETTING_POPUP({ isActive: false });
     }
@@ -3294,6 +3407,12 @@ export const useStageStore = defineStore(
       session,
       replay,
       audioPlayers,
+      masterAudioVolume,
+      masterAudioSignal,
+      setMasterAudioVolume,
+      stopAllAudio,
+      fadeOutAllAudio,
+      handleAudioMasterMessage,
       isSavingScene,
       isLoadingScenes,
       showPlayerChat,
@@ -3335,6 +3454,7 @@ export const useStageStore = defineStore(
       CLEAN_STAGE,
       SET_BACKGROUND,
       SET_STATUS,
+      refreshLiveStatus,
       SET_SUBSCRIBE_STATUS,
       PUSH_CHAT_MESSAGE,
       PUSH_PLAYER_CHAT_MESSAGE,

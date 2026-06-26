@@ -4,6 +4,7 @@ export const TOPICS = {
   BOARD: "board",
   BACKGROUND: "background",
   AUDIO: "audio",
+  AUDIO_MASTER: "audio_master",
   REACTION: "reaction",
   COUNTER: "counter",
   DRAW: "draw",

@@ -44,15 +44,18 @@ export default {
         el.addEventListener("error", function () {
           const audio = audios[refs.indexOf(el)];
           const label = audio?.name || audio?.src || "audio";
-          message.error(`Could not play ${label}. This format may not be supported in your browser.`);
+          message.error(
+            `Could not play ${label}. This format may not be supported in your browser.`,
+          );
           stopAudio(audio);
         });
       }
     };
 
-    const fadeVolume = (audio, volume) => {
+    const fadeVolume = (audio, volume, duration = 1000) => {
       animate(audio, {
         volume,
+        duration,
         ease: "linear",
       });
     };
@@ -76,14 +79,25 @@ export default {
           if (audio.saken) {
             refs[i].currentTime = audio.currentTime ?? 0;
           }
-          fadeVolume(refs[i], audio.volume ?? 1);
+          fadeVolume(refs[i], (audio.volume ?? 1) * stageStore.masterAudioVolume);
           audio.changed = false;
           audio.saken = false;
         }
       });
     };
 
+    // Master volume / "fade out all" — re-apply the global level to every
+    // element over the fade duration carried by the signal. Replacing the
+    // signal object (in the store) guarantees this fires on each change.
+    const applyMasterVolume = (sig) => {
+      audios.forEach((audio, i) => {
+        if (!refs[i]) return;
+        fadeVolume(refs[i], (audio.volume ?? 1) * sig.volume, sig.duration);
+      });
+    };
+
     watch(audios, handleAudioChange);
+    watch(() => stageStore.masterAudioSignal, applyMasterVolume);
     onMounted(handleAudioChange);
 
     return { audios, setRef };

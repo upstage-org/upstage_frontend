@@ -40,6 +40,14 @@ export default {
       stageStore.updateAudioStatus(audio);
     };
 
+    const masterVolume = computed(() => stageStore.masterAudioVolume);
+    // Drag: apply locally (no broadcast) for smooth live feedback; commit and
+    // broadcast on release so the audience only gets the settled value.
+    const onMasterInput = (e) => stageStore.setMasterAudioVolume(Number(e.target.value), false);
+    const onMasterChange = (e) => stageStore.setMasterAudioVolume(Number(e.target.value), true);
+    const stopAll = () => stageStore.stopAllAudio();
+    const fadeOutAll = () => stageStore.fadeOutAllAudio();
+
     useShortcut((e) => {
       if (isFinite(e.key)) {
         const i = e.key - 1;
@@ -68,12 +76,51 @@ export default {
       seek,
       displayTimestamp,
       scrollToEnd,
+      masterVolume,
+      onMasterInput,
+      onMasterChange,
+      stopAll,
+      fadeOutAll,
     };
   },
 };
 </script>
 
 <template>
+  <!-- Master controls: stop / fade-out all, plus a master-volume slider.
+       Mirrors the Backdrops "clear" tile sitting at the left-hand end. -->
+  <div v-if="audios.length" class="audio-master has-text-centered">
+    <div>
+      <div class="audio-name">{{ $t("master") || "Master" }}</div>
+      <div class="master-buttons">
+        <a-tooltip :title="$t('stop_all_audio') || 'Stop all'">
+          <div class="icon" @click="stopAll">
+            <Icon size="24" src="clear.svg" />
+          </div>
+        </a-tooltip>
+        <a-tooltip :title="$t('fade_out_audio') || 'Fade out'">
+          <div class="icon" @click="fadeOutAll">
+            <Icon size="24" src="crossfade.svg" />
+          </div>
+        </a-tooltip>
+      </div>
+      <a-tooltip :title="$t('master_volume') || 'Master volume'">
+        <div class="master-slider">
+          <Icon size="16" src="voice-setting.svg" />
+          <input
+            class="slider is-fullwidth is-dark my-0"
+            step="0.01"
+            min="0"
+            max="1"
+            type="range"
+            :value="masterVolume"
+            @input="onMasterInput($event)"
+            @change="onMasterChange($event)"
+          />
+        </div>
+      </a-tooltip>
+    </div>
+  </div>
   <div
     v-for="(audio, i) in audios"
     :key="audio"
@@ -261,6 +308,44 @@ export default {
           height: 24px !important;
         }
       }
+    }
+  }
+}
+
+.audio-master {
+  > div {
+    width: 100%;
+  }
+
+  .master-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 6px 0;
+
+    .icon {
+      cursor: pointer;
+
+      &:hover {
+        filter: brightness(1.3);
+      }
+    }
+  }
+
+  .master-slider {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .icon {
+      flex: none;
+    }
+
+    .slider {
+      flex: 1 1 auto;
+      min-width: 0;
+      margin: 0;
     }
   }
 }
