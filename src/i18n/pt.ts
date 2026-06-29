@@ -139,8 +139,6 @@ export default {
   audience_view: "Visualização do público",
   light_mode_chat: "Bate-papo em modo claro",
   dark_mode_chat: "Bate-papo no modo escuro",
-  chat_switch_to_light_mode: "Mudar o chat para o modo claro",
-  chat_switch_to_dark_mode: "Mudar o chat para o modo escuro",
   new_text: "Novo texto",
   create_a_account_with_upstage: "Criar uma conta no UpStage",
   email_subject_prefix: "Prefixo do assunto do e-mail",

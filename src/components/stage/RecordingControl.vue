@@ -6,6 +6,7 @@ import { useMutation } from "services/graphql/composable";
 import { stageGraph } from "services/graphql";
 import CustomConfirm from "components/CustomConfirm.vue";
 import Field from "components/form/Field.vue";
+import Switch from "components/form/Switch.vue";
 import Loading from "components/Loading.vue";
 import dayjs from "@utils/dayjs";
 import humanizeDuration from "humanize-duration";
@@ -18,6 +19,7 @@ const model = computed(() => stageStore.model);
 const activeRecording = computed(() => model.value?.activeRecording ?? null);
 
 const form = reactive({ name: "" });
+const clearOnStart = ref(true);
 const loading = ref(false);
 const saving = ref(false);
 
@@ -43,10 +45,13 @@ const startRecording = async (complete: () => void) => {
   if (!model.value?.id || !form.name.trim() || !model.value.fileLocation) return;
   loading.value = true;
   try {
-    const clearStage = useClearStage(model.value.fileLocation, COLORS.DEFAULT_BACKDROP);
-    await clearStage();
+    if (clearOnStart.value) {
+      const clearStage = useClearStage(model.value.fileLocation, COLORS.DEFAULT_BACKDROP);
+      await clearStage();
+    }
     await startMutation(t("recording_started"), model.value.id, form.name.trim());
     await stageStore.loadStage({ url: model.value.fileLocation! });
+    stageStore.refreshLiveStatus();
     complete();
   } finally {
     loading.value = false;
@@ -60,7 +65,10 @@ const saveRecording = async () => {
   try {
     await saveMutation(t("recording_saved"), Number(rec.id));
     const loc = model.value?.fileLocation;
-    if (loc) await stageStore.loadStage({ url: loc });
+    if (loc) {
+      await stageStore.loadStage({ url: loc });
+      stageStore.refreshLiveStatus();
+    }
   } finally {
     saving.value = false;
   }
@@ -71,7 +79,10 @@ const discardRecording = async (complete: () => void) => {
   if (!rec?.id) return;
   await deleteMutation(t("recording_discarded"), Number(rec.id));
   const loc = model.value?.fileLocation;
-  if (loc) await stageStore.loadStage({ url: loc });
+  if (loc) {
+    await stageStore.loadStage({ url: loc });
+    stageStore.refreshLiveStatus();
+  }
   complete();
 };
 </script>
@@ -110,7 +121,8 @@ const discardRecording = async (complete: () => void) => {
       :placeholder="$t('trim_replay_new_name')"
       required
     />
-    <p class="is-size-7 mt-2">
+    <Switch v-model="clearOnStart" :label="$t('recording_clear_stage_on_start')" />
+    <p v-if="clearOnStart" class="is-size-7 mt-2">
       <i class="fas fa-exclamation-triangle has-text-warning"></i>
       {{ $t("recording_start_clears_stage") }}
     </p>

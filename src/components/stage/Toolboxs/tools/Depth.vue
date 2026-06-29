@@ -4,14 +4,30 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import Skeleton from "../Skeleton.vue";
 import Icon from "components/Icon.vue";
-import { isHoldableBoardObject } from "@utils/common";
+import { isHoldableBoardObject, isJitsiBoardType } from "@utils/common";
 
 export default {
   components: { Skeleton, Icon },
   setup() {
     const stageStore = useStageStore();
     const userStore = useUserStore();
-    const objects = computed(() => stageStore.objects);
+    // Hide track-less jitsi "ghost" tiles from the Depth list: a tile whose
+    // participant has no media on the board renders nothing on stage (no green
+    // hover frame), so listing it here is confusing (the reported symptom:
+    // "icons for a stream with nothing on stage"). This is display-only — the
+    // board object is NOT removed (deleting is unsafe; a performer may run
+    // several concurrent stream tiles from one tab, and a stale ghost is
+    // indistinguishable from those in live state). The entry reappears the
+    // instant the tile has media. Tiles still awaiting a participantId
+    // (mid-placement) are kept so an in-progress drag isn't hidden.
+    const objects = computed(() =>
+      stageStore.objects.filter((o) => {
+        if (!isJitsiBoardType(o.type)) return true;
+        const pid = o.participantId;
+        if (pid == null || pid === "") return true;
+        return stageStore.liveJitsiParticipantIds.has(String(pid));
+      }),
+    );
     // `store.state.user.avatarId` worked only by accident: Vuex's root
     // store has no `user` module any more (it was migrated to Pinia in
     // Phase 5), so the read silently threw inside Vue's effect and

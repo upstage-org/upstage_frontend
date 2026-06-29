@@ -521,6 +521,16 @@ export const useStageStore = defineStore(
       /* private mode / blocked storage */
     }
     const audioPlayers = ref<AudioPlayer[]>([]);
+    // Global "master" level applied on top of each track's own volume by
+    // AudioPlayer.vue. `masterAudioSignal` is replaced (not mutated) on every
+    // change so AudioPlayer re-applies even when the value repeats; it carries
+    // the fade `duration` so every client animates over the same span.
+    const masterAudioVolume = ref<number>(1);
+    const masterAudioSignal = ref<{ volume: number; duration: number; seq: number }>({
+      volume: 1,
+      duration: 0,
+      seq: 0,
+    });
     const isSavingScene = ref<boolean>(false);
     const isLoadingScenes = ref<boolean>(false);
     const showPlayerChat = ref<boolean>(false);
@@ -536,27 +546,6 @@ export const useStageStore = defineStore(
     const topbarPosition = ref<{ x: number; y: number } | null>(null);
     const topbarCollapsed = ref<boolean>(false);
     const publicChatPosition = ref<{ x: number; y: number } | null>(null);
-    // Per-user override of the broadcast `settings.chatDarkMode`. The
-    // global flag is set by the stage admin and propagates to every
-    // viewer over MQTT; this lets each viewer (audience or player) flip
-    // their own chat into light or dark independently of the broadcast
-    // value. `null` means "no personal override — follow whatever the
-    // admin broadcast." Persisted to localStorage under
-    // `personalChatDarkMode` so the choice survives reloads and applies
-    // across stages, since dark mode is an accessibility / comfort
-    // preference, not a per-stage UI tweak.
-    const personalChatDarkMode = ref<boolean | null>(
-      (() => {
-        try {
-          const raw = localStorage.getItem("personalChatDarkMode");
-          if (raw === "true") return true;
-          if (raw === "false") return false;
-        } catch {
-          /* ignore */
-        }
-        return null;
-      })(),
-    );
     // Epoch ms of the last seen private message. localStorage returns
     // `string | null`; coerce to a number on load so the unread-count
     // comparator (`m.at > lastSeenPrivateMessage.value`) and the
@@ -599,6 +588,36 @@ export const useStageStore = defineStore(
         ),
       })),
     );
+
+    /**
+     * Participant ids that currently have media on the board — i.e. a jitsi
+     * tile for one of these ids actually renders (it is NOT a track-less
+     * ghost). Mirrors what `Jitsi.vue` needs to show video/audio:
+     *   - every participant id present on a `board.value.tracks` entry, plus
+     *   - the local participant when an *ownerless* track exists (a local
+     *     track added before lib-jitsi-meet assigned its participantId — see
+     *     ADD_TRACK), so the performer's own live tile still counts as live.
+     *
+     * Consumed by the Depth toolbar to hide stale, unbindable jitsi tiles from
+     * the list WITHOUT deleting the board object. Deletion is unsafe here: a
+     * performer may legitimately publish several concurrent stream tiles from
+     * one tab (see utils/jitsiBoardReconcile.ts), and a stale ghost is
+     * observationally identical to one of those in live state. Filtering the
+     * display is reversible — the tile reappears the moment it has media.
+     */
+    const liveJitsiParticipantIds = computed(() => {
+      const ids = new Set<string>();
+      let hasOwnerlessTrack = false;
+      for (const t of board.value.tracks) {
+        const pid = t.getParticipantId?.();
+        if (pid != null && pid !== "") ids.add(String(pid));
+        else hasOwnerlessTrack = true;
+      }
+      if (hasOwnerlessTrack && localJitsiParticipantId.value != null) {
+        ids.add(String(localJitsiParticipantId.value));
+      }
+      return ids;
+    });
 
     const config = computed(() => _config.value);
 
@@ -657,21 +676,6 @@ export const useStageStore = defineStore(
         return null;
       }
       return _activeMovable.value;
-    });
-
-    /**
-     * Effective dark-mode flag for the local user's chat UI. When the
-     * viewer has set a personal override (`personalChatDarkMode` !==
-     * null) we honour that; otherwise we fall through to the broadcast
-     * `settings.chatDarkMode` chosen by the stage admin. Components
-     * read THIS, not `settings.chatDarkMode` directly, so the per-user
-     * toggle on the chat header doesn't affect anyone else.
-     */
-    const effectiveChatDarkMode = computed<boolean>(() => {
-      if (personalChatDarkMode.value !== null) {
-        return personalChatDarkMode.value;
-      }
-      return !!settings.value.chatDarkMode;
     });
 
     const stageSize = computed(() => {
@@ -878,8 +882,7 @@ export const useStageStore = defineStore(
       // stuck in audience view (canPlay=false → no toolbox, no player
       // chat) until they hunt the toggle down again. Reset it here so
       // re-entry always starts in player mode for users with the
-      // permission. `personalChatDarkMode` deliberately survives because
-      // it's a viewer accessibility preference, not stage state.
+      // permission.
       masquerading.value = false;
     }
 
@@ -901,6 +904,19 @@ export const useStageStore = defineStore(
 
     function SET_STATUS(newStatus: string) {
       status.value = newStatus;
+    }
+
+    function refreshLiveStatus() {
+      // loadStage() flips status to OFFLINE via CLEAN_STAGE even when the broker
+      // socket never dropped (e.g. reloading the model after a recording
+      // mutation). If the socket is still connected we are still LIVE — restore
+      // it now instead of waiting for an unrelated reconnect to re-fire mqtt's
+      // `connect` event.
+      // `src/services/mqtt.ts` is @ts-nocheck and infers `.client = null`, so
+      // assert the connected flag we read here (mqtt.js exposes it at runtime).
+      if ((mqtt.client as { connected?: boolean } | null)?.connected) {
+        SET_STATUS("LIVE");
+      }
     }
 
     function SET_SUBSCRIBE_STATUS(s: boolean) {
@@ -1464,7 +1480,29 @@ export const useStageStore = defineStore(
           }
         }
         if (snapshot.audios !== undefined) {
-          tools.value.audios = snapshot.audios;
+          // Reconcile the audio library IN PLACE — never swap the array.
+          // AudioPlayer.vue captures `tools.audios` once at mount; its <audio>
+          // elements and `refs[]` are keyed to that array by index, so a
+          // wholesale reassignment detaches playback control — stale tracks
+          // keep playing and the new scene's state never reaches the elements.
+          // Matching incoming tracks by `src`, we restore each saved track's
+          // state and, crucially, STOP any track the new scene does not play
+          // (the bug: tracks absent from the scene got no stop message). The
+          // `changed`/`saken` flags drive AudioPlayer's watcher to
+          // play/pause/seek each element, on every client (this handler runs
+          // on the initiator and the audience alike).
+          const incoming = snapshot.audios;
+          const incomingPlayers = snapshot.audioPlayers ?? [];
+          tools.value.audios.forEach((track) => {
+            const idx = incoming.findIndex((a) => a.src === track.src);
+            const next = idx >= 0 ? incoming[idx] : undefined;
+            track.isPlaying = next?.isPlaying ?? false;
+            track.currentTime = incomingPlayers[idx]?.currentTime ?? next?.currentTime ?? 0;
+            if (next?.volume !== undefined) track.volume = next.volume;
+            if (next?.loop !== undefined) track.loop = next.loop;
+            track.saken = true;
+            track.changed = true;
+          });
         }
       }
     }
@@ -1756,6 +1794,7 @@ export const useStageStore = defineStore(
         [TOPICS.BOARD]: { qos: 2 },
         [TOPICS.BACKGROUND]: { qos: 2 },
         [TOPICS.AUDIO]: { qos: 2 },
+        [TOPICS.AUDIO_MASTER]: { qos: 2 },
         [TOPICS.REACTION]: { qos: 2 },
         [TOPICS.COUNTER]: { qos: 2 },
         [TOPICS.DRAW]: { qos: 2 },
@@ -1797,6 +1836,9 @@ export const useStageStore = defineStore(
           break;
         case TOPICS.AUDIO:
           handleAudioMessage({ message: message as ToolboxItem });
+          break;
+        case TOPICS.AUDIO_MASTER:
+          handleAudioMasterMessage({ message: message as { volume?: number; duration?: number } });
           break;
         case TOPICS.REACTION:
           handleReactionMessage({ message });
@@ -2621,6 +2663,70 @@ export const useStageStore = defineStore(
       UPDATE_AUDIO(message);
     }
 
+    // Duration of the graceful "fade out all" before tracks are stopped.
+    const MASTER_FADE_OUT_MS = 3000;
+    let masterFadeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function clearMasterFadeTimer() {
+      if (masterFadeTimer) {
+        clearTimeout(masterFadeTimer);
+        masterFadeTimer = null;
+      }
+    }
+
+    function applyMasterAudioVolume(volume: number, duration: number, broadcast: boolean) {
+      masterAudioVolume.value = volume;
+      masterAudioSignal.value = {
+        volume,
+        duration,
+        seq: masterAudioSignal.value.seq + 1,
+      };
+      if (broadcast) mqtt.sendMessage(TOPICS.AUDIO_MASTER, { volume, duration });
+    }
+
+    /** Master-volume slider. `broadcast=false` for purely-local drag feedback. */
+    function setMasterAudioVolume(volume: number, broadcast = true) {
+      clearMasterFadeTimer();
+      applyMasterAudioVolume(volume, 0, broadcast);
+    }
+
+    /** Instantly stop every currently-playing track and reset master to full. */
+    function stopAllAudio() {
+      clearMasterFadeTimer();
+      tools.value.audios.forEach((audio) => {
+        if (!audio.isPlaying) return;
+        audio.isPlaying = false;
+        audio.currentTime = 0;
+        audio.saken = true;
+        updateAudioStatus(audio);
+      });
+      if (masterAudioVolume.value !== 1) applyMasterAudioVolume(1, 0, true);
+    }
+
+    /**
+     * Ramp every playing track to silence over MASTER_FADE_OUT_MS, then stop
+     * them all and snap the master level back to full for the next cue. Only
+     * the initiating client schedules the stop; the fade and the resulting
+     * per-track stops both propagate to the audience over MQTT.
+     */
+    function fadeOutAllAudio() {
+      clearMasterFadeTimer();
+      applyMasterAudioVolume(0, MASTER_FADE_OUT_MS, true);
+      masterFadeTimer = setTimeout(() => {
+        masterFadeTimer = null;
+        stopAllAudio();
+      }, MASTER_FADE_OUT_MS);
+    }
+
+    function handleAudioMasterMessage({
+      message,
+    }: {
+      message: { volume?: number; duration?: number };
+    }) {
+      // Remote-driven: apply locally without re-broadcasting (avoid echo loop).
+      applyMasterAudioVolume(message.volume ?? 1, message.duration ?? 0, false);
+    }
+
     function closeSettingPopup() {
       SET_SETTING_POPUP({ isActive: false });
     }
@@ -3183,30 +3289,6 @@ export const useStageStore = defineStore(
       publicChatPosition.value = pos;
     }
 
-    /**
-     * Set the per-user chat dark-mode override. Pass `null` to clear
-     * the override and follow the admin-broadcast `settings.chatDarkMode`
-     * again. Persists to localStorage so the preference survives reloads
-     * and applies across stages.
-     */
-    function setPersonalChatDarkMode(value: boolean | null) {
-      personalChatDarkMode.value = value;
-      try {
-        if (value === null) {
-          localStorage.removeItem("personalChatDarkMode");
-        } else {
-          localStorage.setItem("personalChatDarkMode", value ? "true" : "false");
-        }
-      } catch {
-        /* ignore quota / private-mode errors */
-      }
-    }
-
-    /** Convenience flip used by the chat header sun/moon button. */
-    function togglePersonalChatDarkMode() {
-      setPersonalChatDarkMode(!effectiveChatDarkMode.value);
-    }
-
     function resetPaletteLayout() {
       topbarPosition.value = null;
       topbarCollapsed.value = false;
@@ -3325,6 +3407,12 @@ export const useStageStore = defineStore(
       session,
       replay,
       audioPlayers,
+      masterAudioVolume,
+      masterAudioSignal,
+      setMasterAudioVolume,
+      stopAllAudio,
+      fadeOutAllAudio,
+      handleAudioMasterMessage,
       isSavingScene,
       isLoadingScenes,
       showPlayerChat,
@@ -3333,7 +3421,6 @@ export const useStageStore = defineStore(
       topbarPosition,
       topbarCollapsed,
       publicChatPosition,
-      personalChatDarkMode,
       lastSeenPrivateMessage,
       masquerading,
       purchasePopup,
@@ -3350,7 +3437,6 @@ export const useStageStore = defineStore(
       audios,
       currentAvatar,
       activeMovable,
-      effectiveChatDarkMode,
       stageSize,
       canPlay,
       players,
@@ -3358,6 +3444,7 @@ export const useStageStore = defineStore(
       unreadPrivateMessageCount,
       whiteboard,
       jitsiTracks,
+      liveJitsiParticipantIds,
       reloadStreams,
       meetingRefreshKey,
       activeObject,
@@ -3367,6 +3454,7 @@ export const useStageStore = defineStore(
       CLEAN_STAGE,
       SET_BACKGROUND,
       SET_STATUS,
+      refreshLiveStatus,
       SET_SUBSCRIBE_STATUS,
       PUSH_CHAT_MESSAGE,
       PUSH_PLAYER_CHAT_MESSAGE,
@@ -3499,8 +3587,6 @@ export const useStageStore = defineStore(
       setTopbarPosition,
       setTopbarCollapsed,
       setPublicChatPosition,
-      setPersonalChatDarkMode,
-      togglePersonalChatDarkMode,
       resetPaletteLayout,
       autoFocusMoveable,
       handleDrawMessage,

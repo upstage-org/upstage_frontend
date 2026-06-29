@@ -14,16 +14,13 @@ export default {
   props: { scene: Object },
   setup: (props) => {
     const stageStore = useStageStore();
+    // Audio state is reconciled centrally in REPLACE_SCENE (store), which runs
+    // on every client via the SWITCH_SCENE broadcast — restoring the scene's
+    // playing tracks and stopping any that the new scene doesn't play. The old
+    // per-track re-broadcast loop here only ever touched tracks *in* the new
+    // scene (so stray audio kept playing) and never ran for the audience.
     const switchScene = () => {
       stageStore.switchScene(props.scene.id);
-      const audios = JSON.parse(props.scene.payload).audios;
-      const audioPlayers = JSON.parse(props.scene.payload).audioPlayers;
-      audios.forEach((audio, index) => {
-        audio.currentTime = audioPlayers[index].currentTime;
-        audio.changed = true;
-        audio.saken = true;
-        stageStore.updateAudioStatus(audio);
-      });
     };
 
     const { mutation } = useMutation(stageGraph.deleteScene, props.scene.id);
