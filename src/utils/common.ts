@@ -48,13 +48,16 @@ export function isJitsiBoardType(type: unknown): boolean {
 
 /**
  * Board objects a performer can claim as their speaking presence (teardrop,
- * chat, voice). Regular avatars, stream-playback clips (`video`), and
- * individual Jitsi tiles — not props, text, meeting embeds, etc.
+ * chat, voice) — avatars only. Stream tiles (stream-playback `video` clips and
+ * live Jitsi tiles) are deliberately NOT holdable: they behave like props
+ * (select/move/resize/opacity/delete with a single click, no hold), do not
+ * speak, and show no teardrop. Note this governs only the presence/UI layer;
+ * the actual media path keys off `isStreamPlaybackBoardType` / `isJitsiBoardType`
+ * and `track.isLocal()`, never this flag.
  */
 export function isHoldableBoardObject(obj: { type?: unknown } | null | undefined): boolean {
   if (obj?.type == null) return false;
-  const t = String(obj.type).trim().toLowerCase();
-  return t === "avatar" || isStreamPlaybackBoardType(t) || isJitsiBoardType(t);
+  return String(obj.type).trim().toLowerCase() === "avatar";
 }
 
 /**

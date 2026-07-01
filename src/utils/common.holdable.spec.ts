@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { isHoldableBoardObject } from "./common";
 
 describe("isHoldableBoardObject", () => {
-  it("includes regular avatars, stream video, and jitsi tiles", () => {
+  it("includes avatars only", () => {
     expect(isHoldableBoardObject({ type: "avatar" })).toBe(true);
-    expect(isHoldableBoardObject({ type: "video" })).toBe(true);
-    expect(isHoldableBoardObject({ type: "stream" })).toBe(true);
-    expect(isHoldableBoardObject({ type: "jitsi" })).toBe(true);
+  });
+
+  it("excludes stream tiles (video/stream/jitsi) — they behave as props now", () => {
+    expect(isHoldableBoardObject({ type: "video" })).toBe(false);
+    expect(isHoldableBoardObject({ type: "stream" })).toBe(false);
+    expect(isHoldableBoardObject({ type: "jitsi" })).toBe(false);
   });
 
   it("excludes props, meetings, and other board types", () => {

@@ -162,6 +162,9 @@ export default {
     });
 
     const shouldShowBubble = computed(() => {
+      // Only holdable objects (avatars) speak. Stream tiles are props now and
+      // must never render a speech bubble, even from stale `speak` data.
+      if (!isHoldableBoardObject(props.object)) return false;
       if (!props.object.speak?.message) return false;
 
       const isReplayMode = window.location.pathname.includes("/replay/");

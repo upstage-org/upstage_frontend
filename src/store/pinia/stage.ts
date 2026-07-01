@@ -36,6 +36,7 @@ import { stageGraph } from "@services/graphql";
 import {
   absolutePath,
   cloneDeep,
+  isHoldableBoardObject,
   isJitsiBoardType,
   isStreamPlaybackBoardType,
   posterJpgForVideoUrl,
@@ -2089,7 +2090,11 @@ export const useStageStore = defineStore(
         }
       }
       PUSH_OBJECT(serializeObject(object));
-      if (object.type === "avatar" && canPlay.value) {
+      // Case-insensitive avatar check: GraphQL `assetType.name` can arrive as
+      // "Avatar", so an exact `=== "avatar"` would occasionally skip the claim
+      // and the dropped avatar would get no teardrop. `isHoldableBoardObject`
+      // is avatar-only now (streams are props) and folds case.
+      if (isHoldableBoardObject(object) && canPlay.value) {
         useUserStore().setAvatarId(object.id);
         SET_ACTIVE_MOVABLE(null);
       }

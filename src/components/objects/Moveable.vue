@@ -3,9 +3,7 @@ import { ref, inject } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
 import { useStageStore } from "@stores/pinia/stage";
-import { useUserStore } from "@stores/pinia/user";
 import { animate } from "animejs";
-import { isHoldableBoardObject } from "@utils/common";
 
 export default {
   props: {
@@ -19,7 +17,6 @@ export default {
     const isDragging = ref(false);
 
     const stageStore = useStageStore();
-    const userStore = useUserStore();
     const replaying = inject("replaying", false);
     const canPlay = computed(() => stageStore.canPlay && !replaying);
     const config = stageStore.config;
@@ -160,22 +157,24 @@ export default {
     const clickOutside = (e) => {
       if (replaying) return;
       if ((!e || e.target.id === "board") && props.controlable && canPlay.value) {
+        // Clicking the empty stage only DESELECTS (hides the frame/tools). It
+        // must NOT release an avatar hold: a player keeps their avatar (and
+        // keeps speaking as it) while moving props etc., and only lets go by
+        // holding a different avatar (double-click) or the context-menu
+        // "Release". Releasing here caused the whole "needs a double-click"
+        // regression, because every empty-stage click dropped the hold.
         stageStore.SET_ACTIVE_MOVABLE(null);
-        // Deselecting by clicking the empty stage is how performers
-        // "let go" of an avatar; without this the session counter still
-        // lists the avatar and the red teardrop never clears.
-        if (isHoldableBoardObject(props.object) && props.object.id === userStore.avatarId) {
-          stageStore.releaseAvatarHold();
-        }
       }
     };
-    watch(
-      activeMovable,
-      (val) => {
-        showControls(val);
-      },
-      { immediate: true },
-    );
+    // NB: not `immediate` — on first render the immediate callback fires during
+    // setup, before `el` is mounted, so `showControls(true)` would target
+    // `undefined` and the frame would never appear for a freshly-dropped object
+    // that is auto-focused on drop (the QuickAction buttons key off the global
+    // `activeMovable` and still showed, hence "buttons but no green frame").
+    // The initial state is applied in onMounted below once `el` exists.
+    watch(activeMovable, (val) => {
+      showControls(val);
+    });
 
     watch(
       () => props.object,
@@ -228,6 +227,11 @@ export default {
       el.value.style.left = `${x}px`;
       el.value.style.top = `${y}px`;
       el.value.style.transform = `rotate(${rotate}deg)`;
+      // If this object mounted already-selected (e.g. auto-focused right after
+      // being dropped on the stage), show its resize frame now that `el` exists.
+      if (activeMovable.value) {
+        showControls(true);
+      }
     });
 
     onUnmounted(() => {

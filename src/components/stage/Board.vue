@@ -2,7 +2,6 @@
 import { computed } from "vue";
 import { storeToRefs } from "pinia";
 import { useStageStore } from "@stores/pinia/stage";
-import { useUserStore } from "@stores/pinia/user";
 import { isStreamPlaybackBoardType } from "@utils/common";
 import Avatar from "components/objects/Avatar/index.vue";
 import Drawing from "components/objects/Drawing.vue";
@@ -96,10 +95,11 @@ export default {
 
     const onBoardPointerDown = (e) => {
       if (!canPlay.value || e.target.id !== "board") return;
+      // Deselect only — do NOT release the avatar hold on an empty-stage click.
+      // The hold persists until the player holds a different avatar
+      // (double-click) or picks "Release" from the avatar context menu, so they
+      // keep speaking as their avatar while moving props/other objects.
       stageStore.SET_ACTIVE_MOVABLE(null);
-      if (useUserStore().avatarId != null) {
-        stageStore.releaseAvatarHold();
-      }
     };
 
     // Remount embedded conference tiles when the user hits "Refresh

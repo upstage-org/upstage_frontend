@@ -103,6 +103,16 @@ export default {
 
     const dropzone = ref(false);
 
+    // Single source for the item's hover tooltip so every kind of skeleton
+    // (avatar/prop image, stream key, meeting/jitsi name) shows one consistent
+    // styled tooltip instead of a mix of native `title` and ant tooltips.
+    const tooltipTitle = computed(() => {
+      const d = props.data;
+      if (d.type === "video") return d.name ? `Stream key: ${d.name}` : "";
+      if (!d.src && d.displayName) return d.displayName;
+      return d.name ?? "";
+    });
+
     return {
       dragstart,
       dragend,
@@ -110,67 +120,74 @@ export default {
       showMovable,
       drop,
       dropzone,
+      tooltipTitle,
     };
   },
 };
 </script>
 
 <template>
-  <div
-    class="is-flex is-align-items-center is-justify-content-center skeleton"
-    :class="{ dropzone }"
-    :title="data.name"
-    draggable="true"
-    @dragstart="dragstart"
-    @dragend="dragend"
-    @dragenter.prevent
-    @dragover.prevent="dropzone = true"
-    @dragleave.prevent="dropzone = false"
-    @drop.prevent="drop"
-    @dblclick="hold"
-    @mouseenter="showMovable"
-  >
-    <slot v-if="$slots.default" />
-    <SavedDrawing v-else-if="data.drawingId" :drawing="data" />
-    <p
-      v-else-if="data.type === 'text'"
-      :style="{
-        ...data,
-        transform: `scale(${76 / data.w})`,
-        'transform-origin': 0,
-        'max-width': '100%',
-      }"
-      v-html="data.content"
-    ></p>
+  <!--
+    One a-tooltip wraps the whole item so every skeleton kind shows the SAME
+    styled tooltip (black bg, white text, rounded — ant defaults + color) rather
+    than a mix of native `title` (light, square) and ant tooltips. ant-design-vue
+    renders the child element directly (no wrapper) and merges event handlers, so
+    the drag/drop/dblclick/mouseenter below are preserved.
+  -->
+  <a-tooltip :title="tooltipTitle" color="#000000" placement="top" :mouse-enter-delay="0.35">
     <div
-      v-else-if="data.type === 'video'"
-      :title="`Stream key: ${data.name}`"
-      class="skeleton-meta"
+      class="is-flex is-align-items-center is-justify-content-center skeleton"
+      :class="{ dropzone }"
+      draggable="true"
+      @dragstart="dragstart"
+      @dragend="dragend"
+      @dragenter.prevent
+      @dragover.prevent="dropzone = true"
+      @dragleave.prevent="dropzone = false"
+      @drop.prevent="drop"
+      @dblclick="hold"
+      @mouseenter="showMovable"
     >
-      <Icon src="stream.svg" size="36" />
-      <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7)">{{
-        data.name
-      }}</span>
+      <slot v-if="$slots.default" />
+      <SavedDrawing v-else-if="data.drawingId" :drawing="data" />
+      <p
+        v-else-if="data.type === 'text'"
+        :style="{
+          ...data,
+          transform: `scale(${76 / data.w})`,
+          'transform-origin': 0,
+          'max-width': '100%',
+        }"
+        v-html="data.content"
+      ></p>
+      <div v-else-if="data.type === 'video'" class="skeleton-meta">
+        <Icon src="stream.svg" size="36" />
+        <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7)">{{
+          data.name
+        }}</span>
+      </div>
+      <div v-else-if="data.type === 'meeting'" class="skeleton-meta">
+        <Icon src="meeting.svg" size="36" />
+        <span class="tag is-light is-block stream-key">{{ data.name }}</span>
+      </div>
+      <div v-else-if="!data.src" class="skeleton-meta">
+        <Icon src="meeting.svg" size="36" />
+      </div>
+      <AppImage v-else class="skeleton-image" :src="data.src" />
+      <Icon v-if="data.multi" class="is-multi" src="multi-frame.svg" />
     </div>
-    <div v-else-if="data.type === 'meeting'" class="skeleton-meta">
-      <Icon src="meeting.svg" size="36" />
-      <span class="tag is-light is-block stream-key">{{ data.name }}</span>
-    </div>
-    <a-tooltip v-else-if="!data.src" :title="data.displayName">
-      <Icon src="meeting.svg" size="36" />
-    </a-tooltip>
-    <AppImage v-else class="skeleton-image" :src="data.src" />
-    <Icon
-      v-if="data.multi"
-      class="is-multi"
-      title="This is a multiframe avatar"
-      src="multi-frame.svg"
-    />
-  </div>
+  </a-tooltip>
 </template>
 
 <style scoped lang="scss">
 .stream-key {
+  // Pin the name label to the bottom so the icon is always the only in-flow
+  // child of `.skeleton-meta` and stays vertically centred — this keeps every
+  // icon (stream / meeting / jitsi) at the same height instead of some being
+  // pushed up by the label below them.
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
@@ -179,6 +196,7 @@ export default {
 }
 
 .skeleton-meta {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
