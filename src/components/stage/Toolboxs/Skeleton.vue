@@ -10,6 +10,13 @@ import { isHoldableBoardObject, isLocalHoldOfBoardObject } from "@utils/common";
 
 export default {
   components: { AppImage, Icon, SavedDrawing },
+  // The root is now <a-tooltip>, but callers (e.g. Yourself.vue) pass class /
+  // style expecting them to land on the inner `.skeleton` flex div — the way
+  // they did when that div was the root. ant-design-vue spreads fallthrough
+  // attrs onto the tooltip component instead, so without this the `p-2` /
+  // `flex-direction: column` from Yourself.vue never reached the flex box and
+  // its label rendered beside the video. Forward attrs to the flex div instead.
+  inheritAttrs: false,
   props: {
     data: {
       type: Object,
@@ -136,6 +143,7 @@ export default {
   -->
   <a-tooltip :title="tooltipTitle" color="#000000" placement="top" :mouse-enter-delay="0.35">
     <div
+      v-bind="$attrs"
       class="is-flex is-align-items-center is-justify-content-center skeleton"
       :class="{ dropzone }"
       draggable="true"
