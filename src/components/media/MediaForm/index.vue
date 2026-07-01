@@ -24,7 +24,7 @@ import {
   UploadFile,
   User,
 } from "models/studio";
-import { absolutePath, capitalize } from "utils/common";
+import { absolutePath, capitalize, compareByLabel } from "utils/common";
 import StageAssignment from "./StageAssignment.vue";
 import { useSaveMedia } from "./composable";
 import { editingMediaVar, inquiryVar } from "apollo";
@@ -219,11 +219,13 @@ const { result } = useQuery<StudioGraph>(MEDIA_FORM_META_QUERY, undefined, {
   fetchPolicy: "cache-and-network",
 });
 const tagOptions = computed(() =>
-  (result.value?.tags ?? []).map((node) => ({
-    value: node.name,
-    label: node.name,
-    key: node.id,
-  })),
+  (result.value?.tags ?? [])
+    .map((node) => ({
+      value: node.name,
+      label: node.name,
+      key: node.id,
+    }))
+    .sort(compareByLabel),
 );
 const mediaTypes = computed(() => {
   if (result.value?.mediaTypes) {
@@ -234,7 +236,8 @@ const mediaTypes = computed(() => {
             node.name.toLowerCase(),
           ),
       )
-      .map((node) => ({ label: capitalize(node.name), value: node.name }));
+      .map((node) => ({ label: capitalize(node.name), value: node.name }))
+      .sort(compareByLabel);
   }
   return [];
 });
@@ -662,11 +665,13 @@ const getUserDisplayName = (user: User) => {
                     show-search
                     :filter-option="false"
                     :options="
-                      filteredUsers.map((user) => ({
-                        value: user.username,
-                        label: getUserDisplayName(user),
-                        key: user.id,
-                      }))
+                      filteredUsers
+                        .map((user) => ({
+                          value: user.username,
+                          label: getUserDisplayName(user),
+                          key: user.id,
+                        }))
+                        .sort(compareByLabel)
                     "
                     @search="handleSearch"
                     @dropdown-visible-change="handleDropdownVisibleChange"

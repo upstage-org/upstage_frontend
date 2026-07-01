@@ -190,6 +190,21 @@ export function includesIgnoreCase(value: string, keyword: string) {
   return value.toLowerCase().includes(keyword.toLowerCase());
 }
 
+/**
+ * Case-insensitive, locale-aware comparator for select/dropdown options so
+ * every list is ordered by the text the user actually sees (the `label`),
+ * not by whatever order the backend happened to return. Use as
+ * `options.sort(compareByLabel)`.
+ */
+export function compareByLabel(
+  a: { label?: string | number | null },
+  b: { label?: string | number | null },
+) {
+  return String(a?.label ?? "").localeCompare(String(b?.label ?? ""), undefined, {
+    sensitivity: "base",
+  });
+}
+
 export const isJson = (d: any) => {
   try {
     JSON.parse(d);

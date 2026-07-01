@@ -204,8 +204,17 @@ const handleTableChange = (
   _: any,
   sorter: SorterResult<Media> | SorterResult<Media>[],
 ) => {
+  // Only keep columns that currently have an active sort direction — an
+  // entry with `order === undefined` means that column's sort was cleared and
+  // must not be sent (previously it was turned into a spurious `_DESC`).
+  // Highest `multiple` = highest priority, so sort descending: the first
+  // entry becomes the primary sort key on the backend, the rest tie-breakers.
   const sort = (Array.isArray(sorter) ? sorter : [sorter])
-    .sort((a, b) => (a.column?.sorter as any).multiple - (b.column?.sorter as any).multiple)
+    .filter((s) => s && s.order)
+    .sort(
+      (a, b) =>
+        ((b.column?.sorter as any)?.multiple ?? 0) - ((a.column?.sorter as any)?.multiple ?? 0),
+    )
     .map(({ columnKey, order }) =>
       `${columnKey == "copyrightLevel" ? "COPYRIGHT_LEVEL" : columnKey}_${order === "ascend" ? "ASC" : "DESC"}`.toUpperCase(),
     );

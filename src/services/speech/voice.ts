@@ -35,16 +35,21 @@ export const voices: { [key: string]: string } = {
 };
 
 export const getVoiceList = () => {
+  // "No voice" stays pinned at the top; the languages below it are sorted by
+  // their displayed label so the picker reads alphabetically no matter how the
+  // `voices` map happens to be ordered.
   return [
     {
       value: "",
       label: "No voice",
     },
   ].concat(
-    Object.keys(voices).map((key) => ({
-      value: key,
-      label: voices[key],
-    })),
+    Object.keys(voices)
+      .map((key) => ({
+        value: key,
+        label: voices[key],
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
   );
 };
 

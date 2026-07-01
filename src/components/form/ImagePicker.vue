@@ -7,7 +7,7 @@ import Modal from "components/Modal.vue";
 import Loading from "components/Loading.vue";
 import Asset from "components/Asset.vue";
 import { computed, provide, reactive, inject, watch, ref } from "vue";
-import { capitalize } from "utils/common";
+import { capitalize, compareByLabel } from "utils/common";
 import { stageGraph } from "services/graphql";
 import { useQuery } from "services/graphql/composable";
 import MediaForm from "components/media/MediaForm/index.vue";
@@ -240,10 +240,14 @@ export default {
         const sortOrder = sorter
           .filter((s) => s.order)
           .map(({ columnKey, order }) => {
+            // Keys must match the backend AssetSortEnum fields exactly
+            // (asset.py sort_field_map), otherwise the sort is silently
+            // dropped — previously this sent ASSET_TYPE / OWNER, which the
+            // backend does not recognise (it expects ASSET_TYPE_ID / OWNER_ID).
             const fieldMap = {
               name: "NAME",
-              asset_type_id: "ASSET_TYPE",
-              owner_id: "OWNER",
+              asset_type_id: "ASSET_TYPE_ID",
+              owner_id: "OWNER_ID",
               copyrightLevel: "COPYRIGHT_LEVEL",
               size: "SIZE",
               created_on: "CREATED_ON",
@@ -299,6 +303,7 @@ export default {
       searchInput,
       result,
       capitalize,
+      compareByLabel,
       visibleDropzone,
       onVisibleDropzone,
       clearFilters,
@@ -359,12 +364,14 @@ export default {
                   :loading="loading"
                   :options="
                     result
-                      ? result.users.map((e) => {
-                          return {
-                            value: e.username,
-                            label: e.displayName || e.username,
-                          };
-                        })
+                      ? result.users
+                          .map((e) => {
+                            return {
+                              value: e.username,
+                              label: e.displayName || e.username,
+                            };
+                          })
+                          .sort(compareByLabel)
                       : []
                   "
                 >
@@ -397,6 +404,7 @@ export default {
                             value: e.name,
                             label: capitalize(e.name),
                           }))
+                          .sort(compareByLabel)
                       : []
                   "
                 >
@@ -412,10 +420,12 @@ export default {
                   :loading="loading"
                   :options="
                     result
-                      ? result.getAllStages.map((e) => ({
-                          value: e.id,
-                          label: e.name,
-                        }))
+                      ? result.getAllStages
+                          .map((e) => ({
+                            value: e.id,
+                            label: e.name,
+                          }))
+                          .sort(compareByLabel)
                       : []
                   "
                 >
@@ -430,10 +440,12 @@ export default {
                   :loading="loading"
                   :options="
                     result
-                      ? result.tags.map((e) => ({
-                          value: e.name,
-                          label: e.name,
-                        }))
+                      ? result.tags
+                          .map((e) => ({
+                            value: e.name,
+                            label: e.name,
+                          }))
+                          .sort(compareByLabel)
                       : []
                   "
                 ></a-select>
