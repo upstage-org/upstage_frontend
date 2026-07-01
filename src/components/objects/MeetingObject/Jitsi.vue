@@ -8,6 +8,8 @@ import { isIOS } from "utils/common";
 import { playMediaElement, retryPlayOnUserGesture } from "@utils/mediaPlayback";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
+import { useStreamFreezeDetector } from "./useStreamFreezeDetector";
+import { useStreamFreezeReporter } from "./useStreamFreezeReporter";
 
 export default {
   components: { AppObject, Loading, AvatarContextMenu },
@@ -83,9 +85,23 @@ export default {
       if (aTracks.find((t) => t.stream.active)) return aTracks.find((t) => t.stream.active);
       return aTracks[0];
     });
-    const loadTrack = () => {
+
+    // Viewer-side freeze detection + reporting. The detector watches the
+    // <video> for stalled frames; the reporter forwards a freeze/recovery to
+    // the publisher over MQTT (no-op for our own tiles / audio-only tiles).
+    const hasVideo = computed(() => !!videoTrack.value);
+    const { frozen } = useStreamFreezeDetector(videoEl, hasVideo);
+    useStreamFreezeReporter(() => props.object, frozen);
+    const loadTrack = (force = false) => {
       if (tracks.value.length) {
         try {
+          // `force` (explicit user "Refresh streams" click) detaches then
+          // re-attaches even when the same MediaStream is already bound —
+          // this resets a stuck decoder that is holding a frozen last frame.
+          // Every implicit caller (mount, tracks/participant watch, gentle
+          // reload watch, 3s poll) leaves `force` false so the idempotent
+          // guard below still prevents the whole-board flicker.
+          //
           // Idempotent attach: only (re)attach when the element isn't
           // already showing this track's stream. After a successful
           // lib-jitsi-meet `attach`, `el.srcObject` IS the track's
@@ -99,10 +115,17 @@ export default {
           // attach (srcObject null), a track swap (different stream), and
           // a fresh element after remount all still attach because the
           // equality check fails in those cases.
+          if (force && videoTrack.value && videoEl.value) {
+            try {
+              videoTrack.value.detach(videoEl.value);
+            } catch (e) {
+              console.warn("Force-detaching video track:", e);
+            }
+          }
           if (
             videoTrack.value &&
             videoEl.value &&
-            videoEl.value.srcObject !== videoTrack.value.stream
+            (force || videoEl.value.srcObject !== videoTrack.value.stream)
           ) {
             videoTrack.value.attach(videoEl.value);
             // Mirror the `disablePictureInPicture` HTML attribute as
@@ -117,11 +140,18 @@ export default {
             // and its watcher.
             videoEl.value.disablePictureInPicture = true;
           }
+          if (force && audioTrack.value && !audioTrack.value.isLocal() && audioEl.value) {
+            try {
+              audioTrack.value.detach(audioEl.value);
+            } catch (e) {
+              console.warn("Force-detaching audio track:", e);
+            }
+          }
           if (
             audioTrack.value &&
             !audioTrack.value.isLocal() &&
             audioEl.value &&
-            audioEl.value.srcObject !== audioTrack.value.stream
+            (force || audioEl.value.srcObject !== audioTrack.value.stream)
           ) {
             audioTrack.value.attach(audioEl.value);
           }
@@ -161,12 +191,26 @@ export default {
     // stage and `stageStore.addTrack(t)` fires synchronously after
     // `await room.addTrack(t)` resolves). `flush: "post"` ensures Vue
     // has applied the conditional swap before we read `videoEl.value`.
-    onMounted(loadTrack);
-    watch(tracks, loadTrack, { flush: "post" });
+    onMounted(() => loadTrack());
+    // Wrap in an arrow: a bare `loadTrack` here would receive the watcher's
+    // (newVal, oldVal) args, making `force` truthy and re-detaching on every
+    // tracks change — the exact whole-board flicker the idempotent guard
+    // exists to prevent.
+    watch(tracks, () => loadTrack(), { flush: "post" });
     watch(
       () => props.object.participantId,
       () => loadTrack(),
       { flush: "post" },
+    );
+
+    // Explicit user "Refresh streams" click: force a detach + re-attach to
+    // reset a stuck decoder. Separate from the gentle `reloadStreams` watch
+    // above so only the button (not automatic page-wake) bypasses the guard.
+    watch(
+      () => stageStore.forceReloadStreams,
+      (val) => {
+        if (val) loadTrack(true);
+      },
     );
 
     // Independent of track attach: any time the <video> ref settles on

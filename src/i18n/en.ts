@@ -277,4 +277,7 @@ export default {
   refresh_meeting_tooltip: "Reload the embedded meeting if it failed to load",
   refresh_streams: "Refresh streams",
   refresh_streams_tooltip: "Retry attaching individual video streams on stage",
+  frozen_viewers: "Frozen for {count} viewer(s)",
+  frozen_viewers_tooltip:
+    "Some viewers have stopped receiving your stream. Click Refresh streams to try to recover it.",
 };

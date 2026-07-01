@@ -5,6 +5,7 @@ import { animate } from "animejs";
 import Popover from "components/Popover.vue";
 import Session from "./Session.vue";
 import ReloadStream from "./ReloadStream.vue";
+import FrozenViewersBadge from "./FrozenViewersBadge.vue";
 import RecordingControl from "components/stage/RecordingControl.vue";
 
 defineProps<{
@@ -30,9 +31,7 @@ const audiences = computed(() => stageStore.audiences);
 const masquerading = computed<boolean>(() => stageStore.masquerading);
 const replaying = inject<boolean>("replaying", false);
 const canPlay = computed(() => stageStore.canPlay);
-const hasSessionHistory = computed(
-  () => players.value.length > 0 || audiences.value.length > 0,
-);
+const hasSessionHistory = computed(() => players.value.length > 0 || audiences.value.length > 0);
 
 onMounted(() => {
   nextTick(() => {
@@ -52,6 +51,7 @@ onMounted(() => {
   <div id="connection-status" :class="{ 'in-top-bar': inTopBar }">
     <RecordingControl v-if="!replaying && canPlay" />
     <ReloadStream v-if="!replaying" />
+    <FrozenViewersBadge v-if="!replaying" />
     <span
       class="tag is-light is-small"
       :class="{
