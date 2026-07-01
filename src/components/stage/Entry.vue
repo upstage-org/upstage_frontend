@@ -22,7 +22,7 @@ const coverImage = (src) => (src ? absolutePath(src) : `/img/${props.fallbackCov
       {{ stage.name }}
     </div>
     <img class="cover" :src="coverImage(stage.cover)" lazy />
-    <PlayerAudienceCounter :stage-url="stage.fileLocation" class="counter" />
+    <PlayerAudienceCounter :players="stage.players" :audiences="stage.audiences" class="counter" />
   </router-link>
 </template>
 

@@ -158,7 +158,7 @@ const onVisibleDropzone = () => {
           allow-clear
           show-arrow
           :filter-option="handleFilterOwnerName"
-          mode="tags"
+          mode="multiple"
           style="min-width: 124px"
           placeholder="Owners"
           :loading="loading"
@@ -190,7 +190,7 @@ const onVisibleDropzone = () => {
           allow-clear
           show-arrow
           filter-option
-          mode="tags"
+          mode="multiple"
           style="min-width: 128px"
           placeholder="Media types"
           :loading="loading"
@@ -212,7 +212,7 @@ const onVisibleDropzone = () => {
           allow-clear
           show-arrow
           :filter-option="handleFilterStageName"
-          mode="tags"
+          mode="multiple"
           style="min-width: 160px"
           placeholder="Stages assigned"
           :loading="loading"
@@ -232,7 +232,7 @@ const onVisibleDropzone = () => {
           v-model:value="tags"
           allow-clear
           show-arrow
-          mode="tags"
+          mode="multiple"
           style="min-width: 160px"
           placeholder="Tags"
           :loading="loading"

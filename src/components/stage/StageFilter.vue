@@ -192,7 +192,7 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
           allow-clear
           show-arrow
           :filter-option="handleFilterOwnerName"
-          mode="tags"
+          mode="multiple"
           style="min-width: 124px"
           placeholder="Owners"
           :loading="loading"
