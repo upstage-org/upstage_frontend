@@ -185,7 +185,9 @@ export default {
         !data.src fallback below) at toolbox/Depth size.
       -->
       <div v-else-if="data.type === 'meeting'" class="skeleton-meta">
-        <Icon src="meeting-room.svg" size="36" />
+        <!-- Same 36x48 as the Meeting panel tile (Meeting/index.vue) so the
+             icon reads identically in the Depth list and the toolbox. -->
+        <Icon src="meeting-room.svg" :width="36" :height="48" />
         <span class="tag is-light is-block stream-key">{{ data.name }}</span>
       </div>
       <div v-else-if="!data.src" class="skeleton-meta">
@@ -227,6 +229,11 @@ export default {
   max-height: 100%;
   overflow: hidden;
   gap: 2px;
+  // Reserve the strip the absolute .stream-key label sits on, so the label
+  // never overlays the icon above it (it was covering the lower half of the
+  // meeting icon's stalks in the Depth list). Applied unconditionally —
+  // label or not — so all skeleton-meta icons stay at the same height.
+  padding-bottom: 20px;
 }
 
 .skeleton {

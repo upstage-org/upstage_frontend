@@ -49,7 +49,6 @@ import Curtain from "./tools/CurtainTool.vue";
 import Scenes from "./tools/Scenes/index.vue";
 
 export default {
-  props: { tool: String },
   components: {
     Icon,
     Avatars,
@@ -66,6 +65,7 @@ export default {
     Scenes,
     Whiteboard,
   },
+  props: { tool: String },
   setup(props) {
     const bar = ref();
     const panel = ref();
@@ -390,6 +390,15 @@ export default {
           background-color: transparent;
         }
       }
+    }
+
+    /* The Text tool's control tiles host pop-out UI (font dropdown menu,
+       colour picker) that must escape the 100px tile box; the generic
+       `overflow: hidden` above (needed to crop media thumbnails) was
+       clipping the font dropdown so it looked dead. Control tiles have
+       no thumbnail to crop, so visible overflow is safe here. */
+    > div.text-tool {
+      overflow: visible;
     }
   }
 }

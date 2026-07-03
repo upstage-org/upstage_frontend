@@ -16,8 +16,11 @@ export default {
     const stageSize = computed(() => stageStore.stageSize);
     const isWriting = computed(() => stageStore.preferences.isWriting);
     const options = stageStore.preferences.text;
+    // Web-safe system fonts plus the open-source webfonts loaded via the
+    // Google Fonts @imports in styles/custom.less (keep both in sync).
     const fontFamilies = [
       "Josefin Sans",
+      // Web-safe / system fonts
       "Arial",
       "Times New Roman",
       "Helvetica",
@@ -38,7 +41,8 @@ export default {
       "Brush Script MT",
       "Lucida Bright",
       "Copperplate",
-      "Roboto", // Opensource fonts
+      // Opensource fonts (custom.less batch 1)
+      "Roboto",
       "Open Sans",
       "Lato",
       "Roboto Condensed",
@@ -59,7 +63,56 @@ export default {
       "Asap",
       "Overpass",
       "Abril Fatface",
-    ];
+      // Opensource fonts (custom.less batch 2: sans / serif / mono)
+      "Amatic SC",
+      "Barlow",
+      "Bitter",
+      "Cabin",
+      "Caveat",
+      "Cinzel",
+      "Comfortaa",
+      "Cormorant Garamond",
+      "Crimson Text",
+      "Dancing Script",
+      "EB Garamond",
+      "Inconsolata",
+      "Inter",
+      "Kalam",
+      "Karla",
+      "Libre Baskerville",
+      "Merriweather",
+      "Montserrat",
+      "Nunito",
+      "Orbitron",
+      "Quicksand",
+      "Raleway",
+      "Source Code Pro",
+      "Work Sans",
+      "Zilla Slab",
+      // Opensource fonts (custom.less batch 3: display / handwriting)
+      "Alfa Slab One",
+      "Architects Daughter",
+      "Audiowide",
+      "Bangers",
+      "Chewy",
+      "Courgette",
+      "Creepster",
+      "Fredericka the Great",
+      "Great Vibes",
+      "Homemade Apple",
+      "Indie Flower",
+      "Luckiest Guy",
+      "Monoton",
+      "Patrick Hand",
+      "Permanent Marker",
+      "Press Start 2P",
+      "Righteous",
+      "Rock Salt",
+      "Satisfy",
+      "Shadows Into Light",
+      "Special Elite",
+      "VT323",
+    ].sort((a, b) => a.localeCompare(b));
     const changeFontSize = (value) => {
       options.fontSize = value.replace(/^\D+/g, "") + "px";
     };
