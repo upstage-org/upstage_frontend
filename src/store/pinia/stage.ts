@@ -2164,13 +2164,17 @@ export const useStageStore = defineStore(
       }
       if (isStreamPlaybackBoardType(object.type)) {
         object.hostId = session.value;
-        // Start playing as soon as the video is placed on stage so the
-        // performer doesn't have to right-click -> Play to start every
-        // newly-dragged clip. The user can still toggle pause/play via the
-        // avatar context menu (ContextMenuAvatar.vue play/pause actions).
-        if (object.isPlaying === undefined) {
-          object.isPlaying = true;
-        }
+        // Never auto-play a freshly placed video. Placement starts paused so
+        // the performer can size/position it and light the bulb first; the
+        // ONLY thing that starts playback is the object's own Play tool
+        // (ContextMenuAvatar.vue playVideo). Forcing `false` (rather than
+        // defaulting undefined -> true as before) also guards against a
+        // stale `isPlaying` riding in on the drag payload: with a truthy
+        // value in the store, ANY later board update (e.g. dropping a
+        // meeting or stream tile) re-runs Object.vue's synchronize() inside
+        // a fresh user gesture and a previously blocked play() suddenly
+        // succeeds — an unlit video would appear to start on its own.
+        object.isPlaying = false;
         try {
           const description = JSON.parse(data.description ?? "");
           if (description.w && description.h) object.h = (description.h * 100) / description.w;
@@ -2844,15 +2848,24 @@ export const useStageStore = defineStore(
       SET_SETTING_POPUP(setting);
     }
 
+    // Saving a new drawing/text places it on stage directly (no drag), so
+    // auto-focus the moveable the same way Board.vue's drop handler does:
+    // the very next step is always "adjust it, then light the bulb", and
+    // without this the creator had to click the fresh object before its
+    // frame/slider/buttons appeared. NB: for drawings the caller must leave
+    // drawing mode BEFORE calling addDrawing — autoFocusMoveable refuses
+    // while `preferences.isDrawing` is true (see Draw/index.vue save()).
     function addDrawing(drawing: Drawing) {
       PUSH_DRAWING(drawing);
-      placeObjectOnStage(drawing as Partial<BoardObject>);
+      const placed = placeObjectOnStage(drawing as Partial<BoardObject>);
+      autoFocusMoveable(placed.id);
     }
 
     function addText(text: TextEntity) {
       text.type = "text";
       PUSH_TEXT(text);
-      placeObjectOnStage(text as Partial<BoardObject>);
+      const placed = placeObjectOnStage(text as Partial<BoardObject>);
+      autoFocusMoveable(placed.id);
     }
 
     function handleReactionMessage({ message }: { message: unknown }) {

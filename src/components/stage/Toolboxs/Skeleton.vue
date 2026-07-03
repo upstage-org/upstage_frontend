@@ -86,7 +86,12 @@ export default {
         holder: props.data.holder,
       });
     const showMovable = () => {
-      if (props.real && (!props.data.holder || !holdable.value || isLocalHolder())) {
+      // Holdable objects (avatars) may only get the manipulation frame when
+      // THIS player holds them — an unheld avatar must not be movable from a
+      // Depth-list hover any more than from an on-stage click (hold first,
+      // then manipulate). Non-holdable objects (props/streams/etc.) keep the
+      // hover frame whenever nobody-relevant blocks it.
+      if (props.real && (holdable.value ? isLocalHolder() : true)) {
         stageStore.SET_ACTIVE_MOVABLE(props.data.id);
       }
     };
@@ -174,8 +179,13 @@ export default {
           data.name
         }}</span>
       </div>
+      <!--
+        Meetings get their own multi-stalk antenna so they read differently
+        from individual streams (single-stalk meeting.svg, used by the
+        !data.src fallback below) at toolbox/Depth size.
+      -->
       <div v-else-if="data.type === 'meeting'" class="skeleton-meta">
-        <Icon src="meeting.svg" size="36" />
+        <Icon src="meeting-room.svg" size="36" />
         <span class="tag is-light is-block stream-key">{{ data.name }}</span>
       </div>
       <div v-else-if="!data.src" class="skeleton-meta">

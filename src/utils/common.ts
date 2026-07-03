@@ -61,7 +61,8 @@ export function isHoldableBoardObject(obj: { type?: unknown } | null | undefined
 }
 
 /**
- * True when this browser tab is the holder of `object` (green teardrop).
+ * True when this browser tab is the holder of `object` (red teardrop;
+ * other players see grey).
  * Uses `localAvatarId` first — set synchronously on claim — then falls back
  * to matching the MQTT session row so multi-tab logins stay distinct per tab.
  */

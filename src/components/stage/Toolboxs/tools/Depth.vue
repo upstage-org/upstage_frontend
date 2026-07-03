@@ -64,11 +64,12 @@ export default {
   height: 16px;
 }
 
+/* Same mapping as Topping.vue: red = my hold, grey = another player's. */
 .current-avatar--mine {
-  filter: hue-rotate(88deg) saturate(1.15) brightness(0.92);
+  filter: none;
 }
 
 .current-avatar--taken {
-  filter: none;
+  filter: grayscale(1) brightness(1.15);
 }
 </style>

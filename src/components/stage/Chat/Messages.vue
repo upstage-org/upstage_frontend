@@ -15,13 +15,17 @@ export default {
   },
   setup: () => {
     const isChatStandalone = inject("isChatStandalone", false);
+    const replaying = inject("replaying", false);
     const stageStore = useStageStore();
     const messageClass = {
       think: "has-text-info has-background-info-light",
       shout: "has-text-danger",
       highlighted: "has-background-warning",
     };
-    const canPlay = computed(() => stageStore.canPlay);
+    // Replay-aware like Chat/index.vue: remove/highlight are moderation
+    // actions that broadcast to the LIVE stage over MQTT, so they must not
+    // be reachable from inside a recording.
+    const canPlay = computed(() => stageStore.canPlay && !replaying);
     const session = computed(() => stageStore.session);
 
     const time = (value) => {
@@ -45,7 +49,16 @@ export default {
       }
     };
 
-    return { messageClass, time, removeChat, highlightChat, canPlay, session, isChatStandalone };
+    return {
+      messageClass,
+      time,
+      removeChat,
+      highlightChat,
+      canPlay,
+      session,
+      isChatStandalone,
+      replaying,
+    };
   },
 };
 </script>
@@ -100,7 +113,11 @@ export default {
               </span>
             </div>
           </template>
-          <template v-if="canPlay || session === item.session" #context="{ closeMenu }">
+          <!-- "own message" delete is also live-only: no actions in a recording. -->
+          <template
+            v-if="canPlay || (!replaying && session === item.session)"
+            #context="{ closeMenu }"
+          >
             <div class="panel-block">
               <span>
                 <Linkify>{{ item.message }}</Linkify>

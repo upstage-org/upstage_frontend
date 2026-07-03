@@ -207,6 +207,20 @@ export const useDrawable = () => {
     // touchmove regardless of pointer handlers.
     canvas.style.touchAction = "none";
 
+    // Real-device hardening (emulated touch never hits this): several
+    // WebKit builds (iPadOS Safari in particular) still hand the touch to
+    // the native scroll/zoom/system-gesture recognizer even with
+    // `touch-action: none`, which fires `pointercancel` after the first
+    // point — the reported "dots, not lines" on tablets. Explicitly
+    // consuming the raw touch events (non-passive, so preventDefault is
+    // honoured) stops the native gesture pipeline before it can steal the
+    // stroke; pointer events still fire normally and drive the drawing.
+    const stopNativeTouch = (e: TouchEvent) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    canvas.addEventListener("touchstart", stopNativeTouch, { passive: false });
+    canvas.addEventListener("touchmove", stopNativeTouch, { passive: false });
+
     canvas.addEventListener("pointerdown", (e) => {
       // Only respond to the primary contact. Multi-touch (e.g. a
       // second finger landing mid-stroke) is ignored to avoid the
