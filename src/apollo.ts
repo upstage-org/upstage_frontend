@@ -131,6 +131,14 @@ const authLink = setContext((request, { headers }) => {
 // Cache implementation
 export const inquiryVar = makeVar({});
 export const editingMediaVar = makeVar<Media | undefined>(undefined);
+/**
+ * Opens the StreamFeedForm modal (RTMP stream feeds — see /root/streaming2):
+ * `{mode:"create"}` for a new feed, `{mode:"info", media}` to show the
+ * ingest panel of an existing stream asset. `undefined` = closed.
+ */
+export const streamFeedVar = makeVar<
+  { mode: "create" } | { mode: "info"; media: Media } | undefined
+>(undefined);
 const cache = new InMemoryCache({
   typePolicies: {
     Query: {
@@ -143,6 +151,11 @@ const cache = new InMemoryCache({
         editingMedia: {
           read() {
             return editingMediaVar();
+          },
+        },
+        streamFeed: {
+          read() {
+            return streamFeedVar();
           },
         },
       },

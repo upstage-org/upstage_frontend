@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 import { gql } from "@apollo/client/core";
 import { computed, reactive, watch, provide, inject, Ref, ComputedRef, onMounted } from "vue";
-import { editingMediaVar, inquiryVar } from "apollo";
+import { editingMediaVar, inquiryVar, streamFeedVar } from "apollo";
 import configs from "config";
 import { permissionFragment } from "models/fragment";
 import { Media, MediaAttributes, StudioGraph, UploadFile } from "models/studio";
@@ -369,6 +369,18 @@ const filterTag = (tag: string) => {
             <a-button type="primary" @click="editMedia(record as Media)">
               <EditOutlined />
               Edit
+            </a-button>
+            <!-- RTMP feeds: reopen the ingest panel (server URL + signed key). -->
+            <a-button
+              v-if="
+                configs.RTMP_ENDPOINT &&
+                record.assetType?.name === 'stream' &&
+                record.owner.username === whoami?.username
+              "
+              @click="streamFeedVar({ mode: 'info', media: record as Media })"
+            >
+              <VideoCameraOutlined />
+              {{ $t("stream_info") }}
             </a-button>
             <a :href="absolutePath(record.fileLocation)" :download="record.name">
               <a-button>

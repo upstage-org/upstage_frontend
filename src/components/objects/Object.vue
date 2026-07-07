@@ -11,6 +11,7 @@ import {
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
+import LiveStreamPlayer from "./LiveStream/LiveStreamPlayer.vue";
 import OpacitySlider from "./OpacitySlider.vue";
 import QuickAction from "./QuickAction.vue";
 import Topping from "./Topping.vue";
@@ -20,6 +21,7 @@ export default {
   components: {
     AppImage,
     ContextMenu,
+    LiveStreamPlayer,
     OpacitySlider,
     QuickAction,
     Topping,
@@ -164,7 +166,9 @@ export default {
     watch(
       () => props.object.replayed,
       () => {
-        video.value.currentTime = 0;
+        // Live RTMP tiles render via LiveStreamPlayer and never set this
+        // ref; a live feed has no seekable timeline to restart anyway.
+        if (video.value) video.value.currentTime = 0;
       },
     );
     const loadeddata = () => {
@@ -288,9 +292,15 @@ export default {
               patching of HTMLMediaElement doesn't leave the
               attribute set in the DOM but unread by the engine.
             -->
+            <!--
+              Live RTMP feed (stream asset with a bare MediaMTX key —
+              `isRTMP` is only ever set for those, so every pre-existing
+              object type falls through to the branches below unchanged).
+            -->
+            <LiveStreamPlayer v-if="object.isRTMP" :object="object" />
             <!-- eslint-disable-next-line vue/no-mutating-props -->
             <video
-              v-if="
+              v-else-if="
                 isStreamPlaybackBoardType(object.type) ||
                 isStreamPlaybackBoardType(object.assetType?.name)
               "

@@ -592,23 +592,6 @@ const stageOps = {
       `,
       { id: String(id) },
     ),
-  getStreamSign: (key) =>
-    studioClient
-      .request(
-        gql`
-          query StreamSign($key: String) {
-            assetList(fileLocation: $key) {
-              edges {
-                node {
-                  sign
-                }
-              }
-            }
-          }
-        `,
-        { key },
-      )
-      .then((response) => response.assetList.edges[0]?.node?.sign),
   getSearchOption: () =>
     studioClient.request(gql`
       {

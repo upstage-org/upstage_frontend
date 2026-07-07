@@ -38,6 +38,7 @@ import {
   cloneDeep,
   isHoldableBoardObject,
   isJitsiBoardType,
+  isRtmpStreamDescription,
   isStreamPlaybackBoardType,
   posterJpgForVideoUrl,
   randomColor,
@@ -822,7 +823,16 @@ export const useStageStore = defineStore(
             }
             if (assetName === "video") {
               const loc = (item.fileLocation ?? item.src ?? "") as string;
-              item.url = absolutePath(loc);
+              // Live RTMP feeds (stream assets with a bare MediaMTX key) carry
+              // isRTMP in their description JSON; they play via
+              // LiveStreamPlayer, not a /resources/<key> URL (which would 404).
+              // Uploaded VoD clips take the exact same path as before.
+              if (isRtmpStreamDescription(item.description)) {
+                item.isRTMP = true;
+                item.url = "";
+              } else {
+                item.url = absolutePath(loc);
+              }
             } else {
               if (item.description) {
                 const meta = JSON.parse(item.description);

@@ -6,6 +6,9 @@ VITE_MQTT_ENDPOINT=ws://localhost:9001
 VITE_MQTT_USERNAME=performance
 VITE_MQTT_PASSWORD=
 VITE_JITSI_ENDPOINT=http://localhost/
+# MediaMTX playback origin for RTMP stream feeds (streaming2). Leave unset to
+# hide all RTMP features.
+VITE_RTMP_ENDPOINT=
 VITE_CLOUDFLARE_CAPTCHA_SITEKEY=
 VITE_STRIPE_KEY=
 VITE_RELEASE_VERSION='3.0.0'

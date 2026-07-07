@@ -15,6 +15,8 @@ export interface StudioGraph {
   stages: Stage[];
   tags: Tag[];
   media: Connection<Media>;
+  /** Flat asset list (mediaList query) — includes owner-scoped `sign`. */
+  mediaList?: Media[];
   whoami: User;
   notifications: Notification[];
   voices: VoiceGraph[];

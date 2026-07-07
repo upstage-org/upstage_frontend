@@ -2,7 +2,8 @@
 import { ref, watch, watchEffect, inject, computed, onMounted } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
-import { editingMediaVar, inquiryVar } from "apollo";
+import { editingMediaVar, inquiryVar, streamFeedVar } from "apollo";
+import configs from "config";
 import { MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
 import { capitalize, compareByLabel, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
@@ -151,6 +152,14 @@ const onVisibleDropzone = () => {
           "
         >
           <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
+        </a-button>
+        <!-- RTMP stream feed (hidden unless VITE_RTMP_ENDPOINT is configured). -->
+        <a-button
+          v-if="!composingMode && configs.RTMP_ENDPOINT"
+          data-testid="new-stream-feed"
+          @click="streamFeedVar({ mode: 'create' })"
+        >
+          <VideoCameraOutlined /> {{ $t("new_stream_feed") }}
         </a-button>
         <a-input-search v-model:value="name" allow-clear class="w-48" placeholder="Search media" />
         <a-select
