@@ -13,7 +13,13 @@ export default {
     const stageStore = useStageStore();
 
     const videos = computed(() => {
-      const res = [...(stageStore.tools?.videos || [])];
+      // Live RTMP feeds render in the Streams (Meeting) tab instead — hide
+      // them here to avoid duplicates. But when enabledLiveStreaming is off
+      // that tab is hidden entirely (Toolboxs/index.vue), so keep the feeds
+      // in this strip as the fallback rather than making them unreachable.
+      const res = (stageStore.tools?.videos || []).filter(
+        (v) => !(v.isRTMP && stageStore.enabledLiveStreaming),
+      );
       return res;
     });
 

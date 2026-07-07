@@ -4,11 +4,18 @@ defineOptions({ name: "Meeting" });
 import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import Skeleton from "../../Skeleton.vue";
+import StreamToolboxThumb from "../Streams/StreamToolboxThumb.vue";
 import { computed } from "vue";
 import Yourself from "components/objects/MeetingObject/Yourself.vue";
 
 const stageStore = useStageStore();
 const rooms = computed(() => stageStore.tools.meetings);
+// RTMP feeds assigned to this stage live in the same `tools.videos` bucket as
+// uploaded clips (assetType "stream" folds into it), but they belong here in
+// the Streams tab next to Jitsi rooms. Pass the raw store item to Skeleton —
+// it carries type/isRTMP/fileLocation/description, so placement is identical
+// to the Video-tab path.
+const liveFeeds = computed(() => (stageStore.tools.videos ?? []).filter((v) => v.isRTMP));
 
 const createRoom = () => {
   stageStore.openSettingPopup({
@@ -36,10 +43,24 @@ const createRoom = () => {
       <span class="tag is-light is-block">{{ room.name }}</span>
     </div>
   </Skeleton>
+  <Skeleton v-for="feed in liveFeeds" :key="feed.id ?? feed.url" :data="feed">
+    <div class="room-skeleton">
+      <div class="live-feed-box">
+        <StreamToolboxThumb :video="feed" />
+      </div>
+      <span class="tag is-light is-block">{{ feed.name }}</span>
+    </div>
+  </Skeleton>
 </template>
 
 <style lang="scss" scoped>
 .room-skeleton {
   flex: none;
+}
+
+.live-feed-box {
+  width: 76px;
+  height: 48px;
+  margin: 0 auto;
 }
 </style>
