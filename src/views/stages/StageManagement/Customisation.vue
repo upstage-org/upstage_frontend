@@ -15,6 +15,7 @@ import buildClient from "services/mqtt";
 import { namespaceTopic } from "store/modules/stage/reusable";
 import { TOPICS } from "utils/constants";
 import { coerceNumber } from "utils/common";
+import { REMOVAL_ANIMATION_OPTIONS } from "components/stage/removalAnimations";
 
 export default {
   components: { Selectable, SaveButton, HorizontalField, Dropdown, AppSwitch, ColorPicker },
@@ -31,6 +32,8 @@ export default {
         curtain: "drop",
         bubbleSpeed: 1800,
         curtainSpeed: 9100,
+        removal: "spiral",
+        removalSpeed: 1000,
       },
       defaultcolor: "#30AC45",
       enabledLiveStreaming: true,
@@ -38,7 +41,17 @@ export default {
     };
 
     const selectedRatio = reactive(config.ratio);
-    const animations = reactive(config.animations);
+    // Seed defaults first so stages whose saved config predates a key show
+    // real values instead of blank fields; saved values win via the spread.
+    const animations = reactive({
+      bubble: "fade",
+      curtain: "drop",
+      bubbleSpeed: 1800,
+      curtainSpeed: 9100,
+      removal: "spiral",
+      removalSpeed: 1000,
+      ...(config.animations ?? {}),
+    });
     const defaultcolor = ref(config.defaultcolor || "#30AC45");
     const enabledLiveStreaming = ref(config.enabledLiveStreaming ?? true);
     // Which transports "Live Streaming" enables: Jitsi rooms, RTMP feeds, or
@@ -106,6 +119,7 @@ export default {
       saving,
       saveCustomisation,
       animations,
+      removalOptions: REMOVAL_ANIMATION_OPTIONS,
       capitalize,
       defaultcolor,
       sendBackdropColor,
@@ -181,6 +195,29 @@ export default {
                   :value="5000 / animations.curtainSpeed"
                   type="range"
                   @change="animations.curtainSpeed = 5000 / $event.target.value"
+                />
+                <span class="ml-2">{{ $t("fast") }}</span>
+              </div>
+            </HorizontalField>
+            <HorizontalField title="Removal effect">
+              <Dropdown
+                v-model="animations.removal"
+                :data="removalOptions"
+                :render-value="(item) => item.value"
+                :render-label="(item) => item.label"
+              />
+            </HorizontalField>
+            <HorizontalField title="Speed">
+              <div class="speed-slider">
+                <span class="mr-2">{{ $t("slow") }}</span>
+                <input
+                  class="slider is-fullwidth"
+                  step="0.01"
+                  min="0.1"
+                  max="1"
+                  :value="1000 / animations.removalSpeed"
+                  type="range"
+                  @change="animations.removalSpeed = 1000 / $event.target.value"
                 />
                 <span class="ml-2">{{ $t("fast") }}</span>
               </div>
