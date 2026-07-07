@@ -10,8 +10,7 @@ import Switch from "components/form/Switch.vue";
 import Loading from "components/Loading.vue";
 import dayjs from "@utils/dayjs";
 import humanizeDuration from "humanize-duration";
-import { COLORS } from "utils/constants";
-import { useClearStage } from "./composable";
+import { BACKGROUND_ACTIONS, COLORS } from "utils/constants";
 
 const { t } = useI18n();
 const stageStore = useStageStore();
@@ -45,12 +44,44 @@ const startRecording = async (complete: () => void) => {
   if (!model.value?.id || !form.name.trim() || !model.value.fileLocation) return;
   loading.value = true;
   try {
-    if (clearOnStart.value) {
-      const clearStage = useClearStage(model.value.fileLocation, COLORS.DEFAULT_BACKDROP);
-      await clearStage();
-    }
     await startMutation(t("recording_started"), model.value.id, form.name.trim());
+    // Both branches publish INSIDE the recording window (i.e. after the
+    // mutation) so the replay's first events establish its opening state.
+    // Previously the "clear" ran before the mutation (outside the window)
+    // and only reset the backdrop colour — the stage was never actually
+    // cleared, and the replay always began blank regardless of the toggle.
+    if (clearOnStart.value) {
+      // Genuinely clear the live stage: empty board (BLANK_SCENE), reset
+      // the backdrop colour (BLANK_SCENE alone keeps the current colour
+      // when the stage has no configured default), and raise any curtain.
+      // The replay opens on the same cleared stage the live audience sees.
+      stageStore.blankScene();
+      stageStore.setBackdropColor(stageStore.config?.defaultcolor || COLORS.DEFAULT_BACKDROP);
+      stageStore.drawCurtain(null);
+    } else {
+      // Keep the stage as-is: snapshot the current state (objects, texts,
+      // drawings, background colour, curtain…) into the event stream so
+      // the replay opens on exactly what was on stage.
+      stageStore.publishRecordingSnapshot();
+    }
     await stageStore.loadStage({ url: model.value.fileLocation! });
+    if (clearOnStart.value) {
+      // loadStage rebuilds local state from ARCHIVED events; the blank/
+      // curtain broadcasts above may not be archived yet, which would
+      // resurrect the pre-clear stage on the recorder's own screen (other
+      // players clear fine via the broker echo). Re-apply the clear
+      // locally — identical to receiving the echo, and idempotent with it.
+      stageStore.handleBackgroundMessage({ message: { type: BACKGROUND_ACTIONS.BLANK_SCENE } });
+      stageStore.handleBackgroundMessage({
+        message: {
+          type: BACKGROUND_ACTIONS.SET_BACKDROP_COLOR,
+          color: stageStore.config?.defaultcolor || COLORS.DEFAULT_BACKDROP,
+        },
+      });
+      stageStore.handleBackgroundMessage({
+        message: { type: BACKGROUND_ACTIONS.DRAW_CURTAIN, curtain: null },
+      });
+    }
     stageStore.refreshLiveStatus();
     complete();
   } finally {
