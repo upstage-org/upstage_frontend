@@ -40,6 +40,9 @@ export const BACKGROUND_ACTIONS = {
   SWITCH_SCENE: "switchScene",
   BLANK_SCENE: "blankScene",
   SET_DARK_MODE_CHAT: "setDarkModeChat",
+  // Full stage-state snapshot written into the event stream at recording
+  // start so a saved recording is self-contained (replay-only; ignored live).
+  RECORDING_SNAPSHOT: "recordingSnapshot",
 };
 
 export const DRAW_ACTIONS = {

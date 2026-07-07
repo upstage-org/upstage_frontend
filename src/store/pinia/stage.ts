@@ -53,6 +53,7 @@ import {
   recalcFontSize,
   serializeForBroadcast,
   serializeObject,
+  takeSnapshotFromStage,
 } from "@stores/modules/stage/reusable";
 import { unnamespaceTopic } from "@utils/mqttTopics";
 import { computeFinalJitsiObjectsFromEvents } from "@utils/jitsiBoardReconcile";
@@ -2698,6 +2699,21 @@ export const useStageStore = defineStore(
     }
 
     /**
+     * Write the current stage state (scene payload + curtain, which scene
+     * snapshots don't carry) into the event stream. Published once, right
+     * after startRecording opens the recording window, so the recording's
+     * first event reconstructs what was on stage. Applied on replay only —
+     * see the RECORDING_SNAPSHOT case in handleBackgroundMessage.
+     */
+    function publishRecordingSnapshot() {
+      mqtt.sendMessage(TOPICS.BACKGROUND, {
+        type: BACKGROUND_ACTIONS.RECORDING_SNAPSHOT,
+        payload: takeSnapshotFromStage(),
+        curtain: curtain.value,
+      });
+    }
+
+    /**
      * Background topic envelope. Each `type` carries a small distinct
      * payload (visible/enabled/color/etc.); fields are all optional, and
      * each case site reads only the ones it expects.
@@ -2713,6 +2729,8 @@ export const useStageStore = defineStore(
       // both via a legacy-string adapter.
       curtain?: Curtain | string | null;
       scene?: ObjectId;
+      // RECORDING_SNAPSHOT: serialized scene payload (takeSnapshotFromStage).
+      payload?: string | null;
     }
 
     function handleBackgroundMessage({ message }: { message: BackgroundMessage }) {
@@ -2762,6 +2780,20 @@ export const useStageStore = defineStore(
           });
           break;
         }
+        case BACKGROUND_ACTIONS.RECORDING_SNAPSHOT:
+          // Published by the recorder right after startRecording so the
+          // saved event slice is self-contained: without it a replay
+          // starts from a blank stage because everything placed BEFORE
+          // the recording window lives in older events the slice never
+          // sees. Live clients already hold this exact state (it was
+          // snapshotted from the live event stream), so applying it
+          // outside a replay would only risk re-mounting board objects —
+          // notably live jitsi tiles. Hence replay-only.
+          if (replay.value.isReplaying) {
+            REPLACE_SCENE({ payload: message.payload ?? null });
+            SET_CURTAIN(message.curtain ?? null);
+          }
+          break;
         default:
           break;
       }
@@ -3730,6 +3762,7 @@ export const useStageStore = defineStore(
       loadScenes,
       switchScene,
       blankScene,
+      publishRecordingSnapshot,
       handleBackgroundMessage,
       updateAudioStatus,
       handleAudioMessage,
