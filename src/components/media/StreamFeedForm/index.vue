@@ -33,7 +33,7 @@ function generateStreamKey(): string {
 }
 
 const { result: streamFeedResult } = useQuery<{
-  streamFeed: { mode: "create" } | { mode: "info"; media: Media } | undefined;
+  streamFeed: { mode: "create" } | { mode: "info"; media: Media } | null | undefined;
 }>(gql`
   {
     streamFeed @client

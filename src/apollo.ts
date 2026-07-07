@@ -150,12 +150,20 @@ const cache = new InMemoryCache({
         },
         editingMedia: {
           read() {
-            return editingMediaVar();
+            // Same `?? null` contract as streamFeed below: undefined would make
+            // Apollo emit `{}` and vue-apollo would keep the stale media in
+            // consumers' results (Dropzone could mistake an upload for a file
+            // replacement after the edit form closed).
+            return editingMediaVar() ?? null;
           },
         },
         streamFeed: {
           read() {
-            return streamFeedVar();
+            // `?? null` matters: a read returning undefined makes Apollo emit
+            // an empty `{}` result, which @vue/apollo-composable interprets as
+            // "keep the previous result" — so the StreamFeedForm modal could
+            // never observe the var being cleared and stayed open forever.
+            return streamFeedVar() ?? null;
           },
         },
       },
