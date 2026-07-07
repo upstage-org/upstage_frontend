@@ -15,7 +15,14 @@
 import Hls from "hls.js";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { connectWhep, hlsUrlForKey, StreamOfflineError, type WhepConnection } from "./whepClient";
+import {
+  connectWhep,
+  hlsStreamHasAudio,
+  hlsUrlForKey,
+  opusMirrorKey,
+  StreamOfflineError,
+  type WhepConnection,
+} from "./whepClient";
 
 const props = defineProps<{
   object: {
@@ -29,6 +36,13 @@ const { t } = useI18n();
 
 const OFFLINE_RETRY_MS = 5000;
 const WHEP_TRACK_TIMEOUT_MS = 4000;
+// A WHEP session with no audio may mean MediaMTX dropped an AAC track
+// (WebRTC can't carry AAC and MediaMTX doesn't transcode — the default
+// for OBS/RTMP encoders). The HLS manifest tells us whether the source
+// really has audio; it can lag a couple of seconds behind stream start,
+// hence the re-check loop instead of a single probe.
+const AUDIO_PROBE_ATTEMPTS = 4;
+const AUDIO_PROBE_INTERVAL_MS = 2500;
 
 const video = ref<HTMLVideoElement>();
 const state = ref<"connecting" | "live" | "waiting">("connecting");
@@ -106,7 +120,18 @@ function waitForTrack(connection: WhepConnection): Promise<void> {
 }
 
 async function tryWhep(key: string): Promise<void> {
-  const connection = await connectWhep(key);
+  let connection: WhepConnection;
+  try {
+    // The Opus mirror is the WebRTC-audible twin of the feed (the raw
+    // feed's AAC audio can't ride WebRTC).
+    connection = await connectWhep(opusMirrorKey(key));
+  } catch (mirrorError) {
+    if (!(mirrorError instanceof StreamOfflineError)) throw mirrorError;
+    // Mirror not up (transcoder still warming up, or a server without
+    // it) — read the raw feed; the audio checks below reroute audible
+    // AAC feeds to HLS so they aren't left silent.
+    connection = await connectWhep(key);
+  }
   whep = connection;
   await waitForTrack(connection);
   if (disposed || !video.value) {
@@ -114,9 +139,23 @@ async function tryWhep(key: string): Promise<void> {
     whep = null;
     return;
   }
+  if (!connection.hasAudio && (await hlsStreamHasAudio(key))) {
+    // The source has audio but WHEP dropped it (AAC over WebRTC).
+    // Throwing sends connect() down its existing HLS fallback path,
+    // which carries the AAC audio at the cost of a little latency.
+    console.info(
+      "[stage] live stream audio can't ride WebRTC (AAC source); playing via HLS instead",
+    );
+    throw new Error("WHEP session has no audio for an audible source");
+  }
   video.value.srcObject = connection.stream;
   state.value = "live";
   applyPlayState();
+  if (!connection.hasAudio) {
+    // Manifest may not exist yet right after the publisher starts;
+    // keep checking briefly so an audible feed still ends up on HLS.
+    probeForLateAudio(key, connection);
+  }
   connection.pc.addEventListener("connectionstatechange", () => {
     if (
       whep === connection &&
@@ -127,6 +166,23 @@ async function tryWhep(key: string): Promise<void> {
       teardown().then(scheduleRetry);
     }
   });
+}
+
+async function probeForLateAudio(key: string, connection: WhepConnection): Promise<void> {
+  for (let attempt = 0; attempt < AUDIO_PROBE_ATTEMPTS; attempt++) {
+    await new Promise((resolve) => window.setTimeout(resolve, AUDIO_PROBE_INTERVAL_MS));
+    if (disposed || whep !== connection) return;
+    if (await hlsStreamHasAudio(key)) {
+      if (disposed || whep !== connection) return;
+      // Reconnect from scratch rather than jumping straight to HLS: the
+      // fresh attempt prefers the Opus mirror (WebRTC latency, with
+      // sound) and only lands on HLS if the mirror still isn't up.
+      console.info("[stage] live stream audio became available; reconnecting for sound");
+      await teardown();
+      await connect();
+      return;
+    }
+  }
 }
 
 function tryHls(key: string): Promise<void> {
@@ -234,7 +290,11 @@ onBeforeUnmount(() => {
 .the-object-video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  // fill, not cover: cover crops whatever doesn't fit the tile (users saw
+  // the top of the feed chopped off). The tile resizes freely (Moveable
+  // exempts isRTMP from keepRatio), so the performer shapes the tile and
+  // the video stretches to match in each axis independently.
+  object-fit: fill;
   display: block;
   background: #000;
 }

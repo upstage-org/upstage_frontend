@@ -122,7 +122,11 @@ export default {
           moveable.setState(
             {
               target: el.value,
-              keepRatio: !["text", "meeting"].includes(props.object.type),
+              // Live RTMP tiles resize freely: the tile's shape is the
+              // performer's framing tool (the <video> uses object-fit: fill),
+              // so locking the ratio would force the initial drop shape on
+              // every feed regardless of the source's real aspect.
+              keepRatio: !["text", "meeting"].includes(props.object.type) && !props.object.isRTMP,
             },
             () => {
               if (e && props.object.type !== "text") {

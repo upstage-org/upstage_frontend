@@ -21,6 +21,13 @@ export interface WhepConnection {
   /** Remote A/V; assign to `video.srcObject`. Tracks may arrive after resolve. */
   stream: MediaStream;
   pc: RTCPeerConnection;
+  /**
+   * Whether the WHEP answer accepted our audio m-line. False when the feed's
+   * audio codec can't ride WebRTC — RTMP encoders (OBS etc.) send AAC, which
+   * WebRTC doesn't support and MediaMTX doesn't transcode, so such feeds are
+   * video-only over WHEP even though HLS carries their sound fine.
+   */
+  hasAudio: boolean;
   /** Tear down the WHEP session (DELETE) and close the peer connection. */
   close: () => Promise<void>;
 }
@@ -29,8 +36,38 @@ export function whepEndpointForKey(key: string): string {
   return `${configs.RTMP_ENDPOINT}/live/${encodeURIComponent(key)}/whep`;
 }
 
+/**
+ * MediaMTX mirrors each feed to `live/<key>-opus` with the audio transcoded
+ * AAC→Opus (see /root/streaming2/mediamtx.yml runOnReady) — the
+ * WebRTC-playable twin of the raw feed, since WebRTC can't carry the AAC
+ * that RTMP encoders send. WHEP playback prefers the mirror; the raw feed
+ * and HLS remain as fallbacks for the mirror's warm-up window or a server
+ * without the transcoder.
+ */
+export function opusMirrorKey(key: string): string {
+  return `${key}-opus`;
+}
+
 export function hlsUrlForKey(key: string): string {
   return `${configs.RTMP_ENDPOINT}/live/${encodeURIComponent(key)}/index.m3u8`;
+}
+
+/**
+ * Whether the feed's HLS multivariant playlist advertises an audio codec
+ * (CODECS="...,mp4a.40.2" for the AAC that RTMP encoders send). Used to
+ * decide if a WHEP session that came up video-only dropped real audio
+ * (→ worth falling back to HLS) or the source simply has no sound.
+ * Best-effort: any fetch/parse failure reads as "no audio detected".
+ */
+export async function hlsStreamHasAudio(key: string): Promise<boolean> {
+  try {
+    const response = await fetch(hlsUrlForKey(key));
+    if (!response.ok) return false;
+    const manifest = await response.text();
+    return /mp4a|opus|ac-3|ec-3/i.test(manifest);
+  } catch {
+    return false;
+  }
 }
 
 const ICE_GATHER_TIMEOUT_MS = 1500;
@@ -111,5 +148,12 @@ export async function connectWhep(key: string): Promise<WhepConnection> {
     throw error;
   }
 
-  return { stream, pc, close };
+  // After the answer is applied, a rejected audio m-line leaves its
+  // transceiver "inactive"; an accepted one is "recvonly" (we offered
+  // recvonly, so no other active state is possible).
+  const hasAudio = pc
+    .getTransceivers()
+    .some((t) => t.receiver.track?.kind === "audio" && t.currentDirection === "recvonly");
+
+  return { stream, pc, hasAudio, close };
 }
