@@ -34,12 +34,19 @@ export default {
       },
       defaultcolor: "#30AC45",
       enabledLiveStreaming: true,
+      streamingMode: "both",
     };
 
     const selectedRatio = reactive(config.ratio);
     const animations = reactive(config.animations);
     const defaultcolor = ref(config.defaultcolor || "#30AC45");
     const enabledLiveStreaming = ref(config.enabledLiveStreaming ?? true);
+    // Which transports "Live Streaming" enables: Jitsi rooms, RTMP feeds, or
+    // both. Legacy configs predate the field, and their enabled state always
+    // meant both, so default accordingly.
+    const streamingMode = ref(
+      ["jitsi", "rtmp", "both"].includes(config.streamingMode) ? config.streamingMode : "both",
+    );
 
     const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
     const saveCustomisation = async () => {
@@ -48,6 +55,7 @@ export default {
         animations,
         defaultcolor: defaultcolor.value,
         enabledLiveStreaming: enabledLiveStreaming.value,
+        streamingMode: streamingMode.value,
       });
       await save(
         () => {
@@ -102,6 +110,7 @@ export default {
       defaultcolor,
       sendBackdropColor,
       enabledLiveStreaming,
+      streamingMode,
       setRatioWidth,
       setRatioHeight,
     };
@@ -184,10 +193,23 @@ export default {
           <h3 class="title">{{ $t("live_streaming") }}</h3>
         </td>
         <td>
-          <AppSwitch
-            v-model="enabledLiveStreaming"
-            :label="enabledLiveStreaming ? 'Enabled' : 'Disabled'"
-          />
+          <div class="streaming-controls">
+            <AppSwitch
+              v-model="enabledLiveStreaming"
+              :label="enabledLiveStreaming ? 'Enabled' : 'Disabled'"
+            />
+            <Dropdown
+              v-if="enabledLiveStreaming"
+              v-model="streamingMode"
+              :data="[
+                { value: 'both', label: 'Jitsi + RTMP' },
+                { value: 'jitsi', label: 'Jitsi only' },
+                { value: 'rtmp', label: 'RTMP only' },
+              ]"
+              :render-value="(item) => item.value"
+              :render-label="(item) => item.label"
+            />
+          </div>
         </td>
       </tr>
       <tr>
@@ -314,6 +336,12 @@ export default {
 .speed-slider {
   display: flex;
   align-items: center;
+}
+
+.streaming-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .title {

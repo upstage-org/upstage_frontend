@@ -9,13 +9,18 @@ import { computed } from "vue";
 import Yourself from "components/objects/MeetingObject/Yourself.vue";
 
 const stageStore = useStageStore();
-const rooms = computed(() => stageStore.tools.meetings);
+// The stage's streaming mode (Customisation page) picks which halves of this
+// tab exist: Jitsi rooms/self-preview, RTMP feeds, or both.
+const jitsiEnabled = computed(() => stageStore.jitsiStreamingEnabled);
+const rooms = computed(() => (jitsiEnabled.value ? stageStore.tools.meetings : []));
 // RTMP feeds assigned to this stage live in the same `tools.videos` bucket as
 // uploaded clips (assetType "stream" folds into it), but they belong here in
 // the Streams tab next to Jitsi rooms. Pass the raw store item to Skeleton —
 // it carries type/isRTMP/fileLocation/description, so placement is identical
 // to the Video-tab path.
-const liveFeeds = computed(() => (stageStore.tools.videos ?? []).filter((v) => v.isRTMP));
+const liveFeeds = computed(() =>
+  stageStore.rtmpStreamingEnabled ? (stageStore.tools.videos ?? []).filter((v) => v.isRTMP) : [],
+);
 
 const createRoom = () => {
   stageStore.openSettingPopup({
@@ -25,13 +30,13 @@ const createRoom = () => {
 </script>
 
 <template>
-  <div class="is-pulled-left room-skeleton" @click="createRoom">
+  <div v-if="jitsiEnabled" class="is-pulled-left room-skeleton" @click="createRoom">
     <div class="icon is-large">
       <Icon src="new.svg" size="36" />
     </div>
     <span class="tag is-light is-block">{{ $t("new_room") }}</span>
   </div>
-  <Yourself />
+  <Yourself v-if="jitsiEnabled" />
   <Skeleton v-for="(room, i) in rooms" :key="i" :data="room">
     <div class="room-skeleton">
       <!--

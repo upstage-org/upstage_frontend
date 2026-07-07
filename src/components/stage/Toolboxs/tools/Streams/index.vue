@@ -14,11 +14,11 @@ export default {
 
     const videos = computed(() => {
       // Live RTMP feeds render in the Streams (Meeting) tab instead — hide
-      // them here to avoid duplicates. But when enabledLiveStreaming is off
-      // that tab is hidden entirely (Toolboxs/index.vue), so keep the feeds
-      // in this strip as the fallback rather than making them unreachable.
+      // them here to avoid duplicates. But when RTMP streaming is off (tab
+      // hidden entirely, or streaming mode is Jitsi-only) keep the feeds in
+      // this strip as the fallback rather than making them unreachable.
       const res = (stageStore.tools?.videos || []).filter(
-        (v) => !(v.isRTMP && stageStore.enabledLiveStreaming),
+        (v) => !(v.isRTMP && stageStore.rtmpStreamingEnabled),
       );
       return res;
     });

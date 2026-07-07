@@ -119,7 +119,7 @@ export function useLocalStreamPublisher(
   };
 
   const publishingAllowed = (): boolean =>
-    Boolean(stageStore.canPlay) && Boolean(stageStore.enabledLiveStreaming);
+    Boolean(stageStore.canPlay) && Boolean(stageStore.jitsiStreamingEnabled);
 
   const publishLocalTracksToRoom = async () => {
     if (!joined.value || !jitsi?.room) return;
@@ -408,7 +408,7 @@ export function useLocalStreamPublisher(
   // on `tracks.length === 0`. WebRTC track lifecycle must NOT be tied
   // to MQTT status. The legitimate release paths are already covered:
   //   * `onUnmounted` below (route teardown).
-  //   * The `publishingAllowed` watcher (canPlay / enabledLiveStreaming
+  //   * The `publishingAllowed` watcher (canPlay / jitsiStreamingEnabled
   //     flipping off mid-session).
   //   * The board-state watcher above (own-jitsi tile removed from board).
 

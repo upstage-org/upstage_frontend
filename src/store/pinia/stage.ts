@@ -14,6 +14,7 @@
  *   • `_config` (ref) / `config` (computed)
  *   • `_reloadStreams` (ref) / `reloadStreams` (computed)
  *   • `_enabledLiveStreaming` (ref) / `enabledLiveStreaming` (computed)
+ *   • `_streamingMode` (ref) / `streamingMode` (computed)
  *
  * State/getter ↔ action collisions (action renamed; the state/getter
  * keeps the original name):
@@ -304,12 +305,16 @@ export interface AudioPlayer {
   [k: string]: unknown;
 }
 
+/** Which live-streaming transports a stage enables while streaming is on. */
+export type StreamingMode = "jitsi" | "rtmp" | "both";
+
 export interface StageConfig {
   animateDuration: number;
   reactionDuration: number;
   ratio: number;
   defaultcolor?: string;
   enabledLiveStreaming?: boolean;
+  streamingMode?: StreamingMode;
   [k: string]: unknown;
 }
 
@@ -582,6 +587,13 @@ export const useStageStore = defineStore(
     const _meetingRefreshKey = ref(0);
     const _enabledLiveStreaming = ref<boolean>(true);
     /**
+     * Which transports the Live Streaming customisation enables — only
+     * meaningful while `_enabledLiveStreaming` is true. Legacy configs
+     * predate the field and their enabled state always covered both
+     * Jitsi and RTMP, so absent/unknown values fold into "both".
+     */
+    const _streamingMode = ref<StreamingMode>("both");
+    /**
      * Standalone `/chat/:url` connects to the same MQTT stream as the live
      * stage but renders only chat — avatar meSpeak would otherwise play on
      * each audience device (e.g. many phones in a hybrid room).
@@ -764,6 +776,15 @@ export const useStageStore = defineStore(
     );
 
     const enabledLiveStreaming = computed(() => _enabledLiveStreaming.value);
+    const streamingMode = computed(() => _streamingMode.value);
+    /** Jitsi rooms/publishing available (streaming on, mode covers Jitsi). */
+    const jitsiStreamingEnabled = computed(
+      () => _enabledLiveStreaming.value && _streamingMode.value !== "rtmp",
+    );
+    /** RTMP feeds surfaced in the Streams tab (streaming on, mode covers RTMP). */
+    const rtmpStreamingEnabled = computed(
+      () => _enabledLiveStreaming.value && _streamingMode.value !== "jitsi",
+    );
 
     // ====================================================================
     // MUTATIONS
@@ -878,6 +899,7 @@ export const useStageStore = defineStore(
           | (Record<string, unknown> & {
               ratio?: { width: number; height: number };
               enabledLiveStreaming?: boolean;
+              streamingMode?: string;
               defaultcolor?: string;
             })
           | null;
@@ -888,6 +910,10 @@ export const useStageStore = defineStore(
           }
           _enabledLiveStreaming.value =
             typeof cfg?.enabledLiveStreaming === "boolean" ? cfg.enabledLiveStreaming : true;
+          _streamingMode.value =
+            cfg?.streamingMode === "jitsi" || cfg?.streamingMode === "rtmp"
+              ? cfg.streamingMode
+              : "both";
         }
         // Match Stage Management default (#30AC45): new stages often have no
         // saved config yet, so do not leave backdropColor on CLEAN_STAGE's "gray".
@@ -3649,6 +3675,7 @@ export const useStageStore = defineStore(
       _forceReloadStreams,
       _meetingRefreshKey,
       _enabledLiveStreaming,
+      _streamingMode,
       // getters (computed views)
       ready,
       url,
@@ -3672,6 +3699,9 @@ export const useStageStore = defineStore(
       meetingRefreshKey,
       activeObject,
       enabledLiveStreaming,
+      streamingMode,
+      jitsiStreamingEnabled,
+      rtmpStreamingEnabled,
       // mutations (UPPER_SNAKE_CASE)
       SET_MODEL,
       CLEAN_STAGE,

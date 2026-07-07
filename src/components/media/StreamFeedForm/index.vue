@@ -19,6 +19,7 @@ import { computed, inject, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { MEDIA_FORM_META_QUERY, MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
 import StageAssignment from "../MediaForm/StageAssignment.vue";
+import { apolloErrorText } from "../MediaForm/composable";
 
 const { t } = useI18n();
 
@@ -141,7 +142,22 @@ async function create() {
     refresh();
     await fetchSign(streamKey.value);
   } catch (error: any) {
-    message.error(error?.message ?? String(error));
+    const text = apolloErrorText(error);
+    // A save whose response was lost mid-flight (network change) still
+    // creates the asset server-side, so the retry trips the duplicate-key
+    // guard. If the "duplicate" is actually our own feed (its sign is
+    // owner-scoped, so a non-empty sign means we own it), recover by
+    // showing its ingest panel instead of a dead-end error.
+    if (/already existed/i.test(text)) {
+      await fetchSign(streamKey.value);
+      if (sign.value) {
+        message.success(t("stream_feed_created"));
+        savedKey.value = streamKey.value;
+        refresh();
+        return;
+      }
+    }
+    message.error(text);
   } finally {
     saving.value = false;
   }
@@ -174,6 +190,7 @@ function close() {
   >
     <!-- Phase 1: create form -->
     <a-form v-if="!savedKey && mode === 'create'" layout="vertical">
+      <p class="mb-3">{{ t("stream_feed_intro") }}</p>
       <a-form-item :label="t('stream_feed_name')" required>
         <a-input v-model:value="name" :maxlength="100" data-testid="stream-feed-name" />
       </a-form-item>
