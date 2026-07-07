@@ -204,6 +204,10 @@ export default {
           stageStore.deleteObject(o);
         });
     };
+
+    // Removes every placed text object from the stage; the saved texts stay
+    // in this strip for re-placing (unlike delete permanently).
+    const clearAll = () => stageStore.clearStageObjectsOfKind("text");
     onUnmounted(() => {
       const topbar = document.querySelector("#topbar");
       if (topbar) topbar.style.overflow = "auto";
@@ -226,6 +230,7 @@ export default {
       savedTexts,
       fontDropdownOpen,
       deleteTextPermanently,
+      clearAll,
     };
   },
 };
@@ -249,6 +254,12 @@ export default {
     </p>
   </section>
   <template v-if="!isWriting">
+    <div @click="clearAll">
+      <div class="icon is-large">
+        <Icon size="36" src="clear.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("clear") }}</span>
+    </div>
     <div class="text-tool" @click="createText">
       <div class="icon is-large">
         <Icon size="36" src="new.svg" />

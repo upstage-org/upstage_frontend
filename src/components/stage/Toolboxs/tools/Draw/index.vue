@@ -64,7 +64,12 @@ export default {
         });
     };
 
+    // Removes every placed drawing object from the stage; the saved
+    // drawings stay in this strip for re-placing (unlike delete permanently).
+    const clearAll = () => stageStore.clearStageObjectsOfKind("drawing");
+
     return {
+      clearAll,
       isDrawing,
       drawings,
       color,
@@ -176,6 +181,12 @@ export default {
     </div>
   </template>
   <template v-else>
+    <div @click="clearAll">
+      <div class="icon is-large">
+        <Icon size="36" src="clear.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("clear") }}</span>
+    </div>
     <div class="is-pulled-left" @click="create">
       <div class="icon is-large">
         <Icon src="new.svg" size="36" />

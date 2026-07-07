@@ -2462,6 +2462,43 @@ export const useStageStore = defineStore(
       }
     }
 
+    /**
+     * Kind predicates for the per-toolbox "clear all from stage" tiles
+     * (the first-position tile mirroring the Backdrops clear). Type strings
+     * are case-folded because GraphQL `assetType.name` arrives capitalized
+     * (e.g. "Avatar"/"Prop") and placeObjectOnStage only folds the
+     * stream/jitsi synonyms. `isRTMP` splits live RTMP feeds (Streams tab)
+     * from uploaded clips (Video tab): both land as board type "video".
+     */
+    const foldBoardType = (o: BoardObject) => `${o.type ?? ""}`.trim().toLowerCase();
+    const STAGE_CLEAR_PREDICATES: Record<string, (o: BoardObject) => boolean> = {
+      avatar: (o) => isHoldableBoardObject(o),
+      prop: (o) => foldBoardType(o) === "prop",
+      stream: (o) =>
+        isJitsiBoardType(o.type) ||
+        foldBoardType(o) === "meeting" ||
+        (isStreamPlaybackBoardType(o.type) && o.isRTMP === true),
+      video: (o) => isStreamPlaybackBoardType(o.type) && o.isRTMP !== true,
+      drawing: (o) => !!o.drawingId,
+      text: (o) => !!o.textId || foldBoardType(o) === "text",
+    };
+
+    /**
+     * Remove every placed board object of one kind from the stage, for
+     * everyone. Loops the existing single-object delete so all its
+     * side-effects apply per object: own-hold release, costume detach,
+     * jitsi track pruning, reconcileAvatarHolds, and a broadcast DESTROY
+     * for published/jitsi objects (bulb-off objects stay a local removal,
+     * same as deleting them one by one). Library entries (drawings, texts,
+     * media) are untouched — objects can be re-placed afterwards.
+     */
+    function clearStageObjectsOfKind(kind: keyof typeof STAGE_CLEAR_PREDICATES) {
+      const predicate = STAGE_CLEAR_PREDICATES[kind];
+      if (!predicate) return;
+      // Snapshot first: deleteObject reassigns board.value.objects per call.
+      board.value.objects.filter(predicate).forEach((o) => deleteObject(o));
+    }
+
     function switchFrame(object: BoardObject) {
       UPDATE_OBJECT(serializeObject(object));
       if (object.liveAction) {
@@ -3781,6 +3818,7 @@ export const useStageStore = defineStore(
       reconcileJitsiBoardFromEvents,
       shapeObject,
       deleteObject,
+      clearStageObjectsOfKind,
       switchFrame,
       sendToBack,
       bringToFront,

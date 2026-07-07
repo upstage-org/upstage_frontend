@@ -27,9 +27,19 @@ const createRoom = () => {
     type: "CreateRoom",
   });
 };
+
+// Removes every placed live tile from the stage — jitsi streams, meeting
+// rooms and RTMP feeds (everything placeable from this tab).
+const clearAll = () => stageStore.clearStageObjectsOfKind("stream");
 </script>
 
 <template>
+  <div class="room-skeleton" @click="clearAll">
+    <div class="icon is-large">
+      <Icon size="36" src="clear.svg" />
+    </div>
+    <span class="tag is-light is-block">{{ $t("clear") }}</span>
+  </div>
   <div v-if="jitsiEnabled" class="is-pulled-left room-skeleton" @click="createRoom">
     <div class="icon is-large">
       <Icon src="new.svg" size="36" />

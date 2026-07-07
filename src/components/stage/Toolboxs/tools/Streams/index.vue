@@ -1,11 +1,13 @@
 <script>
 import { computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import Icon from "components/Icon.vue";
 import Skeleton from "../../Skeleton.vue";
 import StreamToolboxThumb from "./StreamToolboxThumb.vue";
 
 export default {
   components: {
+    Icon,
     Skeleton,
     StreamToolboxThumb,
   },
@@ -23,14 +25,25 @@ export default {
       return res;
     });
 
+    // Removes every placed video-clip object from the stage (live RTMP
+    // tiles belong to the Streams tab's clear instead).
+    const clearAll = () => stageStore.clearStageObjectsOfKind("video");
+
     return {
       videos,
+      clearAll,
     };
   },
 };
 </script>
 
 <template>
+  <div @click="clearAll">
+    <div class="icon is-large">
+      <Icon size="36" src="clear.svg" />
+    </div>
+    <span class="tag is-light is-block">{{ $t("clear") }}</span>
+  </div>
   <div v-for="video in videos" :key="video.id ?? video.url">
     <Skeleton :data="video">
       <StreamToolboxThumb :video="video" />
