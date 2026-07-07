@@ -9,7 +9,10 @@ const hasMeeting = computed(() => objects.value.some((el) => el.type === "meetin
 const hasJitsi = computed(() => objects.value.some((el) => isJitsiBoardType(el.type)));
 const hasMeetingOrJitsi = computed(() => hasMeeting.value || hasJitsi.value);
 
-const onReloadStreams = () => stageStore.triggerReloadStreams();
+// Explicit user click ⇒ force path: re-publishes / re-attaches even when the
+// tracks look "healthy", so a frozen (but not disconnected) stream actually
+// recovers instead of no-opping. The automatic page-wake reload stays gentle.
+const onReloadStreams = () => stageStore.triggerForceReloadStreams();
 const onRefreshMeeting = () => stageStore.refreshMeeting();
 </script>
 

@@ -7,6 +7,7 @@ import { gql } from "@apollo/client/core";
 import { ref, watchEffect, PropType, inject, ComputedRef, watch } from "vue";
 import { editingMediaVar } from "apollo";
 import configs from "config";
+import { compareByLabel } from "utils/common";
 import { Media, StudioGraph } from "models/studio";
 import { useConfirmPermission } from "./composable";
 
@@ -95,10 +96,12 @@ watch(isAdmin, console.log);
       <a-select
         :options="
           result
-            ? (result.users.map((e: any) => ({
-                value: e.username,
-                label: e.displayName || e.username,
-              })) as any)
+            ? (result.users
+                .map((e: any) => ({
+                  value: e.username,
+                  label: e.displayName || e.username,
+                }))
+                .sort(compareByLabel) as any)
             : []
         "
         style="min-width: 124px"

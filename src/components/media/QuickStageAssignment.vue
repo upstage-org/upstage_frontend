@@ -4,6 +4,7 @@ import { message } from "ant-design-vue";
 import { gql } from "@apollo/client/core";
 import { computed, inject, PropType, ref, watch } from "vue";
 import { Media, AssignedStage } from "models/studio";
+import { compareByLabel } from "utils/common";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 import MediaPreview from "./MediaPreview.vue";
@@ -136,10 +137,12 @@ const handleOk = async () => {
         :loading="loading"
         :options="
           dataSource
-            ? dataSource.map((e: any) => ({
-                value: e.id,
-                label: e.name,
-              }))
+            ? dataSource
+                .map((e: any) => ({
+                  value: e.id,
+                  label: e.name,
+                }))
+                .sort(compareByLabel)
             : []
         "
       >

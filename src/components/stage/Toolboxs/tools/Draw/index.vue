@@ -39,6 +39,10 @@ export default {
     };
     const save = (type) => {
       const area = getDrawedArea();
+      // Leave drawing mode BEFORE placing: addDrawing auto-focuses the new
+      // object's moveable frame, and autoFocusMoveable is a no-op while
+      // `preferences.isDrawing` is still true.
+      cancel();
       if (area) {
         const drawingId = uuidv4();
         const commands = [...history];
@@ -49,7 +53,6 @@ export default {
           drawingId,
         });
       }
-      cancel();
     };
 
     const deleteDrawingPermanently = (drawing) => {

@@ -24,8 +24,8 @@ export default {
     const holderPresent = computed(
       () => canPlay.value && isHoldableBoardObject(props.object) && Boolean(props.object.holder),
     );
-    // Green teardrop on this tab when we hold the avatar; red when someone else
-    // holds it so other players know they cannot claim it.
+    // Red teardrop on this tab when we hold the avatar; grey when another
+    // player holds it so everyone else knows they cannot claim it.
     const isHolding = computed(() =>
       holderPresent.value
         ? isLocalHoldOfBoardObject(props.object, {
@@ -162,6 +162,9 @@ export default {
     });
 
     const shouldShowBubble = computed(() => {
+      // Only holdable objects (avatars) speak. Stream tiles are props now and
+      // must never render a speech bubble, even from stale `speak` data.
+      if (!isHoldableBoardObject(props.object)) return false;
       if (!props.object.speak?.message) return false;
 
       const isReplayMode = window.location.pathname.includes("/replay/");
@@ -245,13 +248,18 @@ export default {
   left: -12px;
 }
 
-/* Icon SVG is red (#DB3737); shift hue for "I hold this" (green). */
+/*
+  Icon SVG is red (#DB3737). Red = "you hold this" — the holder must NEVER
+  see grey on their own avatar. Grey = held by a different player. (The old
+  mapping hue-rotated "mine" to a murky green that read as grey at 16px and
+  left "taken" red — exactly inverted from what players expect.)
+*/
 .marker--mine {
-  filter: hue-rotate(88deg) saturate(1.15) brightness(0.92);
+  filter: none;
 }
 
 .marker--taken {
-  filter: none;
+  filter: grayscale(1) brightness(1.15);
 }
 
 .bubble.shout {

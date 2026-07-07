@@ -236,7 +236,12 @@ export function useLocalStreamPublisher(
     }
   };
 
-  const republishLocalTracks = async () => {
+  // Re-entrancy guard for republish. The remove+add loop is async; a second
+  // republish firing mid-flight (e.g. rapid Refresh clicks) would race the
+  // conference into "Cannot add second track". One at a time.
+  let republishing = false;
+
+  const republishLocalTracks = async (force = false) => {
     if (!joined.value || !jitsi?.room || tracks.length === 0) return;
     // Recovery is only meaningful when the publish has actually dropped. If we
     // still hold live, published tracks there is nothing to re-send, and the
@@ -244,24 +249,39 @@ export function useLocalStreamPublisher(
     // "Cannot add second track". Brave funnels repeated wake/focus events here
     // via Layout's triggerReloadStreams(), so without this guard a working
     // publish gets churned until a track is permanently lost. No-op instead.
-    if (published.value && tracksAreHealthy()) return;
-    for (const t of tracks) {
-      try {
-        await jitsi.room.removeTrack(t);
-      } catch (err) {
-        console.warn("room.removeTrack failed:", err);
+    //
+    // EXCEPTION: an explicit user "Refresh streams" click (`force`) bypasses
+    // this guard. A frozen-but-not-ended track reports healthy() === true, so
+    // without the bypass the button could never recover it. remove+add of the
+    // SAME JitsiLocalTrack mints a fresh SSRC/remote track for every viewer
+    // (their idempotent-attach guard then re-attaches naturally). We do NOT
+    // re-acquire the camera here — that is the acquire-churn path the storm
+    // guards above protect against; remove+add is sufficient and never
+    // re-prompts getUserMedia.
+    if (!force && published.value && tracksAreHealthy()) return;
+    if (republishing) return;
+    republishing = true;
+    try {
+      for (const t of tracks) {
+        try {
+          await jitsi.room.removeTrack(t);
+        } catch (err) {
+          console.warn("room.removeTrack failed:", err);
+        }
+        try {
+          await jitsi.room.addTrack(t);
+          stageStore.addTrack(t);
+        } catch (err) {
+          console.warn("room.addTrack failed:", err);
+        }
       }
-      try {
-        await jitsi.room.addTrack(t);
-        stageStore.addTrack(t);
-      } catch (err) {
-        console.warn("room.addTrack failed:", err);
+      syncLocalTracksRef();
+      const myUserId = jitsi?.room?.myUserId?.();
+      if (myUserId) {
+        stageStore.ensureJitsiTileParticipantBroadcast(myUserId);
       }
-    }
-    syncLocalTracksRef();
-    const myUserId = jitsi?.room?.myUserId?.();
-    if (myUserId) {
-      stageStore.ensureJitsiTileParticipantBroadcast(myUserId);
+    } finally {
+      republishing = false;
     }
   };
 
@@ -320,6 +340,15 @@ export function useLocalStreamPublisher(
     () => stageStore.reloadStreams,
     (tick) => {
       if (tick) void republishLocalTracks();
+    },
+  );
+
+  // Explicit user "Refresh streams" click: force a republish even when the
+  // tracks look healthy, so a frozen publish is actually re-established.
+  watch(
+    () => stageStore.forceReloadStreams,
+    (tick) => {
+      if (tick) void republishLocalTracks(true);
     },
   );
 

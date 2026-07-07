@@ -36,6 +36,7 @@ import { stageGraph } from "@services/graphql";
 import {
   absolutePath,
   cloneDeep,
+  isHoldableBoardObject,
   isJitsiBoardType,
   isStreamPlaybackBoardType,
   posterJpgForVideoUrl,
@@ -503,6 +504,12 @@ export const useStageStore = defineStore(
     const viewport = ref<Viewport>({ width: 0, height: 0 });
     const sessions = ref<Session[]>([]);
     const session = ref<string | null>(null);
+    // Publisher-side aggregation of viewer freeze reports (TOPICS.STREAM_HEALTH).
+    // Keyed `${viewerSession}:${objectId}` → last-seen timestamp (ms). Only
+    // reports addressed to OUR session (`message.hostId === session`) are kept.
+    // Pruned on a timer (ageout + roster departure) so the count self-corrects.
+    const frozenViewerReports = ref<Map<string, number>>(new Map());
+    const FROZEN_REPORT_TTL_MS = 10_000;
     const REPLAY_LOOP_KEY = "upstage-replay-loop";
     const replay = ref<ReplayState>({
       timestamp: { begin: 0, end: 0, current: 0 },
@@ -561,6 +568,14 @@ export const useStageStore = defineStore(
       donationDetails: { amount: 0, date: "" },
     });
     const _reloadStreams = ref<Date | null>(null);
+    // Separate, additive signal for an EXPLICIT user-initiated "Refresh
+    // streams" click (vs. the gentle `_reloadStreams` fired on automatic
+    // page-wake). Only the force signal is allowed to bypass the publisher
+    // storm-guard and the viewer idempotent-attach flicker-guard, so a stuck
+    // (frozen but not disconnected) stream can actually be re-established
+    // without reintroducing the Brave publish-storm / whole-board flicker
+    // those guards were added to fix.
+    const _forceReloadStreams = ref<Date | null>(null);
     /** Bumped by `refreshMeeting()` to remount embedded conference iframes. */
     const _meetingRefreshKey = ref(0);
     const _enabledLiveStreaming = ref<boolean>(true);
@@ -714,6 +729,21 @@ export const useStageStore = defineStore(
 
     const audiences = computed(() => sessions.value.filter((s) => !s.isPlayer));
 
+    // Number of DISTINCT viewer sessions currently reporting at least one of
+    // our streams as frozen (drives the "Frozen for N viewers" badge). Reads
+    // the map reactively; stale entries are removed by the pruner, but we also
+    // apply the TTL here so a paused pruner can never over-count.
+    const frozenViewerCount = computed(() => {
+      const now = +new Date();
+      const viewers = new Set<string>();
+      for (const [key, at] of frozenViewerReports.value) {
+        if (now - at > FROZEN_REPORT_TTL_MS) continue;
+        const viewerSession = key.slice(0, key.lastIndexOf(":"));
+        if (viewerSession) viewers.add(viewerSession);
+      }
+      return viewers.size;
+    });
+
     const unreadPrivateMessageCount = computed(
       () =>
         chat.value.privateMessages.filter((m) => (m.at ?? 0) > lastSeenPrivateMessage.value).length,
@@ -724,6 +754,7 @@ export const useStageStore = defineStore(
     const jitsiTracks = computed(() => board.value.tracks);
 
     const reloadStreams = computed(() => _reloadStreams.value);
+    const forceReloadStreams = computed(() => _forceReloadStreams.value);
     const meetingRefreshKey = computed(() => _meetingRefreshKey.value);
 
     const activeObject = computed(() =>
@@ -810,6 +841,20 @@ export const useStageStore = defineStore(
               tools.value[key] = [];
             }
             tools.value[key].push(item);
+          });
+          // Give the asset palettes a stable alphabetical default order instead
+          // of raw GraphQL/DB order, so an author can find e.g. an avatar by
+          // name. This runs once at load; in-session drag reordering
+          // (REORDER_TOOLBOX) still applies on top and is not persisted, so
+          // nothing the user arranged is lost by sorting here. Scenes
+          // (scene_order), meetings (FIFO) and audio/video strips keep their
+          // own meaningful ordering and are intentionally excluded.
+          (["avatars", "props", "backdrops", "curtains"] as const).forEach((paletteKey) => {
+            tools.value[paletteKey]?.sort((a, b) =>
+              String(a.name ?? "").localeCompare(String(b.name ?? ""), undefined, {
+                sensitivity: "base",
+              }),
+            );
           });
         } else {
           preloading.value = false;
@@ -1668,6 +1713,10 @@ export const useStageStore = defineStore(
       _reloadStreams.value = new Date();
     }
 
+    function FORCE_RELOAD_STREAMS() {
+      _forceReloadStreams.value = new Date();
+    }
+
     function REFRESH_MEETING() {
       _meetingRefreshKey.value += 1;
     }
@@ -1737,6 +1786,42 @@ export const useStageStore = defineStore(
       }
     }
 
+    // Prune viewer freeze reports so the "Frozen for N viewers" count can never
+    // stick: drop entries older than the TTL (a viewer that crashed / lost its
+    // recovery message stops sending heartbeats) or whose viewer session has
+    // left the roster. Runs while connected; idempotent to (re)arm.
+    const FROZEN_PRUNE_INTERVAL_MS = 5_000;
+    let frozenPruneInterval: ReturnType<typeof setInterval> | null = null;
+
+    function pruneFrozenViewerReports() {
+      if (frozenViewerReports.value.size === 0) return;
+      const now = +new Date();
+      const liveSessions = new Set(sessions.value.map((s) => String(s.id)));
+      let changed = false;
+      const next = new Map(frozenViewerReports.value);
+      for (const [key, at] of next) {
+        const viewerSession = key.slice(0, key.lastIndexOf(":"));
+        if (now - at > FROZEN_REPORT_TTL_MS || !liveSessions.has(viewerSession)) {
+          next.delete(key);
+          changed = true;
+        }
+      }
+      if (changed) frozenViewerReports.value = next;
+    }
+
+    function startFrozenViewerPruner() {
+      if (frozenPruneInterval !== null) return;
+      frozenPruneInterval = setInterval(pruneFrozenViewerReports, FROZEN_PRUNE_INTERVAL_MS);
+    }
+
+    function stopFrozenViewerPruner() {
+      if (frozenPruneInterval !== null) {
+        clearInterval(frozenPruneInterval);
+        frozenPruneInterval = null;
+      }
+      frozenViewerReports.value = new Map();
+    }
+
     function connect() {
       SET_STATUS("CONNECTING");
       const client = mqtt.connect() as MqttClient | null;
@@ -1765,6 +1850,7 @@ export const useStageStore = defineStore(
           // reconnects fire 'connect' again, so re-arming here is also the
           // re-arm path post-disconnect — startHeartbeat is idempotent.
           startHeartbeat();
+          startFrozenViewerPruner();
         })();
       });
       client.on("error", (err) => {
@@ -1798,6 +1884,7 @@ export const useStageStore = defineStore(
         [TOPICS.REACTION]: { qos: 2 },
         [TOPICS.COUNTER]: { qos: 2 },
         [TOPICS.DRAW]: { qos: 2 },
+        [TOPICS.STREAM_HEALTH]: { qos: 1 },
       };
       mqtt
         .subscribe(topics)
@@ -1810,6 +1897,7 @@ export const useStageStore = defineStore(
 
     async function disconnect() {
       stopHeartbeat();
+      stopFrozenViewerPruner();
       await leaveStage();
       mqtt.disconnect();
     }
@@ -1821,6 +1909,19 @@ export const useStageStore = defineStore(
     interface MqttEnvelope {
       topic: string;
       message: unknown;
+    }
+
+    /** Viewer → performer freeze report on TOPICS.STREAM_HEALTH. */
+    interface StreamHealthMessage {
+      /** Publisher session id the report is addressed to. */
+      hostId?: string | null;
+      /** Board object id of the frozen tile. */
+      objectId?: string | number | null;
+      participantId?: string | null;
+      /** Reporting viewer's per-tab session id. */
+      viewerSession?: string | null;
+      frozen?: boolean;
+      at?: number;
     }
 
     function handleMessage({ topic, message }: MqttEnvelope) {
@@ -1848,6 +1949,9 @@ export const useStageStore = defineStore(
           break;
         case TOPICS.DRAW:
           handleDrawMessage({ message: message as DrawMessage });
+          break;
+        case TOPICS.STREAM_HEALTH:
+          handleStreamHealthMessage({ message: message as StreamHealthMessage });
           break;
         default:
           break;
@@ -2060,13 +2164,17 @@ export const useStageStore = defineStore(
       }
       if (isStreamPlaybackBoardType(object.type)) {
         object.hostId = session.value;
-        // Start playing as soon as the video is placed on stage so the
-        // performer doesn't have to right-click -> Play to start every
-        // newly-dragged clip. The user can still toggle pause/play via the
-        // avatar context menu (ContextMenuAvatar.vue play/pause actions).
-        if (object.isPlaying === undefined) {
-          object.isPlaying = true;
-        }
+        // Never auto-play a freshly placed video. Placement starts paused so
+        // the performer can size/position it and light the bulb first; the
+        // ONLY thing that starts playback is the object's own Play tool
+        // (ContextMenuAvatar.vue playVideo). Forcing `false` (rather than
+        // defaulting undefined -> true as before) also guards against a
+        // stale `isPlaying` riding in on the drag payload: with a truthy
+        // value in the store, ANY later board update (e.g. dropping a
+        // meeting or stream tile) re-runs Object.vue's synchronize() inside
+        // a fresh user gesture and a previously blocked play() suddenly
+        // succeeds — an unlit video would appear to start on its own.
+        object.isPlaying = false;
         try {
           const description = JSON.parse(data.description ?? "");
           if (description.w && description.h) object.h = (description.h * 100) / description.w;
@@ -2075,7 +2183,11 @@ export const useStageStore = defineStore(
         }
       }
       PUSH_OBJECT(serializeObject(object));
-      if (object.type === "avatar" && canPlay.value) {
+      // Case-insensitive avatar check: GraphQL `assetType.name` can arrive as
+      // "Avatar", so an exact `=== "avatar"` would occasionally skip the claim
+      // and the dropped avatar would get no teardrop. `isHoldableBoardObject`
+      // is avatar-only now (streams are props) and folds case.
+      if (isHoldableBoardObject(object) && canPlay.value) {
         useUserStore().setAvatarId(object.id);
         SET_ACTIVE_MOVABLE(null);
       }
@@ -2736,15 +2848,24 @@ export const useStageStore = defineStore(
       SET_SETTING_POPUP(setting);
     }
 
+    // Saving a new drawing/text places it on stage directly (no drag), so
+    // auto-focus the moveable the same way Board.vue's drop handler does:
+    // the very next step is always "adjust it, then light the bulb", and
+    // without this the creator had to click the fresh object before its
+    // frame/slider/buttons appeared. NB: for drawings the caller must leave
+    // drawing mode BEFORE calling addDrawing — autoFocusMoveable refuses
+    // while `preferences.isDrawing` is true (see Draw/index.vue save()).
     function addDrawing(drawing: Drawing) {
       PUSH_DRAWING(drawing);
-      placeObjectOnStage(drawing as Partial<BoardObject>);
+      const placed = placeObjectOnStage(drawing as Partial<BoardObject>);
+      autoFocusMoveable(placed.id);
     }
 
     function addText(text: TextEntity) {
       text.type = "text";
       PUSH_TEXT(text);
-      placeObjectOnStage(text as Partial<BoardObject>);
+      const placed = placeObjectOnStage(text as Partial<BoardObject>);
+      autoFocusMoveable(placed.id);
     }
 
     function handleReactionMessage({ message }: { message: unknown }) {
@@ -3090,6 +3211,49 @@ export const useStageStore = defineStore(
       }
     }
 
+    /**
+     * Ingest a viewer freeze report for one of OUR streams. `frozen:true`
+     * records/refreshes the (viewer, tile) entry; `frozen:false` clears it.
+     * Reports addressed to other performers (`hostId !== session`) are ignored.
+     */
+    function handleStreamHealthMessage({ message }: { message: StreamHealthMessage }) {
+      if (!message || !session.value) return;
+      if (message.hostId !== session.value) return;
+      const viewerSession = message.viewerSession;
+      const objectId = message.objectId;
+      if (!viewerSession || objectId == null) return;
+      const key = `${viewerSession}:${objectId}`;
+      const next = new Map(frozenViewerReports.value);
+      if (message.frozen) {
+        next.set(key, message.at ?? +new Date());
+      } else {
+        next.delete(key);
+      }
+      frozenViewerReports.value = next;
+    }
+
+    /**
+     * Viewer side: publish a freeze/recovery report for a REMOTE stream. Stamps
+     * the reporting viewer's session id + timestamp. Called from
+     * useStreamFreezeReporter (never for own tiles).
+     */
+    function reportStreamHealth(payload: {
+      hostId?: unknown;
+      objectId?: unknown;
+      participantId?: unknown;
+      frozen: boolean;
+    }) {
+      if (!session.value) return;
+      void mqtt.sendMessage(TOPICS.STREAM_HEALTH, {
+        hostId: payload.hostId,
+        objectId: payload.objectId,
+        participantId: payload.participantId,
+        frozen: payload.frozen,
+        viewerSession: session.value,
+        at: +new Date(),
+      });
+    }
+
     function handleCounterMessage({ message }: { message: Session }) {
       UPDATE_SESSIONS_COUNTER(message);
       // We deliberately do NOT mirror `message.avatarId` back onto
@@ -3374,6 +3538,20 @@ export const useStageStore = defineStore(
       RELOAD_STREAMS();
     }
 
+    /**
+     * Explicit user-initiated refresh (the "Refresh streams" button). Fires
+     * BOTH the gentle signal (so the normal idempotent attach-retry still
+     * runs) AND the force signal (which lets the publisher re-publish and the
+     * viewer detach/re-attach even when the tracks look "healthy" — the only
+     * way to recover a frozen-but-not-ended stream short of a full page
+     * reload). The automatic page-wake path keeps calling `triggerReloadStreams`
+     * (gentle only) so it never churns a working publish.
+     */
+    function triggerForceReloadStreams() {
+      RELOAD_STREAMS();
+      FORCE_RELOAD_STREAMS();
+    }
+
     /** Remount every on-stage `meeting` iframe (embedded Jitsi conference tile). */
     function refreshMeeting() {
       REFRESH_MEETING();
@@ -3426,6 +3604,7 @@ export const useStageStore = defineStore(
       purchasePopup,
       receiptPopup,
       _reloadStreams,
+      _forceReloadStreams,
       _meetingRefreshKey,
       _enabledLiveStreaming,
       // getters (computed views)
@@ -3446,6 +3625,8 @@ export const useStageStore = defineStore(
       jitsiTracks,
       liveJitsiParticipantIds,
       reloadStreams,
+      forceReloadStreams,
+      frozenViewerCount,
       meetingRefreshKey,
       activeObject,
       enabledLiveStreaming,
@@ -3602,6 +3783,8 @@ export const useStageStore = defineStore(
       removeObjectLocally,
       removeJitsiParticipantLocally,
       triggerReloadStreams,
+      triggerForceReloadStreams,
+      reportStreamHealth,
       refreshMeeting,
     };
   },

@@ -25,6 +25,8 @@ export default {
             }
             fileLocation
             cover
+            players
+            audiences
           }
         }
       `,

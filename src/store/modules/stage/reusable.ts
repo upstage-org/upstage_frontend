@@ -106,11 +106,11 @@ export function takeSnapshotFromStage() {
     audioPlayers,
     audios: tools.audios,
   });
-  tools.audios?.forEach((audio) => {
-    stageStore.updateAudioStatus({
-      ...audio,
-      isPlaying: false,
-    });
-  });
+  // Taking a snapshot must NOT mutate or broadcast live audio. Previously this
+  // stopped every track via `updateAudioStatus({ isPlaying: false })`, which
+  // publishes over MQTT (TOPICS.AUDIO) — so opening the Save-Scene dialog cut
+  // the audio for EVERY player on the stage, not just the one saving. The scene
+  // payload above already captured the current audio state, so there is nothing
+  // more to do here; leave live playback untouched for everyone.
   return payload;
 }

@@ -27,7 +27,12 @@ const createRoom = () => {
   <Yourself />
   <Skeleton v-for="(room, i) in rooms" :key="i" :data="room">
     <div class="room-skeleton">
-      <Icon src="backdrop.svg" height="48" width="36" />
+      <!--
+        Dedicated meeting icon (multi-stalk antenna) — meetings previously
+        borrowed backdrop.svg here, which made them hard to tell apart from
+        individual streams at a glance.
+      -->
+      <Icon src="meeting-room.svg" height="48" width="36" />
       <span class="tag is-light is-block">{{ room.name }}</span>
     </div>
   </Skeleton>

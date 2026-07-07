@@ -74,6 +74,8 @@ const { result, loading, refetch } = useQuery(
           description
           playerAccess
           permission
+          players
+          audiences
           lastAccess
           owner {
             username
@@ -101,12 +103,7 @@ onMounted(() => {
 watch(
   () => {
     const inquiry = inquiryResult.value?.inquiry ?? {};
-    return [
-      inquiry.name,
-      inquiry.createdBetween,
-      inquiry.owners,
-      inquiry.access,
-    ];
+    return [inquiry.name, inquiry.createdBetween, inquiry.owners, inquiry.access];
   },
   () => {
     tableParams.page = 1;
@@ -313,7 +310,8 @@ onVisibilityUpdated(handleUpdate);
             <br />
             <PlayerAudienceCounter
               v-if="column.key == 'last_access'"
-              :stage-url="record.fileLocation"
+              :players="record.players"
+              :audiences="record.audiences"
               class="counter"
             />
           </div>

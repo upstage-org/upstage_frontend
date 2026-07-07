@@ -4,7 +4,7 @@ import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
 import { editingMediaVar, inquiryVar } from "apollo";
 import { MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
-import { capitalize, getSharedAuth } from "utils/common";
+import { capitalize, compareByLabel, getSharedAuth } from "utils/common";
 import Navbar from "../Navbar.vue";
 import dayjs, { type Dayjs } from "@utils/dayjs";
 import { useUserStore } from "@stores/pinia/user";
@@ -132,7 +132,9 @@ const onVisibleDropzone = () => {
 
 <template>
   <a-affix :offset-top="0">
-    <div class="shadow rounded-xl px-4 py-2 bg-white flex justify-between items-center w-full upstage-media-toolbar">
+    <div
+      class="shadow rounded-xl px-4 py-2 bg-white flex justify-between items-center w-full upstage-media-toolbar"
+    >
       <a-space class="flex-wrap">
         <a-button v-if="composingMode" type="primary" danger @click="composingMode = false">
           <template #icon>
@@ -156,16 +158,18 @@ const onVisibleDropzone = () => {
           allow-clear
           show-arrow
           :filter-option="handleFilterOwnerName"
-          mode="tags"
+          mode="multiple"
           style="min-width: 124px"
           placeholder="Owners"
           :loading="loading"
           :options="
             result
-              ? result.users.map((e: any) => ({
-                  value: e.username,
-                  label: e.displayName || e.username,
-                }))
+              ? result.users
+                  .map((e: any) => ({
+                    value: e.username,
+                    label: e.displayName || e.username,
+                  }))
+                  .sort(compareByLabel)
               : []
           "
         >
@@ -186,7 +190,7 @@ const onVisibleDropzone = () => {
           allow-clear
           show-arrow
           filter-option
-          mode="tags"
+          mode="multiple"
           style="min-width: 128px"
           placeholder="Media types"
           :loading="loading"
@@ -198,6 +202,7 @@ const onVisibleDropzone = () => {
                     value: e.name,
                     label: capitalize(e.name),
                   }))
+                  .sort(compareByLabel)
               : []
           "
         >
@@ -207,16 +212,18 @@ const onVisibleDropzone = () => {
           allow-clear
           show-arrow
           :filter-option="handleFilterStageName"
-          mode="tags"
+          mode="multiple"
           style="min-width: 160px"
           placeholder="Stages assigned"
           :loading="loading"
           :options="
             result
-              ? result.getAllStages.map((e: any) => ({
-                  value: e.id,
-                  label: e.name,
-                }))
+              ? result.getAllStages
+                  .map((e: any) => ({
+                    value: e.id,
+                    label: e.name,
+                  }))
+                  .sort(compareByLabel)
               : []
           "
         >
@@ -225,16 +232,18 @@ const onVisibleDropzone = () => {
           v-model:value="tags"
           allow-clear
           show-arrow
-          mode="tags"
+          mode="multiple"
           style="min-width: 160px"
           placeholder="Tags"
           :loading="loading"
           :options="
             result
-              ? result.tags.map((e: any) => ({
-                  value: e.name,
-                  label: e.name,
-                }))
+              ? result.tags
+                  .map((e: any) => ({
+                    value: e.name,
+                    label: e.name,
+                  }))
+                  .sort(compareByLabel)
               : []
           "
         ></a-select>

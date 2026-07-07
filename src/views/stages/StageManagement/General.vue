@@ -6,7 +6,7 @@ import Field from "components/form/Field.vue";
 import ImagePicker from "components/form/ImagePicker.vue";
 import MultiTransferAccessColumn from "components/MultiTransferAccessColumn.vue";
 import { useRouter } from "vue-router";
-import { displayName, debounce } from "utils/common";
+import { displayName, debounce, compareByLabel } from "utils/common";
 import ClearChatInStage from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
 import DuplicateStage from "components/stage/DuplicateStage.vue";
@@ -248,6 +248,7 @@ export default {
       handleOwnerDropdownChange,
       getOwnerDisplayName,
       ownerSearchValue,
+      compareByLabel,
     };
   },
 };
@@ -402,11 +403,13 @@ export default {
               :filter-option="false"
               style="width: 300px"
               :options="
-                filteredOwnerUsers.map((user) => ({
-                  value: user.id,
-                  label: getOwnerDisplayName(user),
-                  key: user.id,
-                }))
+                filteredOwnerUsers
+                  .map((user) => ({
+                    value: user.id,
+                    label: getOwnerDisplayName(user),
+                    key: user.id,
+                  }))
+                  .sort(compareByLabel)
               "
               @search="handleOwnerSearch"
               @dropdown-visible-change="handleOwnerDropdownChange"
@@ -421,10 +424,10 @@ export default {
       <div class="field-label is-normal">
         <label class="label">{{ $t("player_access") }}</label>
         <p class="help">
-          Click a name to move access one column to the right in the first two lists. In &quot;Player
-          and edit access&quot;, click moves that person one column back to &quot;Player
-          access&quot;. Right-click a name in the second or third list to move them one column left.
-          The chevrons move everyone in the filtered list for that column at once.
+          Click a name to move access one column to the right in the first two lists. In
+          &quot;Player and edit access&quot;, click moves that person one column back to
+          &quot;Player access&quot;. Right-click a name in the second or third list to move them one
+          column left. The chevrons move everyone in the filtered list for that column at once.
         </p>
       </div>
       <div class="field-body" style="flex-wrap: wrap">

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Meeting (multi-stream room) icon. Same visual language as the individual
+  stream icon (meeting.svg) — identical broadcast-burst dashes, identical
+  stalk geometry — but with THREE vertical stalks instead of one to signal
+  "several people/streams in this one" (Helen, 2026-07-04). The dash and
+  stalk rects below are decoded verbatim from meeting.svg's path data.
+-->
+<svg width="76" height="89" viewBox="0 0 75.847218 89.280253" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g fill="#178d00">
+    <!-- three stalks (centre one identical to meeting.svg's single stalk) -->
+    <rect x="25.75" y="15.875" width="6.35" height="73.405"/>
+    <rect x="34.925" y="15.875" width="6.35" height="73.405"/>
+    <rect x="43.747" y="15.875" width="6.35" height="73.405"/>
+    <!-- broadcast burst: dash above the centre stalk -->
+    <rect x="34.925" y="7.736" width="6.35" height="5.292"/>
+    <!-- left arc, top to bottom -->
+    <rect x="16.228" y="0" width="6.35" height="5.292"/>
+    <rect x="7.056" y="7.409" width="6.703" height="5.292"/>
+    <rect x="0" y="14.817" width="6.35" height="5.292"/>
+    <rect x="7.056" y="22.225" width="6.703" height="5.292"/>
+    <rect x="16.228" y="29.633" width="6.35" height="5.292"/>
+    <!-- right arc, top to bottom -->
+    <rect x="53.269" y="0" width="6.35" height="5.292"/>
+    <rect x="62.089" y="7.409" width="6.35" height="5.292"/>
+    <rect x="69.497" y="14.817" width="6.35" height="5.292"/>
+    <rect x="62.089" y="22.225" width="6.35" height="5.292"/>
+    <rect x="53.269" y="29.633" width="6.35" height="5.292"/>
+  </g>
+</svg>

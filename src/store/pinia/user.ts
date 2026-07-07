@@ -170,11 +170,17 @@ export const useUserStore = defineStore("user", () => {
     if (id != null && !stage.canPlay) {
       return;
     }
-    avatarId.value = id;
     if (id == null) {
+      // Release BEFORE clearing local state: releaseAvatarHold reads
+      // `userStore.avatarId` to decide whether there is a hold to drop,
+      // then clears it, hides the moveable frame (SET_ACTIVE_MOVABLE)
+      // and broadcasts `avatarId: null`. Assigning `avatarId.value = null`
+      // first made it early-return, so a released avatar kept its live
+      // resize frame on this tab and other clients never saw the release.
       stage.releaseAvatarHold();
       return;
     }
+    avatarId.value = id;
     stage.syncLocalSessionAvatarHold();
     void Promise.resolve(stage.joinStage());
   };

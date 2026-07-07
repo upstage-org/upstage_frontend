@@ -318,15 +318,24 @@ export default {
           the standalone view sets isStandalone=true via provide()
           so the popped-out window doesn't show its own pop-out
           button.
+
+          Both pop-out and settings are LIVE-stage tools, so they are
+          hidden during replay: pop-out opens the live /chat/<stage>
+          window (a working live chat input inside a recording), and
+          the settings popup (nickname / chat params / download) isn't
+          even mounted by the replay layout — the button would do
+          nothing. The minimise / drag / reset buttons above stay: they
+          only reposition the viewer's own panel, like the replay
+          controls themselves.
         -->
-        <a-tooltip v-if="!isStandalone" :title="$t('pop_out_chat') || 'Pop out chat'">
+        <a-tooltip v-if="!isStandalone && !replaying" :title="$t('pop_out_chat') || 'Pop out chat'">
           <button class="chat-setting button is-rounded is-outlined" @click="popOut">
             <span class="icon">
               <Icon src="bring-to-front.svg" size="20" />
             </span>
           </button>
         </a-tooltip>
-        <a-tooltip v-if="!isStandalone" title="Settings">
+        <a-tooltip v-if="!isStandalone && !replaying" title="Settings">
           <button class="chat-setting button is-rounded is-outlined" @click="openChatSetting">
             <span class="icon">
               <Icon src="setting.svg" size="32" />

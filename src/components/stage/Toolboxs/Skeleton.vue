@@ -10,6 +10,13 @@ import { isHoldableBoardObject, isLocalHoldOfBoardObject } from "@utils/common";
 
 export default {
   components: { AppImage, Icon, SavedDrawing },
+  // The root is now <a-tooltip>, but callers (e.g. Yourself.vue) pass class /
+  // style expecting them to land on the inner `.skeleton` flex div — the way
+  // they did when that div was the root. ant-design-vue spreads fallthrough
+  // attrs onto the tooltip component instead, so without this the `p-2` /
+  // `flex-direction: column` from Yourself.vue never reached the flex box and
+  // its label rendered beside the video. Forward attrs to the flex div instead.
+  inheritAttrs: false,
   props: {
     data: {
       type: Object,
@@ -79,7 +86,12 @@ export default {
         holder: props.data.holder,
       });
     const showMovable = () => {
-      if (props.real && (!props.data.holder || !holdable.value || isLocalHolder())) {
+      // Holdable objects (avatars) may only get the manipulation frame when
+      // THIS player holds them — an unheld avatar must not be movable from a
+      // Depth-list hover any more than from an on-stage click (hold first,
+      // then manipulate). Non-holdable objects (props/streams/etc.) keep the
+      // hover frame whenever nobody-relevant blocks it.
+      if (props.real && (holdable.value ? isLocalHolder() : true)) {
         stageStore.SET_ACTIVE_MOVABLE(props.data.id);
       }
     };
@@ -103,6 +115,16 @@ export default {
 
     const dropzone = ref(false);
 
+    // Single source for the item's hover tooltip so every kind of skeleton
+    // (avatar/prop image, stream key, meeting/jitsi name) shows one consistent
+    // styled tooltip instead of a mix of native `title` and ant tooltips.
+    const tooltipTitle = computed(() => {
+      const d = props.data;
+      if (d.type === "video") return d.name ? `Stream key: ${d.name}` : "";
+      if (!d.src && d.displayName) return d.displayName;
+      return d.name ?? "";
+    });
+
     return {
       dragstart,
       dragend,
@@ -110,67 +132,82 @@ export default {
       showMovable,
       drop,
       dropzone,
+      tooltipTitle,
     };
   },
 };
 </script>
 
 <template>
-  <div
-    class="is-flex is-align-items-center is-justify-content-center skeleton"
-    :class="{ dropzone }"
-    :title="data.name"
-    draggable="true"
-    @dragstart="dragstart"
-    @dragend="dragend"
-    @dragenter.prevent
-    @dragover.prevent="dropzone = true"
-    @dragleave.prevent="dropzone = false"
-    @drop.prevent="drop"
-    @dblclick="hold"
-    @mouseenter="showMovable"
-  >
-    <slot v-if="$slots.default" />
-    <SavedDrawing v-else-if="data.drawingId" :drawing="data" />
-    <p
-      v-else-if="data.type === 'text'"
-      :style="{
-        ...data,
-        transform: `scale(${76 / data.w})`,
-        'transform-origin': 0,
-        'max-width': '100%',
-      }"
-      v-html="data.content"
-    ></p>
+  <!--
+    One a-tooltip wraps the whole item so every skeleton kind shows the SAME
+    styled tooltip (black bg, white text, rounded — ant defaults + color) rather
+    than a mix of native `title` (light, square) and ant tooltips. ant-design-vue
+    renders the child element directly (no wrapper) and merges event handlers, so
+    the drag/drop/dblclick/mouseenter below are preserved.
+  -->
+  <a-tooltip :title="tooltipTitle" color="#000000" placement="top" :mouse-enter-delay="0.35">
     <div
-      v-else-if="data.type === 'video'"
-      :title="`Stream key: ${data.name}`"
-      class="skeleton-meta"
+      v-bind="$attrs"
+      class="is-flex is-align-items-center is-justify-content-center skeleton"
+      :class="{ dropzone }"
+      draggable="true"
+      @dragstart="dragstart"
+      @dragend="dragend"
+      @dragenter.prevent
+      @dragover.prevent="dropzone = true"
+      @dragleave.prevent="dropzone = false"
+      @drop.prevent="drop"
+      @dblclick="hold"
+      @mouseenter="showMovable"
     >
-      <Icon src="stream.svg" size="36" />
-      <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7)">{{
-        data.name
-      }}</span>
+      <slot v-if="$slots.default" />
+      <SavedDrawing v-else-if="data.drawingId" :drawing="data" />
+      <p
+        v-else-if="data.type === 'text'"
+        :style="{
+          ...data,
+          transform: `scale(${76 / data.w})`,
+          'transform-origin': 0,
+          'max-width': '100%',
+        }"
+        v-html="data.content"
+      ></p>
+      <div v-else-if="data.type === 'video'" class="skeleton-meta">
+        <Icon src="stream.svg" size="36" />
+        <span class="tag is-light is-block stream-key" style="color: rgba(0, 0, 0, 0.7)">{{
+          data.name
+        }}</span>
+      </div>
+      <!--
+        Meetings get their own multi-stalk antenna so they read differently
+        from individual streams (single-stalk meeting.svg, used by the
+        !data.src fallback below) at toolbox/Depth size.
+      -->
+      <div v-else-if="data.type === 'meeting'" class="skeleton-meta">
+        <!-- Same 36x48 as the Meeting panel tile (Meeting/index.vue) so the
+             icon reads identically in the Depth list and the toolbox. -->
+        <Icon src="meeting-room.svg" :width="36" :height="48" />
+        <span class="tag is-light is-block stream-key">{{ data.name }}</span>
+      </div>
+      <div v-else-if="!data.src" class="skeleton-meta">
+        <Icon src="meeting.svg" size="36" />
+      </div>
+      <AppImage v-else class="skeleton-image" :src="data.src" />
+      <Icon v-if="data.multi" class="is-multi" src="multi-frame.svg" />
     </div>
-    <div v-else-if="data.type === 'meeting'" class="skeleton-meta">
-      <Icon src="meeting.svg" size="36" />
-      <span class="tag is-light is-block stream-key">{{ data.name }}</span>
-    </div>
-    <a-tooltip v-else-if="!data.src" :title="data.displayName">
-      <Icon src="meeting.svg" size="36" />
-    </a-tooltip>
-    <AppImage v-else class="skeleton-image" :src="data.src" />
-    <Icon
-      v-if="data.multi"
-      class="is-multi"
-      title="This is a multiframe avatar"
-      src="multi-frame.svg"
-    />
-  </div>
+  </a-tooltip>
 </template>
 
 <style scoped lang="scss">
 .stream-key {
+  // Pin the name label to the bottom so the icon is always the only in-flow
+  // child of `.skeleton-meta` and stays vertically centred — this keeps every
+  // icon (stream / meeting / jitsi) at the same height instead of some being
+  // pushed up by the label below them.
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
@@ -179,6 +216,7 @@ export default {
 }
 
 .skeleton-meta {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -191,6 +229,11 @@ export default {
   max-height: 100%;
   overflow: hidden;
   gap: 2px;
+  // Reserve the strip the absolute .stream-key label sits on, so the label
+  // never overlays the icon above it (it was covering the lower half of the
+  // meeting icon's stalks in the Depth list). Applied unconditionally —
+  // label or not — so all skeleton-meta icons stay at the same height.
+  padding-bottom: 20px;
 }
 
 .skeleton {

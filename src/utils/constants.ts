@@ -9,6 +9,11 @@ export const TOPICS = {
   COUNTER: "counter",
   DRAW: "draw",
   STATISTICS: "statistics",
+  // Viewer → performer freeze reports for individual Jitsi streams. A viewer
+  // whose video of a performer's stream stops receiving frames publishes here
+  // addressed to the performer's session (hostId); the performer aggregates a
+  // "frozen for N viewers" count. See useStreamFreezeReporter / stage.ts.
+  STREAM_HEALTH: "stream_health",
 };
 
 export const BOARD_ACTIONS = {
