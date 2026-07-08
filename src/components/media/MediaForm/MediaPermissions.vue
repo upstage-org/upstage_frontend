@@ -131,7 +131,10 @@ watch(isAdmin, console.log);
         @change="$emit('update:note', $event.target.value)"
       ></a-textarea>
     </a-tooltip>
-    <template v-if="copyrightLevel === 1">
+    <div
+      v-if="copyrightLevel === 1 && media?.permissions?.length"
+      class="media-permissions-requests"
+    >
       <a-alert v-for="request in media?.permissions" :key="request.id" show-icon class="bg-white">
         <template #icon>✅</template>
         <template #message>
@@ -144,35 +147,37 @@ watch(isAdmin, console.log);
           </small>
         </template>
       </a-alert>
-    </template>
+    </div>
     <template v-else-if="copyrightLevel === 2">
-      <a-alert
-        v-for="request in media?.permissions.filter((p) => !p.approved)"
-        :key="request.id"
-        type="warning"
-        show-icon
-      >
-        <template #icon>🔑</template>
-        <template #message>
-          <b>
-            <DName :user="request.user" />
-          </b>
-          is requesting access to this media: &quot;{{ request.note }}&quot;
-          <br />
-          <a-space>
-            <smart-button type="primary" :action="() => confirm(request.id, true)">{{
-              $t("approve")
-            }}</smart-button>
-            <smart-button type="danger" :action="() => confirm(request.id, false)">{{
-              $t("reject")
-            }}</smart-button>
-          </a-space>
-          <br />
-          <small class="text-gray-500">
-            <d-date :value="request.createdOn" />
-          </small>
-        </template>
-      </a-alert>
+      <div v-if="media?.permissions?.some((p) => !p.approved)" class="media-permissions-requests">
+        <a-alert
+          v-for="request in media?.permissions.filter((p) => !p.approved)"
+          :key="request.id"
+          type="warning"
+          show-icon
+        >
+          <template #icon>🔑</template>
+          <template #message>
+            <b>
+              <DName :user="request.user" />
+            </b>
+            is requesting access to this media: &quot;{{ request.note }}&quot;
+            <br />
+            <a-space>
+              <smart-button type="primary" :action="() => confirm(request.id, true)">{{
+                $t("approve")
+              }}</smart-button>
+              <smart-button type="danger" :action="() => confirm(request.id, false)">{{
+                $t("reject")
+              }}</smart-button>
+            </a-space>
+            <br />
+            <small class="text-gray-500">
+              <d-date :value="request.createdOn" />
+            </small>
+          </template>
+        </a-alert>
+      </div>
       <div class="upstage-transfer--sorter-arrows">
         <a-transfer
           v-model:target-keys="targetKeys"
@@ -203,3 +208,17 @@ watch(isAdmin, console.log);
     </template>
   </a-space>
 </template>
+
+<style scoped>
+.media-permissions-requests {
+  /* Acknowledgement/request lists grow with player count; cap them like the
+     stage lists so the dialog never outgrows the screen. */
+  max-height: min(17.5em, 35vh);
+  overflow-y: auto;
+}
+
+/* Preserve the vertical rhythm the alerts had as direct a-space children. */
+.media-permissions-requests :deep(.ant-alert + .ant-alert) {
+  margin-top: 8px;
+}
+</style>

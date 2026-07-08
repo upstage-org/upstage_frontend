@@ -428,7 +428,7 @@ const getUserDisplayName = (user: User) => {
 <template>
   <a-modal
     :visible="!!files?.length && !composingMode"
-    :body-style="{ padding: 0 }"
+    :body-style="{ padding: 0, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }"
     :width="1100"
     @cancel="handleClose"
   >
@@ -558,7 +558,10 @@ const getUserDisplayName = (user: User) => {
     </div>
     <a-row :gutter="12">
       <a-col :span="6">
-        <div class="bg-gray-200 flex items-center justify-center h-full" style="max-height: 600px">
+        <div
+          class="bg-gray-200 flex items-center justify-center h-full"
+          style="max-height: min(600px, 55vh)"
+        >
           <audio v-if="type === 'audio'" :key="files?.[0]?.preview" controls class="w-48">
             <source v-if="files && files.length" :src="files[0].preview" />
             Your browser does not support the audio element.

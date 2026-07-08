@@ -55,8 +55,7 @@ const availableStages = computed(() =>
   stages.value.filter(
     (s) =>
       !assignedIdSet.value.has(String(s.key)) &&
-      (!searchAvailable.value.trim() ||
-        includesIgnoreCase(s.name, searchAvailable.value.trim())),
+      (!searchAvailable.value.trim() || includesIgnoreCase(s.name, searchAvailable.value.trim())),
   ),
 );
 
@@ -198,7 +197,9 @@ function assignedEmptyMessage(): string {
 }
 
 .stage-assignment-columns .panel-body {
-  max-height: 50vh;
+  /* ~7 rows; the list scrolls and is searchable, so the dialog must not
+     grow with the number of stages (50vh pushed Save off-screen). */
+  max-height: min(17.5em, 35vh);
   overflow-y: auto !important;
 }
 
