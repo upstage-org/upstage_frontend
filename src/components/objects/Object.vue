@@ -2,7 +2,7 @@
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
-import { computed, inject, provide, reactive, ref, watch } from "vue";
+import { computed, inject, onUnmounted, provide, reactive, ref, watch } from "vue";
 import {
   isHoldableBoardObject,
   isLocalHoldOfBoardObject,
@@ -67,6 +67,11 @@ export default {
       interval: null,
       currentFrame: null,
     });
+    // Plain local, not reactive: holds Image objects only to keep the
+    // frame files warm in the browser cache while autoplay runs, so a
+    // no-cache media server can't leave a frame swap waiting on the
+    // network mid-animation.
+    let _warmFrames = null;
     if (props.object.multi) {
       watch(
         () => [props.object.autoplayFrames, props.object.frameLoop],
@@ -74,10 +79,16 @@ export default {
           const { autoplayFrames, frames, src } = props.object;
           clearInterval(frameAnimation.interval);
           frameAnimation.interval = null;
+          _warmFrames = null;
           if (autoplayFrames) {
-            frameAnimation.currentFrame = src;
+            frameAnimation.currentFrame = src ?? frames?.[0] ?? null;
             const intervalMs = parseFloat(String(autoplayFrames)) * 1000;
             if (!(intervalMs > 0) || !frames?.length) return;
+            _warmFrames = frames.map((frame) => {
+              const img = new Image();
+              img.src = frame;
+              return img;
+            });
             frameAnimation.interval = setInterval(() => {
               const fr = props.object.frames;
               if (!fr?.length) return;
@@ -89,6 +100,7 @@ export default {
                 } else {
                   clearInterval(frameAnimation.interval);
                   frameAnimation.interval = null;
+                  _warmFrames = null;
                   stageStore.toggleAutoplayFrames({
                     ...props.object,
                     autoplayFrames: null,
@@ -106,6 +118,11 @@ export default {
           immediate: true,
         },
       );
+      onUnmounted(() => {
+        clearInterval(frameAnimation.interval);
+        frameAnimation.interval = null;
+        _warmFrames = null;
+      });
     }
     const src = computed(() => {
       if (props.object.autoplayFrames && props.object.multi) {
