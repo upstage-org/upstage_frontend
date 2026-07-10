@@ -428,7 +428,12 @@ const getUserDisplayName = (user: User) => {
 <template>
   <a-modal
     :visible="!!files?.length && !composingMode"
-    :body-style="{ padding: 0, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }"
+    :body-style="{
+      padding: 0,
+      maxHeight: 'calc(100vh - 280px)',
+      overflowY: 'auto',
+      overflowX: 'hidden',
+    }"
     :width="1100"
     @cancel="handleClose"
   >
