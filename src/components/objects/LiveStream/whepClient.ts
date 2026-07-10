@@ -70,6 +70,29 @@ export async function hlsStreamHasAudio(key: string): Promise<boolean> {
   }
 }
 
+/**
+ * Decoded-video-frame count of a live WHEP session (0 when the session has
+ * no video or the connection is already closed). Some encoder settings —
+ * notably OBS's default High profile with B-frames, which WebRTC can't
+ * reorder — negotiate a WHEP session that then never decodes: the SDP
+ * exchange succeeds and track objects arrive, so only the inbound-rtp
+ * stats reveal that no watchable video is coming through.
+ */
+export async function videoFramesDecoded(pc: RTCPeerConnection): Promise<number> {
+  try {
+    const stats = await pc.getStats();
+    let frames = 0;
+    stats.forEach((report) => {
+      if (report.type === "inbound-rtp" && report.kind === "video") {
+        frames = report.framesDecoded ?? 0;
+      }
+    });
+    return frames;
+  } catch {
+    return 0; // getStats on a closing/closed connection
+  }
+}
+
 const ICE_GATHER_TIMEOUT_MS = 1500;
 
 function waitForIceGathering(pc: RTCPeerConnection): Promise<void> {

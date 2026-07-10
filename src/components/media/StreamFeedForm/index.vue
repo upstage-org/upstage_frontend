@@ -245,6 +245,7 @@ function close() {
           </a-input-group>
         </a-form-item>
       </a-form>
+      <p class="mb-3 text-xs opacity-75">{{ t("ingest_encoder_hint") }}</p>
       <a-space class="w-full justify-end">
         <a-button type="primary" @click="close">{{ t("finish") }}</a-button>
       </a-space>

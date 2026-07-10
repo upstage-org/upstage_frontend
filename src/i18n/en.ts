@@ -276,6 +276,8 @@ export default {
   ingest_stream_key: "Stream key (OBS: Settings → Stream → Stream Key)",
   ingest_panel_intro:
     "Point your encoder (e.g. OBS) at this server with this stream key. The key includes your personal publish token — don't share it.",
+  ingest_encoder_hint:
+    "Encoder settings: use H.264 video with AAC audio, set the keyframe interval to 2 seconds, and disable B-frames — in OBS: Settings → Output → Advanced, Keyframe Interval 2s, and Tune = zerolatency (or add bf=0 to the x264 options). Other settings can make the stream connect but stay black for viewers.",
   waiting_for_stream: "Waiting for stream…",
   stream_feed_created: "RTMP stream feed created",
   copied_to_clipboard: "Copied to clipboard",

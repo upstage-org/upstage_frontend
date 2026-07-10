@@ -4,9 +4,11 @@
  * file_location is a bare MediaMTX stream key, see /root/streaming2).
  *
  * Playback strategy: WHEP (WebRTC, sub-second) first; if the WebRTC leg
- * fails (media firewalled, no track within the timeout) fall back to
- * LL-HLS via hls.js (native HLS on Safari). While the feed is offline
- * (MediaMTX answers 404) show a placeholder and retry on an interval.
+ * fails (media firewalled, no track within the timeout, or a session that
+ * decodes no frames — OBS-default B-frames, see the stall watchdog) fall
+ * back to LL-HLS via hls.js (native HLS on Safari). While the feed is
+ * offline (MediaMTX answers 404) show a placeholder and retry on an
+ * interval.
  *
  * The element mirrors Object.vue's <video> contract: same PiP/controls
  * hardening, and the performer's Play/Stop context tool drives
@@ -21,6 +23,7 @@ import {
   hlsUrlForKey,
   opusMirrorKey,
   StreamOfflineError,
+  videoFramesDecoded,
   type WhepConnection,
 } from "./whepClient";
 
@@ -43,6 +46,17 @@ const WHEP_TRACK_TIMEOUT_MS = 4000;
 // hence the re-check loop instead of a single probe.
 const AUDIO_PROBE_ATTEMPTS = 4;
 const AUDIO_PROBE_INTERVAL_MS = 2500;
+// A WHEP session can negotiate fine and still deliver no video — OBS's
+// default encoder settings (High profile with B-frames, which WebRTC
+// can't reorder) are the common cause. Track objects arrive, so only the
+// decoded-frame counter reveals it; the session then either stalls while
+// "connected" or is killed by MediaMTX within seconds. Either way a
+// session that ends having decoded under ~a second of video marks the
+// feed as unable to ride WebRTC, and playback moves to HLS (which handles
+// those feeds fine, at some latency cost) instead of looping on WHEP.
+const WHEP_STALL_CHECK_MS = 2000;
+const WHEP_STALL_LIMIT_MS = 8000;
+const WHEP_BROKEN_FRAME_THRESHOLD = 30;
 
 const video = ref<HTMLVideoElement>();
 const state = ref<"connecting" | "live" | "waiting">("connecting");
@@ -50,6 +64,9 @@ const state = ref<"connecting" | "live" | "waiting">("connecting");
 let whep: WhepConnection | null = null;
 let hls: Hls | null = null;
 let retryTimer: number | null = null;
+let stallTimer: number | null = null;
+let whepSessionFrames = 0;
+let whepBroken = false;
 let disposed = false;
 
 const streamKey = () => props.object.fileLocation ?? "";
@@ -68,8 +85,50 @@ function scheduleRetry() {
   retryTimer = window.setTimeout(connect, OFFLINE_RETRY_MS);
 }
 
+function stopStallWatchdog() {
+  if (stallTimer != null) {
+    window.clearInterval(stallTimer);
+    stallTimer = null;
+  }
+}
+
+function startStallWatchdog(connection: WhepConnection) {
+  stopStallWatchdog();
+  whepSessionFrames = 0;
+  let stalledMs = 0;
+  stallTimer = window.setInterval(async () => {
+    if (disposed || whep !== connection) {
+      stopStallWatchdog();
+      return;
+    }
+    const el = video.value;
+    if (!el || el.paused) {
+      // Not playing (the Play tool drives playback) — no frames expected.
+      stalledMs = 0;
+      return;
+    }
+    const frames = await videoFramesDecoded(connection.pc);
+    if (disposed || whep !== connection) return;
+    if (frames > whepSessionFrames) {
+      whepSessionFrames = frames;
+      stalledMs = 0;
+      return;
+    }
+    stalledMs += WHEP_STALL_CHECK_MS;
+    if (stalledMs < WHEP_STALL_LIMIT_MS) return;
+    stopStallWatchdog();
+    console.info(
+      "[stage] live stream WebRTC session decodes no video (encoder settings — e.g. OBS B-frames?); falling back to HLS",
+    );
+    whepBroken = true;
+    await teardown();
+    if (!disposed) await connect();
+  }, WHEP_STALL_CHECK_MS);
+}
+
 async function teardown() {
   clearRetry();
+  stopStallWatchdog();
   if (whep) {
     const connection = whep;
     whep = null;
@@ -151,6 +210,7 @@ async function tryWhep(key: string): Promise<void> {
   video.value.srcObject = connection.stream;
   state.value = "live";
   applyPlayState();
+  startStallWatchdog(connection);
   if (!connection.hasAudio) {
     // Manifest may not exist yet right after the publisher starts;
     // keep checking briefly so an audible feed still ends up on HLS.
@@ -162,8 +222,25 @@ async function tryWhep(key: string): Promise<void> {
       (connection.pc.connectionState === "failed" ||
         connection.pc.connectionState === "disconnected")
     ) {
-      // Publisher went away or network dropped: tear down and re-poll.
-      teardown().then(scheduleRetry);
+      // Publisher went away, network dropped — or MediaMTX killed a
+      // session it couldn't payload (OBS-default B-frames die like this
+      // within seconds of connecting). A session that never decoded real
+      // video is the latter kind: reconnect on HLS instead of re-polling
+      // WHEP into the same wall.
+      videoFramesDecoded(connection.pc).then((frames) => {
+        if (whep !== connection) return;
+        if (Math.max(frames, whepSessionFrames) < WHEP_BROKEN_FRAME_THRESHOLD) {
+          whepBroken = true;
+          console.info(
+            "[stage] live stream WebRTC session died before decoding video (encoder settings — e.g. OBS B-frames?); switching to HLS",
+          );
+        }
+        teardown().then(() => {
+          if (disposed) return;
+          if (whepBroken) connect();
+          else scheduleRetry();
+        });
+      });
     }
   });
 }
@@ -232,6 +309,19 @@ async function connect() {
     return;
   }
   state.value = "connecting";
+  if (whepBroken) {
+    // This feed already proved it can't ride WebRTC — go straight to HLS.
+    // If HLS fails too the feed has probably ended; forget the verdict so
+    // the next publish gets a fresh WHEP (low-latency) chance.
+    try {
+      await tryHls(key);
+    } catch {
+      await teardown();
+      whepBroken = false;
+      scheduleRetry();
+    }
+    return;
+  }
   try {
     await tryWhep(key);
   } catch (whepError) {
