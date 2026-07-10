@@ -25,7 +25,9 @@ const { load, refetch } = useLazyQuery<StudioGraph>(
     fetchPolicy: "network-only",
   },
 );
-const { result: editingMediaResult, refetch: reload } = useQuery<{ editingMedia: Media }>(gql`
+const { result: editingMediaResult, refetch: reload } = useQuery<{
+  editingMedia: Media | null;
+}>(gql`
   {
     editingMedia @client
   }

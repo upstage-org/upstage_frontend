@@ -7,6 +7,7 @@ const {
   VITE_MQTT_USERNAME,
   VITE_MQTT_PASSWORD,
   VITE_JITSI_ENDPOINT,
+  VITE_RTMP_ENDPOINT,
   VITE_STRIPE_KEY,
   VITE_RELEASE_VERSION,
   VITE_ALIAS_RELEASE_VERSION,
@@ -41,6 +42,27 @@ const jitsiEndpoint =
   typeof VITE_JITSI_ENDPOINT === "string" && VITE_JITSI_ENDPOINT
     ? VITE_JITSI_ENDPOINT.replace(/\/$/, "")
     : window.location.origin;
+
+/**
+ * MediaMTX playback origin for RTMP stream feeds (e.g.
+ * `https://streaming2.upstage.live`). Unlike JITSI_ENDPOINT there is no
+ * same-origin fallback: when unset, every RTMP feature (studio "New stream
+ * feed", live playback) stays hidden and the app behaves exactly as before.
+ */
+const rtmpEndpoint =
+  typeof VITE_RTMP_ENDPOINT === "string" && VITE_RTMP_ENDPOINT
+    ? VITE_RTMP_ENDPOINT.replace(/\/$/, "")
+    : "";
+
+/** OBS "Server" value: rtmp://<media host>/live (empty when RTMP is disabled). */
+const rtmpIngestEndpoint = (() => {
+  if (!rtmpEndpoint) return "";
+  try {
+    return `rtmp://${new URL(rtmpEndpoint).host}/live`;
+  } catch {
+    return "";
+  }
+})();
 
 const configs = {
   MODE: import.meta.env.VITE_ENV_TYPE as "Development" | "Production",
@@ -86,6 +108,8 @@ const configs = {
   CLOUDFLARE_CAPTCHA_SITEKEY: VITE_CLOUDFLARE_CAPTCHA_SITEKEY,
   AXIOS_TIMEOUT: 10000,
   JITSI_ENDPOINT: jitsiEndpoint,
+  RTMP_ENDPOINT: rtmpEndpoint,
+  RTMP_INGEST_ENDPOINT: rtmpIngestEndpoint,
   MQTT_NAMESPACE: VITE_MQTT_NAMESPACE,
   MQTT_CONNECTION: {
     url: VITE_MQTT_ENDPOINT,

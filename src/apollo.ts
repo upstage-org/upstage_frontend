@@ -131,6 +131,14 @@ const authLink = setContext((request, { headers }) => {
 // Cache implementation
 export const inquiryVar = makeVar({});
 export const editingMediaVar = makeVar<Media | undefined>(undefined);
+/**
+ * Opens the StreamFeedForm modal (RTMP stream feeds — see /root/streaming2):
+ * `{mode:"create"}` for a new feed, `{mode:"info", media}` to show the
+ * ingest panel of an existing stream asset. `undefined` = closed.
+ */
+export const streamFeedVar = makeVar<
+  { mode: "create" } | { mode: "info"; media: Media } | undefined
+>(undefined);
 const cache = new InMemoryCache({
   typePolicies: {
     Query: {
@@ -142,7 +150,20 @@ const cache = new InMemoryCache({
         },
         editingMedia: {
           read() {
-            return editingMediaVar();
+            // Same `?? null` contract as streamFeed below: undefined would make
+            // Apollo emit `{}` and vue-apollo would keep the stale media in
+            // consumers' results (Dropzone could mistake an upload for a file
+            // replacement after the edit form closed).
+            return editingMediaVar() ?? null;
+          },
+        },
+        streamFeed: {
+          read() {
+            // `?? null` matters: a read returning undefined makes Apollo emit
+            // an empty `{}` result, which @vue/apollo-composable interprets as
+            // "keep the previous result" — so the StreamFeedForm modal could
+            // never observe the var being cleared and stayed open forever.
+            return streamFeedVar() ?? null;
           },
         },
       },

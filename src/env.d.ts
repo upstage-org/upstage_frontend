@@ -32,6 +32,11 @@ interface ImportMetaEnv {
   readonly VITE_JITSI_XMPP_MUC_DOMAIN?: string;
   readonly VITE_JITSI_XMPP_FOCUS_DOMAIN?: string;
   readonly VITE_JITSI_PREFER_WEBSOCKET?: string;
+  /**
+   * MediaMTX playback origin for RTMP stream feeds (e.g.
+   * `https://streaming2.upstage.live`). Unset ⇒ all RTMP UI hidden.
+   */
+  readonly VITE_RTMP_ENDPOINT?: string;
   readonly VITE_STRIPE_KEY?: string;
   readonly VITE_RELEASE_VERSION?: string;
   readonly VITE_ALIAS_RELEASE_VERSION?: string;

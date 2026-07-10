@@ -39,7 +39,7 @@ const model = defineModel<boolean>();
 const files = inject<Ref<UploadFile[]>>("files");
 
 const { result: editingMediaResult, refetch } = useQuery<{
-  editingMedia: Media;
+  editingMedia: Media | null;
 }>(gql`
   {
     editingMedia @client
@@ -89,8 +89,8 @@ const handleDropdownVisibleChange = (open: boolean) => {
 };
 
 watch(editingMediaResult, () => {
-  if (editingMediaResult.value) {
-    const { editingMedia } = editingMediaResult.value;
+  const editingMedia = editingMediaResult.value?.editingMedia;
+  if (editingMedia) {
     name.value = editingMedia.name;
     type.value = editingMedia.assetType.name;
     tags.value = editingMedia.tags;
@@ -187,7 +187,7 @@ const handleFrameClick = ({ event, index }: { event: any; index: number }) => {
 
 const handleClose = () => {
   if (files) {
-    if (editingMediaResult.value) {
+    if (editingMediaResult.value?.editingMedia) {
       editingMediaVar(undefined);
       files.value = [];
       editingMediaResult.value = undefined;
@@ -232,9 +232,11 @@ const mediaTypes = computed(() => {
     return result.value.mediaTypes
       .filter(
         (node) =>
-          !(editingMediaResult.value ? ["media", "video", "shape"] : ["media", "shape"]).includes(
-            node.name.toLowerCase(),
-          ),
+          !(
+            editingMediaResult.value?.editingMedia
+              ? ["media", "video", "shape"]
+              : ["media", "shape"]
+          ).includes(node.name.toLowerCase()),
       )
       .map((node) => ({ label: capitalize(node.name), value: node.name }))
       .sort(compareByLabel);
@@ -401,13 +403,13 @@ const { loading: dormanting, mutate: updateStatus } = useMutation(gql`
 const onUpdateStatus = async () => {
   const res = await updateStatus({
     id: editingMediaResult.value?.editingMedia?.id,
-    status: editingMediaResult.value?.editingMedia.dormant ? "Active" : "Dormant",
+    status: editingMediaResult.value?.editingMedia?.dormant ? "Active" : "Dormant",
   });
   if (res?.data.updateMediaStatus) {
     message.success(res?.data.updateMediaStatus.message);
     editingMediaVar({
       ...editingMediaVar()!,
-      dormant: !editingMediaResult.value?.editingMedia.dormant,
+      dormant: !editingMediaResult.value?.editingMedia?.dormant,
     });
     refresh();
   } else {
@@ -426,7 +428,12 @@ const getUserDisplayName = (user: User) => {
 <template>
   <a-modal
     :visible="!!files?.length && !composingMode"
-    :body-style="{ padding: 0 }"
+    :body-style="{
+      padding: 0,
+      maxHeight: 'calc(100vh - 280px)',
+      overflowY: 'auto',
+      overflowX: 'hidden',
+    }"
     :width="1100"
     @cancel="handleClose"
   >
@@ -482,7 +489,7 @@ const getUserDisplayName = (user: User) => {
           <Icon src="replace.webp" class="media-form-action-icon" />
           Replace
         </a-button>
-        <template v-if="editingMediaResult?.editingMedia.dormant">
+        <template v-if="editingMediaResult?.editingMedia?.dormant">
           <a-popconfirm
             placement="bottom"
             ok-text="Yes"
@@ -556,7 +563,10 @@ const getUserDisplayName = (user: User) => {
     </div>
     <a-row :gutter="12">
       <a-col :span="6">
-        <div class="bg-gray-200 flex items-center justify-center h-full" style="max-height: 600px">
+        <div
+          class="bg-gray-200 flex items-center justify-center h-full"
+          style="max-height: min(600px, 55vh)"
+        >
           <audio v-if="type === 'audio'" :key="files?.[0]?.preview" controls class="w-48">
             <source v-if="files && files.length" :src="files[0].preview" />
             Your browser does not support the audio element.
@@ -645,7 +655,7 @@ const getUserDisplayName = (user: User) => {
                 v-model:owner="owner"
                 v-model:users="userIds"
                 v-model:note="note"
-                :media="editingMediaResult?.editingMedia"
+                :media="editingMediaResult?.editingMedia ?? undefined"
               />
             </a-tab-pane>
             <a-tab-pane v-if="type === 'avatar'" key="voice" tab="Voice">

@@ -25,6 +25,25 @@ import "mobile-drag-drop/default.css";
 
 mobileDragDropPolyfill({
   holdToDrag: 300,
+  // 3.0.0-rc.0's default tryFindDraggableTarget reads event.composedPath(),
+  // which the DOM spec empties as soon as dispatch completes. With holdToDrag
+  // the lookup runs 300ms later from a setTimeout, so it always saw an empty
+  // path and the delayed drag silently never started — the only touch drags
+  // that ever worked were Chrome-Android's NATIVE long-press drags kicking in
+  // independently. event.target survives dispatch, so walk up from it instead
+  // (same draggable checks as the polyfill's own implementation).
+  tryFindDraggableTarget: (event) => {
+    let el = event.target as
+      | (Node & { draggable?: boolean; getAttribute?: (n: string) => string | null })
+      | null;
+    while (el && el !== document.body) {
+      if (el.draggable === true || el.getAttribute?.("draggable") === "true") {
+        return el as HTMLElement;
+      }
+      el = el.parentNode;
+    }
+    return undefined;
+  },
 });
 
 installApolloClient();

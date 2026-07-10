@@ -14,6 +14,7 @@
  *   • `_config` (ref) / `config` (computed)
  *   • `_reloadStreams` (ref) / `reloadStreams` (computed)
  *   • `_enabledLiveStreaming` (ref) / `enabledLiveStreaming` (computed)
+ *   • `_streamingMode` (ref) / `streamingMode` (computed)
  *
  * State/getter ↔ action collisions (action renamed; the state/getter
  * keeps the original name):
@@ -38,6 +39,7 @@ import {
   cloneDeep,
   isHoldableBoardObject,
   isJitsiBoardType,
+  isRtmpStreamDescription,
   isStreamPlaybackBoardType,
   posterJpgForVideoUrl,
   randomColor,
@@ -303,12 +305,16 @@ export interface AudioPlayer {
   [k: string]: unknown;
 }
 
+/** Which live-streaming transports a stage enables while streaming is on. */
+export type StreamingMode = "jitsi" | "rtmp" | "both";
+
 export interface StageConfig {
   animateDuration: number;
   reactionDuration: number;
   ratio: number;
   defaultcolor?: string;
   enabledLiveStreaming?: boolean;
+  streamingMode?: StreamingMode;
   [k: string]: unknown;
 }
 
@@ -581,6 +587,13 @@ export const useStageStore = defineStore(
     const _meetingRefreshKey = ref(0);
     const _enabledLiveStreaming = ref<boolean>(true);
     /**
+     * Which transports the Live Streaming customisation enables — only
+     * meaningful while `_enabledLiveStreaming` is true. Legacy configs
+     * predate the field and their enabled state always covered both
+     * Jitsi and RTMP, so absent/unknown values fold into "both".
+     */
+    const _streamingMode = ref<StreamingMode>("both");
+    /**
      * Standalone `/chat/:url` connects to the same MQTT stream as the live
      * stage but renders only chat — avatar meSpeak would otherwise play on
      * each audience device (e.g. many phones in a hybrid room).
@@ -763,6 +776,15 @@ export const useStageStore = defineStore(
     );
 
     const enabledLiveStreaming = computed(() => _enabledLiveStreaming.value);
+    const streamingMode = computed(() => _streamingMode.value);
+    /** Jitsi rooms/publishing available (streaming on, mode covers Jitsi). */
+    const jitsiStreamingEnabled = computed(
+      () => _enabledLiveStreaming.value && _streamingMode.value !== "rtmp",
+    );
+    /** RTMP feeds surfaced in the Streams tab (streaming on, mode covers RTMP). */
+    const rtmpStreamingEnabled = computed(
+      () => _enabledLiveStreaming.value && _streamingMode.value !== "jitsi",
+    );
 
     // ====================================================================
     // MUTATIONS
@@ -822,7 +844,16 @@ export const useStageStore = defineStore(
             }
             if (assetName === "video") {
               const loc = (item.fileLocation ?? item.src ?? "") as string;
-              item.url = absolutePath(loc);
+              // Live RTMP feeds (stream assets with a bare MediaMTX key) carry
+              // isRTMP in their description JSON; they play via
+              // LiveStreamPlayer, not a /resources/<key> URL (which would 404).
+              // Uploaded VoD clips take the exact same path as before.
+              if (isRtmpStreamDescription(item.description)) {
+                item.isRTMP = true;
+                item.url = "";
+              } else {
+                item.url = absolutePath(loc);
+              }
             } else {
               if (item.description) {
                 const meta = JSON.parse(item.description);
@@ -868,6 +899,7 @@ export const useStageStore = defineStore(
           | (Record<string, unknown> & {
               ratio?: { width: number; height: number };
               enabledLiveStreaming?: boolean;
+              streamingMode?: string;
               defaultcolor?: string;
             })
           | null;
@@ -878,6 +910,10 @@ export const useStageStore = defineStore(
           }
           _enabledLiveStreaming.value =
             typeof cfg?.enabledLiveStreaming === "boolean" ? cfg.enabledLiveStreaming : true;
+          _streamingMode.value =
+            cfg?.streamingMode === "jitsi" || cfg?.streamingMode === "rtmp"
+              ? cfg.streamingMode
+              : "both";
         }
         // Match Stage Management default (#30AC45): new stages often have no
         // saved config yet, so do not leave backdropColor on CLEAN_STAGE's "gray".
@@ -2426,6 +2462,43 @@ export const useStageStore = defineStore(
       }
     }
 
+    /**
+     * Kind predicates for the per-toolbox "clear all from stage" tiles
+     * (the first-position tile mirroring the Backdrops clear). Type strings
+     * are case-folded because GraphQL `assetType.name` arrives capitalized
+     * (e.g. "Avatar"/"Prop") and placeObjectOnStage only folds the
+     * stream/jitsi synonyms. `isRTMP` splits live RTMP feeds (Streams tab)
+     * from uploaded clips (Video tab): both land as board type "video".
+     */
+    const foldBoardType = (o: BoardObject) => `${o.type ?? ""}`.trim().toLowerCase();
+    const STAGE_CLEAR_PREDICATES: Record<string, (o: BoardObject) => boolean> = {
+      avatar: (o) => isHoldableBoardObject(o),
+      prop: (o) => foldBoardType(o) === "prop",
+      stream: (o) =>
+        isJitsiBoardType(o.type) ||
+        foldBoardType(o) === "meeting" ||
+        (isStreamPlaybackBoardType(o.type) && o.isRTMP === true),
+      video: (o) => isStreamPlaybackBoardType(o.type) && o.isRTMP !== true,
+      drawing: (o) => !!o.drawingId,
+      text: (o) => !!o.textId || foldBoardType(o) === "text",
+    };
+
+    /**
+     * Remove every placed board object of one kind from the stage, for
+     * everyone. Loops the existing single-object delete so all its
+     * side-effects apply per object: own-hold release, costume detach,
+     * jitsi track pruning, reconcileAvatarHolds, and a broadcast DESTROY
+     * for published/jitsi objects (bulb-off objects stay a local removal,
+     * same as deleting them one by one). Library entries (drawings, texts,
+     * media) are untouched — objects can be re-placed afterwards.
+     */
+    function clearStageObjectsOfKind(kind: keyof typeof STAGE_CLEAR_PREDICATES) {
+      const predicate = STAGE_CLEAR_PREDICATES[kind];
+      if (!predicate) return;
+      // Snapshot first: deleteObject reassigns board.value.objects per call.
+      board.value.objects.filter(predicate).forEach((o) => deleteObject(o));
+    }
+
     function switchFrame(object: BoardObject) {
       UPDATE_OBJECT(serializeObject(object));
       if (object.liveAction) {
@@ -3639,6 +3712,7 @@ export const useStageStore = defineStore(
       _forceReloadStreams,
       _meetingRefreshKey,
       _enabledLiveStreaming,
+      _streamingMode,
       // getters (computed views)
       ready,
       url,
@@ -3662,6 +3736,9 @@ export const useStageStore = defineStore(
       meetingRefreshKey,
       activeObject,
       enabledLiveStreaming,
+      streamingMode,
+      jitsiStreamingEnabled,
+      rtmpStreamingEnabled,
       // mutations (UPPER_SNAKE_CASE)
       SET_MODEL,
       CLEAN_STAGE,
@@ -3741,6 +3818,7 @@ export const useStageStore = defineStore(
       reconcileJitsiBoardFromEvents,
       shapeObject,
       deleteObject,
+      clearStageObjectsOfKind,
       switchFrame,
       sendToBack,
       bringToFront,

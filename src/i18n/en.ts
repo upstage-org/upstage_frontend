@@ -265,6 +265,23 @@ export default {
   introduction: "Introduction",
   new_object: "New {0}",
   new_stream: "My Stream",
+  new_stream_feed: "New RTMP stream feed",
+  stream_feed: "RTMP stream feed",
+  stream_feed_intro:
+    "This sets up an RTMP feed: UpStage will give you an RTMP server URL and stream key to paste into your broadcast software (e.g. OBS).",
+  stream_feed_name: "Feed name",
+  stream_key: "RTMP stream key",
+  stream_key_hint: "Letters, numbers, dashes and underscores only",
+  ingest_server: "Server (OBS: Settings → Stream → Server)",
+  ingest_stream_key: "Stream key (OBS: Settings → Stream → Stream Key)",
+  ingest_panel_intro:
+    "Point your encoder (e.g. OBS) at this server with this stream key. The key includes your personal publish token — don't share it.",
+  ingest_encoder_hint:
+    "Encoder settings: use H.264 video with AAC audio, set the keyframe interval to 2 seconds, and disable B-frames — in OBS: Settings → Output → Advanced, Keyframe Interval 2s, and Tune = zerolatency (or add bf=0 to the x264 options). Other settings can make the stream connect but stay black for viewers.",
+  waiting_for_stream: "Waiting for stream…",
+  stream_feed_created: "RTMP stream feed created",
+  copied_to_clipboard: "Copied to clipboard",
+  stream_info: "Stream info",
   default_backgroundcolor: "Default Background Colour",
   pop_out_chat: "Pop out chat",
   public_chat: "Public",

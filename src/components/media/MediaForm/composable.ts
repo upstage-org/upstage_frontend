@@ -28,6 +28,25 @@ interface SaveMediaMutationVariables {
   link: Link;
 }
 
+/**
+ * The backend answers GraphQL errors with HTTP 400, which Apollo surfaces
+ * as a generic ServerError ("Received status code 400") in `error.message`
+ * — the real cause ("Stream with the same key already existed",
+ * "Authenticated Failed", …) is buried in `networkError.result.errors`.
+ * Dig it out so error toasts say something actionable.
+ */
+export function apolloErrorText(error: any): string {
+  const buried =
+    error?.graphQLErrors?.[0]?.message ?? error?.networkError?.result?.errors?.[0]?.message;
+  if (buried) return buried;
+  const text = error?.message ?? String(error);
+  // Chrome aborts in-flight fetches when the machine's network changes
+  // (ERR_NETWORK_CHANGED); Apollo reports that as a bare "Failed to fetch".
+  return /failed to fetch/i.test(text)
+    ? "Network connection interrupted — please try saving again."
+    : text;
+}
+
 const getBase64 = (file: File) =>
   new Promise<string>((resolve) => {
     const reader = new FileReader();
@@ -108,7 +127,7 @@ export const useSaveMedia = (
         handleSuccess(mediaId);
       }
     } catch (error) {
-      message.error("" + error);
+      message.error(apolloErrorText(error));
     } finally {
       progress.value = 100;
     }

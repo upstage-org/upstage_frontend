@@ -54,7 +54,7 @@ const { result, loading, refetch } = useQuery(
   { pollInterval: 30_000 },
 );
 
-const { result: editingMediaResult } = useQuery<{ editingMedia: Media }>(gql`
+const { result: editingMediaResult } = useQuery<{ editingMedia: Media | null }>(gql`
   {
     editingMedia @client
   }

@@ -377,15 +377,34 @@ export default {
         box-shadow: none;
       }
 
-      &:hover,
-      &.active {
+      &:hover {
         cursor: pointer;
-        filter: brightness(1.2);
-        background-color: lightgray;
-        img {
-          -webkit-filter: drop-shadow(5px 5px 5px #f5f5f5);
-          filter: drop-shadow(5px 5px 5px #f5f5f5);
+      }
+
+      /* Hover affordance only where hover is real: on touch screens :hover
+         sticks to the last-tapped tile, which made the erase toggle's state
+         unreadable (hover and .active looked identical). */
+      @media (hover: hover) {
+        &:hover {
+          filter: brightness(1.2);
+          background-color: lightgray;
+          img {
+            -webkit-filter: drop-shadow(5px 5px 5px #f5f5f5);
+            filter: drop-shadow(5px 5px 5px #f5f5f5);
+          }
+          .tag {
+            background-color: transparent;
+          }
         }
+      }
+
+      /* Selected/toggled tiles (erase mode, current backdrop/curtain, text
+         bold/italic/underline) must read differently from hover on every
+         input type. Inset outline: no layout shift, visible over thumbnails. */
+      &.active {
+        background-color: #d8d8d8;
+        outline: 3px solid #007011;
+        outline-offset: -3px;
         .tag {
           background-color: transparent;
         }

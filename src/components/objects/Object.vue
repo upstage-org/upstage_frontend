@@ -2,7 +2,7 @@
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
-import { computed, inject, provide, reactive, ref, watch } from "vue";
+import { computed, inject, onUnmounted, provide, reactive, ref, watch } from "vue";
 import {
   isHoldableBoardObject,
   isLocalHoldOfBoardObject,
@@ -11,6 +11,7 @@ import {
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
+import LiveStreamPlayer from "./LiveStream/LiveStreamPlayer.vue";
 import OpacitySlider from "./OpacitySlider.vue";
 import QuickAction from "./QuickAction.vue";
 import Topping from "./Topping.vue";
@@ -20,6 +21,7 @@ export default {
   components: {
     AppImage,
     ContextMenu,
+    LiveStreamPlayer,
     OpacitySlider,
     QuickAction,
     Topping,
@@ -65,6 +67,11 @@ export default {
       interval: null,
       currentFrame: null,
     });
+    // Plain local, not reactive: holds Image objects only to keep the
+    // frame files warm in the browser cache while autoplay runs, so a
+    // no-cache media server can't leave a frame swap waiting on the
+    // network mid-animation.
+    let _warmFrames = null;
     if (props.object.multi) {
       watch(
         () => [props.object.autoplayFrames, props.object.frameLoop],
@@ -72,10 +79,16 @@ export default {
           const { autoplayFrames, frames, src } = props.object;
           clearInterval(frameAnimation.interval);
           frameAnimation.interval = null;
+          _warmFrames = null;
           if (autoplayFrames) {
-            frameAnimation.currentFrame = src;
+            frameAnimation.currentFrame = src ?? frames?.[0] ?? null;
             const intervalMs = parseFloat(String(autoplayFrames)) * 1000;
             if (!(intervalMs > 0) || !frames?.length) return;
+            _warmFrames = frames.map((frame) => {
+              const img = new Image();
+              img.src = frame;
+              return img;
+            });
             frameAnimation.interval = setInterval(() => {
               const fr = props.object.frames;
               if (!fr?.length) return;
@@ -87,6 +100,7 @@ export default {
                 } else {
                   clearInterval(frameAnimation.interval);
                   frameAnimation.interval = null;
+                  _warmFrames = null;
                   stageStore.toggleAutoplayFrames({
                     ...props.object,
                     autoplayFrames: null,
@@ -104,6 +118,11 @@ export default {
           immediate: true,
         },
       );
+      onUnmounted(() => {
+        clearInterval(frameAnimation.interval);
+        frameAnimation.interval = null;
+        _warmFrames = null;
+      });
     }
     const src = computed(() => {
       if (props.object.autoplayFrames && props.object.multi) {
@@ -164,7 +183,9 @@ export default {
     watch(
       () => props.object.replayed,
       () => {
-        video.value.currentTime = 0;
+        // Live RTMP tiles render via LiveStreamPlayer and never set this
+        // ref; a live feed has no seekable timeline to restart anyway.
+        if (video.value) video.value.currentTime = 0;
       },
     );
     const loadeddata = () => {
@@ -288,9 +309,15 @@ export default {
               patching of HTMLMediaElement doesn't leave the
               attribute set in the DOM but unread by the engine.
             -->
+            <!--
+              Live RTMP feed (stream asset with a bare MediaMTX key —
+              `isRTMP` is only ever set for those, so every pre-existing
+              object type falls through to the branches below unchanged).
+            -->
+            <LiveStreamPlayer v-if="object.isRTMP" :object="object" />
             <!-- eslint-disable-next-line vue/no-mutating-props -->
             <video
-              v-if="
+              v-else-if="
                 isStreamPlaybackBoardType(object.type) ||
                 isStreamPlaybackBoardType(object.assetType?.name)
               "

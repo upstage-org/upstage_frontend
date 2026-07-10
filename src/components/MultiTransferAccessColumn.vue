@@ -108,7 +108,16 @@ export default {
       }
     };
 
-    return { shouldVisible, moveRight, moveLeft, onRowClick, onRowContextMenu, count, searchs, moveAll };
+    return {
+      shouldVisible,
+      moveRight,
+      moveLeft,
+      onRowClick,
+      onRowContextMenu,
+      count,
+      searchs,
+      moveAll,
+    };
   },
 };
 </script>
@@ -155,10 +164,7 @@ export default {
           </div>
         </article>
       </div>
-      <div
-        v-if="i < columns.length - 1"
-        class="column is-narrow px-0 is-flex is-align-self-center"
-      >
+      <div v-if="i < columns.length - 1" class="column is-narrow px-0 is-flex is-align-self-center">
         <div class="upstage-multi-transfer-arrows">
           <button
             type="button"
@@ -190,7 +196,9 @@ article.panel {
   font-size: unset;
 }
 .panel-body {
-  max-height: 50vh;
+  /* ~7 rows, matching StageAssignment.vue — the lists scroll and are
+     searchable, so they must not grow the page/dialog with user count. */
+  max-height: min(17.5em, 35vh);
   overflow-y: auto !important;
 }
 .panel-block.owner {

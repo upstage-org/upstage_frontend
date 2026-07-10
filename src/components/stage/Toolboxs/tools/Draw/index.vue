@@ -64,7 +64,12 @@ export default {
         });
     };
 
+    // Removes every placed drawing object from the stage; the saved
+    // drawings stay in this strip for re-placing (unlike delete permanently).
+    const clearAll = () => stageStore.clearStageObjectsOfKind("drawing");
+
     return {
+      clearAll,
       isDrawing,
       drawings,
       color,
@@ -107,7 +112,9 @@ export default {
       </div>
       <span class="tag is-light is-block">{{ $t("colour") }}</span>
     </div>
-    <div class="drawing-tool" style="width: 200px">
+    <!-- Marking the pen tile active when drawing makes pen/erase read as a
+         radio pair — on touch there is no cursor preview to reveal the mode. -->
+    <div class="drawing-tool" style="width: 200px" :class="{ active: mode === 'draw' }">
       <div class="size-preview">
         <div
           class="dot"
@@ -176,6 +183,12 @@ export default {
     </div>
   </template>
   <template v-else>
+    <div @click="clearAll">
+      <div class="icon is-large">
+        <Icon size="36" src="clear.svg" />
+      </div>
+      <span class="tag is-light is-block">{{ $t("clear") }}</span>
+    </div>
     <div class="is-pulled-left" @click="create">
       <div class="icon is-large">
         <Icon src="new.svg" size="36" />

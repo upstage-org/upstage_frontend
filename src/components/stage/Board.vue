@@ -18,6 +18,7 @@ import Whiteboard from "components/stage/Whiteboard.vue";
 import AppImage from "../Image.vue";
 import { animate } from "animejs";
 import Backdrop from "./Backdrop.vue";
+import { runRemovalAnimation } from "./removalAnimations";
 
 const TYPE_TO_COMPONENT = {
   drawing: "Drawing",
@@ -81,12 +82,8 @@ export default {
       });
     };
     const avatarLeave = (el, complete) => {
-      animate(el.querySelector(".object"), {
-        scale: 0,
-        rotate: 180,
-        duration: config.value.animateDuration,
-        ease: "inOutQuad",
-        onComplete: complete,
+      runRemovalAnimation(config.value?.animations?.removal ?? "spiral", el, complete, {
+        duration: config.value?.animations?.removalSpeed ?? config.value?.animateDuration ?? 1000,
       });
     };
 
@@ -163,5 +160,9 @@ export default {
   position: fixed;
   background-size: cover;
   overflow: hidden;
+  /* Single-finger pans starting on the stage must not scroll the page
+     ("mysterious margins" while trying to move objects on a tablet);
+     two-finger pinch-zoom stays available for the audience. */
+  touch-action: pinch-zoom;
 }
 </style>

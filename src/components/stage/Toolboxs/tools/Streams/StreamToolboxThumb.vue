@@ -69,8 +69,17 @@ onBeforeUnmount(clearPosterTimer);
 </script>
 
 <template>
+  <!--
+    Live RTMP feed (isRTMP): there is no poster and no VoD URL to peek at
+    (both would 404 against /resources/<stream key>), so render a static
+    tile. Uploaded clips keep the poster/peek behavior below unchanged.
+  -->
+  <div v-if="video.isRTMP" class="live-feed-thumb">
+    <i class="fas fa-broadcast-tower" aria-hidden="true"></i>
+    <span>LIVE</span>
+  </div>
   <img
-    v-if="video.url && !posterFailed"
+    v-else-if="video.url && !posterFailed"
     class="thumb-preview"
     loading="eager"
     decoding="async"
@@ -96,5 +105,19 @@ onBeforeUnmount(clearPosterTimer);
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.live-feed-thumb {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: #1d1d1d;
+  color: #e0e0e0;
+  font-size: 10px;
+  letter-spacing: 1px;
 }
 </style>

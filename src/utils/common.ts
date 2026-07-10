@@ -38,6 +38,22 @@ export function isStreamPlaybackBoardType(type: unknown): boolean {
   return STREAM_PLAYBACK_TYPE_ALIASES.has(String(type).trim().toLowerCase());
 }
 
+/**
+ * True when an asset's `description` JSON carries the backend's `isRTMP`
+ * flag (stream assets with a bare MediaMTX key — see asset.py saveMedia
+ * and /root/streaming2). Tolerates missing/invalid JSON: only an explicit
+ * flag opts an item into the LiveStreamPlayer path.
+ */
+export function isRtmpStreamDescription(description: unknown): boolean {
+  if (typeof description !== "string" || !description) return false;
+  try {
+    const meta = JSON.parse(description);
+    return meta != null && typeof meta === "object" && meta.isRTMP === true;
+  } catch {
+    return false;
+  }
+}
+
 /** GraphQL `assetType.name` may be `Jitsi`; board resolution uses key `jitsi` only. */
 const JITSI_BOARD_TYPE_ALIASES = new Set(["jitsi"]);
 
