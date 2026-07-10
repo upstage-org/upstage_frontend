@@ -110,6 +110,14 @@ html {
   overflow-y: auto !important;
 }
 
+html,
+body {
+  /* Kill Android Chrome pull-to-refresh: a failed touch-drag from the toolbox
+   * used to reload the whole stage. -y only, so horizontal swipe-back
+   * navigation on admin/management pages keeps working. */
+  overscroll-behavior-y: none;
+}
+
 body.waiting * {
   cursor: wait !important;
 }
@@ -152,6 +160,27 @@ body.waiting * {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* moveable@0.53 sets no touch-action itself, so without this, dragging a
+ * resize/rotate handle on a touch screen pans the page instead of resizing
+ * the object. The control box is rendered on document.body (outside any
+ * scoped style), hence it lives here. */
+.moveable-control-box {
+  touch-action: none;
+}
+
+@media (pointer: coarse) {
+  /* moveable's injected default is 14x14 / margin -7px — too small for
+   * fingers. The doubled selector out-specifies its runtime-injected sheet
+   * without !important. Keep margin = -size/2 so handles stay centred on
+   * the frame corners. */
+  .moveable-control-box .moveable-control {
+    width: 24px;
+    height: 24px;
+    margin-top: -12px;
+    margin-left: -12px;
+  }
 }
 
 .root {

@@ -1,7 +1,8 @@
 <script>
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useDragHoldShim } from "composables/index";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import Icon from "components/Icon.vue";
@@ -71,12 +72,73 @@ export default {
     // `touchmove` handler. The previous half-implemented `touchmove` /
     // `touchend` here was missing `touchstart` (so position was NaN on
     // first move) and bypassed the actual drop target.
+    //
+    // Two touch-only helpers on top of the polyfill (desktop mouse DnD
+    // never enters either):
+    // - useDragHoldShim hides sub-slop finger jitter from the polyfill's
+    //   zero-tolerance hold-to-drag abort listener, so a 300ms press
+    //   reliably arms the drag on tablets.
+    // - The `dragPending` class gives instant "keep holding" feedback from
+    //   the polyfill's dnd-poly-dragstart-pending event; without it the
+    //   first visible cue is the drag image appearing 300ms in.
+    const skelEl = ref();
+    useDragHoldShim(skelEl);
+
+    const dragPending = ref(false);
+    const setPending = () => (dragPending.value = true);
+    // A hold that is released without moving fires neither
+    // dnd-poly-dragstart-cancel nor dragend, so plain touchend/touchcancel
+    // must also clear the highlight or it sticks forever.
+    const clearPending = () => (dragPending.value = false);
+    const pendingOn = ["dnd-poly-dragstart-pending"];
+    const pendingOff = [
+      "dnd-poly-dragstart-cancel",
+      "dragstart",
+      "dragend",
+      "touchend",
+      "touchcancel",
+    ];
+    onMounted(() => {
+      const el = skelEl.value;
+      if (!el) return;
+      pendingOn.forEach((t) => el.addEventListener(t, setPending));
+      pendingOff.forEach((t) => el.addEventListener(t, clearPending));
+    });
+    onBeforeUnmount(() => {
+      const el = skelEl.value;
+      if (!el) return;
+      pendingOn.forEach((t) => el.removeEventListener(t, setPending));
+      pendingOff.forEach((t) => el.removeEventListener(t, clearPending));
+    });
 
     const holdable = computed(() => isHoldableBoardObject(props.data));
     const hold = () => {
       if (props.real && holdable.value && stageStore.canPlay && !props.data.holder) {
         useUserStore().setAvatarId(props.data.id);
       }
+    };
+
+    // Double-click / double-tap. Real (on-stage) items keep the existing
+    // "hold this avatar" semantics. Toolbox items get placed at stage centre
+    // — the touch equivalent of drag-to-stage, since hold-then-drag is
+    // fiddly on tablets. `nodrop` tiles (backdrops, curtains, scenes) are
+    // never placeable, mirroring the Board.vue drop guard.
+    const dblclick = (e) => {
+      if (props.real) {
+        hold();
+        return;
+      }
+      if (props.nodrop || !stageStore.canPlay) return;
+      // Same hook a real drag fires first: MeetingObject/Yourself.vue
+      // starts publishing the self-camera from @dragstart.
+      emit("dragstart", e);
+      const { width, height } = stageStore.stageSize;
+      const placed = stageStore.placeObjectOnStage({
+        ...props.data,
+        x: width / 2 - 50,
+        y: height / 2 - 50,
+      });
+      stageStore.autoFocusMoveable(placed.id);
     };
     const userStore = useUserStore();
     const isLocalHolder = () =>
@@ -128,11 +190,13 @@ export default {
     return {
       dragstart,
       dragend,
-      hold,
+      dblclick,
       showMovable,
       drop,
       dropzone,
       tooltipTitle,
+      skelEl,
+      dragPending,
     };
   },
 };
@@ -148,9 +212,10 @@ export default {
   -->
   <a-tooltip :title="tooltipTitle" color="#000000" placement="top" :mouse-enter-delay="0.35">
     <div
+      ref="skelEl"
       v-bind="$attrs"
       class="is-flex is-align-items-center is-justify-content-center skeleton"
-      :class="{ dropzone }"
+      :class="{ dropzone, 'drag-pending': dragPending }"
       draggable="true"
       @dragstart="dragstart"
       @dragend="dragend"
@@ -158,7 +223,7 @@ export default {
       @dragover.prevent="dropzone = true"
       @dragleave.prevent="dropzone = false"
       @drop.prevent="drop"
-      @dblclick="hold"
+      @dblclick="dblclick"
       @mouseenter="showMovable"
     >
       <slot v-if="$slots.default" />
@@ -272,5 +337,14 @@ export default {
   > * {
     transform: translateX(50%) !important;
   }
+}
+
+/* Touch hold-to-drag feedback: appears at touchstart (polyfill's
+   dragstart-pending event) so the player knows to keep holding until the
+   drag image takes over. The transition delay keeps quick taps flash-free. */
+.drag-pending {
+  outline: 3px solid #007011;
+  outline-offset: -3px;
+  transition: outline-color 0.15s ease 0.12s;
 }
 </style>

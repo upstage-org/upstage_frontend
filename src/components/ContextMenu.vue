@@ -1,5 +1,6 @@
 <script>
 import { reactive, ref } from "vue";
+import { onLongPress } from "@vueuse/core";
 export default {
   props: {
     active: Boolean,
@@ -46,6 +47,57 @@ export default {
     };
     const closeMenu = () => (isActive.value = false);
 
+    // Touch path: Android Chrome never fires `contextmenu` on long-press for
+    // user-select:none elements (which every draggable / stage object is), so
+    // the menu was unreachable on tablets. Long-press emulates right-click.
+    const triggerEl = ref();
+    // Draggable children (toolbox Skeletons) arm a polyfill drag 300ms into a
+    // hold; once a real drag has started the long-press must not also open
+    // the menu mid-drag. dragstart/dragend bubble up to the trigger wrapper.
+    const dragging = ref(false);
+
+    // The finger-lift after a long-press dispatches a compatibility `click`
+    // on the element under the finger; the v-click-outside directive listens
+    // for document clicks and would close the menu the instant it opened.
+    // Swallow exactly that one click, self-removing so a genuinely later tap
+    // (or a desktop click) is never eaten.
+    const suppressNextClick = () => {
+      let timer;
+      const swallow = (ev) => {
+        ev.stopPropagation();
+        cleanup();
+      };
+      const cleanup = () => {
+        document.removeEventListener("click", swallow, true);
+        clearTimeout(timer);
+      };
+      document.addEventListener("click", swallow, true);
+      timer = setTimeout(cleanup, 800);
+    };
+
+    onLongPress(
+      triggerEl,
+      (e) => {
+        if (props.preventClicking) return;
+        // Touch/pen only: on desktop a click-hold is a moveable drag in
+        // progress, not a menu request.
+        if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+        if (dragging.value) return;
+        // Mirror openMenu's currentTarget.click(): closes other open menus /
+        // deselects other objects via their click-outside handlers.
+        // (e.currentTarget is null on a stored pointer event, hence the ref.)
+        triggerEl.value?.click();
+        suppressNextClick();
+        position.x = e.clientX + props.padLeft;
+        position.y = e.clientY + props.padTop;
+        isActive.value = true;
+      },
+      // distanceThreshold guarantees an in-progress object drag (moveable
+      // grabs the object at touchstart) has barely moved before the menu
+      // opens; larger movements are drags, not menu requests.
+      { delay: 600, distanceThreshold: 10 },
+    );
+
     const contextAppear = (el) => {
       const { width, height, right, bottom } = el?.getBoundingClientRect() ?? {};
       if (width == null || height == null) return;
@@ -74,13 +126,19 @@ export default {
       );
     };
 
-    return { isActive, openMenu, closeMenu, position, contextAppear };
+    return { isActive, openMenu, closeMenu, position, contextAppear, triggerEl, dragging };
   },
 };
 </script>
 
 <template>
-  <div :style="style" @contextmenu.prevent="openMenu">
+  <div
+    ref="triggerEl"
+    :style="style"
+    @contextmenu.prevent="openMenu"
+    @dragstart="dragging = !$event.defaultPrevented"
+    @dragend="dragging = false"
+  >
     <slot name="trigger" />
   </div>
   <teleport to="body">

@@ -78,20 +78,19 @@ export default {
         target.style.left = `${left}px`;
         target.style.top = `${top}px`;
       })
-      .on(
-        "resizeEnd",
-        ({
-          target,
-          lastEvent: {
+      .on("resizeEnd", ({ target, lastEvent }) => {
+        // lastEvent is undefined when a handle is grabbed and released
+        // without moving (easy to do on touch) — same guard dragEnd has.
+        if (lastEvent) {
+          const {
             width,
             height,
             drag: { left, top },
-          },
-        }) => {
+          } = lastEvent;
           sendResize(target, { left, top, width, height });
-          isDragging.value = false;
-        },
-      );
+        }
+        isDragging.value = false;
+      });
 
     const sendRotation = (target, rotate) => {
       target.style.transform = `rotate(${props.object.rotate}deg)`;
@@ -111,8 +110,10 @@ export default {
       .on("rotate", ({ target, rotate }) => {
         target.style.transform = `rotate(${rotate}deg)`;
       })
-      .on("rotateEnd", ({ target, lastEvent: { rotate } }) => {
-        sendRotation(target, rotate);
+      .on("rotateEnd", ({ target, lastEvent }) => {
+        if (lastEvent) {
+          sendRotation(target, lastEvent.rotate);
+        }
         isDragging.value = false;
       });
 
@@ -129,7 +130,15 @@ export default {
               keepRatio: !["text", "meeting"].includes(props.object.type) && !props.object.isRTMP,
             },
             () => {
-              if (e && props.object.type !== "text") {
+              // Adopt the in-flight gesture so a single mousedown both
+              // selects and drags. MOUSE ONLY: gesto cannot adopt an
+              // in-flight touch (the stored touchstart is stale by the time
+              // this async callback runs) and the attempt corrupts its state
+              // — every later touchmove then throws "Cannot set properties
+              // of null (setting 'dist')" and the object never moves. On
+              // touch the first tap selects; moveable's own listeners on the
+              // now-set target handle the next touch gesture natively.
+              if (e && props.object.type !== "text" && !("touches" in e)) {
                 moveable.dragStart(e);
               }
             },
@@ -150,9 +159,33 @@ export default {
 
     const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
+    // Timestamp of the last touch on this object, to recognise the
+    // compatibility mouse events (mousedown/mouseup/click) the browser
+    // synthesises right after every tap.
+    let lastTouchAt = 0;
+
     const clickInside = (e) => {
       if (replaying) return;
       if (props.controlable && canPlay.value) {
+        if ("touches" in e) {
+          lastTouchAt = Date.now();
+          // Touch on an ALREADY-selected object: moveable's own listeners
+          // on the target are handling this very gesture. Re-running
+          // setState here re-renders moveable mid-gesture, which wipes its
+          // internal state.dragInfo — every subsequent move then throws
+          // ("Cannot set properties of null (setting 'dist')") and the
+          // object never moves.
+          if (stageStore.activeMovable === props.object.id) {
+            return;
+          }
+        } else if (Date.now() - lastTouchAt < 800) {
+          // Compatibility mousedown synthesised after a tap. The touchstart
+          // branch above already selected the object; letting this through
+          // would call moveable.dragStart() on a gesture that is already
+          // over, corrupting gesto's drag state so the next real touch drag
+          // does nothing.
+          return;
+        }
         showControls(true, e);
         stageStore.SET_ACTIVE_MOVABLE(props.object.id);
       }
@@ -267,6 +300,10 @@ export default {
       opacity: object.opacity * (isDragging ? 0.5 : 1),
       filter: `grayscale(${object.liveAction === false ? 1 : 0})`,
       'transform-origin': transformOrigin,
+      /* Players drag objects with a finger: without this the browser claims
+         the gesture and pans the page instead. Audience (not controlable)
+         keeps default scrolling. */
+      'touch-action': controlable ? 'none' : 'auto',
     }"
     @mousedown="clickInside"
     @touchstart="clickInside"

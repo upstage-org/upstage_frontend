@@ -160,5 +160,9 @@ export default {
   position: fixed;
   background-size: cover;
   overflow: hidden;
+  /* Single-finger pans starting on the stage must not scroll the page
+     ("mysterious margins" while trying to move objects on a tablet);
+     two-finger pinch-zoom stays available for the audience. */
+  touch-action: pinch-zoom;
 }
 </style>
