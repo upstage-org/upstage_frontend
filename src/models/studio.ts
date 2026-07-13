@@ -110,6 +110,9 @@ export interface MediaAttributes {
   w: number;
   h: number;
   note: string;
+  // Per-media exit (removal) animation; absent = use the stage default.
+  exitAnimation?: string;
+  exitSpeed?: number;
 }
 
 export interface Link {

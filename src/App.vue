@@ -89,6 +89,11 @@ onMounted(() => {
     :theme="{
       token: {
         colorPrimary: '#007011',
+        // Ant derives link colours from its own blue, not colorPrimary —
+        // links must roll over green like the rest of the UpStage palette.
+        colorLink: '#007011',
+        colorLinkHover: '#30ac45',
+        colorLinkActive: '#00560d',
         borderRadius: 4,
         fontSize: 16,
         fontFamily: 'Josefin Sans, sans-serif',

@@ -26,6 +26,10 @@ interface SaveMediaMutationVariables {
   note: string;
   voice: AvatarVoice;
   link: Link;
+  // "" / 0 are the explicit "stage default" sentinels: the backend deletes
+  // the stored keys, while omitting the fields leaves them untouched.
+  exitAnimation: string;
+  exitSpeed: number;
 }
 
 /**

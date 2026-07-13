@@ -277,6 +277,8 @@ export default {
           :data-testid="object?.name ? `object-${object.name}` : undefined"
           :data-object-id="object?.id"
           :data-object-type="object?.type"
+          :data-exit-animation="object?.exitAnimation || undefined"
+          :data-exit-speed="object?.exitSpeed || undefined"
           class="object"
           :class="{ 'link-hover-effect': hasLink && object.link.effect }"
           :style="{

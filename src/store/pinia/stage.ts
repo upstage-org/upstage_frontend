@@ -111,6 +111,11 @@ export interface BoardObject {
   frameLoop?: boolean;
   /** Live RTMP feed tile (renders via LiveStreamPlayer, not <video src>). */
   isRTMP?: boolean;
+  /** Per-media exit (removal) animation, seeded from the media's saved
+   *  attributes at placement time; absent = stage default. */
+  exitAnimation?: string;
+  /** Exit animation duration in ms; only meaningful with exitAnimation. */
+  exitSpeed?: number;
   assetType?: { name?: string };
   description?: string;
   fontSize?: string;
@@ -2217,6 +2222,12 @@ export const useStageStore = defineStore(
         try {
           const description = JSON.parse(data.description ?? "");
           if (description.w && description.h) object.h = (description.h * 100) / description.w;
+          // Video/stream toolbox items keep their description unparsed (unlike
+          // avatars/props, whose attributes SET_MODEL merges onto the item), so
+          // the per-media exit animation must be lifted onto the board object
+          // here for Board.vue's leave hook to see it.
+          if (description.exitAnimation) object.exitAnimation = description.exitAnimation;
+          if (description.exitSpeed) object.exitSpeed = description.exitSpeed;
         } catch {
           // description is optional / may not be JSON; fall back to defaults.
         }

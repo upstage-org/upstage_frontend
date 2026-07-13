@@ -82,9 +82,20 @@ export default {
       });
     };
     const avatarLeave = (el, complete) => {
-      runRemovalAnimation(config.value?.animations?.removal ?? "spiral", el, complete, {
-        duration: config.value?.animations?.removalSpeed ?? config.value?.animateDuration ?? 1000,
-      });
+      // Per-media exit settings ride the object and are mirrored onto the
+      // rendered `.object` div as data attributes (Object.vue) — the store
+      // has already dropped the object by the time this leave hook runs, so
+      // the DOM snapshot is the only place left to read them. Objects
+      // without their own setting (text, drawings, older media) fall back
+      // to the stage-wide config.
+      const dataset = el.querySelector?.(".object")?.dataset ?? {};
+      const animation = dataset.exitAnimation || config.value?.animations?.removal || "spiral";
+      const speed = Number(dataset.exitSpeed);
+      const duration =
+        speed > 0
+          ? speed
+          : (config.value?.animations?.removalSpeed ?? config.value?.animateDuration ?? 1000);
+      runRemovalAnimation(animation, el, complete, { duration });
     };
 
     const backdropColor = computed(() => stageStore.backdropColor);
@@ -140,14 +151,20 @@ export default {
       @mousedown="onBoardPointerDown"
     >
       <Backdrop />
+      <!--
+        Each object is wrapped in a plain div so the transition-group child is
+        a single element root. The object components bottom out in
+        ContextMenu.vue, whose template is a fragment (trigger div + teleport)
+        — Vue cannot animate a fragment-rooted component inside a transition
+        ("renders non-element root node that cannot be animated"), so the
+        enter/leave hooks silently never ran and objects blinked out with no
+        exit animation. The wrapper is layout-neutral: everything the object
+        components render is absolutely positioned against #board.
+      -->
       <transition-group name="stage-avatars" :css="false" @enter="avatarEnter" @leave="avatarLeave">
-        <component
-          :is="resolveType(object)"
-          v-for="object in objects"
-          :id="object.id"
-          :key="boardObjectKey(object)"
-          :object="object"
-        />
+        <div v-for="object in objects" :key="boardObjectKey(object)">
+          <component :is="resolveType(object)" :id="object.id" :object="object" />
+        </div>
       </transition-group>
     </div>
   </section>

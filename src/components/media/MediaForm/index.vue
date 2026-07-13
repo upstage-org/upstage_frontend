@@ -31,6 +31,7 @@ import { editingMediaVar, inquiryVar } from "apollo";
 import MediaPermissions from "./MediaPermissions.vue";
 import AvatarVoice from "./AvatarVoice.vue";
 import PropLink from "./PropLink.vue";
+import ExitAnimation from "./ExitAnimation.vue";
 import { getDefaultAvatarVoice } from "services/speech/voice";
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { MEDIA_FORM_META_QUERY } from "services/graphql/mediaList";
@@ -122,6 +123,8 @@ watch(editingMediaResult, () => {
     if (attributes?.link) {
       Object.assign(link, attributes.link);
     }
+    exit.animation = attributes?.exitAnimation ?? "";
+    exit.speed = attributes?.exitSpeed ?? 1000;
     note.value = attributes?.note ?? "";
     if (editingMedia.stages) {
       stageIds.value = editingMedia.stages.map((stage) => stage.id);
@@ -151,6 +154,9 @@ const copyrightLevel = ref<CopyrightLevel>(0);
 const owner = ref<string>("");
 const voice = reactive<Voice>(getDefaultAvatarVoice());
 const link = reactive<Link>({ url: "", blank: true, effect: false });
+// animation "" = "Stage default" (no per-media override saved); speed is a
+// duration in ms, only meaningful (and only persisted) with an animation.
+const exit = reactive<{ animation: string; speed: number }>({ animation: "", speed: 1000 });
 
 const whoami = inject<ComputedRef<User>>("whoami");
 if (whoami) {
@@ -264,6 +270,10 @@ const { progress, saveMedia, saving } = useSaveMedia(
         urls: [],
         voice,
         link,
+        // "Stage default" clears BOTH stored keys (0 is the backend's
+        // delete sentinel for the speed) so the item falls back cleanly.
+        exitAnimation: exit.animation,
+        exitSpeed: exit.animation ? exit.speed : 0,
       },
     };
   },
@@ -320,6 +330,8 @@ watch(visibleDropzone as Ref, (val) => {
   if (files?.value && files.value.length === 0 && val) {
     name.value = "";
     note.value = "";
+    exit.animation = "";
+    exit.speed = 1000;
   }
 });
 
@@ -663,6 +675,9 @@ const getUserDisplayName = (user: User) => {
             </a-tab-pane>
             <a-tab-pane v-if="type === 'avatar' || type === 'prop'" key="link" tab="Link">
               <PropLink :link="link" />
+            </a-tab-pane>
+            <a-tab-pane v-if="['avatar', 'prop', 'video'].includes(type)" key="exit" tab="Exit">
+              <ExitAnimation :exit="exit" :preview-src="files?.[0]?.preview" />
             </a-tab-pane>
             <a-tab-pane key="changeowner" tab="Change Owner">
               <div class="p-4">

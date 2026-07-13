@@ -92,6 +92,10 @@ export default {
             link,
             w,
             h,
+            // Set in the Studio media editor; passed through here so saving
+            // from this legacy dialog doesn't wipe the exit animation.
+            ...(form.exitAnimation ? { exitAnimation: form.exitAnimation } : {}),
+            ...(form.exitSpeed ? { exitSpeed: form.exitSpeed } : {}),
           }),
           fileLocation: src,
           copyrightLevel,

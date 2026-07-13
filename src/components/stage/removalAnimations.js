@@ -143,7 +143,7 @@ const ANIMATIONS = {
     });
   },
 
-  sparkle: ({ target, duration, complete }) => {
+  sparkle: ({ target, duration, complete, board }) => {
     // Measure before complete() — Vue removes the element the moment it fires.
     const rect = target.getBoundingClientRect();
 
@@ -155,9 +155,8 @@ const ANIMATIONS = {
       onComplete: complete,
     });
 
-    // Glitter burst on #board (never on the leaving element), each dot
-    // cleaning itself up independently of the object's removal.
-    const board = boardElement();
+    // Glitter burst on the board overlay (never on the leaving element),
+    // each dot cleaning itself up independently of the object's removal.
     if (!board) return;
     const boardRect = board.getBoundingClientRect();
     const cx = rect.left - boardRect.left + rect.width / 2;
@@ -189,7 +188,7 @@ const ANIMATIONS = {
     }
   },
 
-  poof: ({ target, duration, complete }) => {
+  poof: ({ target, duration, complete, board }) => {
     // Measure before complete() — Vue removes the element the moment it fires.
     const rect = target.getBoundingClientRect();
 
@@ -200,9 +199,8 @@ const ANIMATIONS = {
       onComplete: complete,
     });
 
-    // The cloud lives on #board (never on the leaving element) and cleans
-    // itself up independently of the object's removal.
-    const board = boardElement();
+    // The cloud lives on the board overlay (never on the leaving element)
+    // and cleans itself up independently of the object's removal.
     if (!board) return;
     const boardRect = board.getBoundingClientRect();
     const size = Math.min(Math.max(80, Math.max(rect.width, rect.height) * 1.1), 400);
@@ -230,10 +228,23 @@ const ANIMATIONS = {
   },
 };
 
-export function runRemovalAnimation(name, el, complete, { duration = 1000 } = {}) {
+/**
+ * @param {string} name
+ * @param {Element} el wrapper containing the `.object` div to animate
+ * @param {() => void} complete
+ * @param {{ duration?: number, board?: Element | null }} [options]
+ */
+export function runRemovalAnimation(name, el, complete, { duration = 1000, board } = {}) {
   const target = el.querySelector(".object");
   // Never strand Vue's leave hook: no target means nothing to animate, but
   // complete() must still fire or the element ghosts in the DOM forever.
   if (!target) return complete();
-  (ANIMATIONS[name] || ANIMATIONS.spiral)({ target, duration, complete });
+  // `board` hosts the detached overlays (poof cloud, sparkle glitter). On
+  // stage that's #board; the studio media-form preview passes its own box.
+  (ANIMATIONS[name] || ANIMATIONS.spiral)({
+    target,
+    duration,
+    complete,
+    board: board ?? boardElement(),
+  });
 }
