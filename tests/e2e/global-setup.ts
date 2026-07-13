@@ -53,6 +53,27 @@ export default async function globalSetup() {
   const mqttHost = e2eCfg.mqttHost;
   const mqttPort = e2eCfg.mqttWsPort;
 
+  // This suite AUTHORS data (users, media, stages). Runs against the shared
+  // dev backend have polluted the live dev DB — orphaned stages, and on
+  // 2026-07-14 e2e media assigned to a REAL user's account (the persona
+  // picker matched "Gregory" for the missing "gregory"). Default to the
+  // disposable e2e backend (tests/e2e/env/e2e-backend-up.sh, port 9092) and
+  // require an explicit opt-in for the known shared backends.
+  const sharedBackend = /:9090(\/|$)|dev\.upstage\.live|\/\/(www\.)?upstage\.live/.test(
+    e2eCfg.graphqlEndpoint,
+  );
+  if (sharedBackend && process.env.E2E_ALLOW_SHARED_DB !== "1") {
+    throw new Error(
+      `[e2e] E2E_GRAPHQL_ENDPOINT (${e2eCfg.graphqlEndpoint}) is a SHARED backend whose ` +
+        "database this suite would write test users/media/stages into. Use the disposable " +
+        "e2e backend instead:\n" +
+        "    tests/e2e/env/e2e-backend-up.sh   # fresh upstage_e2e DB + API on 127.0.0.1:9092\n" +
+        "    tests/e2e/env/vite-e2e.sh         # SPA on :3001 pointed at it\n" +
+        "and set E2E_GRAPHQL_ENDPOINT=http://127.0.0.1:9092/api/studio_graphql in .env.test.\n" +
+        "If you REALLY mean to write into the shared dev DB, set E2E_ALLOW_SHARED_DB=1.",
+    );
+  }
+
   // Fail fast with a clear message instead of waiting for browser timeouts.
   await probeTcp(
     baseUrl.hostname,

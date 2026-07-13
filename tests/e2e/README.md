@@ -5,6 +5,23 @@ Mosquitto. The main flow authors a Romeo and Juliet Act I Scene I stage as
 `admin`, then runs the play with thirteen player browser contexts plus an
 admin observer so chats and board actions round-trip through MQTT.
 
+**The suite writes into its own disposable backend** — a fresh `upstage_e2e`
+postgres database plus an `upstage_backend_e2e` API container on
+`127.0.0.1:9092` — never into the shared dev DB (`global-setup` refuses the
+known shared endpoints unless `E2E_ALLOW_SHARED_DB=1`; running against dev
+once assigned e2e media to a real user's account). Standard flow:
+
+```sh
+tests/e2e/env/e2e-backend-up.sh     # fresh DB + API :9092 (migrations seed admin)
+tests/e2e/env/vite-e2e.sh           # SPA on :3001 pointed at :9092
+E2E_SKIP_CONFIRM=1 PWHEADLESS=1 pnpm e2e
+tests/e2e/env/e2e-backend-down.sh   # dispose (drops the DB; --purge removes uploads too)
+```
+
+Personas are self-seeding: `global-setup` batch-creates any missing player
+accounts through the admin API, and `setup.spec.ts` authors the stage/media,
+so a fresh DB needs no manual preparation.
+
 Configuration and secrets are merged into `process.env` from **`upstage_frontend/.env.test`**
 (copy from **`.env.test.example`** on first setup).
 The authoritative defaults and summaries live in **`tests/e2e/e2e-config.ts`**
@@ -44,7 +61,7 @@ Running **`pnpm exec playwright test`** directly bypasses preflight entirely.
    facade). That hook and the `vuex` dependency itself were removed in
    Phase 5.3 Wave F. If you're rebasing a branch onto a tree that still
    uses `__UPSTAGE_STORE__` the rewrite is mechanical: `store.dispatch
-   ("stage/X", p)` → `__UPSTAGE_PINIA__.stage.X(p)`, `store.state.stage.X`
+("stage/X", p)` → `__UPSTAGE_PINIA__.stage.X(p)`, `store.state.stage.X`
    → `__UPSTAGE_PINIA__.stage.X`, `store.getters["stage/X"]` →
    `__UPSTAGE_PINIA__.stage.X`. All stores (`auth`, `cache`, `config`,
    `user`, `stage`) are exposed via `__UPSTAGE_PINIA__`.
@@ -108,49 +125,49 @@ If you set **`E2E_RUN_ID`** yourself, global-setup **does not** overwrite it.
 Cast accounts are defined in `personas/index.ts`. **`global-setup.ts`** calls
 Studio’s batch user creation **idempotently** (existing usernames are skipped).
 
-| Role | Source |
-|------|--------|
-| Admin | `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD` (defaults `admin` / `12345678`) |
+| Role        | Source                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------- |
+| Admin       | `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD` (defaults `admin` / `12345678`)             |
 | All players | `E2E_PLAYER_PASSWORD` (default `e2e-pw`) plus per-persona emails in `personas/index.ts` |
 
 Passwords are not stored in `runtime.json`; they stay in code and env.
 
 ## Commands (from `upstage_frontend`)
 
-| Command | Purpose |
-|---------|---------|
-| `pnpm e2e` | Full suite (`run-e2e` preflight → Playwright lists all projects: smoke + setup + perform + features). |
-| `pnpm e2e:setup` | Setup project only (`run-e2e` preflight → `playwright test --project=setup`). |
-| `pnpm e2e:perform` | Perform project (`run-e2e` preflight → `playwright --project=perform`; setup runs first via dependencies). |
-| `pnpm e2e:features` | Features project (drawing, drawing-as-avatar, opacity, depth; setup runs first via dependencies). |
-| `pnpm e2e:smoke` | Short perform slice via `E2E_BEATS=smoke` + `run-e2e` preflight. |
-| `pnpm e2e:smoke:stub` | Mock smoke specs only + `run-e2e` preflight. |
-| `pnpm e2e:replay-studio` | Studio Archive → replay viewer (`replay-studio.spec.ts`; needs setup + archived performance). |
-| `pnpm e2e:perform:replay` | Perform pass 3 only (`E2E_PHASES=replay`). |
+| Command                   | Purpose                                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `pnpm e2e`                | Full suite (`run-e2e` preflight → Playwright lists all projects: smoke + setup + perform + features).      |
+| `pnpm e2e:setup`          | Setup project only (`run-e2e` preflight → `playwright test --project=setup`).                              |
+| `pnpm e2e:perform`        | Perform project (`run-e2e` preflight → `playwright --project=perform`; setup runs first via dependencies). |
+| `pnpm e2e:features`       | Features project (drawing, drawing-as-avatar, opacity, depth; setup runs first via dependencies).          |
+| `pnpm e2e:smoke`          | Short perform slice via `E2E_BEATS=smoke` + `run-e2e` preflight.                                           |
+| `pnpm e2e:smoke:stub`     | Mock smoke specs only + `run-e2e` preflight.                                                               |
+| `pnpm e2e:replay-studio`  | Studio Archive → replay viewer (`replay-studio.spec.ts`; needs setup + archived performance).              |
+| `pnpm e2e:perform:replay` | Perform pass 3 only (`E2E_PHASES=replay`).                                                                 |
 
 ## Environment variables
 
-| Variable | Meaning |
-|----------|---------|
-| `E2E_BASE_URL` | SPA origin (**must be listening already**). Unset ⇒ default `http://127.0.0.1:3000`; Playwright never spawns Vite. |
-| `E2E_GRAPHQL_ENDPOINT` | Studio GraphQL URL for Node helpers (`graphql.ts`, setup, global-setup). |
-| `E2E_MQTT_HOST`, `E2E_MQTT_PORT` | TCP probe for the WS listener on the host (defaults `localhost` / **`9001`**). Use the same port your `ws://…` MQTT URL exposes; **1883** is internal MQTT, not WS. |
-| `E2E_ADMIN_USERNAME`, `E2E_ADMIN_PASSWORD` | Admin login for harness and SPA. |
-| `E2E_PLAYER_PASSWORD` | Password for every persona row created by batch user creation. |
-| `E2E_RUN_ID` | Fixed authoring id prefix; disables automatic `runId` generation from timestamp/PID when set. |
-| `E2E_FORCE_FRESH_SETUP` | Non-false ⇒ drop `runtime.json`, ignore persisted stage reuse (see above). |
-| `E2E_BEATS` | Set to `smoke` for the short perform slice (`e2e:smoke`). |
-| `E2E_SKIP_CONFIRM` | Set to `1` to skip the interactive “proceed?” step in `run-e2e.ts`. |
-| `PWHEADLESS` | `1`/`0`/`false` overrides headed vs headless (CI defaults headless via `CI=1`). |
+| Variable                                   | Meaning                                                                                                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `E2E_BASE_URL`                             | SPA origin (**must be listening already**). Unset ⇒ default `http://127.0.0.1:3000`; Playwright never spawns Vite.                                                  |
+| `E2E_GRAPHQL_ENDPOINT`                     | Studio GraphQL URL for Node helpers (`graphql.ts`, setup, global-setup).                                                                                            |
+| `E2E_MQTT_HOST`, `E2E_MQTT_PORT`           | TCP probe for the WS listener on the host (defaults `localhost` / **`9001`**). Use the same port your `ws://…` MQTT URL exposes; **1883** is internal MQTT, not WS. |
+| `E2E_ADMIN_USERNAME`, `E2E_ADMIN_PASSWORD` | Admin login for harness and SPA.                                                                                                                                    |
+| `E2E_PLAYER_PASSWORD`                      | Password for every persona row created by batch user creation.                                                                                                      |
+| `E2E_RUN_ID`                               | Fixed authoring id prefix; disables automatic `runId` generation from timestamp/PID when set.                                                                       |
+| `E2E_FORCE_FRESH_SETUP`                    | Non-false ⇒ drop `runtime.json`, ignore persisted stage reuse (see above).                                                                                          |
+| `E2E_BEATS`                                | Set to `smoke` for the short perform slice (`e2e:smoke`).                                                                                                           |
+| `E2E_SKIP_CONFIRM`                         | Set to `1` to skip the interactive “proceed?” step in `run-e2e.ts`.                                                                                                 |
+| `PWHEADLESS`                               | `1`/`0`/`false` overrides headed vs headless (CI defaults headless via `CI=1`).                                                                                     |
 
 ## Playwright projects
 
-| Project | Files |
-|---------|-------|
-| `smoke` | `auth.spec.ts`, `media.spec.ts`, `stage.spec.ts` |
-| `setup` | `setup.spec.ts` |
-| `perform` | `perform.spec.ts` (runs after `setup` in one invocation) |
-| `features` | `features.spec.ts` — drawing, drawing-as-avatar, opacity, depth (runs after `setup`) |
+| Project         | Files                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| `smoke`         | `auth.spec.ts`, `media.spec.ts`, `stage.spec.ts`                                            |
+| `setup`         | `setup.spec.ts`                                                                             |
+| `perform`       | `perform.spec.ts` (runs after `setup` in one invocation)                                    |
+| `features`      | `features.spec.ts` — drawing, drawing-as-avatar, opacity, depth (runs after `setup`)        |
 | `replay-studio` | `replay-studio.spec.ts` — Studio Archive tab opens `/replay/:slug/:id` (runs after `setup`) |
 
 `workers: 1` and `fullyParallel: false` keep ordering predictable for setup and MQTT.
@@ -192,7 +209,7 @@ narrowing beats via `E2E_BEATS=smoke`.
 
 ## Out of scope
 
-- Driving Jitsi beyond basic presence checks where applicable  
-- Replay / recording workflows  
-- Mobile viewports  
-- Locales other than English for these specs  
+- Driving Jitsi beyond basic presence checks where applicable
+- Replay / recording workflows
+- Mobile viewports
+- Locales other than English for these specs

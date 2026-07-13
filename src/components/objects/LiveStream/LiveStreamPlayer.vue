@@ -10,13 +10,15 @@
  * offline (MediaMTX answers 404) show a placeholder and retry on an
  * interval.
  *
- * The element mirrors Object.vue's <video> contract: same PiP/controls
- * hardening, and the performer's Play/Stop context tool drives
- * `object.isPlaying` for everyone (paused live video shows a frozen frame).
+ * The element shares Object.vue's <video> PiP/controls hardening, but NOT
+ * its Play/Stop contract: like a jitsi tile, a live feed plays the moment
+ * it connects — the lightbulb alone decides who sees/hears it (unpublished
+ * objects never reach the audience, see reusable.ts serializeForBroadcast).
  */
 import Hls from "hls.js";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStageStore } from "@stores/pinia/stage";
 import {
   connectWhep,
   hlsStreamHasAudio,
@@ -31,11 +33,11 @@ const props = defineProps<{
   object: {
     id?: string;
     fileLocation?: string;
-    isPlaying?: boolean;
   };
 }>();
 
 const { t } = useI18n();
+const stageStore = useStageStore();
 
 const OFFLINE_RETRY_MS = 5000;
 const WHEP_TRACK_TIMEOUT_MS = 4000;
@@ -103,7 +105,8 @@ function startStallWatchdog(connection: WhepConnection) {
     }
     const el = video.value;
     if (!el || el.paused) {
-      // Not playing (the Play tool drives playback) — no frames expected.
+      // Not playing (autoplay may still be gesture-blocked) — no frames
+      // expected.
       stalledMs = 0;
       return;
     }
@@ -144,23 +147,34 @@ async function teardown() {
   }
 }
 
-function applyPlayState() {
+// Live feeds play unconditionally once connected (jitsi-tile semantics —
+// there is no Play tool for them; the lightbulb governs who sees the
+// object at all). Browsers may still block the un-gestured play() with
+// audio, so on rejection retry on the next user interaction anywhere on
+// the page.
+let gestureRetryArmed = false;
+const retryPlayOnGesture = () => {
+  gestureRetryArmed = false;
+  if (!disposed) ensurePlaying();
+};
+
+function ensurePlaying() {
   const el = video.value;
   if (!el || state.value !== "live") return;
-  if (props.object.isPlaying) {
-    const playPromise = el.play();
-    if (playPromise) {
-      playPromise.catch((error) => {
-        // Same contract as Object.vue: browsers block un-gestured playback
-        // with audio; the performer/audience can use the Play tool.
-        console.warn(
-          "[stage] live stream play() was blocked; right-click the object and choose Play to start it:",
-          error?.name || error,
-        );
+  const playPromise = el.play();
+  if (playPromise) {
+    playPromise.catch((error) => {
+      console.warn(
+        "[stage] live stream play() was blocked; will retry on the next click/tap (or use the Refresh streams button):",
+        error?.name || error,
+      );
+      if (disposed || gestureRetryArmed) return;
+      gestureRetryArmed = true;
+      document.addEventListener("pointerdown", retryPlayOnGesture, {
+        once: true,
+        capture: true,
       });
-    }
-  } else {
-    el.pause();
+    });
   }
 }
 
@@ -209,7 +223,7 @@ async function tryWhep(key: string): Promise<void> {
   }
   video.value.srcObject = connection.stream;
   state.value = "live";
-  applyPlayState();
+  ensurePlaying();
   startStallWatchdog(connection);
   if (!connection.hasAudio) {
     // Manifest may not exist yet right after the publisher starts;
@@ -272,7 +286,7 @@ function tryHls(key: string): Promise<void> {
       hls = instance;
       instance.on(Hls.Events.MANIFEST_PARSED, () => {
         state.value = "live";
-        applyPlayState();
+        ensurePlaying();
         resolve();
       });
       instance.on(Hls.Events.ERROR, (_event, data) => {
@@ -289,7 +303,7 @@ function tryHls(key: string): Promise<void> {
         "loadedmetadata",
         () => {
           state.value = "live";
-          applyPlayState();
+          ensurePlaying();
           resolve();
         },
         { once: true },
@@ -340,14 +354,25 @@ async function connect() {
   }
 }
 
+// The Refresh-streams button (ReloadStream.vue → triggerForceReloadStreams)
+// is a local per-browser signal: jitsi tiles re-attach their tracks, and a
+// live feed reconnects from scratch. Forget any "can't ride WebRTC" verdict
+// so the fresh attempt gets the low-latency WHEP path again (the publisher
+// may have fixed their encoder settings since).
 watch(
-  () => props.object.isPlaying,
-  () => applyPlayState(),
+  () => stageStore.forceReloadStreams,
+  async () => {
+    if (disposed) return;
+    whepBroken = false;
+    await teardown();
+    if (!disposed) await connect();
+  },
 );
 
 onMounted(connect);
 onBeforeUnmount(() => {
   disposed = true;
+  document.removeEventListener("pointerdown", retryPlayOnGesture, { capture: true });
   teardown();
 });
 </script>
@@ -380,11 +405,11 @@ onBeforeUnmount(() => {
 .the-object-video {
   width: 100%;
   height: 100%;
-  // fill, not cover: cover crops whatever doesn't fit the tile (users saw
-  // the top of the feed chopped off). The tile resizes freely (Moveable
-  // exempts isRTMP from keepRatio), so the performer shapes the tile and
-  // the video stretches to match in each axis independently.
-  object-fit: fill;
+  // Same philosophy as a jitsi window (Jitsi.vue): the video is never
+  // distorted — it covers the tile and crops what doesn't fit. Resizing
+  // keeps the tile's proportions (Moveable keepRatio); performers who want
+  // a different picture shape adjust the canvas in OBS.
+  object-fit: cover;
   display: block;
   background: #000;
 }

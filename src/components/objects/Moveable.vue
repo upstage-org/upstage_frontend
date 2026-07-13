@@ -123,11 +123,11 @@ export default {
           moveable.setState(
             {
               target: el.value,
-              // Live RTMP tiles resize freely: the tile's shape is the
-              // performer's framing tool (the <video> uses object-fit: fill),
-              // so locking the ratio would force the initial drop shape on
-              // every feed regardless of the source's real aspect.
-              keepRatio: !["text", "meeting"].includes(props.object.type) && !props.object.isRTMP,
+              // Live RTMP tiles keep their proportions like every other
+              // media object (jitsi philosophy: the <video> uses
+              // object-fit: cover, so the picture is never distorted —
+              // performers reshape the picture in OBS, not on stage).
+              keepRatio: !["text", "meeting"].includes(props.object.type),
             },
             () => {
               // Adopt the in-flight gesture so a single mousedown both

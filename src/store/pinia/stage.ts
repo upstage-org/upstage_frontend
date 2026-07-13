@@ -109,6 +109,8 @@ export interface BoardObject {
   frames?: string[];
   /** When false, multiframe `autoplayFrames` stops after one cycle; true/omitted = loop. */
   frameLoop?: boolean;
+  /** Live RTMP feed tile (renders via LiveStreamPlayer, not <video src>). */
+  isRTMP?: boolean;
   assetType?: { name?: string };
   description?: string;
   fontSize?: string;

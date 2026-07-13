@@ -1246,6 +1246,113 @@ test.describe("streaming: performer streams, audience views @full", () => {
   });
 
   /**
+   * Live RTMP feed tile controls — the tile follows jitsi-window
+   * semantics, not the VoD video contract:
+   *
+   *   • reduced context menu: Volume only — no Play/Pause, Restart, Loop
+   *     (a live feed has no timeline; playback starts on connect)
+   *   • jitsi-style fit: `object-fit: cover`, never distorted
+   *   • the Refresh-streams button appears for an RTMP tile (previously
+   *     jitsi-only) and its force-reload signal makes LiveStreamPlayer
+   *     reconnect immediately instead of waiting out the 5s retry timer.
+   *
+   * The feed itself is never live: every MediaMTX request (WHEP + HLS,
+   * raw and -opus mirror keys) is intercepted with a 404, which drives
+   * the player's offline retry loop deterministically.
+   */
+  test("RTMP tile: reduced menu, cover fit, refresh button reconnects", async ({ browser }) => {
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const tileName = `rtmp-tile-${runtime.runId}`;
+    const streamKey = `e2e-rtmp-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const page = await performerCtx.newPage();
+
+      // Count connect attempts (each connect() bursts 1-3 requests:
+      // -opus WHEP, raw WHEP, HLS manifest — all match this pattern).
+      let feedRequests = 0;
+      await page.route(`**/live/${streamKey}*/**`, async (route) => {
+        feedRequests += 1;
+        await route.fulfill({ status: 404, body: "" });
+      });
+
+      await new LoginPage(page).login(persona.username, persona.password);
+      await new LiveStagePage(page).goto(runtime.stageSlug);
+      await page.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      // Place the RTMP tile store-side (placeObjectOnStage is local-only —
+      // nothing is broadcast, so the shared test stage stays clean).
+      const objectId = await page.evaluate(
+        ({ name, key }) => {
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            placeObjectOnStage: (p: unknown) => { id: string };
+          };
+          const placed = stage.placeObjectOnStage({
+            type: "video",
+            isRTMP: true,
+            name,
+            fileLocation: key,
+            w: 200,
+            h: 150,
+            x: 240,
+            y: 200,
+            liveAction: true,
+            published: true,
+          });
+          return placed.id;
+        },
+        { name: tileName, key: streamKey },
+      );
+
+      // Refresh-streams button shows for an RTMP-only stream set.
+      const refreshButton = page
+        .locator("#reload-stream button")
+        .filter({ has: page.locator("i.fa-sync") });
+      await expect(refreshButton).toBeVisible({ timeout: 10_000 });
+
+      // LiveStreamPlayer renders the tile with jitsi-style cover fit.
+      const video = page.locator(`[id="video${objectId}"]`);
+      await expect(video).toBeAttached({ timeout: 10_000 });
+      expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("cover");
+
+      // Context menu: Volume present; Play/Pause, Restart, Loop absent.
+      await page.locator(`[data-testid="object-${tileName}"]`).click({ button: "right" });
+      const menu = page.locator(".avatar-context-menu");
+      await expect(menu).toBeVisible({ timeout: 5_000 });
+      await expect(menu.getByText("Volume setting", { exact: false })).toBeVisible();
+      await expect(menu.getByText("Play", { exact: true })).toHaveCount(0);
+      await expect(menu.getByText("Pause", { exact: true })).toHaveCount(0);
+      await expect(menu.getByText("Restart", { exact: true })).toHaveCount(0);
+      await expect(menu.locator("i.fa-play, i.fa-pause, i.fa-infinity")).toHaveCount(0);
+      // Close the menu (outside click) so it can't overlap the top-bar
+      // refresh button for the next step.
+      await page.mouse.click(650, 550);
+      await expect(menu).toBeHidden({ timeout: 5_000 });
+
+      // Refresh reconnects immediately. Sync to the 5s offline-retry
+      // cadence first: wait for a fresh attempt, let its request burst
+      // finish, then click — any request inside the next 2.5s window can
+      // only come from the force-reload signal.
+      await expect.poll(() => feedRequests, { timeout: 15_000 }).toBeGreaterThan(0);
+      const settled = feedRequests;
+      await expect.poll(() => feedRequests, { timeout: 15_000 }).toBeGreaterThan(settled);
+      await page.waitForTimeout(500);
+      const beforeClick = feedRequests;
+      await refreshButton.click();
+      await expect
+        .poll(() => feedRequests, { timeout: 2_500, message: "refresh must trigger a reconnect" })
+        .toBeGreaterThan(beforeClick);
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
    * Cross-client WebRTC publish — performer drags Yourself onto the
    * board, audience renders a `Jitsi.vue` tile that subscribes to the
    * remote track. This needs:
@@ -1492,7 +1599,20 @@ test.describe("streaming: performer streams, audience views @full", () => {
     }
   });
 
-  test("reconcileJitsiBoardFromEvents drops destroyed tiles and latest hostId wins", async ({
+  /**
+   * Ghost-tile reconcile contract (computeFinalJitsiObjectsFromEvents).
+   * De-dup is by *generation* (`participantId`), NOT by `hostId`:
+   * lib-jitsi-meet mints a fresh participantId on every CONFERENCE_JOINED
+   * and the publisher re-broadcasts its tiles with the current id, so a
+   * tile carrying an OLDER participantId than its host's latest broadcast
+   * is a leftover of a previous join — drop it. Tiles sharing the CURRENT
+   * participantId are concurrent live streams from one tab and must ALL
+   * survive (keying the de-dup on hostId alone collapsed them to one —
+   * the "multiple streams" regression fixed in c7c4c9c). Tiles with no
+   * host/participant binding are legacy data and are kept; DESTROYed
+   * tiles are dropped.
+   */
+  test("reconcileJitsiBoardFromEvents keeps current-generation streams, drops stale generations and destroyed tiles", async ({
     browser,
   }) => {
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
@@ -1520,27 +1640,24 @@ test.describe("streaming: performer streams, audience views @full", () => {
 
         const boardTopic = `dev/${stage.url}/board`;
         const hostId = "tab-session-host-a";
-        const ghostA = "ghost-jitsi-a";
-        const ghostB = "ghost-jitsi-b";
-        const removed = "ghost-jitsi-removed";
+        const staleGenPid = "participant-gen-1";
+        const currentGenPid = "participant-gen-2";
+        const stale = "jitsi-stale-generation";
+        const liveA = "jitsi-live-a";
+        const liveB = "jitsi-live-b";
+        const legacy = "jitsi-legacy-unbound";
+        const removed = "jitsi-removed";
 
+        // Simulate a stale local board: the prior-generation tile and the
+        // destroyed tile are still present when the archive is replayed.
         stage.PUSH_OBJECT({
-          id: ghostA,
+          id: stale,
           type: "jitsi",
           hostId,
-          name: "old stream",
+          participantId: staleGenPid,
+          name: "previous join",
           x: 10,
           y: 10,
-          w: 100,
-          h: 80,
-        });
-        stage.PUSH_OBJECT({
-          id: ghostB,
-          type: "jitsi",
-          hostId,
-          name: "newer stream",
-          x: 200,
-          y: 200,
           w: 100,
           h: 80,
         });
@@ -1561,7 +1678,13 @@ test.describe("streaming: performer streams, audience views @full", () => {
             mqttTimestamp: 100,
             payload: {
               type: "placeObjectOnStage",
-              object: { id: ghostA, type: "jitsi", hostId, name: "old stream" },
+              object: {
+                id: stale,
+                type: "jitsi",
+                hostId,
+                participantId: staleGenPid,
+                name: "previous join",
+              },
             },
           },
           {
@@ -1569,12 +1692,40 @@ test.describe("streaming: performer streams, audience views @full", () => {
             mqttTimestamp: 200,
             payload: {
               type: "placeObjectOnStage",
-              object: { id: ghostB, type: "jitsi", hostId, name: "newer stream" },
+              object: {
+                id: liveA,
+                type: "jitsi",
+                hostId,
+                participantId: currentGenPid,
+                name: "live stream a",
+              },
             },
           },
           {
             topic: boardTopic,
-            mqttTimestamp: 250,
+            mqttTimestamp: 300,
+            payload: {
+              type: "placeObjectOnStage",
+              object: {
+                id: liveB,
+                type: "jitsi",
+                hostId,
+                participantId: currentGenPid,
+                name: "live stream b",
+              },
+            },
+          },
+          {
+            topic: boardTopic,
+            mqttTimestamp: 350,
+            payload: {
+              type: "placeObjectOnStage",
+              object: { id: legacy, type: "jitsi", name: "legacy unbound" },
+            },
+          },
+          {
+            topic: boardTopic,
+            mqttTimestamp: 400,
             payload: {
               type: "destroy",
               object: { id: removed, type: "jitsi", hostId: "other-tab" },
@@ -1587,15 +1738,22 @@ test.describe("streaming: performer streams, audience views @full", () => {
         const ids = stage.board.objects.filter((o) => o.type === "jitsi").map((o) => o.id);
         return {
           ids,
-          hasGhostA: ids.includes(ghostA),
-          hasGhostB: ids.includes(ghostB),
+          hasStale: ids.includes(stale),
+          hasLiveA: ids.includes(liveA),
+          hasLiveB: ids.includes(liveB),
+          hasLegacy: ids.includes(legacy),
           hasRemoved: ids.includes(removed),
         };
       });
 
-      expect(result.hasGhostA).toBe(false);
-      expect(result.hasGhostB).toBe(true);
-      expect(result.hasRemoved).toBe(false);
+      expect(result.hasStale, "prior-generation tile must be dropped").toBe(false);
+      expect(result.hasLiveA, "current-generation tile must survive").toBe(true);
+      expect(
+        result.hasLiveB,
+        "concurrent same-generation stream must survive (hostId de-dup regression)",
+      ).toBe(true);
+      expect(result.hasLegacy, "legacy tile without host/participant binding is kept").toBe(true);
+      expect(result.hasRemoved, "DESTROYed tile must be dropped").toBe(false);
     } finally {
       await audienceCtx?.close().catch(() => {});
     }

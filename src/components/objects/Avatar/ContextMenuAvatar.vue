@@ -236,6 +236,13 @@ export default {
         isStreamPlaybackBoardType(props.object.assetType?.name),
     );
 
+    // Live RTMP feeds have no timeline: no play/pause/restart/loop. The
+    // tile is live the moment the bulb is on (LiveStreamPlayer plays
+    // unconditionally), so only Volume of the video tools applies.
+    const isRtmpStreamObject = computed(
+      () => isStreamBoardObject.value && props.object.isRTMP === true,
+    );
+
     return {
       switchFrame,
       holdAvatar,
@@ -269,6 +276,7 @@ export default {
       restartVideo,
       supportsPerStreamVolume,
       isStreamBoardObject,
+      isRtmpStreamObject,
       isJitsiBoardType,
     };
   },
@@ -306,31 +314,33 @@ export default {
       </a>
     </template>
     <div v-if="isStreamBoardObject">
-      <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
-        <span class="panel-icon">
-          <i class="fas fa-pause"></i>
-        </span>
-        <span>{{ $t("pause") }}</span>
-      </a>
-      <a v-else class="panel-block" @click="playVideo(slotProps)">
-        <span class="panel-icon">
-          <i class="fas fa-play"></i>
-        </span>
-        <span>{{ $t("play") }}</span>
-      </a>
-      <a class="panel-block" @click="restartVideo">
-        <span class="panel-icon">
-          <i class="fas fa-sync"></i>
-        </span>
-        <span>{{ $t("restart") }}</span>
-      </a>
+      <template v-if="!isRtmpStreamObject">
+        <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
+          <span class="panel-icon">
+            <i class="fas fa-pause"></i>
+          </span>
+          <span>{{ $t("pause") }}</span>
+        </a>
+        <a v-else class="panel-block" @click="playVideo(slotProps)">
+          <span class="panel-icon">
+            <i class="fas fa-play"></i>
+          </span>
+          <span>{{ $t("play") }}</span>
+        </a>
+        <a class="panel-block" @click="restartVideo">
+          <span class="panel-icon">
+            <i class="fas fa-sync"></i>
+          </span>
+          <span>{{ $t("restart") }}</span>
+        </a>
+      </template>
       <a v-if="supportsPerStreamVolume" class="panel-block" @click="openVolumePopup(slotProps)">
         <span class="panel-icon">
           <Icon src="voice-setting.svg" />
         </span>
         <span>{{ $t("volumn_setting") }}</span>
       </a>
-      <a class="panel-block" @click="toggleVideoLoop">
+      <a v-if="!isRtmpStreamObject" class="panel-block" @click="toggleVideoLoop">
         <span class="panel-icon">
           <i v-if="object.loop" class="fas fa-infinity"></i>
           <b v-else>1</b>
