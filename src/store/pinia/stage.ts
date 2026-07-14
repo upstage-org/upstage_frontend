@@ -1199,22 +1199,8 @@ export const useStageStore = defineStore(
       }
     }
 
-    /** Reconcile `board.objects` paint order with the performer's stack index. */
-    function setObjectStackIndex(objectId: ObjectId, targetIndex: number) {
-      const current = board.value.objects.findIndex((o) => o.id === objectId);
-      if (current < 0) return;
-      const [obj] = board.value.objects.splice(current, 1);
-      const idx = Math.max(0, Math.min(targetIndex, board.value.objects.length));
-      board.value.objects.splice(idx, 0, obj);
-    }
-
     function boardStackIndexFor(objectId: ObjectId): number {
       return board.value.objects.findIndex((o) => o.id === objectId);
-    }
-
-    /** True when audience should receive a board side-effect (not local-only ghosts). */
-    function shouldSyncBoardMutationToAudience(object: BoardObject): boolean {
-      return Boolean(object.liveAction || object.published);
     }
 
     function SET_PREFERENCES(prefs: Partial<Preferences>) {
@@ -3431,8 +3417,6 @@ export const useStageStore = defineStore(
       if (!session.value) {
         session.value = readOrMintTabSessionId();
       }
-      const id = session.value;
-      const nickname = userStore.nickname;
       if (!isPlayer && userStore.avatarId != null) {
         userStore.$patch({ avatarId: null });
       }
