@@ -207,9 +207,27 @@ router.beforeEach(
   },
 );
 
+// A lazy route chunk can fail to load when the network drops mid-navigation
+// or when a rebuild renamed the hashed chunks while this tab was open. A
+// full reload fetches the fresh index.html + chunk map and lands on the
+// intended route. The sessionStorage one-shot guard prevents reload loops
+// when the server itself is unreachable.
+const CHUNK_RELOAD_FLAG = "chunk-reload-attempted";
+router.onError((error, to) => {
+  const isChunkError =
+    /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed/i.test(
+      String(error?.message ?? error),
+    );
+  if (isChunkError && !sessionStorage.getItem(CHUNK_RELOAD_FLAG)) {
+    sessionStorage.setItem(CHUNK_RELOAD_FLAG, "1");
+    window.location.assign(to.fullPath);
+  }
+});
+
 router.afterEach(() => {
   document.body.classList.remove("waiting");
   message.destroy(UPLOAD_LIMIT_MESSAGE_KEY);
+  sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
 });
 
 export default router;

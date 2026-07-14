@@ -39,7 +39,10 @@ const hasShowPrompt = computed(() => {
 // Check version
 const checkVersion = async (): Promise<void> => {
   try {
-    const response = await fetch("/version.json", { cache: "no-store" });
+    const response = await fetch("/version.json", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
     const data: VersionData = await response.json();
     latestVersion.value = data.version;
 

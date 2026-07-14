@@ -9,19 +9,35 @@ import {
 } from "@apollo/client/core";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
+import { RetryLink } from "@apollo/client/link/retry";
 import { message } from "ant-design-vue";
 import configs from "config";
 import { getSharedAuth, setSharedAuth } from "utils/common";
+import { fetchWithTimeout, notifyNetworkError, shouldRetry } from "utils/networkResilience";
 import { getAccessTokenForGraphql, getRefreshTokenForGraphql } from "utils/graphqlAuth";
 import { Media } from "models/studio";
 import { provideApolloClient } from "@vue/apollo-composable";
 import { logout } from "utils/auth";
 
 const REFRESHABLE_ERRORS = new Set(["Signature has expired", "Authenticated Failed"]);
+// Overall per-request deadline. Generous on purpose: slow networks should
+// finish, only truly hung sockets (e.g. killed by a network switch with no
+// RST) get aborted — and the abort lets RetryLink replay queries.
+const REQUEST_TIMEOUT_MS = 60_000;
 // HTTP connection to the API
 const httpLink = createHttpLink({
   // You should use an absolute URL here
   uri: `${configs.GRAPHQL_ENDPOINT}studio_graphql`,
+  fetch: fetchWithTimeout(REQUEST_TIMEOUT_MS),
+});
+
+// Transparent retries for transient network failures (wifi↔cellular
+// switches, bursty slowness). Only fires on network errors — GraphQL
+// errors, including the auth-refresh ones handled by errorLink below,
+// pass straight through. Policy lives in utils/networkResilience.
+const retryLink = new RetryLink({
+  delay: { initial: 400, max: 8_000, jitter: true },
+  attempts: shouldRetry,
 });
 
 let refreshing = false;
@@ -114,7 +130,8 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
     }
   }
   if (networkError) {
-    message.error(`[Network error]: ${networkError}`);
+    // Only reached after retryLink has exhausted its attempts.
+    notifyNetworkError();
   }
 });
 
@@ -173,7 +190,10 @@ const cache = new InMemoryCache({
 
 // Create the apollo client
 export const apolloClient = new ApolloClient({
-  link: from([errorLink, authLink, httpLink]),
+  // retryLink sits below errorLink (so the network-error toast fires once,
+  // after retries are exhausted) and above authLink (so each retry re-runs
+  // setContext and picks up a token refreshed in the meantime).
+  link: from([errorLink, retryLink, authLink, httpLink]),
   cache,
 });
 
