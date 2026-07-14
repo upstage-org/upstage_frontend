@@ -14,6 +14,12 @@ const props = defineProps({
     type: Array as PropType<StageAssignmentValue[]>,
     required: true,
   },
+  // Media types that never render on the board (audio, backdrop, curtain)
+  // have no removal animation, so their assignments hide the exit picker.
+  showExitSettings: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emits = defineEmits(["update:modelValue"]);
@@ -120,8 +126,11 @@ function assignedEmptyMessage(): string {
   <div>
     <p class="stage-assignment-help help mb-3">
       Click a stage name to move it between the lists — the same interaction as assigning player
-      access on Stage Management. Each assigned stage has its own exit animation for this item. Use
-      Save on the media form when you are finished.
+      access on Stage Management.
+      <template v-if="showExitSettings">
+        Each assigned stage has its own exit animation for this item.
+      </template>
+      Use Save on the media form when you are finished.
     </p>
     <div class="columns stage-assignment-columns">
       <div class="column">
@@ -198,6 +207,7 @@ function assignedEmptyMessage(): string {
                 {{ stage.name }}
               </button>
               <ExitSettings
+                v-if="showExitSettings"
                 compact
                 :animation="stage.assignment.exitAnimation"
                 :speed="stage.assignment.exitSpeed"

@@ -92,6 +92,7 @@ export default {
     "Loop: when on, frames repeat continuously. When off (dimmed), play runs through all frames once then stops.",
   volumn_setting: "Volume setting (local)",
   transparency_setting: "Transparency setting",
+  exit_setting: "Exit animation",
   bring_forward: "Bring forward",
   send_back: "Send back",
   avatar_name: "Avatar name",

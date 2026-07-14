@@ -3,12 +3,12 @@ import { computed, inject, watch, reactive } from "vue";
 import { message } from "ant-design-vue";
 import Reorder from "./Reorder.vue";
 import ExitSettings from "components/media/ExitSettings.vue";
-import { DEFAULT_EXIT_ANIMATION, DEFAULT_EXIT_SPEED } from "components/stage/removalAnimations";
+import {
+  DEFAULT_EXIT_ANIMATION,
+  DEFAULT_EXIT_SPEED,
+  EXIT_ANIMATED_TYPES,
+} from "components/stage/removalAnimations";
 import { stageGraph } from "services/graphql";
-
-// Only these types render on the board and run a removal animation.
-// (Streams fold to "video" on the board — see SET_MODEL — so they exit too.)
-const ANIMATED_TYPES = ["avatar", "prop", "video", "stream"];
 
 // Same defensive access as Reorder.vue's assetTypeName: GraphQL returns
 // `assetType: { name }`, older payloads may carry a bare string, and
@@ -68,7 +68,9 @@ export default {
     });
 
     const animatedAssets = computed(() =>
-      (stage.value.assets || []).filter((asset) => ANIMATED_TYPES.includes(assetTypeName(asset))),
+      (stage.value.assets || []).filter((asset) =>
+        EXIT_ANIMATED_TYPES.includes(assetTypeName(asset)),
+      ),
     );
 
     const saveExitSettings = (asset) => {

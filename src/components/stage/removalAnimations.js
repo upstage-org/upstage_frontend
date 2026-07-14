@@ -7,6 +7,12 @@ import { animate } from "animejs";
 export const DEFAULT_EXIT_ANIMATION = "vanish";
 export const DEFAULT_EXIT_SPEED = 1000;
 
+// Only these media types render on the board and run a removal animation,
+// so only they get exit settings in the assignment editors. (Streams fold
+// to "video" on the board — see SET_MODEL — so they exit too. Audio,
+// backdrops and curtains never leave the board as objects.)
+export const EXIT_ANIMATED_TYPES = ["avatar", "prop", "video", "stream"];
+
 export const REMOVAL_ANIMATION_OPTIONS = [
   { value: "vanish", label: "Disappear (instant)" },
   { value: "spiral", label: "Spiral (classic)" },

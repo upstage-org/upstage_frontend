@@ -134,6 +134,13 @@ export default {
       props.closeMenu();
     };
 
+    const openExitSetting = () => {
+      stageStore.openSettingPopup({
+        type: "ExitParameters",
+      });
+      props.closeMenu();
+    };
+
     const isWearing = inject("isWearing");
     const currentAvatar = computed(() => stageStore.currentAvatar);
 
@@ -255,6 +262,7 @@ export default {
       toggleFrameLoop,
       changeSliderMode,
       openVoiceSetting,
+      openExitSetting,
       wearCostume,
       takeOffCostume,
       currentAvatar,
@@ -494,6 +502,12 @@ export default {
       </a-tooltip>
     </template>
 
+    <a class="panel-block" @click="openExitSetting">
+      <span class="panel-icon">
+        <Icon src="clear.svg" />
+      </span>
+      <span>{{ $t("exit_setting") }}</span>
+    </a>
     <a class="panel-block has-text-danger" @click="deleteObject">
       <span class="panel-icon">
         <Icon src="remove.svg" />

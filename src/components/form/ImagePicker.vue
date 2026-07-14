@@ -399,7 +399,9 @@ export default {
                   :options="
                     result
                       ? result.mediaTypes
-                          .filter((e) => !['shape', 'media'].includes(e.name.toLowerCase()))
+                          .filter(
+                            (e) => !['shape', 'media', 'image'].includes(e.name.toLowerCase()),
+                          )
                           .map((e) => ({
                             value: e.name,
                             label: capitalize(e.name),

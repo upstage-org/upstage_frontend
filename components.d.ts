@@ -108,6 +108,7 @@ declare module 'vue' {
     EditOutlined: typeof import('@ant-design/icons-vue')['EditOutlined']
     ElasticInput: typeof import('./src/components/form/ElasticInput.vue')['default']
     Entry: typeof import('./src/components/stage/Entry.vue')['default']
+    ExitParameters: typeof import('./src/components/stage/SettingPopup/settings/ExitParameters.vue')['default']
     ExitSettings: typeof import('./src/components/media/ExitSettings.vue')['default']
     Field: typeof import('./src/components/form/Field.vue')['default']
     Footer: typeof import('./src/components/Footer.vue')['default']

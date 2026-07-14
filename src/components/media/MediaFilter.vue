@@ -206,7 +206,7 @@ const onVisibleDropzone = () => {
           :options="
             result
               ? result.mediaTypes
-                  .filter((e: any) => !['shape', 'media'].includes(e.name.toLowerCase()))
+                  .filter((e: any) => !['shape', 'media', 'image'].includes(e.name.toLowerCase()))
                   .map((e: any) => ({
                     value: e.name,
                     label: capitalize(e.name),
