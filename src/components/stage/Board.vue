@@ -18,7 +18,11 @@ import Whiteboard from "components/stage/Whiteboard.vue";
 import AppImage from "../Image.vue";
 import { animate } from "animejs";
 import Backdrop from "./Backdrop.vue";
-import { runRemovalAnimation } from "./removalAnimations";
+import {
+  DEFAULT_EXIT_ANIMATION,
+  DEFAULT_EXIT_SPEED,
+  runRemovalAnimation,
+} from "./removalAnimations";
 
 const TYPE_TO_COMPONENT = {
   drawing: "Drawing",
@@ -82,19 +86,16 @@ export default {
       });
     };
     const avatarLeave = (el, complete) => {
-      // Per-media exit settings ride the object and are mirrored onto the
-      // rendered `.object` div as data attributes (Object.vue) — the store
-      // has already dropped the object by the time this leave hook runs, so
-      // the DOM snapshot is the only place left to read them. Objects
-      // without their own setting (text, drawings, older media) fall back
-      // to the stage-wide config.
+      // Per-assignment exit settings ride the object and are mirrored onto
+      // the rendered `.object` div as data attributes (Object.vue) — the
+      // store has already dropped the object by the time this leave hook
+      // runs, so the DOM snapshot is the only place left to read them.
+      // Objects without their own setting (text, drawings) disappear
+      // instantly, same as the default for media.
       const dataset = el.querySelector?.(".object")?.dataset ?? {};
-      const animation = dataset.exitAnimation || config.value?.animations?.removal || "spiral";
+      const animation = dataset.exitAnimation || DEFAULT_EXIT_ANIMATION;
       const speed = Number(dataset.exitSpeed);
-      const duration =
-        speed > 0
-          ? speed
-          : (config.value?.animations?.removalSpeed ?? config.value?.animateDuration ?? 1000);
+      const duration = speed > 0 ? speed : DEFAULT_EXIT_SPEED;
       runRemovalAnimation(animation, el, complete, { duration });
     };
 

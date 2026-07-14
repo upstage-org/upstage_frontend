@@ -40,10 +40,10 @@ export default {
     const selectedRatio = reactive(config.ratio);
     // Seed defaults first so stages whose saved config predates a key show
     // real values instead of blank fields; saved values win via the spread.
-    // `removal`/`removalSpeed` have no UI here anymore (exit animations are
-    // set per media item in the Studio media editor) but any saved values
-    // ride along in the spread and keep acting as the stage-wide fallback
-    // for objects without their own setting (text, drawings, older media).
+    // `removal`/`removalSpeed` are dead keys: exit animations are set per
+    // stage assignment (media editor Stages tab / Stage Management > Media)
+    // and the board no longer reads a stage-wide fallback. Old saved values
+    // just ride along in the spread, ignored.
     const animations = reactive({
       bubble: "fade",
       curtain: "drop",

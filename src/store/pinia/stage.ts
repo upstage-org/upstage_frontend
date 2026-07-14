@@ -111,8 +111,8 @@ export interface BoardObject {
   frameLoop?: boolean;
   /** Live RTMP feed tile (renders via LiveStreamPlayer, not <video src>). */
   isRTMP?: boolean;
-  /** Per-media exit (removal) animation, seeded from the media's saved
-   *  attributes at placement time; absent = stage default. */
+  /** Exit (removal) animation for this stage assignment, seeded from the
+   *  stage's assets at placement time; absent = default ("vanish"). */
   exitAnimation?: string;
   /** Exit animation duration in ms; only meaningful with exitAnimation. */
   exitSpeed?: number;
@@ -865,6 +865,11 @@ export const useStageStore = defineStore(
               if (item.description) {
                 const meta = JSON.parse(item.description);
                 delete item.description;
+                // Exit settings live per stage assignment (top-level GraphQL
+                // fields, already on `item`); legacy media-level keys in old
+                // description blobs must not clobber them.
+                delete meta.exitAnimation;
+                delete meta.exitSpeed;
                 Object.assign(item, meta);
               }
               item.src = absolutePath(item.fileLocation ?? "");
@@ -2222,15 +2227,13 @@ export const useStageStore = defineStore(
         try {
           const description = JSON.parse(data.description ?? "");
           if (description.w && description.h) object.h = (description.h * 100) / description.w;
-          // Video/stream toolbox items keep their description unparsed (unlike
-          // avatars/props, whose attributes SET_MODEL merges onto the item), so
-          // the per-media exit animation must be lifted onto the board object
-          // here for Board.vue's leave hook to see it.
-          if (description.exitAnimation) object.exitAnimation = description.exitAnimation;
-          if (description.exitSpeed) object.exitSpeed = description.exitSpeed;
         } catch {
           // description is optional / may not be JSON; fall back to defaults.
         }
+        // Exit settings are per stage assignment: top-level fields on the
+        // toolbox item (from the stage's assets query), carried onto the
+        // board object by the `...data` spread above — nothing to lift
+        // from description JSON anymore.
       }
       PUSH_OBJECT(serializeObject(object));
       // Case-insensitive avatar check: GraphQL `assetType.name` can arrive as

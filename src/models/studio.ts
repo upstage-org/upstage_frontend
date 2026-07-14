@@ -78,6 +78,17 @@ export interface AssignedStage {
   id: string;
   name: string;
   url: string;
+  // Per-assignment exit (removal) animation; null = default (vanish / 1000 ms).
+  exitAnimation?: string | null;
+  exitSpeed?: number | null;
+}
+
+// One entry of saveMedia's stageAssignments input: the stage plus the exit
+// settings this media uses on that stage.
+export interface StageAssignmentValue {
+  stageId: string;
+  exitAnimation: string;
+  exitSpeed: number;
 }
 
 export type CopyrightLevel = 0 | 1 | 2 | 3;
@@ -110,9 +121,6 @@ export interface MediaAttributes {
   w: number;
   h: number;
   note: string;
-  // Per-media exit (removal) animation; absent = use the stage default.
-  exitAnimation?: string;
-  exitSpeed?: number;
 }
 
 export interface Link {

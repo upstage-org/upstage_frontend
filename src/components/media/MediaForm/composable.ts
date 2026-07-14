@@ -4,7 +4,15 @@ import { gql } from "@apollo/client/core";
 import { ref, computed } from "vue";
 import { MEDIA_FORM_META_QUERY, MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
 import { permissionFragment } from "models/fragment";
-import { AvatarVoice, CopyrightLevel, Link, Media, Permission, UploadFile } from "models/studio";
+import {
+  AvatarVoice,
+  CopyrightLevel,
+  Link,
+  Media,
+  Permission,
+  StageAssignmentValue,
+  UploadFile,
+} from "models/studio";
 
 interface SaveMediaPayload {
   files: UploadFile[];
@@ -18,7 +26,7 @@ interface SaveMediaMutationVariables {
   mediaType: string;
   copyrightLevel: CopyrightLevel;
   owner: string;
-  stageIds: string[];
+  stageAssignments: StageAssignmentValue[];
   userIds: string[];
   tags: string[];
   w: number;
@@ -26,10 +34,6 @@ interface SaveMediaMutationVariables {
   note: string;
   voice: AvatarVoice;
   link: Link;
-  // "" / 0 are the explicit "stage default" sentinels: the backend deletes
-  // the stored keys, while omitting the fields leaves them untouched.
-  exitAnimation: string;
-  exitSpeed: number;
 }
 
 /**

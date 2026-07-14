@@ -1,36 +1,53 @@
 <!--
-  Per-media exit (removal) animation picker. Parent (MediaForm) passes a
-  shared reactive `exit` object ({ animation, speed }) and this child
-  mutates it in place — same contract as PropLink/AvatarVoice.
+  Exit (removal) animation picker for one stage assignment: how this media
+  leaves that particular stage. Used inline per assigned stage in the media
+  form's Stages tab and per media row in Stage Management > Media.
 
-  `animation === ""` means "Stage default": the media carries no override
-  and leaves the stage with the stage-configured effect. The speed slider
-  only applies (and is only saved) when a specific effect is chosen.
+  There is no "stage default" sentinel: every assignment has a concrete
+  type, "vanish" (Disappear) unless chosen otherwise. The speed slider is
+  disabled for "vanish" since an instant exit has no duration.
 -->
-<!-- eslint-disable vue/no-mutating-props -->
 <script lang="ts" setup>
 import { computed, ref } from "vue";
-import { REMOVAL_ANIMATION_OPTIONS, runRemovalAnimation } from "components/stage/removalAnimations";
+import {
+  DEFAULT_EXIT_ANIMATION,
+  DEFAULT_EXIT_SPEED,
+  REMOVAL_ANIMATION_OPTIONS,
+  runRemovalAnimation,
+} from "components/stage/removalAnimations";
 
-const props = defineProps<{
-  exit: { animation: string; speed: number };
-  /** First frame / poster used as the preview subject. */
-  previewSrc?: string;
+const props = withDefaults(
+  defineProps<{
+    animation: string;
+    speed: number;
+    /** First frame / poster used as the preview subject. */
+    previewSrc?: string;
+    /** Inline row layout: no labels, no preview box. */
+    compact?: boolean;
+  }>(),
+  { compact: false },
+);
+
+const emit = defineEmits<{
+  (e: "update:animation", value: string): void;
+  (e: "update:speed", value: number): void;
 }>();
 
-const options = computed(() => [
-  { value: "", label: "Stage default" },
-  ...REMOVAL_ANIMATION_OPTIONS,
-]);
+const animationValue = computed({
+  get: () => props.animation || DEFAULT_EXIT_ANIMATION,
+  set: (value: string) => emit("update:animation", value),
+});
 
 // Same slow↔fast mapping the stage Customisation page used: slider value
 // is 1000/duration in [0.1, 1] → duration in [1000, 10000] ms.
 const sliderValue = computed({
-  get: () => 1000 / (props.exit.speed || 1000),
+  get: () => 1000 / (props.speed || DEFAULT_EXIT_SPEED),
   set: (value: number) => {
-    props.exit.speed = Math.round(1000 / Math.min(Math.max(value, 0.1), 1));
+    emit("update:speed", Math.round(1000 / Math.min(Math.max(value, 0.1), 1)));
   },
 });
+
+const instant = computed(() => animationValue.value === "vanish");
 
 const previewBox = ref<HTMLElement>();
 const previewing = ref(false);
@@ -41,7 +58,7 @@ const playPreview = () => {
   if (!target) return;
   previewing.value = true;
   runRemovalAnimation(
-    props.exit.animation || "spiral",
+    animationValue.value,
     box,
     () => {
       // The effects mutate transform/opacity/filter in place; clear them so
@@ -51,19 +68,41 @@ const playPreview = () => {
         previewing.value = false;
       }, 400);
     },
-    { duration: props.exit.speed || 1000, board: box },
+    { duration: props.speed || DEFAULT_EXIT_SPEED, board: box },
   );
 };
 </script>
 
 <template>
-  <!-- eslint-disable vue/no-mutating-props -->
-  <a-space direction="vertical" class="w-full mb-4">
+  <div v-if="compact" class="exit-settings-compact">
+    <a-select
+      v-model:value="animationValue"
+      data-testid="exit-settings-animation"
+      :options="REMOVAL_ANIMATION_OPTIONS"
+      size="small"
+      class="exit-compact-select"
+    />
+    <div class="exit-speed-row exit-compact-slider">
+      <span>Slow</span>
+      <a-slider
+        v-model:value="sliderValue"
+        data-testid="exit-settings-speed"
+        :min="0.1"
+        :max="1"
+        :step="0.01"
+        :disabled="instant"
+        :tip-formatter="null"
+        class="exit-speed-slider"
+      />
+      <span>Fast</span>
+    </div>
+  </div>
+  <a-space v-else direction="vertical" class="w-full mb-4">
     <a-form-item label="Exit animation" :label-col="{ span: 6 }" class="mb-2">
       <a-select
-        v-model:value="props.exit.animation"
-        data-testid="media-form-exit-animation"
-        :options="options"
+        v-model:value="animationValue"
+        data-testid="exit-settings-animation"
+        :options="REMOVAL_ANIMATION_OPTIONS"
         style="max-width: 320px"
       />
     </a-form-item>
@@ -72,18 +111,18 @@ const playPreview = () => {
         <span>Slow</span>
         <a-slider
           v-model:value="sliderValue"
-          data-testid="media-form-exit-speed"
+          data-testid="exit-settings-speed"
           :min="0.1"
           :max="1"
           :step="0.01"
-          :disabled="!props.exit.animation"
+          :disabled="instant"
           :tip-formatter="null"
           class="exit-speed-slider"
         />
         <span>Fast</span>
       </div>
-      <div v-if="!props.exit.animation" class="text-gray-500 text-sm">
-        Pick an effect above to set its speed; "Stage default" uses the stage's own settings.
+      <div v-if="instant" class="text-gray-500 text-sm">
+        "Disappear" is instant; pick another effect to set its speed.
       </div>
     </a-form-item>
     <a-form-item label="Preview" :label-col="{ span: 6 }" class="mb-2">
@@ -101,6 +140,22 @@ const playPreview = () => {
 </template>
 
 <style scoped>
+.exit-settings-compact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.exit-compact-select {
+  width: 210px;
+}
+
+.exit-compact-slider {
+  max-width: 220px;
+  flex: auto;
+}
+
 .exit-speed-row {
   display: flex;
   align-items: center;

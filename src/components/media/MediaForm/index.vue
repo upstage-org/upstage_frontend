@@ -20,6 +20,7 @@ import {
   Link,
   Media,
   MediaAttributes,
+  StageAssignmentValue,
   StudioGraph,
   UploadFile,
   User,
@@ -31,7 +32,7 @@ import { editingMediaVar, inquiryVar } from "apollo";
 import MediaPermissions from "./MediaPermissions.vue";
 import AvatarVoice from "./AvatarVoice.vue";
 import PropLink from "./PropLink.vue";
-import ExitAnimation from "./ExitAnimation.vue";
+import { DEFAULT_EXIT_ANIMATION, DEFAULT_EXIT_SPEED } from "components/stage/removalAnimations";
 import { getDefaultAvatarVoice } from "services/speech/voice";
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { MEDIA_FORM_META_QUERY } from "services/graphql/mediaList";
@@ -123,11 +124,13 @@ watch(editingMediaResult, () => {
     if (attributes?.link) {
       Object.assign(link, attributes.link);
     }
-    exit.animation = attributes?.exitAnimation ?? "";
-    exit.speed = attributes?.exitSpeed ?? 1000;
     note.value = attributes?.note ?? "";
     if (editingMedia.stages) {
-      stageIds.value = editingMedia.stages.map((stage) => stage.id);
+      stageAssignments.value = editingMedia.stages.map((stage) => ({
+        stageId: stage.id,
+        exitAnimation: stage.exitAnimation ?? DEFAULT_EXIT_ANIMATION,
+        exitSpeed: stage.exitSpeed ?? DEFAULT_EXIT_SPEED,
+      }));
     }
     userIds.value = editingMedia.permissions
       .filter((permission) => permission.approved)
@@ -138,7 +141,7 @@ watch(editingMediaResult, () => {
 const name = ref("");
 const type = ref("avatar");
 const tags = ref<string[]>([]);
-const stageIds = ref<string[]>([]);
+const stageAssignments = ref<StageAssignmentValue[]>([]);
 const userIds = ref<string[]>([]);
 const note = ref<string>("");
 const mediaName = computed(() => {
@@ -154,9 +157,6 @@ const copyrightLevel = ref<CopyrightLevel>(0);
 const owner = ref<string>("");
 const voice = reactive<Voice>(getDefaultAvatarVoice());
 const link = reactive<Link>({ url: "", blank: true, effect: false });
-// animation "" = "Stage default" (no per-media override saved); speed is a
-// duration in ms, only meaningful (and only persisted) with an animation.
-const exit = reactive<{ animation: string; speed: number }>({ animation: "", speed: 1000 });
 
 const whoami = inject<ComputedRef<User>>("whoami");
 if (whoami) {
@@ -261,7 +261,7 @@ const { progress, saveMedia, saving } = useSaveMedia(
         mediaType: type.value,
         copyrightLevel: copyrightLevel.value,
         owner: owner.value,
-        stageIds: stageIds.value,
+        stageAssignments: stageAssignments.value,
         userIds: userIds.value,
         tags: tags.value,
         w: frameSize.value.width,
@@ -270,10 +270,6 @@ const { progress, saveMedia, saving } = useSaveMedia(
         urls: [],
         voice,
         link,
-        // "Stage default" clears BOTH stored keys (0 is the backend's
-        // delete sentinel for the speed) so the item falls back cleanly.
-        exitAnimation: exit.animation,
-        exitSpeed: exit.animation ? exit.speed : 0,
       },
     };
   },
@@ -330,8 +326,6 @@ watch(visibleDropzone as Ref, (val) => {
   if (files?.value && files.value.length === 0 && val) {
     name.value = "";
     note.value = "";
-    exit.animation = "";
-    exit.speed = 1000;
   }
 });
 
@@ -636,7 +630,7 @@ const getUserDisplayName = (user: User) => {
         <div class="card-container pr-4">
           <a-tabs>
             <a-tab-pane key="stages" tab="Stages" class="pb-4">
-              <StageAssignment v-model="stageIds as any" />
+              <StageAssignment v-model="stageAssignments" />
             </a-tab-pane>
             <a-tab-pane key="tags" tab="Tags" class="pb-4">
               <div class="p-2 media-form-tags-pane">
@@ -675,9 +669,6 @@ const getUserDisplayName = (user: User) => {
             </a-tab-pane>
             <a-tab-pane v-if="type === 'avatar' || type === 'prop'" key="link" tab="Link">
               <PropLink :link="link" />
-            </a-tab-pane>
-            <a-tab-pane v-if="['avatar', 'prop', 'video'].includes(type)" key="exit" tab="Exit">
-              <ExitAnimation :exit="exit" :preview-src="files?.[0]?.preview" />
             </a-tab-pane>
             <a-tab-pane key="changeowner" tab="Change Owner">
               <div class="p-4">

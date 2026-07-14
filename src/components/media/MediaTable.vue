@@ -92,6 +92,8 @@ const { result, loading, fetchMore, refetch } = useQuery(
             name
             fileLocation
             id
+            exitAnimation
+            exitSpeed
           }
           privilege
         }

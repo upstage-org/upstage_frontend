@@ -1,13 +1,17 @@
 import { animate } from "animejs";
 
-// Per-stage removal effects for stage objects (config.animations.removal).
-// Single source of truth: the Customisation dropdown renders these options
-// and Board.vue's leave hook dispatches on the same values.
+// Removal effects for stage objects, set per stage assignment (the
+// stage<->media link). Single source of truth: the assignment editors
+// render these options and Board.vue's leave hook dispatches on the
+// same values. "vanish" (Disappear) is the default when nothing is set.
+export const DEFAULT_EXIT_ANIMATION = "vanish";
+export const DEFAULT_EXIT_SPEED = 1000;
+
 export const REMOVAL_ANIMATION_OPTIONS = [
+  { value: "vanish", label: "Disappear (instant)" },
   { value: "spiral", label: "Spiral (classic)" },
   { value: "poof", label: "Poof! (cartoon smoke cloud)" },
   { value: "fade", label: "Fade out" },
-  { value: "vanish", label: "Vanish instantly" },
   { value: "fall", label: "Trapdoor (drops off the stage)" },
   { value: "flyaway", label: "Fly away (floats off the top)" },
   { value: "tvoff", label: "TV off (squashes to a line)" },
@@ -241,7 +245,7 @@ export function runRemovalAnimation(name, el, complete, { duration = 1000, board
   if (!target) return complete();
   // `board` hosts the detached overlays (poof cloud, sparkle glitter). On
   // stage that's #board; the studio media-form preview passes its own box.
-  (ANIMATIONS[name] || ANIMATIONS.spiral)({
+  (ANIMATIONS[name] || ANIMATIONS[DEFAULT_EXIT_ANIMATION])({
     target,
     duration,
     complete,
