@@ -405,11 +405,10 @@ onBeforeUnmount(() => {
 .the-object-video {
   width: 100%;
   height: 100%;
-  // Same philosophy as a jitsi window (Jitsi.vue): the video is never
-  // distorted — it covers the tile and crops what doesn't fit. Resizing
-  // keeps the tile's proportions (Moveable keepRatio); performers who want
-  // a different picture shape adjust the canvas in OBS.
-  object-fit: cover;
+  // Same philosophy as a jitsi window (Jitsi.vue): the tile resizes freely
+  // (Moveable exempts stream tiles from keepRatio) and the picture stretches
+  // to fill it — distortion is a creative choice made on stage.
+  object-fit: fill;
   display: block;
   background: #000;
 }

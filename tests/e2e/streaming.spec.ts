@@ -1251,7 +1251,10 @@ test.describe("streaming: performer streams, audience views @full", () => {
    *
    *   • reduced context menu: Volume only — no Play/Pause, Restart, Loop
    *     (a live feed has no timeline; playback starts on connect)
-   *   • jitsi-style fit: `object-fit: cover`, never distorted
+   *   • jitsi-style fit: `object-fit: fill` — the picture stretches with
+   *     the freely-resizable frame (stream tiles are keepRatio-exempt)
+   *   • frame-shape row: the shared Shape swatches in the context menu
+   *     clip the tile wrapper (border-radius / %-clip-path)
    *   • the Refresh-streams button appears for an RTMP tile (previously
    *     jitsi-only) and its force-reload signal makes LiveStreamPlayer
    *     reconnect immediately instead of waiting out the 5s retry timer.
@@ -1260,7 +1263,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
    * raw and -opus mirror keys) is intercepted with a 404, which drives
    * the player's offline retry loop deterministically.
    */
-  test("RTMP tile: reduced menu, cover fit, refresh button reconnects", async ({ browser }) => {
+  test("RTMP tile: reduced menu, shapes, free resize, refresh reconnects", async ({ browser }) => {
     const runtime = readRuntime();
     const persona = findPersona(PERFORMER_USERNAME);
     const tileName = `rtmp-tile-${runtime.runId}`;
@@ -1315,10 +1318,10 @@ test.describe("streaming: performer streams, audience views @full", () => {
         .filter({ has: page.locator("i.fa-sync") });
       await expect(refreshButton).toBeVisible({ timeout: 10_000 });
 
-      // LiveStreamPlayer renders the tile with jitsi-style cover fit.
+      // LiveStreamPlayer stretches the picture with the frame (fill).
       const video = page.locator(`[id="video${objectId}"]`);
       await expect(video).toBeAttached({ timeout: 10_000 });
-      expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("cover");
+      expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("fill");
 
       // Context menu: Volume present; Play/Pause, Restart, Loop absent.
       await page.locator(`[data-testid="object-${tileName}"]`).click({ button: "right" });
@@ -1329,10 +1332,75 @@ test.describe("streaming: performer streams, audience views @full", () => {
       await expect(menu.getByText("Pause", { exact: true })).toHaveCount(0);
       await expect(menu.getByText("Restart", { exact: true })).toHaveCount(0);
       await expect(menu.locator("i.fa-play, i.fa-pause, i.fa-infinity")).toHaveCount(0);
-      // Close the menu (outside click) so it can't overlap the top-bar
-      // refresh button for the next step.
-      await page.mouse.click(650, 550);
+
+      // Shape row: all presets offered; picking one clips the tile wrapper
+      // (the menu stays open so shapes can be tried in place).
+      const tileWrapper = page.locator(`[data-object-id="${objectId}"]`);
+      await expect(menu.locator('[data-testid^="shape-"]')).toHaveCount(9);
+      await menu.locator('[data-testid="shape-circle"]').click();
+      await expect
+        .poll(() => tileWrapper.evaluate((el) => getComputedStyle(el).borderRadius), {
+          timeout: 5_000,
+        })
+        .toBe("50%");
+      await menu.locator('[data-testid="shape-hexagon"]').click();
+      await expect
+        .poll(() => tileWrapper.evaluate((el) => getComputedStyle(el).clipPath), {
+          timeout: 5_000,
+        })
+        .toMatch(/^polygon\(/);
+      // Close the menu with a click on empty board WELL AWAY from it: the
+      // shape row made the menu taller, so the old (650,550) spot now lands
+      // on its "Exit animation" row and opens that modal instead of closing
+      // the menu (the modal then intercepts every later click).
+      await page.mouse.click(150, 520);
       await expect(menu).toBeHidden({ timeout: 5_000 });
+      await expect(page.locator(".modal.is-active")).toHaveCount(0);
+
+      // Free resize: stream frames stretch in any direction (keepRatio is
+      // off for RTMP/jitsi tiles). Drag the east handle horizontally and
+      // assert only the width grew. Click the tile's lower-right quarter:
+      // the right-click above left the OpacitySlider overlay active, and it
+      // hugs the tile's top/left edges — a centre click would be intercepted
+      // and retried until the test times out. (The point is also inside the
+      // hexagon clip applied above, so the wrapper still receives it.)
+      const wrapperBox = (await tileWrapper.boundingBox())!;
+      await page.locator(`[data-testid="object-${tileName}"]`).click({
+        position: { x: wrapperBox.width * 0.75, y: wrapperBox.height * 0.75 },
+      });
+      // Every board object owns a Moveable instance whose (hidden) control
+      // box lives on document.body — scope to the visible one.
+      const eastHandle = page.locator(".moveable-control.moveable-e:visible");
+      await expect(eastHandle).toBeVisible({ timeout: 5_000 });
+      const readSize = () =>
+        page.evaluate((id) => {
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            board: { objects: Array<{ id: string; w: number; h: number }> };
+          };
+          const obj = stage.board.objects.find((o) => o.id === id);
+          return obj ? { w: obj.w, h: obj.h } : null;
+        }, objectId);
+      const sizeBefore = await readSize();
+      expect(sizeBefore).not.toBeNull();
+      const handleBox = await eastHandle.boundingBox();
+      expect(handleBox).not.toBeNull();
+      const grabX = handleBox!.x + handleBox!.width / 2;
+      const grabY = handleBox!.y + handleBox!.height / 2;
+      await page.mouse.move(grabX, grabY);
+      await page.mouse.down();
+      await page.mouse.move(grabX + 80, grabY, { steps: 8 });
+      await page.mouse.up();
+      await expect
+        .poll(async () => (await readSize())!.w, {
+          timeout: 5_000,
+          message: "east-handle drag must widen the tile",
+        })
+        .toBeGreaterThan(sizeBefore!.w);
+      const sizeAfter = await readSize();
+      // Height untouched by a pure-horizontal drag → no ratio lock.
+      expect(Math.abs(sizeAfter!.h - sizeBefore!.h)).toBeLessThan(1);
+      // Deselect so the moveable frame can't intercept the refresh click.
+      await page.mouse.click(150, 520);
 
       // Refresh reconnects immediately. Sync to the 5s offline-retry
       // cadence first: wait for a fresh attempt, let its request burst

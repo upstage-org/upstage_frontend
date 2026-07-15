@@ -10,6 +10,7 @@ import {
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "utils/common";
+import { FRAME_SHAPES, effectiveFrameShapeId } from "../frameShapes";
 
 // `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
 // `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
@@ -250,6 +251,27 @@ export default {
       () => isStreamBoardObject.value && props.object.isRTMP === true,
     );
 
+    // Frame shapes apply to live stream tiles only (jitsi + RTMP). The
+    // shape rides the object like flip/opacity (shapeObject broadcast) and
+    // Object.vue clips the tile wrapper with it. The menu stays open so
+    // shapes can be tried in place — same behaviour as the old jitsi-only
+    // square/circle buttons this row replaces.
+    const isLiveStreamTile = computed(
+      () => isJitsiBoardType(props.object.type) || props.object.isRTMP === true,
+    );
+    const activeShapeId = computed(() =>
+      effectiveFrameShapeId(
+        props.object.shape,
+        isJitsiBoardType(props.object.type) ? "jitsi" : "rtmp",
+      ),
+    );
+    const setFrameShape = (shape) => {
+      stageStore.shapeObject({
+        ...props.object,
+        shape,
+      });
+    };
+
     return {
       switchFrame,
       holdAvatar,
@@ -286,6 +308,10 @@ export default {
       isStreamBoardObject,
       isRtmpStreamObject,
       isJitsiBoardType,
+      FRAME_SHAPES,
+      isLiveStreamTile,
+      activeShapeId,
+      setFrameShape,
     };
   },
 };
@@ -491,6 +517,25 @@ export default {
         </a-tooltip>
       </p>
     </div>
+    <div v-if="isLiveStreamTile" class="field has-addons menu-group shape-group">
+      <p class="control menu-group-title">
+        <span>{{ $t("shape") }}</span>
+      </p>
+      <p v-for="s in FRAME_SHAPES" :key="s.id" class="control menu-group-item">
+        <a-tooltip :title="s.title" placement="bottom">
+          <button
+            class="button is-light"
+            :class="{ 'has-background-primary-light': activeShapeId === s.id }"
+            :data-testid="`shape-${s.id}`"
+            @click="setFrameShape(s.id)"
+          >
+            <!-- The swatch IS the shape: the registry's border-radius /
+                 clip-path applied to a small solid span. -->
+            <span class="shape-swatch" :style="s.swatchStyle ?? s.style"></span>
+          </button>
+        </a-tooltip>
+      </p>
+    </div>
     <template v-if="hasLink">
       <a-tooltip :title="object.link.url" placement="bottom">
         <a class="panel-block" @click="openLink">
@@ -590,6 +635,29 @@ export default {
 
     button {
       width: 100%;
+    }
+
+    // Shape row: 9 swatch buttons don't fit beside the title in the 250px
+    // menu, so they wrap onto extra lines instead of shrinking to slivers.
+    &.shape-group {
+      flex-wrap: wrap;
+
+      .menu-group-item {
+        flex: 0 0 auto;
+      }
+
+      button {
+        width: 34px;
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      .shape-swatch {
+        display: inline-block;
+        width: 18px;
+        height: 14px;
+        background: currentColor;
+      }
     }
 
     .anmation-input {

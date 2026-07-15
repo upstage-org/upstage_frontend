@@ -111,6 +111,10 @@ export interface BoardObject {
   frameLoop?: boolean;
   /** Live RTMP feed tile (renders via LiveStreamPlayer, not <video src>). */
   isRTMP?: boolean;
+  /** Frame shape for live stream tiles (jitsi + RTMP): a registry id from
+   *  components/objects/frameShapes.ts. Legacy values are null/absent
+   *  (per-kind default look) and "circle". Rides MQTT broadcasts untouched. */
+  shape?: string | null;
   /** Exit (removal) animation for this stage assignment, seeded from the
    *  stage's assets at placement time; absent = default ("vanish"). */
   exitAnimation?: string;

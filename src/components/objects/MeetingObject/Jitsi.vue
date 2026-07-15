@@ -226,13 +226,6 @@ export default {
       { immediate: true },
     );
 
-    const clip = (shape) => {
-      stageStore.shapeObject({
-        ...props.object,
-        shape,
-      });
-    };
-
     const localMuted = ref(false);
     const toggleMuted = () => {
       localMuted.value = !localMuted.value;
@@ -318,7 +311,6 @@ export default {
       audioTrack,
       videoEl,
       audioEl,
-      clip,
       localMuted,
       toggleMuted,
       isPlayer,
@@ -371,9 +363,6 @@ export default {
           playsinline
           disablePictureInPicture
           controlslist="nodownload nofullscreen noremoteplayback"
-          :style="{
-            'border-radius': object.shape === 'circle' ? '100%' : '12px',
-          }"
           @timeupdate="timeupdate"
           @loadeddata="loadeddata"
         >
@@ -393,23 +382,8 @@ export default {
       </template>
     </template>
     <template #menu="slotProps">
-      <div class="field has-addons shape-group">
-        <p class="control menu-group-item">Shape</p>
-        <p class="control menu-group-item">
-          <button class="button is-light" @click="clip(null)">
-            <div class="icon">
-              <i class="fas fa-square"></i>
-            </div>
-          </button>
-        </p>
-        <p class="control menu-group-item" @click="clip('circle')">
-          <button class="button is-light">
-            <div class="icon">
-              <i class="fas fa-circle"></i>
-            </div>
-          </button>
-        </p>
-      </div>
+      <!-- The Shape row now lives in the shared AvatarContextMenu (composed
+           below), so jitsi and RTMP tiles get the same picker. -->
       <a class="panel-block" @click="toggleMuted">
         <span class="panel-icon">
           <i v-if="localMuted" class="fas fa-volume-mute has-text-danger"></i>
@@ -438,7 +412,9 @@ export default {
 video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  // The picture stretches with the freely-resizable frame (Moveable exempts
+  // stream tiles from keepRatio) — distortion is a creative choice.
+  object-fit: fill;
   display: block;
 }
 </style>
@@ -469,20 +445,6 @@ video {
   }
 }
 
-.shape-group {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  text-align: center;
-
-  .menu-group-item {
-    flex: 1;
-
-    button {
-      width: 100%;
-    }
-  }
-}
 .loading {
   width: 100%;
   height: 100%;

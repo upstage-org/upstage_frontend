@@ -15,6 +15,7 @@ export default {
   play: "Abspielen",
   restart: "Neustart",
   slider: "Schieberegler",
+  shape: "Form",
   flip: "Flip",
   horizontal: "Horizontal",
   vertical: "Vertikal",

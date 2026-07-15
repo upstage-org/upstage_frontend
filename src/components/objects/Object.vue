@@ -5,9 +5,11 @@ import { storeToRefs } from "pinia";
 import { computed, inject, onUnmounted, provide, reactive, ref, watch } from "vue";
 import {
   isHoldableBoardObject,
+  isJitsiBoardType,
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "@utils/common";
+import { frameShapeStyle } from "./frameShapes";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
@@ -140,6 +142,18 @@ export default {
     };
     const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
+    // Frame shape for live stream tiles only (jitsi + RTMP). Applied to the
+    // sized `.object` wrapper so the <video> AND the RTMP "waiting" /
+    // jitsi loading overlays are clipped together, and the %-based shape
+    // stretches live while the frame is resized. A pure style binding on an
+    // existing div: the Board key is object.id, so this can never remount
+    // the player or touch srcObject.
+    const frameStyle = computed(() => {
+      const jitsi = isJitsiBoardType(props.object.type);
+      if (!jitsi && props.object.isRTMP !== true) return {};
+      return frameShapeStyle(props.object.shape, jitsi ? "jitsi" : "rtmp");
+    });
+
     const isWearing = computed(
       () => props.object.wornBy && stageStore.currentAvatar?.id === props.object.wornBy,
     );
@@ -220,6 +234,7 @@ export default {
       controlable,
       sliderMode,
       activeMovable,
+      frameStyle,
       isWearing,
       hasLink,
       openLink,
@@ -286,6 +301,7 @@ export default {
             height: '100%',
             cursor: controlable ? 'grab' : object.link && object.link.url ? 'pointer' : 'normal',
             ...(activeMovable ? { position: 'relative', 'z-index': 1 } : {}),
+            ...frameStyle,
           }"
           @keyup.delete="deleteObject"
           @dblclick="hold"
