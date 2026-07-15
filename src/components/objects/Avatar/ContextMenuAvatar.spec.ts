@@ -4,10 +4,11 @@ import { mount } from "@vue/test-utils";
 import { ref } from "vue";
 
 /**
- * The shared Shape row: live stream tiles (jitsi + RTMP) get the full
- * frame-shape swatch row; other object types don't. Picking a shape goes
- * through the generic shapeObject broadcast (like flip/opacity) and leaves
- * the menu open so shapes can be tried in place.
+ * Live stream tiles (jitsi + RTMP) no longer pass through this menu — they
+ * use the standardised ContextMenuStream (see Avatar/index.vue and
+ * Jitsi.vue). This menu keeps serving avatars, props and stream-playback
+ * VIDEO FILES, whose transport controls (play/pause/restart/loop) must
+ * survive the split.
  */
 
 const { shapeObject } = vi.hoisted(() => ({ shapeObject: vi.fn() }));
@@ -27,7 +28,6 @@ vi.mock("@stores/pinia/user", () => ({
 }));
 
 import ContextMenuAvatar from "./ContextMenuAvatar.vue";
-import { FRAME_SHAPES } from "../frameShapes";
 
 const mountMenu = (object: Record<string, unknown>) =>
   mount(ContextMenuAvatar, {
@@ -48,42 +48,26 @@ beforeEach(() => {
   shapeObject.mockClear();
 });
 
-describe("ContextMenuAvatar shape row", () => {
-  it("shows every preset swatch for an RTMP tile and broadcasts the pick", async () => {
-    const object = { id: "o1", type: "video", isRTMP: true, name: "feed" };
-    const wrapper = mountMenu(object);
-
-    const swatches = wrapper.findAll("[data-testid^='shape-']");
-    expect(swatches).toHaveLength(FRAME_SHAPES.length);
-
-    await wrapper.find("[data-testid='shape-hexagon']").trigger("click");
-    expect(shapeObject).toHaveBeenCalledWith({ ...object, shape: "hexagon" });
-    // Menu stays open (same as the old jitsi square/circle buttons) so
-    // several shapes can be tried without re-opening.
-    expect(wrapper.props("closeMenu")).not.toHaveBeenCalled();
+describe("ContextMenuAvatar after the stream-menu split", () => {
+  it("keeps the video-file transport controls (play/restart/volume/loop)", () => {
+    const wrapper = mountMenu({ id: "v1", type: "video", name: "clip", isPlaying: false });
+    const text = wrapper.text();
+    expect(text).toContain("play");
+    expect(text).toContain("restart");
+    expect(text).toContain("volumn_setting");
+    expect(text).toContain("loop.off");
   });
 
-  it("shows the row for a jitsi tile with the per-kind default highlighted", () => {
-    const wrapper = mountMenu({ id: "o2", type: "jitsi", shape: null });
-    expect(wrapper.findAll("[data-testid^='shape-']")).toHaveLength(FRAME_SHAPES.length);
-    // null = legacy 12px look = "rounded" for jitsi.
-    expect(wrapper.find("[data-testid='shape-rounded']").classes()).toContain(
-      "has-background-primary-light",
+  it("offers no frame-shape row (that row lives in ContextMenuStream)", () => {
+    expect(mountMenu({ id: "o4", type: "avatar" }).findAll("[data-testid^='shape-']")).toHaveLength(
+      0,
     );
-    expect(wrapper.find("[data-testid='shape-rect']").classes()).not.toContain(
-      "has-background-primary-light",
-    );
+    expect(
+      mountMenu({ id: "v1", type: "video", name: "clip" }).findAll("[data-testid^='shape-']"),
+    ).toHaveLength(0);
   });
 
-  it("highlights legacy 'circle' broadcasts on the circle swatch", () => {
-    const wrapper = mountMenu({ id: "o3", type: "jitsi", shape: "circle" });
-    expect(wrapper.find("[data-testid='shape-circle']").classes()).toContain(
-      "has-background-primary-light",
-    );
-  });
-
-  it("offers no shape row on non-stream objects", () => {
-    const wrapper = mountMenu({ id: "o4", type: "avatar" });
-    expect(wrapper.findAll("[data-testid^='shape-']")).toHaveLength(0);
+  it("keeps the exit-animation override for props/avatars", () => {
+    expect(mountMenu({ id: "o4", type: "avatar" }).text()).toContain("exit_setting");
   });
 });

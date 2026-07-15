@@ -1323,14 +1323,18 @@ test.describe("streaming: performer streams, audience views @full", () => {
       await expect(video).toBeAttached({ timeout: 10_000 });
       expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("fill");
 
-      // Context menu: Volume present; Play/Pause, Restart, Loop absent.
+      // Context menu: the standardised stream menu (shared with jitsi
+      // tiles) — Mute locally + Volume present; Play/Pause, Restart, Loop
+      // and the exit-animation override absent.
       await page.locator(`[data-testid="object-${tileName}"]`).click({ button: "right" });
-      const menu = page.locator(".avatar-context-menu");
+      const menu = page.locator(".stream-context-menu");
       await expect(menu).toBeVisible({ timeout: 5_000 });
+      await expect(menu.locator('[data-testid="stream-mute-locally"]')).toBeVisible();
       await expect(menu.getByText("Volume setting", { exact: false })).toBeVisible();
       await expect(menu.getByText("Play", { exact: true })).toHaveCount(0);
       await expect(menu.getByText("Pause", { exact: true })).toHaveCount(0);
       await expect(menu.getByText("Restart", { exact: true })).toHaveCount(0);
+      await expect(menu.getByText("Exit animation", { exact: true })).toHaveCount(0);
       await expect(menu.locator("i.fa-play, i.fa-pause, i.fa-infinity")).toHaveCount(0);
 
       // Shape row: all presets offered; picking one clips the tile wrapper
@@ -1349,10 +1353,9 @@ test.describe("streaming: performer streams, audience views @full", () => {
           timeout: 5_000,
         })
         .toMatch(/^polygon\(/);
-      // Close the menu with a click on empty board WELL AWAY from it: the
-      // shape row made the menu taller, so the old (650,550) spot now lands
-      // on its "Exit animation" row and opens that modal instead of closing
-      // the menu (the modal then intercepts every later click).
+      // Close the menu with a click on empty board WELL AWAY from it, so
+      // the click can't land on another menu row (e.g. Remove) and act on
+      // the tile instead of just dismissing the menu.
       await page.mouse.click(150, 520);
       await expect(menu).toBeHidden({ timeout: 5_000 });
       await expect(page.locator(".modal.is-active")).toHaveCount(0);

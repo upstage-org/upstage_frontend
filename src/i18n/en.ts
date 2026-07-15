@@ -91,6 +91,8 @@ export default {
   multiframe_loop_tooltip:
     "Loop: when on, frames repeat continuously. When off (dimmed), play runs through all frames once then stops.",
   volumn_setting: "Volume setting (local)",
+  mute_locally: "Mute locally",
+  unmute_locally: "Unmute locally",
   transparency_setting: "Transparency setting",
   exit_setting: "Exit animation",
   bring_forward: "Bring forward",

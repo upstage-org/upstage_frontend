@@ -268,9 +268,19 @@ export default {
     :pad-top="-stageSize.top"
     :pad-right="250"
     :opacity="0.8"
-    :prevent-clicking="replaying"
+    :disabled="replaying"
   >
     <template #trigger>
+      <!--
+        While this object is selected (green Moveable frame showing), its
+        control overlay (lightbulb / X buttons, sliders) must float above
+        every other object on the board — `.object` divs carry z-index 10,
+        so without the raise a neighbouring object rendered later buries
+        the buttons even though the frame (drawn on document.body) stays
+        visible. pointer-events:none keeps the transparent wrapper from
+        stealing the object's own drag/click hits; the controls re-enable
+        their own pointer events in their scoped styles.
+      -->
       <div
         :style="{
           position: 'absolute',
@@ -279,6 +289,7 @@ export default {
           width: object.w + 'px',
           height: object.h + 'px',
           transform: `rotate(${object.rotate}deg)`,
+          ...(activeMovable ? { zIndex: 100, pointerEvents: 'none' } : {}),
         }"
       >
         <OpacitySlider v-model:active="active" v-model:slider-mode="sliderMode" :object="object" />

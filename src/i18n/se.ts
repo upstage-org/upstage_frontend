@@ -216,6 +216,8 @@ export default {
   registration_button: "Registreringsknapp",
   enable_upstage_donate: "Aktivera UpStage Donate",
   shape: "Form",
+  mute_locally: "Tysta lokalt",
+  unmute_locally: "Slå på ljudet lokalt",
   loop: {
     on: "Loop",
     off: "No Loop",

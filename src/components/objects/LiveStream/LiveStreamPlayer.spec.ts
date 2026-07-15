@@ -62,7 +62,12 @@ vi.mock("vue-i18n", () => ({
 // button); a reactive stand-in lets tests fire the signal without Pinia.
 vi.mock("@stores/pinia/stage", async () => {
   const { reactive } = await import("vue");
-  const store = reactive({ forceReloadStreams: null as Date | null });
+  const store = reactive({
+    forceReloadStreams: null as Date | null,
+    // Local listening controls read by the player (defaults: audible).
+    streamLocalMuted: () => false,
+    streamLocalVolume: () => 100,
+  });
   return { useStageStore: () => store };
 });
 import { useStageStore } from "@stores/pinia/stage";

@@ -16,6 +16,8 @@ export default {
   restart: "Neustart",
   slider: "Schieberegler",
   shape: "Form",
+  mute_locally: "Lokal stummschalten",
+  unmute_locally: "Lokale Stummschaltung aufheben",
   flip: "Flip",
   horizontal: "Horizontal",
   vertical: "Vertikal",

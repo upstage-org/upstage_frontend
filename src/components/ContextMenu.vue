@@ -25,7 +25,18 @@ export default {
       default: 1,
     },
     style: Object,
+    /**
+     * Skip the synthesized `currentTarget.click()` when opening — for
+     * triggers whose click is a real action (e.g. a Scene thumbnail click
+     * switches scenes), so right-click only ever opens the menu. The menu
+     * still opens; use `disabled` to suppress the menu entirely.
+     */
     preventClicking: {
+      type: Boolean,
+      default: false,
+    },
+    /** No context menu at all (e.g. while replaying a recording). */
+    disabled: {
       type: Boolean,
       default: false,
     },
@@ -35,7 +46,7 @@ export default {
     const position = reactive({ x: 100, y: 100 });
 
     const openMenu = (e) => {
-      if (props.preventClicking) {
+      if (props.disabled) {
         return;
       }
       if (!props.preventClicking) {
@@ -78,7 +89,7 @@ export default {
     onLongPress(
       triggerEl,
       (e) => {
-        if (props.preventClicking) return;
+        if (props.disabled) return;
         // Touch/pen only: on desktop a click-hold is a moveable drag in
         // progress, not a menu request.
         if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
@@ -86,7 +97,7 @@ export default {
         // Mirror openMenu's currentTarget.click(): closes other open menus /
         // deselects other objects via their click-outside handlers.
         // (e.currentTarget is null on a stored pointer event, hence the ref.)
-        triggerEl.value?.click();
+        if (!props.preventClicking) triggerEl.value?.click();
         suppressNextClick();
         position.x = e.clientX + props.padLeft;
         position.y = e.clientY + props.padTop;

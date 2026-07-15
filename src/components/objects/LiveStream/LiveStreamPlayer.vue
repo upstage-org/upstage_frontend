@@ -16,7 +16,7 @@
  * objects never reach the audience, see reusable.ts serializeForBroadcast).
  */
 import Hls from "hls.js";
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStageStore } from "@stores/pinia/stage";
 import {
@@ -62,6 +62,22 @@ const WHEP_BROKEN_FRAME_THRESHOLD = 30;
 
 const video = ref<HTMLVideoElement>();
 const state = ref<"connecting" | "live" | "waiting">("connecting");
+
+// Listening level for THIS browser only, set from the shared stream context
+// menu (Mute locally / Volume setting). Never broadcast — several performers
+// in one room each control their own playback; see the stage store's
+// `_streamLocalAudio`. Same semantics as a jitsi tile's <audio> element.
+const localMuted = computed(() => stageStore.streamLocalMuted(props.object.id ?? ""));
+const localVolume = computed(() => stageStore.streamLocalVolume(props.object.id ?? ""));
+// `volume` has no attribute form, so it can't be a template binding; write
+// the IDL property whenever the level changes or the element (re)appears.
+watch(
+  [video, localVolume],
+  ([el, volume]) => {
+    if (el) el.volume = volume / 100;
+  },
+  { immediate: true },
+);
 
 let whep: WhepConnection | null = null;
 let hls: Hls | null = null;
@@ -384,6 +400,7 @@ onBeforeUnmount(() => {
       :id="'video' + object.id"
       ref="video"
       class="the-object-video"
+      :muted="localMuted"
       playsinline
       disablePictureInPicture
       controlslist="nodownload nofullscreen noremoteplayback"

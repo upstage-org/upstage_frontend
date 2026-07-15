@@ -1,6 +1,7 @@
 <script>
 import { reactive, computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { isJitsiBoardType } from "@utils/common";
 import HorizontalField from "components/form/HorizontalField.vue";
 import SaveButton from "components/form/SaveButton.vue";
 
@@ -14,13 +15,28 @@ export default {
   setup: (props, { emit }) => {
     const stageStore = useStageStore();
     const currentAvatar = computed(() => stageStore.activeObject);
+    // Live stream tiles (jitsi + RTMP): volume is LOCAL to this browser
+    // (stage store `_streamLocalAudio`, applied by Jitsi.vue /
+    // LiveStreamPlayer.vue) and never broadcast — several performers in one
+    // room each set their own level without echoing each other. Video files
+    // keep the legacy behaviour: the level rides shapeObject to everyone.
+    const isLiveStreamTile = computed(
+      () => isJitsiBoardType(currentAvatar.value?.type) || currentAvatar.value?.isRTMP === true,
+    );
     const parameters = reactive({
-      volume: currentAvatar.value?.volume,
+      volume: isLiveStreamTile.value
+        ? stageStore.streamLocalVolume(currentAvatar.value?.id)
+        : currentAvatar.value?.volume,
     });
     // `shapeObject` is synchronous in Pinia; the previous `.then(() =>
     // emit("close"))` was a Vuex dispatch artefact (see VoiceParameters
     // for the same pattern).
     const saveVolume = () => {
+      if (isLiveStreamTile.value) {
+        stageStore.setStreamLocalVolume(currentAvatar.value.id, parameters.volume);
+        emit("close");
+        return;
+      }
       let video = document.getElementById("video" + currentAvatar.value.id);
       video.volume = parameters.volume / 100;
       stageStore.shapeObject({

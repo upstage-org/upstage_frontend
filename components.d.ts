@@ -80,6 +80,7 @@ declare module 'vue' {
     Confirm: typeof import('./src/components/Confirm.vue')['default']
     ContextMenu: typeof import('./src/components/ContextMenu.vue')['default']
     ContextMenuAvatar: typeof import('./src/components/objects/Avatar/ContextMenuAvatar.vue')['default']
+    ContextMenuStream: typeof import('./src/components/objects/ContextMenuStream.vue')['default']
     Copy: typeof import('./src/components/Copy.vue')['default']
     CopyOutlined: typeof import('@ant-design/icons-vue')['CopyOutlined']
     CreateRoom: typeof import('./src/components/stage/SettingPopup/settings/CreateRoom.vue')['default']

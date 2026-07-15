@@ -6,11 +6,9 @@ import Icon from "components/Icon.vue";
 import {
   coerceNumber,
   isIOS,
-  isJitsiBoardType,
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "utils/common";
-import { FRAME_SHAPES, effectiveFrameShapeId } from "../frameShapes";
 
 // `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
 // `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
@@ -238,39 +236,14 @@ export default {
     // control that silently does nothing.
     const supportsPerStreamVolume = !isIOS();
 
+    // Stream-playback video files (mp4/webm media). Live stream tiles
+    // (jitsi + RTMP) never reach this menu — they use the standardised
+    // ContextMenuStream instead (see Avatar/index.vue and Jitsi.vue).
     const isStreamBoardObject = computed(
       () =>
         isStreamPlaybackBoardType(props.object.type) ||
         isStreamPlaybackBoardType(props.object.assetType?.name),
     );
-
-    // Live RTMP feeds have no timeline: no play/pause/restart/loop. The
-    // tile is live the moment the bulb is on (LiveStreamPlayer plays
-    // unconditionally), so only Volume of the video tools applies.
-    const isRtmpStreamObject = computed(
-      () => isStreamBoardObject.value && props.object.isRTMP === true,
-    );
-
-    // Frame shapes apply to live stream tiles only (jitsi + RTMP). The
-    // shape rides the object like flip/opacity (shapeObject broadcast) and
-    // Object.vue clips the tile wrapper with it. The menu stays open so
-    // shapes can be tried in place — same behaviour as the old jitsi-only
-    // square/circle buttons this row replaces.
-    const isLiveStreamTile = computed(
-      () => isJitsiBoardType(props.object.type) || props.object.isRTMP === true,
-    );
-    const activeShapeId = computed(() =>
-      effectiveFrameShapeId(
-        props.object.shape,
-        isJitsiBoardType(props.object.type) ? "jitsi" : "rtmp",
-      ),
-    );
-    const setFrameShape = (shape) => {
-      stageStore.shapeObject({
-        ...props.object,
-        shape,
-      });
-    };
 
     return {
       switchFrame,
@@ -306,12 +279,6 @@ export default {
       restartVideo,
       supportsPerStreamVolume,
       isStreamBoardObject,
-      isRtmpStreamObject,
-      isJitsiBoardType,
-      FRAME_SHAPES,
-      isLiveStreamTile,
-      activeShapeId,
-      setFrameShape,
     };
   },
 };
@@ -348,33 +315,31 @@ export default {
       </a>
     </template>
     <div v-if="isStreamBoardObject">
-      <template v-if="!isRtmpStreamObject">
-        <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
-          <span class="panel-icon">
-            <i class="fas fa-pause"></i>
-          </span>
-          <span>{{ $t("pause") }}</span>
-        </a>
-        <a v-else class="panel-block" @click="playVideo(slotProps)">
-          <span class="panel-icon">
-            <i class="fas fa-play"></i>
-          </span>
-          <span>{{ $t("play") }}</span>
-        </a>
-        <a class="panel-block" @click="restartVideo">
-          <span class="panel-icon">
-            <i class="fas fa-sync"></i>
-          </span>
-          <span>{{ $t("restart") }}</span>
-        </a>
-      </template>
+      <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
+        <span class="panel-icon">
+          <i class="fas fa-pause"></i>
+        </span>
+        <span>{{ $t("pause") }}</span>
+      </a>
+      <a v-else class="panel-block" @click="playVideo(slotProps)">
+        <span class="panel-icon">
+          <i class="fas fa-play"></i>
+        </span>
+        <span>{{ $t("play") }}</span>
+      </a>
+      <a class="panel-block" @click="restartVideo">
+        <span class="panel-icon">
+          <i class="fas fa-sync"></i>
+        </span>
+        <span>{{ $t("restart") }}</span>
+      </a>
       <a v-if="supportsPerStreamVolume" class="panel-block" @click="openVolumePopup(slotProps)">
         <span class="panel-icon">
           <Icon src="voice-setting.svg" />
         </span>
         <span>{{ $t("volumn_setting") }}</span>
       </a>
-      <a v-if="!isRtmpStreamObject" class="panel-block" @click="toggleVideoLoop">
+      <a class="panel-block" @click="toggleVideoLoop">
         <span class="panel-icon">
           <i v-if="object.loop" class="fas fa-infinity"></i>
           <b v-else>1</b>
@@ -448,24 +413,6 @@ export default {
           </button>
         </a-tooltip>
       </p>
-      <p
-        v-if="isJitsiBoardType(object.type) && supportsPerStreamVolume"
-        class="control menu-group-item"
-      >
-        <a-tooltip title="Volume" placement="bottom">
-          <button
-            class="button is-light"
-            :class="{
-              'has-background-warning-light': sliderMode === 'volume',
-            }"
-            @click="changeSliderMode('volume')"
-          >
-            <span class="mt-1">
-              <Icon src="animation-slider.svg" style="width: 16px; height: 16px" />
-            </span>
-          </button>
-        </a-tooltip>
-      </p>
       <p class="control menu-group-item">
         <a-tooltip title="Move speed" placement="bottom">
           <button
@@ -513,25 +460,6 @@ export default {
             @click="flipVertical"
           >
             <span class="mt-1">{{ $t("vertical") }}</span>
-          </button>
-        </a-tooltip>
-      </p>
-    </div>
-    <div v-if="isLiveStreamTile" class="field has-addons menu-group shape-group">
-      <p class="control menu-group-title">
-        <span>{{ $t("shape") }}</span>
-      </p>
-      <p v-for="s in FRAME_SHAPES" :key="s.id" class="control menu-group-item">
-        <a-tooltip :title="s.title" placement="bottom">
-          <button
-            class="button is-light"
-            :class="{ 'has-background-primary-light': activeShapeId === s.id }"
-            :data-testid="`shape-${s.id}`"
-            @click="setFrameShape(s.id)"
-          >
-            <!-- The swatch IS the shape: the registry's border-radius /
-                 clip-path applied to a small solid span. -->
-            <span class="shape-swatch" :style="s.swatchStyle ?? s.style"></span>
           </button>
         </a-tooltip>
       </p>
@@ -635,29 +563,6 @@ export default {
 
     button {
       width: 100%;
-    }
-
-    // Shape row: 9 swatch buttons don't fit beside the title in the 250px
-    // menu, so they wrap onto extra lines instead of shrinking to slivers.
-    &.shape-group {
-      flex-wrap: wrap;
-
-      .menu-group-item {
-        flex: 0 0 auto;
-      }
-
-      button {
-        width: 34px;
-        padding-left: 0;
-        padding-right: 0;
-      }
-
-      .shape-swatch {
-        display: inline-block;
-        width: 18px;
-        height: 14px;
-        background: currentColor;
-      }
     }
 
     .anmation-input {

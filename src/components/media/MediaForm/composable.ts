@@ -131,7 +131,15 @@ export const useSaveMedia = (
       const result = await mutate({ input: payload.media });
       const mediaId = result?.data?.saveMedia.asset.id;
       if (mediaId) {
-        message.success("Media saved successfully");
+        // Short-lived and click-to-dismiss: the toast sits exactly over the
+        // media list's stage / media-type filter row, so it must never
+        // block a user who saves and immediately reaches for the filters.
+        message.success({
+          content: "Media saved successfully",
+          key: "media-saved",
+          duration: 1.5,
+          onClick: () => message.destroy("media-saved"),
+        });
         handleSuccess(mediaId);
       }
     } catch (error) {
