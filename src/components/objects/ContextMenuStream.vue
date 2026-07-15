@@ -3,7 +3,12 @@ import { computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import { isIOS, isJitsiBoardType } from "utils/common";
-import { FRAME_SHAPES, effectiveFrameShapeId } from "./frameShapes";
+import {
+  FRAME_FITS,
+  FRAME_SHAPES,
+  effectiveFrameFitId,
+  effectiveFrameShapeId,
+} from "./frameShapes";
 
 /**
  * The ONE context menu for live stream tiles — individual jitsi streams and
@@ -46,6 +51,17 @@ export default {
       stageStore.shapeObject({
         ...props.object,
         shape,
+      });
+    };
+
+    // Stretch (fill, the historical default) vs crop (cover) when the frame
+    // is resized. Pure CSS on the wrapper (--stream-fit) — the <video> and
+    // its audio pipeline are never touched. Menu stays open for A/B checks.
+    const activeFitId = computed(() => effectiveFrameFitId(props.object.fit));
+    const setFrameFit = (fit) => {
+      stageStore.shapeObject({
+        ...props.object,
+        fit,
       });
     };
 
@@ -106,6 +122,9 @@ export default {
       FRAME_SHAPES,
       activeShapeId,
       setFrameShape,
+      FRAME_FITS,
+      activeFitId,
+      setFrameFit,
       localMuted,
       toggleMuted,
       supportsPerStreamVolume,
@@ -138,6 +157,23 @@ export default {
             <!-- The swatch IS the shape: the registry's border-radius /
                  clip-path applied to a small solid span. -->
             <span class="shape-swatch" :style="s.swatchStyle ?? s.style"></span>
+          </button>
+        </a-tooltip>
+      </p>
+    </div>
+    <div class="field has-addons menu-group">
+      <p class="control menu-group-title">
+        <span>{{ $t("resize") }}</span>
+      </p>
+      <p v-for="f in FRAME_FITS" :key="f.id" class="control menu-group-item">
+        <a-tooltip :title="f.title" placement="bottom">
+          <button
+            class="button is-light"
+            :class="{ 'has-background-primary-light': activeFitId === f.id }"
+            :data-testid="`fit-${f.id}`"
+            @click="setFrameFit(f.id)"
+          >
+            <span class="mt-1">{{ $t(f.labelKey) }}</span>
           </button>
         </a-tooltip>
       </p>
@@ -244,6 +280,12 @@ export default {
         <Icon src="remove.svg" />
       </span>
       <span>{{ $t("remove") }}</span>
+    </a>
+    <a class="panel-block" data-testid="close-context-menu" @click="closeMenu()">
+      <span class="panel-icon">
+        <i class="fas fa-times"></i>
+      </span>
+      <span>{{ $t("close_menu") }}</span>
     </a>
   </div>
 </template>

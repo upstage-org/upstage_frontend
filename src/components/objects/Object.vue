@@ -9,7 +9,7 @@ import {
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "@utils/common";
-import { frameShapeStyle } from "./frameShapes";
+import { effectiveFrameFitId, frameShapeStyle } from "./frameShapes";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
@@ -151,7 +151,12 @@ export default {
     const frameStyle = computed(() => {
       const jitsi = isJitsiBoardType(props.object.type);
       if (!jitsi && props.object.isRTMP !== true) return {};
-      return frameShapeStyle(props.object.shape, jitsi ? "jitsi" : "rtmp");
+      return {
+        ...frameShapeStyle(props.object.shape, jitsi ? "jitsi" : "rtmp"),
+        // Stretch/crop choice; the <video> reads it via object-fit:
+        // var(--stream-fit, fill) in Jitsi.vue / LiveStreamPlayer.vue.
+        "--stream-fit": effectiveFrameFitId(props.object.fit),
+      };
     });
 
     const isWearing = computed(

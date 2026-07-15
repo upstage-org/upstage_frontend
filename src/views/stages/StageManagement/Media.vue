@@ -1,8 +1,9 @@
 <script>
-import { computed, inject, watch, reactive } from "vue";
+import { computed, inject, watch, reactive, ref } from "vue";
 import { message } from "ant-design-vue";
 import Reorder from "./Reorder.vue";
 import ExitSettings from "components/media/ExitSettings.vue";
+import SaveButton from "components/form/SaveButton.vue";
 import {
   DEFAULT_EXIT_ANIMATION,
   DEFAULT_EXIT_SPEED,
@@ -23,6 +24,7 @@ export default {
   components: {
     Reorder,
     ExitSettings,
+    SaveButton,
   },
   setup: () => {
     const stage = inject("stage");
@@ -30,12 +32,11 @@ export default {
     // Local editable copy of each assignment's exit settings, keyed by
     // asset id and rebuilt whenever the stage (or its asset list) changes —
     // exit settings are per (stage, asset) pair, so rows must never
-    // survive a stage switch. Saves are per-row and immediate (this panel
-    // has no global Save button).
+    // survive a stage switch. Edits buffer here until the Save button
+    // writes the changed rows; a stage switch discards unsaved edits.
     const exitRows = reactive({});
     let rowsStageId = null;
     const dropRow = (id) => {
-      if (exitRows[id]?.timer) window.clearTimeout(exitRows[id].timer);
       delete exitRows[id];
     };
     const syncRows = () => {
@@ -53,8 +54,6 @@ export default {
           exitRows[asset.id] = {
             exitAnimation: asset.exitAnimation ?? DEFAULT_EXIT_ANIMATION,
             exitSpeed: asset.exitSpeed ?? DEFAULT_EXIT_SPEED,
-            saving: false,
-            timer: null,
           };
         }
       }
@@ -73,14 +72,24 @@ export default {
       ),
     );
 
-    const saveExitSettings = (asset) => {
+    const rowIsDirty = (asset) => {
       const row = exitRows[asset.id];
-      if (!row) return;
-      // Debounce: the speed slider emits continuously while dragging.
-      if (row.timer) window.clearTimeout(row.timer);
-      row.timer = window.setTimeout(async () => {
-        row.timer = null;
-        row.saving = true;
+      if (!row) return false;
+      return (
+        row.exitAnimation !== (asset.exitAnimation ?? DEFAULT_EXIT_ANIMATION) ||
+        row.exitSpeed !== (asset.exitSpeed ?? DEFAULT_EXIT_SPEED)
+      );
+    };
+    const dirtyAssets = computed(() => animatedAssets.value.filter(rowIsDirty));
+
+    const savingExits = ref(false);
+    const saveExitSettings = async () => {
+      if (savingExits.value) return;
+      savingExits.value = true;
+      const failed = [];
+      let firstError = null;
+      for (const asset of dirtyAssets.value) {
+        const row = exitRows[asset.id];
         try {
           await stageGraph.updateStageAssignment(
             stage.value.id,
@@ -89,23 +98,28 @@ export default {
             row.exitSpeed,
           );
           // Keep the injected stage cache in step so revisits don't seed
-          // stale values without a refetch.
+          // stale values without a refetch. This also marks the row clean.
           asset.exitAnimation = row.exitAnimation;
           asset.exitSpeed = row.exitSpeed;
         } catch (error) {
-          message.error(
-            error?.response?.errors?.[0]?.message || "Could not save the exit animation.",
-          );
-        } finally {
-          row.saving = false;
+          failed.push(asset.name);
+          firstError ??= error?.response?.errors?.[0]?.message;
         }
-      }, 400);
+      }
+      savingExits.value = false;
+      if (failed.length) {
+        message.error(firstError || `Could not save the exit animation for: ${failed.join(", ")}`);
+      } else {
+        message.success("Exit animations saved!");
+      }
     };
 
     return {
       selectedMedia: stage.value.assets || [],
       animatedAssets,
       exitRows,
+      dirtyAssets,
+      savingExits,
       saveExitSettings,
     };
   },
@@ -127,7 +141,7 @@ export default {
         <b><span>Exit animations</span></b>
         <p class="help mb-0">
           How each item leaves this stage when it is removed. The same media can exit differently on
-          other stages; changes here save immediately.
+          other stages.
         </p>
       </div>
     </div>
@@ -141,21 +155,17 @@ export default {
         compact
         :animation="exitRows[asset.id].exitAnimation"
         :speed="exitRows[asset.id].exitSpeed"
-        @update:animation="
-          (value) => {
-            exitRows[asset.id].exitAnimation = value;
-            saveExitSettings(asset);
-          }
-        "
-        @update:speed="
-          (value) => {
-            exitRows[asset.id].exitSpeed = value;
-            saveExitSettings(asset);
-          }
-        "
+        @update:animation="(value) => (exitRows[asset.id].exitAnimation = value)"
+        @update:speed="(value) => (exitRows[asset.id].exitSpeed = value)"
       />
-      <a-spin v-if="exitRows[asset.id]?.saving" size="small" />
     </div>
+    <SaveButton
+      class="mt-3"
+      data-testid="exit-animations-save"
+      :loading="savingExits"
+      :disabled="!dirtyAssets.length"
+      @click="saveExitSettings"
+    />
   </template>
 </template>
 

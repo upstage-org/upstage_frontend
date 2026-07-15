@@ -91,6 +91,27 @@ export const FRAME_SHAPES: FrameShapeDef[] = [
 const SHAPES_BY_ID = new Map(FRAME_SHAPES.map((s) => [s.id, s]));
 
 /**
+ * How the live picture fills a resized frame. Stored as `fit` on the board
+ * object (rides shapeObject/MQTT like `shape`); absent/unknown means the
+ * historical behaviour: stretch to fill, distortion is a creative choice.
+ * "cover" crops instead — the picture keeps its own aspect ratio and the
+ * frame windows into it. Applied as the `--stream-fit` CSS variable on the
+ * `.object` wrapper (Object.vue) so the <video> element itself is never
+ * touched — playback and audio can't be interrupted by toggling it.
+ */
+export type FrameFitId = "fill" | "cover";
+
+export const FRAME_FITS: { id: FrameFitId; title: string; labelKey: string }[] = [
+  { id: "fill", title: "Stretch the picture to fill the frame", labelKey: "stretch" },
+  { id: "cover", title: "Crop: the frame windows into the picture", labelKey: "crop" },
+];
+
+/** Effective fit for a stored `fit` value (drives menu highlight + CSS var). */
+export function effectiveFrameFitId(fit: unknown): FrameFitId {
+  return fit === "cover" ? "cover" : "fill";
+}
+
+/**
  * Per-kind default for `null`/absent/unknown: jitsi tiles have always been
  * 12px-rounded, RTMP tiles sharp — keeping those defaults means untouched
  * tiles (and replayed archives) look exactly as before.

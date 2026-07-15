@@ -103,6 +103,46 @@ describe("ContextMenuStream — the one menu for jitsi and RTMP tiles", () => {
     }
   });
 
+  it.each([
+    ["jitsi", { id: "o1", type: "jitsi", name: "cam" }],
+    ["RTMP", { id: "o2", type: "video", isRTMP: true, name: "feed" }],
+  ])("offers the stretch/crop resize choice on a %s tile", (_kind, object) => {
+    const wrapper = mountMenu(object);
+    // Historical default: stretch (fill) highlighted, crop not.
+    expect(wrapper.find("[data-testid='fit-fill']").classes()).toContain(
+      "has-background-primary-light",
+    );
+    expect(wrapper.find("[data-testid='fit-cover']").classes()).not.toContain(
+      "has-background-primary-light",
+    );
+  });
+
+  it("broadcasts a crop pick, leaves the menu open, and never touches audio", async () => {
+    const object = { id: "o1", type: "jitsi", name: "cam" };
+    const wrapper = mountMenu(object);
+
+    await wrapper.find("[data-testid='fit-cover']").trigger("click");
+    expect(shapeObject).toHaveBeenCalledWith({ ...object, fit: "cover" });
+    expect(closeMenu).not.toHaveBeenCalled();
+    // The toggle is pure frame styling — the local audio state (mute/volume)
+    // must be completely unaffected.
+    expect(audioState.muted).toBe(false);
+
+    expect(
+      mountMenu({ ...object, fit: "cover" })
+        .find("[data-testid='fit-cover']")
+        .classes(),
+    ).toContain("has-background-primary-light");
+  });
+
+  it("offers an explicit close item that only closes the menu", async () => {
+    const wrapper = mountMenu({ id: "o1", type: "jitsi" });
+    await wrapper.find("[data-testid='close-context-menu']").trigger("click");
+    expect(closeMenu).toHaveBeenCalled();
+    expect(shapeObject).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
+  });
+
   it("broadcasts a shape pick and leaves the menu open", async () => {
     const object = { id: "o1", type: "video", isRTMP: true, name: "feed" };
     const wrapper = mountMenu(object);

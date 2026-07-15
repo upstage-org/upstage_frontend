@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { FRAME_SHAPES, effectiveFrameShapeId, frameShapeStyle } from "./frameShapes";
+import {
+  FRAME_FITS,
+  FRAME_SHAPES,
+  effectiveFrameFitId,
+  effectiveFrameShapeId,
+  frameShapeStyle,
+} from "./frameShapes";
 
 describe("frameShapes registry", () => {
   it("offers the full preset set", () => {
@@ -64,5 +70,24 @@ describe("effectiveFrameShapeId", () => {
     expect(effectiveFrameShapeId("circle", "jitsi")).toBe("circle");
     expect(effectiveFrameShapeId("star", "rtmp")).toBe("star");
     expect(effectiveFrameShapeId("nope", "jitsi")).toBe("rounded");
+  });
+});
+
+describe("effectiveFrameFitId (stretch vs crop)", () => {
+  it("offers exactly the stretch and crop choices", () => {
+    expect(FRAME_FITS.map((f) => f.id)).toEqual(["fill", "cover"]);
+  });
+
+  it("defaults absent/legacy/unknown values to the historical stretch", () => {
+    // Every tile broadcast before the toggle existed has no `fit` — it must
+    // keep stretching exactly as it always did.
+    expect(effectiveFrameFitId(undefined)).toBe("fill");
+    expect(effectiveFrameFitId(null)).toBe("fill");
+    expect(effectiveFrameFitId("nope")).toBe("fill");
+    expect(effectiveFrameFitId("fill")).toBe("fill");
+  });
+
+  it("honours an explicit crop", () => {
+    expect(effectiveFrameFitId("cover")).toBe("cover");
   });
 });

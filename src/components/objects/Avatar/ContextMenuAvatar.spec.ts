@@ -70,4 +70,21 @@ describe("ContextMenuAvatar after the stream-menu split", () => {
   it("keeps the exit-animation override for props/avatars", () => {
     expect(mountMenu({ id: "o4", type: "avatar" }).text()).toContain("exit_setting");
   });
+
+  it("offers no stretch/crop row (that row lives in ContextMenuStream)", () => {
+    expect(mountMenu({ id: "o4", type: "avatar" }).findAll("[data-testid^='fit-']")).toHaveLength(
+      0,
+    );
+    expect(
+      mountMenu({ id: "v1", type: "video", name: "clip" }).findAll("[data-testid^='fit-']"),
+    ).toHaveLength(0);
+  });
+
+  it("offers an explicit close item that only closes the menu", async () => {
+    const wrapper = mountMenu({ id: "o4", type: "avatar" });
+    const closeItem = wrapper.find("[data-testid='close-context-menu']");
+    await closeItem.trigger("click");
+    expect(wrapper.props("closeMenu")).toHaveBeenCalled();
+    expect(shapeObject).not.toHaveBeenCalled();
+  });
 });

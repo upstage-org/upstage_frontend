@@ -523,6 +523,12 @@ export default {
         </button>
       </p>
     </div>
+    <a class="panel-block" data-testid="close-context-menu" @click="closeMenu()">
+      <span class="panel-icon">
+        <i class="fas fa-times"></i>
+      </span>
+      <span>{{ $t("close_menu") }}</span>
+    </a>
   </div>
 </template>
 
