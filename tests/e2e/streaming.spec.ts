@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 
 import { findPersona } from "./personas";
+import { gql } from "./graphql";
 import { LoginPage } from "./pages/LoginPage";
 import { LiveStagePage } from "./pages/LiveStagePage";
 import { readRuntime } from "./fixtures/runtime";
@@ -566,6 +567,83 @@ test.describe("streaming: performer streams, audience views @full", () => {
         path: path.join(SCREENSHOT_DIR, "yourself-preview.png"),
         fullPage: true,
       });
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Regression: a stage whose URL slug is literally "demo" must still start
+   * the Jitsi conference.
+   *
+   * `stageStore.url` used to fall back to the string "demo" while the stage
+   * model was loading, and useJitsi's one-shot watcher treated that value as
+   * the not-loaded placeholder — permanently, for a real stage whose
+   * fileLocation IS "demo" (the dev/prod "Demo Stage"). `startConnection()`
+   * (and `JitsiMeetJS.init()`) then never ran: no conference, no room, no
+   * publish, and every jitsi tile on that stage buffered forever. The
+   * placeholder is now the empty string only.
+   *
+   * Assertion target: the composable's own first-line diagnostics. Both
+   * "[diag] useJitsi: starting connection" (endpoint configured) and the
+   * "VITE_JITSI_ENDPOINT is unset" warning are emitted only after the
+   * placeholder gate has passed — with the old bug neither ever appears on
+   * /demo. The local-camera preview is asserted too, proving the stage is
+   * fully usable as a publisher surface.
+   */
+  test("stage slugged 'demo' still starts the jitsi conference", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    await ensureDemoSlugStage(runtime.adminToken, persona.username);
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const page = await performerCtx.newPage();
+      // Attach before navigation — the connection attempt fires as soon as
+      // loadStage resolves, well before the board is interactable.
+      const consoleLines: string[] = [];
+      page.on("console", (msg) => consoleLines.push(msg.text()));
+
+      const loginPage = new LoginPage(page);
+      await loginPage.login(persona.username, persona.password);
+      const live = new LiveStagePage(page);
+      await live.goto("demo");
+
+      await expect
+        .poll(
+          () =>
+            consoleLines.find(
+              (l) =>
+                l.includes("useJitsi: starting connection") ||
+                l.includes("VITE_JITSI_ENDPOINT is unset"),
+            ) ?? null,
+          {
+            timeout: 30_000,
+            message:
+              'useJitsi never attempted a connection on /demo — the "demo" slug is being ' +
+              "treated as the unloaded-stage placeholder again",
+          },
+        )
+        .not.toBeNull();
+
+      // The publisher path must work here too: open the Streams tab and wait
+      // for the fake camera to decode into Yourself.vue's <video>.
+      const meetingTab = page
+        .locator('nav#toolbox .panel-block:has(img[src$="meeting.svg"])')
+        .first();
+      await meetingTab.waitFor({ state: "visible", timeout: 15_000 });
+      await meetingTab.click();
+      await page.waitForFunction(
+        () => {
+          const v = document.querySelector(
+            "#topbar video[playsinline][muted]",
+          ) as HTMLVideoElement | null;
+          return Boolean(v && v.videoWidth > 0);
+        },
+        { timeout: 30_000 },
+      );
     } finally {
       await performerCtx?.close().catch(() => {});
     }
@@ -2093,4 +2171,68 @@ async function waitForAudienceVideoFreshFrames(
   throw new Error(
     `[streaming] audience <video> for "${streamName}" did not advance currentTime within ${timeoutMs}ms`,
   );
+}
+
+/**
+ * Find-or-create a stage whose fileLocation is literally "demo" (idempotent
+ * across reruns in one harness DB), set it live, and grant the performer
+ * player-edit access so `canPlay` is true and the Streams toolbox mounts.
+ * Mirrors the setup.spec.ts flow, minus the UI page objects.
+ */
+async function ensureDemoSlugStage(adminToken: string, performerUsername: string): Promise<string> {
+  const existing = await gql<{ stageList: Array<{ id: string | number }> }>(
+    `query DemoStageByLoc($fileLocation: String!) {
+      stageList(input: { fileLocation: $fileLocation }) { id }
+    }`,
+    { fileLocation: "demo" },
+    adminToken,
+  );
+  let stageId =
+    existing.data?.stageList?.[0]?.id != null ? String(existing.data.stageList[0].id) : null;
+  if (!stageId) {
+    const created = await gql<{ createStage: { id: string | number } }>(
+      `mutation DemoStageCreate($input: StageInput!) {
+        createStage(input: $input) { id }
+      }`,
+      { input: { name: "Demo (sentinel regression)", fileLocation: "demo", status: "live" } },
+      adminToken,
+    );
+    if (created.errors?.length || created.data?.createStage?.id == null) {
+      throw new Error(`[streaming] createStage(demo) failed: ${JSON.stringify(created.errors)}`);
+    }
+    stageId = String(created.data.createStage.id);
+  }
+
+  const users = await gql<{ users: Array<{ id: string; username: string }> }>(
+    `query DemoStageUsers { users(active: true) { id username } }`,
+    {},
+    adminToken,
+  );
+  const performer = users.data?.users?.find(
+    (u) => u.username.toLowerCase() === performerUsername.toLowerCase(),
+  );
+  if (!performer) {
+    throw new Error(`[streaming] performer "${performerUsername}" not found for demo stage`);
+  }
+  // playerAccess is a JSON string of [playerIds, playerEditIds] — same shape
+  // StageManagementPage.grantPlayerAccess writes.
+  const updated = await gql<{ updateStage: { id: string } | null }>(
+    `mutation DemoStageAccess($input: StageInput!) {
+      updateStage(input: $input) { id }
+    }`,
+    {
+      input: {
+        id: stageId,
+        status: "live",
+        playerAccess: JSON.stringify([[], [performer.id]]),
+      },
+    },
+    adminToken,
+  );
+  if (updated.errors?.length) {
+    throw new Error(
+      `[streaming] demo stage access grant failed: ${JSON.stringify(updated.errors)}`,
+    );
+  }
+  return stageId;
 }

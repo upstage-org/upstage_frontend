@@ -627,7 +627,12 @@ export const useStageStore = defineStore(
     // ready: model loaded and preload finished
     const ready = computed(() => model.value && !preloading.value);
 
-    const url = computed(() => (model.value ? model.value.fileLocation : "demo"));
+    // Empty string until loadStage populates the model. Do NOT use a
+    // word-like sentinel here: a previous "demo" fallback collided with the
+    // real Demo Stage (fileLocation === "demo"), making downstream "is the
+    // stage loaded yet?" checks treat that stage as never-loaded and never
+    // start its Jitsi conference.
+    const url = computed(() => (model.value ? model.value.fileLocation : ""));
 
     const objects = computed(() =>
       board.value.objects.map((o) => ({

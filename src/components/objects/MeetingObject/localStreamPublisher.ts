@@ -40,6 +40,7 @@ type JitsiRefs = {
 export type LocalStreamPublisherApi = {
   join: () => Promise<void>;
   ensureTracks: () => Promise<void>;
+  retryAcquire: () => Promise<void>;
   blocked: Ref<boolean>;
   blockedMessage: Ref<string>;
   pendingPublish: Ref<boolean>;
@@ -163,6 +164,17 @@ export function useLocalStreamPublisher(
     tracks.length > 0 && tracks.every((t) => !(t as { isEnded?: () => boolean }).isEnded?.());
 
   const acquireLocalTracks = async () => {
+    // [diag] mirror of tryPublishWhenReady's trace: the acquire path had no
+    // logging, which made "preview never lights up until I drag the cam"
+    // reports undiagnosable — every guard below rejects silently.
+    console.log("[diag] localStream.acquireLocalTracks", {
+      canPlay: Boolean(stageStore.canPlay),
+      jitsiStreamingEnabled: Boolean(stageStore.jitsiStreamingEnabled),
+      acquiring,
+      blocked: blocked.value,
+      published: published.value,
+      tracksLen: tracks.length,
+    });
     if (!publishingAllowed()) {
       // Audience or live-streaming disabled: never touch the camera.
       // The composable is mounted from Shell for ALL viewers because
@@ -194,8 +206,13 @@ export function useLocalStreamPublisher(
     }
 
     acquiring = true;
+    const gumStartedAt = performance.now();
     try {
       const newTracks = await JitsiMeetJS.createLocalTracks({ devices: ["audio", "video"] });
+      console.log("[diag] localStream.createLocalTracks resolved", {
+        ms: Math.round(performance.now() - gumStartedAt),
+        types: newTracks.map((t) => t.type),
+      });
       for (const old of tracks) {
         try {
           (old as { dispose?: () => void }).dispose?.();
@@ -229,7 +246,10 @@ export function useLocalStreamPublisher(
       }
       await tryPublishWhenReady("acquire-resolved");
     } catch (err) {
-      console.error("Failed to create local tracks:", err);
+      console.error(
+        `Failed to create local tracks after ${Math.round(performance.now() - gumStartedAt)}ms:`,
+        err,
+      );
       setBlocked(blockedReason(err));
     } finally {
       acquiring = false;
@@ -289,6 +309,17 @@ export function useLocalStreamPublisher(
     if (tracks.length === 0 && !blocked.value) {
       await acquireLocalTracks();
     }
+  };
+
+  // Explicit user retry after a failed acquire (denied/dismissed permission
+  // prompt, busy device, ...). `blocked` is a latch: ensureTracks refuses to
+  // re-acquire while it is set, so without this the only recovery from a
+  // one-off getUserMedia failure was a full page reload. Clearing the latch
+  // first also re-enables ensureTracks for later callers if this attempt
+  // fails again (acquireLocalTracks re-sets blocked on failure).
+  const retryAcquire = async () => {
+    clearBlocked();
+    await acquireLocalTracks();
   };
 
   const join = async () => {
@@ -422,6 +453,7 @@ export function useLocalStreamPublisher(
   return {
     join,
     ensureTracks,
+    retryAcquire,
     blocked,
     blockedMessage,
     pendingPublish,

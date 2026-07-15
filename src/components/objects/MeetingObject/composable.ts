@@ -8,6 +8,13 @@ export const useLowLevelAPI = () => {
   return JitsiMeetJS;
 };
 
+// "Has loadStage populated the stage URL yet?" — the store's `url` getter
+// returns "" until the model arrives. Only null/undefined/"" count as
+// not-loaded: a previous version also matched the literal "demo", which
+// permanently disabled Jitsi on the real Demo Stage (fileLocation "demo").
+// Exported for unit tests.
+export const isPlaceholderStageUrl = (u: unknown) => u == null || u === "";
+
 // Parse `VITE_JITSI_ENDPOINT` into the pieces we actually need at runtime.
 // Returns `null` if the env value is missing or unparseable so callers can
 // degrade gracefully without crashing the SPA at mount time.
@@ -177,19 +184,22 @@ export const useJitsi = () => {
   const JitsiMeetJS = useLowLevelAPI();
 
   /**
-   * `stageStore.url` is `computed(() => model.value?.fileLocation ?? "demo")`.
-   * Until `loadStage()` populates `model.value`, the getter returns the
-   * placeholder string `"demo"`. Shell.vue calls `useJitsi()` inside
-   * Layout.vue's template, which mounts in the same tick that `loadStage`
-   * is *kicked off* (async, network-bound), so the previous code captured
-   * `"demo"` and pinned the conference to a sentinel room for the rest of
-   * the session — `initJitsiConference("demo")` succeeds quietly, the
-   * performer joins a room nobody else is in, and even local-tile rendering
-   * is brittle because the per-participantId filter races with myUserId
-   * timing on a not-really-joined room.
+   * `stageStore.url` is empty until `loadStage()` populates `model.value`.
+   * Shell.vue calls `useJitsi()` inside Layout.vue's template, which mounts
+   * in the same tick that `loadStage` is *kicked off* (async, network-bound),
+   * so code that read the URL at mount time captured the unloaded placeholder
+   * and pinned the conference to a sentinel room for the rest of the session —
+   * the performer joined a room nobody else is in, and even local-tile
+   * rendering was brittle because the per-participantId filter races with
+   * myUserId timing on a not-really-joined room.
    *
    * Defer connection setup until `stageStore.url` resolves to the real
    * stage URL via a one-shot watcher inside `onMounted`.
+   *
+   * NOTE: the placeholder is the EMPTY string only. The store's fallback
+   * used to be the literal `"demo"`, and this watcher treated `"demo"` as
+   * never-loaded — which permanently disabled Jitsi on the real Demo Stage
+   * (fileLocation === "demo"). Any real fileLocation must count as loaded.
    */
   const startConnection = async (stageUrl: string) => {
     if (!endpoint) {
@@ -806,11 +816,10 @@ export const useJitsi = () => {
   };
 
   // One-shot watcher: as soon as `stageStore.url` reports a real stage
-  // (anything other than the empty/"demo" placeholder), kick off the
-  // conference connect with the *resolved* URL. The watcher self-stops
-  // after the first non-placeholder value so a transient model refresh
-  // can't tear down and re-create the conference mid-session.
-  const isPlaceholderStageUrl = (u: unknown) => u == null || u === "" || u === "demo";
+  // (anything other than the empty placeholder), kick off the conference
+  // connect with the *resolved* URL. The watcher self-stops after the
+  // first non-placeholder value so a transient model refresh can't tear
+  // down and re-create the conference mid-session.
   onMounted(() => {
     const initialUrl = stageStore.url;
     if (!isPlaceholderStageUrl(initialUrl)) {
