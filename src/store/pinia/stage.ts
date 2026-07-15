@@ -109,6 +109,17 @@ export interface BoardObject {
   frames?: string[];
   /** When false, multiframe `autoplayFrames` stops after one cycle; true/omitted = loop. */
   frameLoop?: boolean;
+  /** Live RTMP feed tile (renders via LiveStreamPlayer, not <video src>). */
+  isRTMP?: boolean;
+  /** Frame shape for live stream tiles (jitsi + RTMP): a registry id from
+   *  components/objects/frameShapes.ts. Legacy values are null/absent
+   *  (per-kind default look) and "circle". Rides MQTT broadcasts untouched. */
+  shape?: string | null;
+  /** Exit (removal) animation for this stage assignment, seeded from the
+   *  stage's assets at placement time; absent = default ("vanish"). */
+  exitAnimation?: string;
+  /** Exit animation duration in ms; only meaningful with exitAnimation. */
+  exitSpeed?: number;
   assetType?: { name?: string };
   description?: string;
   fontSize?: string;
@@ -583,6 +594,15 @@ export const useStageStore = defineStore(
     // without reintroducing the Brave publish-storm / whole-board flicker
     // those guards were added to fix.
     const _forceReloadStreams = ref<Date | null>(null);
+    /**
+     * Per-tile LOCAL listening controls for live stream tiles (jitsi +
+     * RTMP), keyed by board-object id. Deliberately NOT part of the
+     * shapeObject broadcast: every person in the room sets what THEY hear,
+     * so several performers sharing a physical space can mute/lower a
+     * stream on their own machine without silencing it for the audience
+     * (and without feeding each other echo). Defaults: unmuted, 100%.
+     */
+    const _streamLocalAudio = ref<Record<string, { muted: boolean; volume: number }>>({});
     /** Bumped by `refreshMeeting()` to remount embedded conference iframes. */
     const _meetingRefreshKey = ref(0);
     const _enabledLiveStreaming = ref<boolean>(true);
@@ -607,7 +627,12 @@ export const useStageStore = defineStore(
     // ready: model loaded and preload finished
     const ready = computed(() => model.value && !preloading.value);
 
-    const url = computed(() => (model.value ? model.value.fileLocation : "demo"));
+    // Empty string until loadStage populates the model. Do NOT use a
+    // word-like sentinel here: a previous "demo" fallback collided with the
+    // real Demo Stage (fileLocation === "demo"), making downstream "is the
+    // stage loaded yet?" checks treat that stage as never-loaded and never
+    // start its Jitsi conference.
+    const url = computed(() => (model.value ? model.value.fileLocation : ""));
 
     const objects = computed(() =>
       board.value.objects.map((o) => ({
@@ -858,6 +883,11 @@ export const useStageStore = defineStore(
               if (item.description) {
                 const meta = JSON.parse(item.description);
                 delete item.description;
+                // Exit settings live per stage assignment (top-level GraphQL
+                // fields, already on `item`); legacy media-level keys in old
+                // description blobs must not clobber them.
+                delete meta.exitAnimation;
+                delete meta.exitSpeed;
                 Object.assign(item, meta);
               }
               item.src = absolutePath(item.fileLocation ?? "");
@@ -1187,22 +1217,8 @@ export const useStageStore = defineStore(
       }
     }
 
-    /** Reconcile `board.objects` paint order with the performer's stack index. */
-    function setObjectStackIndex(objectId: ObjectId, targetIndex: number) {
-      const current = board.value.objects.findIndex((o) => o.id === objectId);
-      if (current < 0) return;
-      const [obj] = board.value.objects.splice(current, 1);
-      const idx = Math.max(0, Math.min(targetIndex, board.value.objects.length));
-      board.value.objects.splice(idx, 0, obj);
-    }
-
     function boardStackIndexFor(objectId: ObjectId): number {
       return board.value.objects.findIndex((o) => o.id === objectId);
-    }
-
-    /** True when audience should receive a board side-effect (not local-only ghosts). */
-    function shouldSyncBoardMutationToAudience(object: BoardObject): boolean {
-      return Boolean(object.liveAction || object.published);
     }
 
     function SET_PREFERENCES(prefs: Partial<Preferences>) {
@@ -2218,6 +2234,10 @@ export const useStageStore = defineStore(
         } catch {
           // description is optional / may not be JSON; fall back to defaults.
         }
+        // Exit settings are per stage assignment: top-level fields on the
+        // toolbox item (from the stage's assets query), carried onto the
+        // board object by the `...data` spread above — nothing to lift
+        // from description JSON anymore.
       }
       PUSH_OBJECT(serializeObject(object));
       // Case-insensitive avatar check: GraphQL `assetType.name` can arrive as
@@ -3415,8 +3435,6 @@ export const useStageStore = defineStore(
       if (!session.value) {
         session.value = readOrMintTabSessionId();
       }
-      const id = session.value;
-      const nickname = userStore.nickname;
       if (!isPlayer && userStore.avatarId != null) {
         userStore.$patch({ avatarId: null });
       }
@@ -3662,6 +3680,30 @@ export const useStageStore = defineStore(
       REFRESH_MEETING();
     }
 
+    /** This browser's own mute for a live stream tile — see `_streamLocalAudio`. */
+    function streamLocalMuted(objectId: string): boolean {
+      return _streamLocalAudio.value[objectId]?.muted ?? false;
+    }
+
+    /** This browser's own volume (0–100) for a live stream tile — see `_streamLocalAudio`. */
+    function streamLocalVolume(objectId: string): number {
+      return _streamLocalAudio.value[objectId]?.volume ?? 100;
+    }
+
+    function toggleStreamLocalMuted(objectId: string) {
+      _streamLocalAudio.value[objectId] = {
+        volume: streamLocalVolume(objectId),
+        muted: !streamLocalMuted(objectId),
+      };
+    }
+
+    function setStreamLocalVolume(objectId: string, volume: number) {
+      _streamLocalAudio.value[objectId] = {
+        muted: streamLocalMuted(objectId),
+        volume: Math.min(100, Math.max(0, volume)),
+      };
+    }
+
     // ====================================================================
     // RETURN — public store surface
     // ====================================================================
@@ -3710,6 +3752,7 @@ export const useStageStore = defineStore(
       receiptPopup,
       _reloadStreams,
       _forceReloadStreams,
+      _streamLocalAudio,
       _meetingRefreshKey,
       _enabledLiveStreaming,
       _streamingMode,
@@ -3897,6 +3940,10 @@ export const useStageStore = defineStore(
       triggerForceReloadStreams,
       reportStreamHealth,
       refreshMeeting,
+      streamLocalMuted,
+      streamLocalVolume,
+      toggleStreamLocalMuted,
+      setStreamLocalVolume,
     };
   },
   {

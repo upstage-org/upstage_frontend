@@ -4,7 +4,15 @@ import { gql } from "@apollo/client/core";
 import { ref, computed } from "vue";
 import { MEDIA_FORM_META_QUERY, MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
 import { permissionFragment } from "models/fragment";
-import { AvatarVoice, CopyrightLevel, Link, Media, Permission, UploadFile } from "models/studio";
+import {
+  AvatarVoice,
+  CopyrightLevel,
+  Link,
+  Media,
+  Permission,
+  StageAssignmentValue,
+  UploadFile,
+} from "models/studio";
 
 interface SaveMediaPayload {
   files: UploadFile[];
@@ -18,7 +26,7 @@ interface SaveMediaMutationVariables {
   mediaType: string;
   copyrightLevel: CopyrightLevel;
   owner: string;
-  stageIds: string[];
+  stageAssignments: StageAssignmentValue[];
   userIds: string[];
   tags: string[];
   w: number;
@@ -123,7 +131,15 @@ export const useSaveMedia = (
       const result = await mutate({ input: payload.media });
       const mediaId = result?.data?.saveMedia.asset.id;
       if (mediaId) {
-        message.success("Media saved successfully");
+        // Short-lived and click-to-dismiss: the toast sits exactly over the
+        // media list's stage / media-type filter row, so it must never
+        // block a user who saves and immediately reaches for the filters.
+        message.success({
+          content: "Media saved successfully",
+          key: "media-saved",
+          duration: 1.5,
+          onClick: () => message.destroy("media-saved"),
+        });
         handleSuccess(mediaId);
       }
     } catch (error) {

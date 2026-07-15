@@ -98,12 +98,15 @@ export class MediaLibraryPage {
     if (options?.useSearch) {
       // `show-search` + virtual list; the option's a11y `name` is the username
       // (see error-context snapshots) — use anchored username so `montague` ≠
-      // `ladymontague`.
+      // `ladymontague`. CASE-SENSITIVE on purpose: usernames are exact, and a
+      // case-insensitive match once picked the REAL dev user "Gregory" when
+      // the persona "gregory" was missing, assigning e2e media to a real
+      // person's account (2026-07-14). Better to fail loudly here.
       await this.page.keyboard.type(value, { delay: 30 });
       const ev = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const option = this.page
         .locator(".ant-select-item-option")
-        .filter({ hasText: new RegExp(`^\\s*${ev}\\s*$`, "i") })
+        .filter({ hasText: new RegExp(`^\\s*${ev}\\s*$`) })
         .first();
       await option.waitFor({ state: "attached", timeout: 10_000 });
       await option.scrollIntoViewIfNeeded();

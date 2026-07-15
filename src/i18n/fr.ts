@@ -218,6 +218,8 @@ export default {
   registration_button: "Bouton d’enregistrement",
   enable_upstage_donate: "Activer Donation à UpStage",
   shape: "Forme",
+  mute_locally: "Couper le son localement",
+  unmute_locally: "Rétablir le son localement",
   loop: {
     on: "Boucle",
     off: "Pas de boucle",

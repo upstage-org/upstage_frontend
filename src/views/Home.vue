@@ -129,6 +129,14 @@ export default {
       font-size: inherit !important;
     }
 
+    // Tailwind preflight forces img { display: block }, which defeats the
+    // text-align centering TinyMCE uses; restore the editor's inline layout.
+    :deep(img) {
+      display: inline-block;
+      max-width: 100%;
+      height: auto;
+    }
+
     > :after {
       content: "";
       pointer-events: none;

@@ -1,177 +1,157 @@
 # UpStage Frontend
 
-Vue 3 SPA for UpStage players and audience. Production deploys serve a static `dist/` bundle from host nginx.
+The Vue 3 single-page app ("studio") for UpStage players and audience. It
+talks GraphQL to the [backend](../upstage_backend) at `/api/studio_graphql`,
+receives live-stage traffic over MQTT WebSockets, and is deployed as a static
+`dist/` bundle served by host nginx.
 
-**Install is not run from this repo directly.** The backend single-host installer (phase `90_frontend`) invokes `run_front_end_{dev,prod}.sh` here. See the [backend README](../upstage_backend/README.md).
+**Toolchain:** Node `>=22 <23` (`.nvmrc` says 22) and pnpm `>=10`
+(`packageManager: pnpm@11.1.2`; `corepack enable` gives you the right one).
 
-## Installation
+---
 
-From the backend installer:
+## Running for development
 
 ```sh
-cd upstage_backend/installation
-./install_single_host.sh --all
-```
-
-Before running (or before re-running phase `90_frontend`), prepare your per-site env files in this repo — see [Configuration](#configuration) below.
-
-### Prerequisites
-
-- The single-host installer handles Docker; you do not invoke `docker compose` directly for production installs.
-- `pnpm` is only needed if you use `run_front_end_*.sh --serve` for optional local dev (see [Run scripts](#run-scripts)).
-
-## Configuration
-
-Each site has a gitignored env backup plus a matching run script:
-
-```bash
-cp env.template env_backup_dev     # or env_backup_prod
-# edit values, then run the installer (or re-run phase 90_frontend)
-```
-
-- Only [`env.template`](env.template) is committed. `env_backup*` files are gitignored and live on the host.
-- Create `env_backup_prod` the same way as `env_backup_dev`.
-
-### Variables
-
-| Variable                                              | Purpose                                                              |
-| ----------------------------------------------------- | -------------------------------------------------------------------- |
-| `VITE_GRAPHQL_ENDPOINT`                               | Backend API URL (baked at build time)                                |
-| `VITE_STATIC_ASSETS_ENDPOINT`                         | Upload URL prefix (default `/resources/`)                            |
-| `VITE_MQTT_NAMESPACE`                                 | MQTT topic prefix                                                    |
-| `VITE_MQTT_ENDPOINT`                                  | WebSocket MQTT URL                                                   |
-| `VITE_MQTT_USERNAME` / `VITE_MQTT_PASSWORD`           | Match backend Mosquitto `performance` user                           |
-| `VITE_JITSI_ENDPOINT`                                 | Streaming host from installer `state.env`                            |
-| `VITE_CLOUDFLARE_CAPTCHA_SITEKEY`                     | Turnstile site key                                                   |
-| `VITE_STRIPE_KEY`                                     | Stripe publishable key                                               |
-| `VITE_RELEASE_VERSION` / `VITE_ALIAS_RELEASE_VERSION` | Display version strings                                              |
-| `VITE_ENV_TYPE`                                       | `Production` → CAPTCHA + CORS; anything else → relaxed dev           |
-| `VITE_E2E`                                            | Exposes Pinia for Playwright (dev/test)                              |
-| `LOCAL_SERVE_STATIC_CONTENT`                          | **Required for `--serve` only** — path to `/app_code_<site>/uploads` |
-
-See also [`.env.example`](.env.example) for inline comments (including optional Jitsi XMPP overrides).
-
-### Dev vs prod example values
-
-Use your actual domain; placeholders shown below:
-
-|                              | dev                           | prod                      |
-| ---------------------------- | ----------------------------- | ------------------------- |
-| `VITE_GRAPHQL_ENDPOINT`      | `https://dev.<domain>/api/`   | `https://<domain>/api/`   |
-| `VITE_MQTT_ENDPOINT`         | `wss://mqtt-dev.<domain>:443` | `wss://mqtt.<domain>:443` |
-| `LOCAL_SERVE_STATIC_CONTENT` | `/app_code_dev/uploads`       | `/app_code_prod/uploads`  |
-
-## Run scripts
-
-[`run_front_end_dev.sh`](run_front_end_dev.sh) and [`run_front_end_prod.sh`](run_front_end_prod.sh) are invoked by the installer (default **`--build`**). Re-run them manually after config changes if needed.
-
-| Mode                            | Flag                 | Behavior                                                                                         |
-| ------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
-| **Build** (default, production) | `--build` or no flag | One-shot Docker compose build → `dist/` at `/frontend_app_<site>/dist/` for nginx                |
-| **Serve** (local dev only)      | `--serve`            | Host Vite HMR on `:3001` (dev) or `:3002` (prod); requires `pnpm` + `LOCAL_SERVE_STATIC_CONTENT` |
-
-- **`SITE`** (dev vs prod) and **`--build` vs `--serve`** are independent choices.
-- The script copies `env_backup_<site>` → `/frontend_app_<site>/.env` and `./.env`.
-- `--serve` is not used by the production installer.
-
-Host paths:
-
-| Path                                               | Purpose                                      |
-| -------------------------------------------------- | -------------------------------------------- |
-| `/frontend_app_dev/` / `/frontend_app_prod/`       | `.env` + built `dist/`                       |
-| `/app_code_dev/uploads` / `/app_code_prod/uploads` | Backend media (for `--serve` static serving) |
-
-## Verify
-
-- **Production (`--build`):** nginx serves `/frontend_app_<site>/dist/` at your app domain.
-- **`--serve` only:** open `http://localhost:3001` (dev) or `http://localhost:3002` (prod).
-
-## Testing
-
-End-to-end tests use Playwright. See [`tests/e2e/README.md`](tests/e2e/README.md) for full setup.
-
-```bash
-pnpm e2e:features
-
-# Default: all three phases headed, no replay headless.
-PWHEADLESS=0 pnpm e2e:perform
-
-# Just rehearsal: cast walks the script in rehearsal mode, no audience.
-PWHEADLESS=0 pnpm e2e:perform:rehearsal
-
-# Just live: cast performs while audience watches; no rehearsal, no replay.
-PWHEADLESS=0 pnpm e2e:perform:live
-
-# Just replay: no cast logins. Audience watches the most recent recording.
-# Errors clearly if no Performance exists for the stage yet.
-PWHEADLESS=0 pnpm e2e:perform:replay
-
-# Arbitrary combos via the env var:
-PWHEADLESS=0 E2E_PHASES=live,replay pnpm e2e:perform
-PWHEADLESS=0 E2E_PHASES=rehearsal,replay pnpm e2e:perform
-
-# Smoke beats still works on top of any phase selection:
-PWHEADLESS=0 E2E_PHASES=live E2E_BEATS=smoke pnpm e2e:perform
-```
-
-`E2E_REPLAY` still works as a fallback default when `E2E_PHASES` is unset.
-
-## Local protections (git hooks)
-
-This repo uses [husky](https://typicode.github.io/husky) to run a small
-suite of local protections against the same checks that run in CI. They
-exist so problems are caught at the developer's machine — before they
-hit `main` — and so a `git push --no-verify` bypass is still caught
-server-side by `.github/workflows/ci.yml`.
-
-### One-time install
-
-```bash
 pnpm install
+cp .env.example .env      # then edit — see the sample below
+pnpm dev                  # Vite on http://localhost:3000
 ```
 
-The `prepare` script runs `husky` automatically and installs the hooks
-into `.husky/`. If pnpm 10/11 prompts about build scripts, run
-`pnpm approve-builds husky` once.
+Two things the dev server needs:
 
-### What runs and when
+- **`LOCAL_SERVE_STATIC_CONTENT`** must point at an uploads directory on
+  disk (e.g. `/app_code_dev/uploads`). In development there is no nginx to
+  serve `/resources/`, so Vite serves it; **`pnpm dev` refuses to start
+  without this variable.**
+- **A backend.** The dev server proxies `/api` → `http://127.0.0.1:9090`
+  (the dev backend's host port); override with `VITE_STUDIO_API_PROXY`.
+  Point `VITE_GRAPHQL_ENDPOINT` at the _frontend's own_ origin (e.g.
+  `http://localhost:3000/api/`) so requests go through the proxy.
 
-| Hook         | What it does                                                                             | Typical time |
-| ------------ | ---------------------------------------------------------------------------------------- | ------------ |
-| `pre-commit` | `lint-staged`: ESLint `--fix` + Prettier `--write` on staged JS/TS/Vue/JSON/MD/SCSS only | < 5 s        |
-| `commit-msg` | Light gate: rejects empty / `wip` / `fixup!` / messages shorter than 10 characters       | instant      |
-| `pre-push`   | `pnpm typecheck` + `pnpm test` + `pnpm audit:ci` (production deps, fail on `high`+)      | ~30–35 s     |
+### Sample `.env`
 
-The `pre-push` hook is intentionally identical to the `verify` script
-and to the CI workflow, so a clean local push is a strong signal that
-CI will pass.
+Copied from a working dev instance with secret-like values X'd out:
 
-### Manual run
-
-```bash
-pnpm run verify        # typecheck + tests + audit
-pnpm run typecheck     # vue-tsc only
-pnpm run audit:ci      # production audit, fail on high+
+```sh
+VITE_GRAPHQL_ENDPOINT=https://dev.example.org/api/
+VITE_STATIC_ASSETS_ENDPOINT=/resources/
+VITE_MQTT_NAMESPACE=dev
+VITE_MQTT_ENDPOINT=wss://mqtt-dev.example.org:443
+VITE_MQTT_USERNAME=performance
+VITE_MQTT_PASSWORD=XXXXXXXXXXXXX
+VITE_JITSI_ENDPOINT=https://streaming.example.org
+VITE_RTMP_ENDPOINT=https://streaming2.example.org
+VITE_CLOUDFLARE_CAPTCHA_SITEKEY=XXXXXXXXXXXXXXXXXXXXXXX
+VITE_STRIPE_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+VITE_RELEASE_VERSION='3.1.0'
+VITE_ALIAS_RELEASE_VERSION='Build 001'
+VITE_ENV_TYPE=Dev
+# LOCAL_SERVE_STATIC_CONTENT — local dev and vitest only (not production).
+# Lets the Vite dev server serve uploaded media from disk; omit in prod deploys.
+LOCAL_SERVE_STATIC_CONTENT=/app_code_dev/uploads
 ```
 
-### Bypassing for emergencies
+### Environment variables
 
-Both hooks honour git's standard escape hatch:
+All runtime config is baked in at build time (`import.meta.env`), consumed
+centrally in `src/config.ts` (types in `src/env.d.ts`):
 
-```bash
-git commit --no-verify -m "hotfix: ..."
-git push --no-verify
+| Variable                                                                                                                 | Purpose                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `VITE_GRAPHQL_ENDPOINT`                                                                                                  | Backend API base URL (with trailing slash). Falls back to `window.location.origin + /api/`. |
+| `VITE_STATIC_ASSETS_ENDPOINT`                                                                                            | Uploaded-media URL prefix (default `/resources/`).                                          |
+| `VITE_MQTT_NAMESPACE`                                                                                                    | MQTT topic prefix (must match the stage namespace, e.g. `dev`).                             |
+| `VITE_MQTT_ENDPOINT`                                                                                                     | MQTT **WebSocket** URL (`ws://…:9001` in dev, `wss://…:443` in prod).                       |
+| `VITE_MQTT_USERNAME` / `VITE_MQTT_PASSWORD`                                                                              | Broker credentials — must match the backend Mosquitto `performance` user.                   |
+| `VITE_JITSI_ENDPOINT`                                                                                                    | Jitsi host origin for camera/mic streaming.                                                 |
+| `VITE_JITSI_XMPP_DOMAIN` / `VITE_JITSI_XMPP_MUC_DOMAIN` / `VITE_JITSI_XMPP_FOCUS_DOMAIN` / `VITE_JITSI_PREFER_WEBSOCKET` | Optional Jitsi XMPP overrides for non-default Jitsi installs.                               |
+| `VITE_RTMP_ENDPOINT`                                                                                                     | MediaMTX playback origin for RTMP/OBS stream feeds. **Leave unset to hide all RTMP UI.**    |
+| `VITE_CLOUDFLARE_CAPTCHA_SITEKEY`                                                                                        | Turnstile site key for the login captcha.                                                   |
+| `VITE_STRIPE_KEY`                                                                                                        | Stripe publishable key (donations/subscriptions; optional).                                 |
+| `VITE_RELEASE_VERSION` / `VITE_ALIAS_RELEASE_VERSION`                                                                    | Version strings shown in the UI.                                                            |
+| `VITE_ENV_TYPE`                                                                                                          | `Production` enables captcha + CORS restrictions; anything else relaxes them.               |
+| `VITE_E2E`                                                                                                               | Exposes `window.__UPSTAGE_PINIA__` for Playwright (also on in `pnpm dev`).                  |
+| `LOCAL_SERVE_STATIC_CONTENT`                                                                                             | Dev/test only (not `VITE_`-prefixed): uploads dir for the dev static server.                |
+| `VITE_STUDIO_API_PROXY`                                                                                                  | Dev only: override the `/api` proxy target (default `http://127.0.0.1:9090`).               |
+| `FRONTEND_PORT`                                                                                                          | Port for `pnpm serve:dist` preview (default 4173).                                          |
+
+---
+
+## Building & deploying
+
+Each site keeps a gitignored `env_backup_<site>` file (same format as `.env`
+above). The run scripts copy it into place and build:
+
+```sh
+./run_front_end_dev.sh --build     # or run_front_end_prod.sh
 ```
 
-Use sparingly. CI will still run the full verify suite on the pushed
-branch and on the PR, so a bypass only delays the failure — it does not
-hide it.
+`--build` runs a one-shot docker compose builder (Node 22 + pnpm, typecheck +
+`vite build`) and writes the result to **`/frontend_app_<site>/dist`** on the
+host. Nothing in this repo serves production traffic — that's nginx's job:
 
-### Adding a new check
+### Serving (nginx) — all SSL is stripped at nginx
 
-1. Add a script to `package.json` so it can be run standalone (e.g.
-   `pnpm run my-check`).
-2. Add the same script to `.husky/pre-push` (and update the `verify`
-   script if it should be part of the bundle).
-3. Add the matching step to `.github/workflows/ci.yml` so the local
-   gate and the server-side gate stay in lockstep.
+TLS terminates at nginx; everything behind it is plain HTTP/WS. The proxy
+must:
+
+- serve `/frontend_app_<site>/dist` as the site root, **with an HTML5
+  history fallback** (`try_files $uri /index.html`) — the router uses
+  `createWebHistory`, so deep links like `/replay/...` 404 without it;
+- alias `/resources/` to the backend's uploads dir (`/app_code_<site>/uploads`);
+- proxy `/api/` to the backend (`http://127.0.0.1:9090` dev / `:9091` prod);
+- proxy the MQTT WebSocket hostname (e.g. `wss://mqtt-dev.example.org:443`)
+  to `http://127.0.0.1:9001` (dev) / `:9002` (prod) with WebSocket upgrade
+  headers — the browser's MQTT connection is WebSocket-only;
+- use HTTPS in production: browsers only allow camera/microphone (Jitsi) on
+  secure origins.
+
+The vendored scripts under `public/js/` (`lib-jitsi-meet.min.js`,
+`mespeak.js`) ship inside `dist/` — deploy the whole directory.
+
+`./run_front_end_<site>.sh --serve` runs a Vite dev server against that
+site's env instead of building (dev :3001 / prod :3002).
+
+---
+
+## Testing & quality
+
+| Task                       | Command                                                                  |
+| -------------------------- | ------------------------------------------------------------------------ |
+| Unit tests (vitest, jsdom) | `pnpm test` / `pnpm test:watch`                                          |
+| Typecheck                  | `pnpm typecheck`                                                         |
+| Lint / format              | `pnpm lint` / `pnpm format`                                              |
+| Full local gate (pre-push) | `pnpm verify` (typecheck + test + `pnpm audit`)                          |
+| End-to-end (Playwright)    | `pnpm e2e`, `pnpm e2e:features`, `pnpm e2e:perform`, `pnpm e2e:smoke`, … |
+| GraphQL codegen            | `pnpm codegen` (schema from `GRAPHQL_SCHEMA_URL` or `./schema.graphql`)  |
+
+The e2e suite is documented in [tests/e2e/README.md](tests/e2e/README.md): it
+runs against a **disposable** backend + `upstage_e2e` database on
+`127.0.0.1:9092` (`tests/e2e/env/e2e-backend-up.sh`), configured via
+`.env.test` (copy from `.env.test.example`). The seeded login is
+`admin` / `Secret@123` (created by the backend migrations). Husky hooks and
+CI run the same `verify` gate.
+
+---
+
+## Behaviour notes
+
+- **Admin roles don't grant stage controls.** Admin/Super-admin roles gate
+  the Studio admin panels only. Player controls on a live stage (the left
+  toolbox, player chat) are granted **per stage**: to the stage owner and to
+  users on the stage's player/editor access lists, edited in Stage
+  Management → General. An admin who is neither the owner nor listed joins
+  that stage as audience. This is intentional.
+- **Stale logins on a stage.** If a viewer's login token expires while they
+  are watching a stage, they keep watching uninterrupted (as audience); the
+  app completes the logout when they navigate away from the stage.
+- More docs: [docs/REPLAY.md](docs/REPLAY.md) (recordings & replay),
+  [docs/BROWSER_SUPPORT.md](docs/BROWSER_SUPPORT.md),
+  [TOUCH_CHEATSHEET.md](TOUCH_CHEATSHEET.md) (touch-screen controls),
+  [UpstageInternal.md](UpstageInternal.md) (upstage.live-specific settings +
+  data restoration).
+
+## License
+
+GPL-3.0 (see [LICENSE](LICENSE)).

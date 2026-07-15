@@ -14,7 +14,7 @@ import { useMutation, useQuery } from "@vue/apollo-composable";
 import { message } from "ant-design-vue";
 import { streamFeedVar } from "apollo";
 import configs from "config";
-import { Media, StudioGraph } from "models/studio";
+import { Media, StageAssignmentValue, StudioGraph } from "models/studio";
 import { computed, inject, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { MEDIA_FORM_META_QUERY, MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
@@ -45,7 +45,7 @@ const mode = computed(() => streamFeedResult.value?.streamFeed?.mode);
 
 const name = ref("");
 const streamKey = ref("");
-const stageIds = ref<string[]>([]);
+const stageAssignments = ref<StageAssignmentValue[]>([]);
 const saving = ref(false);
 const savedKey = ref("");
 const sign = ref("");
@@ -61,7 +61,7 @@ watch(visible, (open) => {
   if (state?.mode === "create") {
     name.value = "";
     streamKey.value = generateStreamKey();
-    stageIds.value = [];
+    stageAssignments.value = [];
   } else if (state?.mode === "info") {
     savedKey.value = state.media.fileLocation;
     fetchSign(state.media.fileLocation);
@@ -130,7 +130,7 @@ async function create() {
         urls: [streamKey.value],
         copyrightLevel: 3,
         owner: "",
-        stageIds: stageIds.value,
+        stageAssignments: stageAssignments.value,
         userIds: [],
         tags: [],
         w: 16,
@@ -203,7 +203,7 @@ function close() {
         <a-input v-model:value="streamKey" :maxlength="64" data-testid="stream-feed-key" />
       </a-form-item>
       <a-form-item :label="t('stages')">
-        <StageAssignment v-model="stageIds" />
+        <StageAssignment v-model="stageAssignments" />
       </a-form-item>
       <a-space class="w-full justify-end">
         <a-button @click="close">{{ t("cancel") }}</a-button>

@@ -61,7 +61,7 @@ export function hlsUrlForKey(key: string): string {
  */
 export async function hlsStreamHasAudio(key: string): Promise<boolean> {
   try {
-    const response = await fetch(hlsUrlForKey(key));
+    const response = await fetch(hlsUrlForKey(key), { signal: AbortSignal.timeout(8_000) });
     if (!response.ok) return false;
     const manifest = await response.text();
     return /mp4a|opus|ac-3|ec-3/i.test(manifest);
@@ -130,7 +130,8 @@ export async function connectWhep(key: string): Promise<WhepConnection> {
       const url = sessionUrl;
       sessionUrl = null;
       try {
-        await fetch(url, { method: "DELETE" });
+        // keepalive lets the teardown complete even during a page unload.
+        await fetch(url, { method: "DELETE", keepalive: true });
       } catch {
         // Best effort — MediaMTX also reaps sessions on ICE disconnect.
       }
@@ -151,6 +152,8 @@ export async function connectWhep(key: string): Promise<WhepConnection> {
       method: "POST",
       headers: { "Content-Type": "application/sdp" },
       body: pc.localDescription?.sdp ?? offer.sdp,
+      // Don't hang forever on a stalled socket; callers fall back to HLS/raw.
+      signal: AbortSignal.timeout(15_000),
     });
     if (response.status === 404) {
       throw new StreamOfflineError(key);

@@ -192,6 +192,8 @@ export default {
   registration_button: "Nút đăng ký",
   enable_upstage_donate: "Cho phép đóng góp cho UpStage",
   shape: "Hình dạng",
+  mute_locally: "Tắt tiếng cục bộ",
+  unmute_locally: "Bật tiếng cục bộ",
   loop: {
     on: "Lặp lại",
     off: "Không lặp",

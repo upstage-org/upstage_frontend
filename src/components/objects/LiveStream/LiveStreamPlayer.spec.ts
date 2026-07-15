@@ -58,6 +58,22 @@ vi.mock("hls.js", () => ({
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
+// The player watches the store's force-reload tick (Refresh streams
+// button); a reactive stand-in lets tests fire the signal without Pinia.
+vi.mock("@stores/pinia/stage", async () => {
+  const { reactive } = await import("vue");
+  const store = reactive({
+    forceReloadStreams: null as Date | null,
+    // Local listening controls read by the player (defaults: audible).
+    streamLocalMuted: () => false,
+    streamLocalVolume: () => 100,
+  });
+  return { useStageStore: () => store };
+});
+import { useStageStore } from "@stores/pinia/stage";
+// The real store types `forceReloadStreams` as a readonly computed; the
+// mock above is a plain reactive object the tests may write to.
+const stageStoreMock = () => useStageStore() as unknown as { forceReloadStreams: Date | null };
 vi.mock("./whepClient", () => ({
   connectWhep: (key: string) => connectWhep(key),
   videoFramesDecoded: () => framesDecoded(),
@@ -69,14 +85,15 @@ vi.mock("./whepClient", () => ({
 
 import LiveStreamPlayer from "./LiveStreamPlayer.vue";
 
-async function mountPlaying(isPlaying = true) {
+async function mountPlaying(playing = true) {
   const wrapper = mount(LiveStreamPlayer, {
-    props: { object: { id: "obj1", fileLocation: "key1", isPlaying } },
+    props: { object: { id: "obj1", fileLocation: "key1" } },
   });
   const video = wrapper.find("video").element as HTMLVideoElement;
   // jsdom media elements never actually play; the watchdog only counts
-  // time while the element is unpaused, so mirror isPlaying here.
-  Object.defineProperty(video, "paused", { get: () => !isPlaying });
+  // time while the element is unpaused, so stub the element state
+  // (`playing=false` models a gesture-blocked autoplay attempt).
+  Object.defineProperty(video, "paused", { get: () => !playing });
   Object.defineProperty(video, "play", { value: () => undefined });
   Object.defineProperty(video, "pause", { value: () => undefined });
   await vi.advanceTimersByTimeAsync(0); // let connect() settle
@@ -91,6 +108,7 @@ beforeEach(() => {
   framesDecoded.mockResolvedValue(0);
   whepClose.mockClear();
   connectWhep.mockClear();
+  stageStoreMock().forceReloadStreams = null;
 });
 
 afterEach(() => {
@@ -162,12 +180,30 @@ describe("LiveStreamPlayer WHEP stall watchdog", () => {
     wrapper.unmount();
   });
 
-  it("does not count stall time while the tile is paused (Play tool off)", async () => {
+  it("does not count stall time while the element is paused (autoplay blocked)", async () => {
     const wrapper = await mountPlaying(false);
 
     await vi.advanceTimersByTimeAsync(20000);
     expect(whepClose).not.toHaveBeenCalled();
     expect(fakeHlsInstances).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it("reconnects from scratch — WHEP first again — on the force-reload signal", async () => {
+    const wrapper = await mountPlaying();
+
+    // Stall out the WHEP session so the feed is marked WebRTC-hostile and
+    // playback lands on HLS.
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(fakeHlsInstances).toHaveLength(1);
+    expect(connectWhep).toHaveBeenCalledTimes(1);
+
+    // Refresh streams button → full teardown, HLS instance destroyed, and
+    // the WebRTC-hostile verdict is forgotten: WHEP gets a fresh chance.
+    stageStoreMock().forceReloadStreams = new Date();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(fakeHlsInstances[0].destroy).toHaveBeenCalled();
+    expect(connectWhep).toHaveBeenCalledTimes(2);
     wrapper.unmount();
   });
 });

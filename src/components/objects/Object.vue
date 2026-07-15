@@ -5,9 +5,11 @@ import { storeToRefs } from "pinia";
 import { computed, inject, onUnmounted, provide, reactive, ref, watch } from "vue";
 import {
   isHoldableBoardObject,
+  isJitsiBoardType,
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "@utils/common";
+import { effectiveFrameFitId, frameShapeStyle } from "./frameShapes";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
@@ -140,6 +142,23 @@ export default {
     };
     const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
+    // Frame shape for live stream tiles only (jitsi + RTMP). Applied to the
+    // sized `.object` wrapper so the <video> AND the RTMP "waiting" /
+    // jitsi loading overlays are clipped together, and the %-based shape
+    // stretches live while the frame is resized. A pure style binding on an
+    // existing div: the Board key is object.id, so this can never remount
+    // the player or touch srcObject.
+    const frameStyle = computed(() => {
+      const jitsi = isJitsiBoardType(props.object.type);
+      if (!jitsi && props.object.isRTMP !== true) return {};
+      return {
+        ...frameShapeStyle(props.object.shape, jitsi ? "jitsi" : "rtmp"),
+        // Stretch/crop choice; the <video> reads it via object-fit:
+        // var(--stream-fit, fill) in Jitsi.vue / LiveStreamPlayer.vue.
+        "--stream-fit": effectiveFrameFitId(props.object.fit),
+      };
+    });
+
     const isWearing = computed(
       () => props.object.wornBy && stageStore.currentAvatar?.id === props.object.wornBy,
     );
@@ -220,6 +239,7 @@ export default {
       controlable,
       sliderMode,
       activeMovable,
+      frameStyle,
       isWearing,
       hasLink,
       openLink,
@@ -253,9 +273,19 @@ export default {
     :pad-top="-stageSize.top"
     :pad-right="250"
     :opacity="0.8"
-    :prevent-clicking="replaying"
+    :disabled="replaying"
   >
     <template #trigger>
+      <!--
+        While this object is selected (green Moveable frame showing), its
+        control overlay (lightbulb / X buttons, sliders) must float above
+        every other object on the board — `.object` divs carry z-index 10,
+        so without the raise a neighbouring object rendered later buries
+        the buttons even though the frame (drawn on document.body) stays
+        visible. pointer-events:none keeps the transparent wrapper from
+        stealing the object's own drag/click hits; the controls re-enable
+        their own pointer events in their scoped styles.
+      -->
       <div
         :style="{
           position: 'absolute',
@@ -264,6 +294,7 @@ export default {
           width: object.w + 'px',
           height: object.h + 'px',
           transform: `rotate(${object.rotate}deg)`,
+          ...(activeMovable ? { zIndex: 100, pointerEvents: 'none' } : {}),
         }"
       >
         <OpacitySlider v-model:active="active" v-model:slider-mode="sliderMode" :object="object" />
@@ -277,6 +308,8 @@ export default {
           :data-testid="object?.name ? `object-${object.name}` : undefined"
           :data-object-id="object?.id"
           :data-object-type="object?.type"
+          :data-exit-animation="object?.exitAnimation || undefined"
+          :data-exit-speed="object?.exitSpeed || undefined"
           class="object"
           :class="{ 'link-hover-effect': hasLink && object.link.effect }"
           :style="{
@@ -284,6 +317,7 @@ export default {
             height: '100%',
             cursor: controlable ? 'grab' : object.link && object.link.url ? 'pointer' : 'normal',
             ...(activeMovable ? { position: 'relative', 'z-index': 1 } : {}),
+            ...frameStyle,
           }"
           @keyup.delete="deleteObject"
           @dblclick="hold"

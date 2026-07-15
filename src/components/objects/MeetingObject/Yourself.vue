@@ -2,7 +2,7 @@
 import Skeleton from "components/stage/Toolboxs/Skeleton.vue";
 import { computed, inject, onActivated, onDeactivated, onMounted, reactive, ref, watch } from "vue";
 import { useUserStore } from "@stores/pinia/user";
-import { playMediaElement } from "@utils/mediaPlayback";
+import { playMediaElement, retryPlayOnUserGesture } from "@utils/mediaPlayback";
 
 export default {
   components: { Skeleton },
@@ -50,6 +50,11 @@ export default {
         el.value.disablePictureInPicture = true;
         playMediaElement(el.value, { muted: true, inline: true }).catch(() => {
           loading.value = false;
+          // Autoplay was blocked. The idempotent srcObject guard above means
+          // attachPreview will never call play() again for this stream, so
+          // without a retry the preview stays a black box forever (same
+          // recovery Jitsi.vue uses for on-stage tiles).
+          retryPlayOnUserGesture(el.value);
         });
       } catch (e) {
         console.warn("Re-attaching local preview:", e);
@@ -91,6 +96,15 @@ export default {
       }
     };
 
+    // Clicking the blocked warning retries the camera acquire — the blocked
+    // latch otherwise requires a full page reload to clear (ensureTracks
+    // refuses to re-acquire while blocked is set).
+    const retryAcquire = async () => {
+      if (publisher?.retryAcquire) {
+        await publisher.retryAcquire();
+      }
+    };
+
     const userStore = useUserStore();
     const nickname = computed(() => userStore.nickname);
 
@@ -112,7 +126,7 @@ export default {
       blockedMessage,
       data,
       join,
-      joined,
+      retryAcquire,
       el,
       nickname,
       loading,
@@ -125,13 +139,28 @@ export default {
 <template>
   <div>
     <img v-if="loading && !blocked" class="overlay" src="/img/videoloading.gif" />
-    <div v-if="blocked" class="blocked-tag" :title="blockedMessage">
+    <div
+      v-if="blocked"
+      class="blocked-tag"
+      role="button"
+      :title="blockedMessage"
+      @click="retryAcquire"
+    >
       <span class="tag is-warning is-small">{{ blockedMessage }}</span>
+      <span class="tag is-light is-small">Click to try again</span>
     </div>
     <Skeleton v-else :data="data" class="p-2" style="flex-direction: column" @dragstart="join">
+      <!--
+        Cursor: always a pointer. Dragging the preview onto the stage does
+        NOT require the conference to be joined (publish is deferred via
+        pendingPublish and the board watcher), so the old
+        `joined ? pointer : not-allowed` gate showed a red "blocked" cursor
+        during the join handshake — and forever on a stage whose join stalls
+        — for an action that actually works.
+      -->
       <video
         ref="el"
-        :style="{ cursor: joined ? 'pointer' : 'not-allowed', height: '48px', marginBottom: '2px' }"
+        :style="{ cursor: 'pointer', height: '48px', marginBottom: '2px' }"
         :onClick="join"
         autoplay
         :muted.attr="true"
@@ -182,5 +211,6 @@ video {
   text-align: center;
   white-space: normal;
   font-size: 0.7rem;
+  cursor: pointer;
 }
 </style>

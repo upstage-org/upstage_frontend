@@ -111,6 +111,10 @@ export default {
   position: absolute;
   width: min-content;
   right: -40px;
+  // The parent overlay wrapper is pointer-events:none while the object is
+  // selected (so it can't swallow the object's drag/click); the buttons
+  // themselves must stay clickable.
+  pointer-events: auto;
   button {
     width: 16px;
     margin-bottom: 4px;

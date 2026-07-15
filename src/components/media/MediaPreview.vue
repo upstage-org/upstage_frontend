@@ -26,6 +26,12 @@ const attributes = computed<MediaAttributes>(() => {
       <VideoFirstFrameThumb :media="props.media" />
     </div>
   </template>
+  <!-- RTMP feeds: fileLocation is the stream KEY, not an image — an <img>
+       would render the browser's broken-image icon. Same camera-on-dark
+       placeholder as an offline live tile (LiveStreamPlayer.vue). -->
+  <div v-else-if="props.media.assetType.name === 'stream'" class="stream-preview-frame">
+    <i class="fas fa-video" aria-hidden="true"></i>
+  </div>
   <template v-else>
     <a-image :src="absolutePath(props.media.fileLocation)" class="w-24 max-h-24 object-contain" />
     <a-popover v-if="attributes.multi" placement="right">
@@ -53,6 +59,18 @@ const attributes = computed<MediaAttributes>(() => {
   border-radius: 4px;
   overflow: hidden;
   background: #1a1a1a;
+}
+
+.stream-preview-frame {
+  width: 96px;
+  height: 96px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 28px;
 }
 
 .ant-carousel :deep(.slick-dots) {

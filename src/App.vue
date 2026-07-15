@@ -39,7 +39,10 @@ const hasShowPrompt = computed(() => {
 // Check version
 const checkVersion = async (): Promise<void> => {
   try {
-    const response = await fetch("/version.json", { cache: "no-store" });
+    const response = await fetch("/version.json", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
     const data: VersionData = await response.json();
     latestVersion.value = data.version;
 
@@ -89,6 +92,11 @@ onMounted(() => {
     :theme="{
       token: {
         colorPrimary: '#007011',
+        // Ant derives link colours from its own blue, not colorPrimary —
+        // links must roll over green like the rest of the UpStage palette.
+        colorLink: '#007011',
+        colorLinkHover: '#30ac45',
+        colorLinkActive: '#00560d',
         borderRadius: 4,
         fontSize: 16,
         fontFamily: 'Josefin Sans, sans-serif',

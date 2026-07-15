@@ -53,6 +53,8 @@ interface BoardObject {
   type?: string;
   drawingId?: string;
   opacity?: number;
+  exitAnimation?: string;
+  exitSpeed?: number;
   x?: number;
   y?: number;
   w?: number;
@@ -1365,5 +1367,109 @@ test.describe("features: drawing + opacity + depth @features", () => {
     expect(result.holderAId).toBeNull();
     expect(result.holderBId).toBe("tab-newer");
     expect(result.holdingSessionCount).toBe(1);
+  });
+
+  // ---------------------------------------------------------------------
+  // Context-menu exit override — right-clicking a placed prop offers an
+  // "Exit animation" row; saving the popup shapeObject's the chosen
+  // exitAnimation/exitSpeed onto the live board object, which observers
+  // receive over MQTT. The override is temporary: the toolbox/assignment
+  // source is untouched, so a fresh placement of the same media reverts
+  // to the assignment's exit settings.
+  //
+  // This drives the REAL UI (right-click → menu row → ant-select → Save)
+  // rather than the dev hook, because the surface under test IS the menu
+  // and popup wiring; the store path underneath is the same shapeObject
+  // contract the opacity test already covers.
+  // ---------------------------------------------------------------------
+  test("context-menu exit animation override propagates and stays temporary", async () => {
+    await showBanner(admin.page, "Test — Exit override", "right-click > Exit animation > Poof!");
+    await showBanner(audience.page, "Test — Exit override", "watching exitAnimation ride MQTT");
+    await settle(admin.page);
+
+    const propKey = Object.keys(runtime.props)[0];
+    if (!propKey) test.skip(true, "runtime.json has no props — re-run pnpm e2e:setup");
+
+    const placedId = await placeProp({
+      admin,
+      runtime,
+      propKey,
+      to: { x: 400, y: 300 },
+      size: { w: 200, h: 200 },
+    });
+
+    // Baseline: whatever the stage assignment seeded (normally "vanish").
+    const readExit = (id: string) =>
+      admin.page.evaluate((objectId) => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          board: { objects: Array<{ id: string; exitAnimation?: string; exitSpeed?: number }> };
+        };
+        const o = stage.board.objects.find((x) => x.id === objectId);
+        if (!o) throw new Error(`readExit: ${objectId} not on admin board`);
+        return { exitAnimation: o.exitAnimation ?? null, exitSpeed: o.exitSpeed ?? null };
+      }, id);
+    const baseline = await readExit(placedId);
+    expect(baseline.exitAnimation).not.toBe("poof");
+
+    // The banner overlays the top of the page; drop it before real clicks
+    // so it can't intercept the menu/popup.
+    await clearBanner(admin.page);
+
+    // Right-click the object wrapper to open the shared context menu.
+    // bringToFront matters: with two pages in one headless browser the
+    // admin tab is backgrounded, its rAF throttles, and the animejs enter
+    // animation can leave the wrapper parked off-viewport — poll until the
+    // box has settled where placeObjectOnStage put it.
+    await admin.page.bringToFront();
+    const wrapper = admin.page.locator(`[data-object-id="${placedId}"]`).first();
+    await expect(wrapper).toBeVisible({ timeout: 5_000 });
+    await expect
+      .poll(async () => (await wrapper.boundingBox())?.y ?? -9999, {
+        timeout: 10_000,
+        intervals: [100, 200, 500],
+      })
+      .toBeCloseTo(300, -1);
+    await wrapper.click({ button: "right", force: true });
+    const menu = admin.page.locator(".avatar-context-menu");
+    await expect(menu).toBeVisible({ timeout: 5_000 });
+    await menu.getByText("Exit animation", { exact: true }).click();
+
+    // The ExitParameters popup hosts the shared ExitSettings picker.
+    const animationSelect = admin.page.locator('[data-testid="exit-settings-animation"]');
+    await expect(animationSelect).toBeVisible({ timeout: 5_000 });
+    await animationSelect.click();
+    await admin.page
+      .locator(".ant-select-item-option", { hasText: "Poof!" })
+      .first()
+      .click({ timeout: 5_000 });
+    await admin.page.locator(".modal.is-active").getByRole("button", { name: /save/i }).click();
+    await expect(admin.page.locator(".modal.is-active")).toBeHidden({ timeout: 5_000 });
+
+    // Override landed locally…
+    const overridden = await readExit(placedId);
+    expect(overridden.exitAnimation).toBe("poof");
+
+    // …and rode the shapeObject broadcast to the audience seat.
+    await pollUntil<BoardObject[]>(
+      `audience sees exitAnimation=poof on ${placedId}`,
+      async () => (await audience.live.getStageState<BoardObject[]>("board.objects")) ?? [],
+      (objs) => objs.find((o) => o.id === placedId)?.exitAnimation === "poof",
+    );
+
+    // Temporariness: the toolbox source media is untouched, so a fresh
+    // placement of the same prop starts from the assignment's settings.
+    const secondId = await placeProp({
+      admin,
+      runtime,
+      propKey,
+      to: { x: 620, y: 300 },
+      size: { w: 200, h: 200 },
+    });
+    const second = await readExit(secondId);
+    expect(second.exitAnimation).toBe(baseline.exitAnimation);
+
+    await settle(audience.page);
+    await deleteObjectAdmin(admin, secondId);
+    await deleteObjectAdmin(admin, placedId);
   });
 });

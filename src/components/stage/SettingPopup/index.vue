@@ -8,6 +8,7 @@ import SaveScene from "./settings/SaveScene.vue";
 import Icon from "components/Icon.vue";
 import VolumeParameters from "./settings/VolumeParameters.vue";
 import TransparencyParameters from "./settings/TransparencyParameters.vue";
+import ExitParameters from "./settings/ExitParameters.vue";
 import CreateRoom from "./settings/CreateRoom.vue";
 
 export default {
@@ -19,6 +20,7 @@ export default {
     SaveScene,
     VolumeParameters,
     TransparencyParameters,
+    ExitParameters,
     CreateRoom,
   },
   setup: () => {

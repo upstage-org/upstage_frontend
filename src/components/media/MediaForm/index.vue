@@ -20,6 +20,7 @@ import {
   Link,
   Media,
   MediaAttributes,
+  StageAssignmentValue,
   StudioGraph,
   UploadFile,
   User,
@@ -31,6 +32,11 @@ import { editingMediaVar, inquiryVar } from "apollo";
 import MediaPermissions from "./MediaPermissions.vue";
 import AvatarVoice from "./AvatarVoice.vue";
 import PropLink from "./PropLink.vue";
+import {
+  DEFAULT_EXIT_ANIMATION,
+  DEFAULT_EXIT_SPEED,
+  EXIT_ANIMATED_TYPES,
+} from "components/stage/removalAnimations";
 import { getDefaultAvatarVoice } from "services/speech/voice";
 import { useMutation, useQuery } from "@vue/apollo-composable";
 import { MEDIA_FORM_META_QUERY } from "services/graphql/mediaList";
@@ -124,7 +130,11 @@ watch(editingMediaResult, () => {
     }
     note.value = attributes?.note ?? "";
     if (editingMedia.stages) {
-      stageIds.value = editingMedia.stages.map((stage) => stage.id);
+      stageAssignments.value = editingMedia.stages.map((stage) => ({
+        stageId: stage.id,
+        exitAnimation: stage.exitAnimation ?? DEFAULT_EXIT_ANIMATION,
+        exitSpeed: stage.exitSpeed ?? DEFAULT_EXIT_SPEED,
+      }));
     }
     userIds.value = editingMedia.permissions
       .filter((permission) => permission.approved)
@@ -134,8 +144,13 @@ watch(editingMediaResult, () => {
 
 const name = ref("");
 const type = ref("avatar");
+// Audio (and other never-on-the-board types) has no removal animation,
+// so its stage assignments hide the exit picker.
+const exitSettingsApply = computed(() =>
+  EXIT_ANIMATED_TYPES.includes((type.value ?? "").toLowerCase()),
+);
 const tags = ref<string[]>([]);
-const stageIds = ref<string[]>([]);
+const stageAssignments = ref<StageAssignmentValue[]>([]);
 const userIds = ref<string[]>([]);
 const note = ref<string>("");
 const mediaName = computed(() => {
@@ -234,8 +249,8 @@ const mediaTypes = computed(() => {
         (node) =>
           !(
             editingMediaResult.value?.editingMedia
-              ? ["media", "video", "shape"]
-              : ["media", "shape"]
+              ? ["media", "video", "shape", "image"]
+              : ["media", "shape", "image"]
           ).includes(node.name.toLowerCase()),
       )
       .map((node) => ({ label: capitalize(node.name), value: node.name }))
@@ -255,7 +270,7 @@ const { progress, saveMedia, saving } = useSaveMedia(
         mediaType: type.value,
         copyrightLevel: copyrightLevel.value,
         owner: owner.value,
-        stageIds: stageIds.value,
+        stageAssignments: stageAssignments.value,
         userIds: userIds.value,
         tags: tags.value,
         w: frameSize.value.width,
@@ -624,7 +639,7 @@ const getUserDisplayName = (user: User) => {
         <div class="card-container pr-4">
           <a-tabs>
             <a-tab-pane key="stages" tab="Stages" class="pb-4">
-              <StageAssignment v-model="stageIds as any" />
+              <StageAssignment v-model="stageAssignments" :show-exit-settings="exitSettingsApply" />
             </a-tab-pane>
             <a-tab-pane key="tags" tab="Tags" class="pb-4">
               <div class="p-2 media-form-tags-pane">

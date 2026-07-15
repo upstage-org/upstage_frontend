@@ -5,11 +5,20 @@ import { computed, PropType, ref } from "vue";
 import { includesIgnoreCase } from "utils/common";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
+import ExitSettings from "components/media/ExitSettings.vue";
+import { DEFAULT_EXIT_ANIMATION, DEFAULT_EXIT_SPEED } from "components/stage/removalAnimations";
+import { StageAssignmentValue } from "models/studio";
 
 const props = defineProps({
   modelValue: {
-    type: Array as PropType<string[]>,
+    type: Array as PropType<StageAssignmentValue[]>,
     required: true,
+  },
+  // Media types that never render on the board (audio, backdrop, curtain)
+  // have no removal animation, so their assignments hide the exit picker.
+  showExitSettings: {
+    type: Boolean,
+    default: true,
   },
 });
 
@@ -46,7 +55,7 @@ const stages = computed((): StageRow[] => {
   return [];
 });
 
-const assignedIdSet = computed(() => new Set(props.modelValue.map((id) => String(id))));
+const assignedIdSet = computed(() => new Set(props.modelValue.map((a) => String(a.stageId))));
 
 const searchAvailable = ref("");
 const searchAssigned = ref("");
@@ -59,12 +68,14 @@ const availableStages = computed(() =>
   ),
 );
 
-const assignedStages = computed(() => {
+type AssignedRow = StageRow & { assignment: StageAssignmentValue };
+
+const assignedStages = computed((): AssignedRow[] => {
   const byId = new Map(stages.value.map((s) => [String(s.key), s]));
-  const ordered: StageRow[] = [];
-  for (const id of props.modelValue) {
-    const row = byId.get(String(id));
-    if (row) ordered.push(row);
+  const ordered: AssignedRow[] = [];
+  for (const assignment of props.modelValue) {
+    const row = byId.get(String(assignment.stageId));
+    if (row) ordered.push({ ...row, assignment });
   }
   const q = searchAssigned.value.trim();
   if (!q) return ordered;
@@ -73,15 +84,26 @@ const assignedStages = computed(() => {
 
 function assignStage(id: string) {
   const sid = String(id);
-  if (props.modelValue.some((k) => String(k) === sid)) return;
-  emits("update:modelValue", [...props.modelValue, sid]);
+  if (props.modelValue.some((a) => String(a.stageId) === sid)) return;
+  emits("update:modelValue", [
+    ...props.modelValue,
+    { stageId: sid, exitAnimation: DEFAULT_EXIT_ANIMATION, exitSpeed: DEFAULT_EXIT_SPEED },
+  ]);
 }
 
 function unassignStage(id: string) {
   const sid = String(id);
   emits(
     "update:modelValue",
-    props.modelValue.filter((k) => String(k) !== sid),
+    props.modelValue.filter((a) => String(a.stageId) !== sid),
+  );
+}
+
+function updateAssignment(id: string, patch: Partial<StageAssignmentValue>) {
+  const sid = String(id);
+  emits(
+    "update:modelValue",
+    props.modelValue.map((a) => (String(a.stageId) === sid ? { ...a, ...patch } : a)),
   );
 }
 
@@ -104,7 +126,11 @@ function assignedEmptyMessage(): string {
   <div>
     <p class="stage-assignment-help help mb-3">
       Click a stage name to move it between the lists — the same interaction as assigning player
-      access on Stage Management. Use Save on the media form when you are finished.
+      access on Stage Management.
+      <template v-if="showExitSettings">
+        Each assigned stage has its own exit animation for this item.
+      </template>
+      Use Save on the media form when you are finished.
     </p>
     <div class="columns stage-assignment-columns">
       <div class="column">
@@ -167,15 +193,28 @@ function assignedEmptyMessage(): string {
             <p v-if="!assignedStages.length" class="panel-block has-text-grey">
               {{ assignedEmptyMessage() }}
             </p>
-            <button
+            <div
               v-for="stage in assignedStages"
               :key="stage.key"
-              type="button"
-              class="panel-block stage-assignment-row stage-assignment-row--assigned"
-              @click="unassignStage(stage.key)"
+              class="panel-block stage-assignment-assigned"
             >
-              {{ stage.name }}
-            </button>
+              <button
+                type="button"
+                class="stage-assignment-row stage-assignment-row--assigned"
+                title="Click to unassign"
+                @click="unassignStage(stage.key)"
+              >
+                {{ stage.name }}
+              </button>
+              <ExitSettings
+                v-if="showExitSettings"
+                compact
+                :animation="stage.assignment.exitAnimation"
+                :speed="stage.assignment.exitSpeed"
+                @update:animation="updateAssignment(stage.key, { exitAnimation: $event })"
+                @update:speed="updateAssignment(stage.key, { exitSpeed: $event })"
+              />
+            </div>
           </div>
         </article>
       </div>
@@ -220,9 +259,15 @@ button.stage-assignment-row:hover {
   background-color: rgba(0, 112, 17, 0.08);
 }
 
+.stage-assignment-assigned {
+  display: block;
+  padding: 0.25em 0.75em 0.5em;
+}
+
 button.stage-assignment-row--assigned {
   background-color: rgba(0, 112, 17, 0.12);
   border-left: 3px solid #007011;
+  margin-bottom: 0.35em;
 }
 
 button.stage-assignment-row--assigned:hover {

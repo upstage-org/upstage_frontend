@@ -15,7 +15,7 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useAuthStore } from "@stores/pinia/auth";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import { storeToRefs } from "pinia";
-import { onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { isJwtExpired, loggedIn } from "utils/auth";
 
@@ -49,18 +49,18 @@ export default {
     });
 
     // Live-route expiry guard. The Live route does NOT set requireAuth
-    // (audience members must be able to land here unauthenticated), so
-    // a player whose JWT has gone stale can sit on the stage indefinitely
-    // until something happens to fire a GraphQL call. MQTT chat / board
-    // messages keep flowing because MQTT auth is build-time creds, not
-    // the user's JWT — exactly the silent-zombie state the proactive
-    // refresh in the auth store is designed to prevent. Re-check on
-    // mount and on visibilitychange so a tab brought back from the
-    // background after an overnight expiry detects it without waiting
-    // for the next GraphQL operation.
+    // (audience members must be able to land here unauthenticated).
+    // Deliberate UX: a viewer whose JWT expires while watching keeps the
+    // stage view undisturbed (the backend already treats a stale token as
+    // audience) — no mid-performance logout. We only REMEMBER that the
+    // token went stale (checked on mount, visibilitychange, and page
+    // wake, so an overnight tab is detected) and complete the logout when
+    // they navigate away from the stage, so the rest of the app never
+    // runs half-authenticated with a dead token.
+    const staleTokenSeen = ref(false);
     const checkExpiry = () => {
       if (authStore.loggedIn && isJwtExpired(authStore.getToken)) {
-        authStore.logout();
+        staleTokenSeen.value = true;
       }
     };
     onMounted(checkExpiry);
@@ -70,6 +70,10 @@ export default {
     document.addEventListener("visibilitychange", onVisibility);
     onUnmounted(() => {
       document.removeEventListener("visibilitychange", onVisibility);
+      checkExpiry();
+      if (staleTokenSeen.value && authStore.loggedIn) {
+        authStore.logout();
+      }
     });
 
     usePageWakeRecovery(() => {

@@ -7,7 +7,10 @@ const stageStore = useStageStore();
 const objects = computed(() => stageStore.objects);
 const hasMeeting = computed(() => objects.value.some((el) => el.type === "meeting"));
 const hasJitsi = computed(() => objects.value.some((el) => isJitsiBoardType(el.type)));
-const hasMeetingOrJitsi = computed(() => hasMeeting.value || hasJitsi.value);
+// Live RTMP feed tiles (only placed RTMP tiles carry `isRTMP`); their
+// player reconnects on the same force-reload signal as jitsi tiles.
+const hasRtmp = computed(() => objects.value.some((el) => el.isRTMP === true));
+const hasRefreshableStreams = computed(() => hasMeeting.value || hasJitsi.value || hasRtmp.value);
 
 // Explicit user click ⇒ force path: re-publishes / re-attaches even when the
 // tracks look "healthy", so a frozen (but not disconnected) stream actually
@@ -17,7 +20,7 @@ const onRefreshMeeting = () => stageStore.refreshMeeting();
 </script>
 
 <template>
-  <div v-if="hasMeetingOrJitsi" id="reload-stream">
+  <div v-if="hasRefreshableStreams" id="reload-stream">
     <a-tooltip v-if="hasMeeting" :title="$t('refresh_meeting_tooltip')">
       <button
         class="button is-small refresh-icon clickable"
@@ -28,7 +31,7 @@ const onRefreshMeeting = () => stageStore.refreshMeeting();
         <i class="fas fa-video" />
       </button>
     </a-tooltip>
-    <a-tooltip v-if="hasJitsi" :title="$t('refresh_streams_tooltip')">
+    <a-tooltip v-if="hasJitsi || hasRtmp" :title="$t('refresh_streams_tooltip')">
       <button
         class="button is-small refresh-icon clickable"
         type="button"

@@ -6,7 +6,6 @@ import Icon from "components/Icon.vue";
 import {
   coerceNumber,
   isIOS,
-  isJitsiBoardType,
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "utils/common";
@@ -134,6 +133,13 @@ export default {
       props.closeMenu();
     };
 
+    const openExitSetting = () => {
+      stageStore.openSettingPopup({
+        type: "ExitParameters",
+      });
+      props.closeMenu();
+    };
+
     const isWearing = inject("isWearing");
     const currentAvatar = computed(() => stageStore.currentAvatar);
 
@@ -230,6 +236,9 @@ export default {
     // control that silently does nothing.
     const supportsPerStreamVolume = !isIOS();
 
+    // Stream-playback video files (mp4/webm media). Live stream tiles
+    // (jitsi + RTMP) never reach this menu — they use the standardised
+    // ContextMenuStream instead (see Avatar/index.vue and Jitsi.vue).
     const isStreamBoardObject = computed(
       () =>
         isStreamPlaybackBoardType(props.object.type) ||
@@ -248,6 +257,7 @@ export default {
       toggleFrameLoop,
       changeSliderMode,
       openVoiceSetting,
+      openExitSetting,
       wearCostume,
       takeOffCostume,
       currentAvatar,
@@ -269,7 +279,6 @@ export default {
       restartVideo,
       supportsPerStreamVolume,
       isStreamBoardObject,
-      isJitsiBoardType,
     };
   },
 };
@@ -404,24 +413,6 @@ export default {
           </button>
         </a-tooltip>
       </p>
-      <p
-        v-if="isJitsiBoardType(object.type) && supportsPerStreamVolume"
-        class="control menu-group-item"
-      >
-        <a-tooltip title="Volume" placement="bottom">
-          <button
-            class="button is-light"
-            :class="{
-              'has-background-warning-light': sliderMode === 'volume',
-            }"
-            @click="changeSliderMode('volume')"
-          >
-            <span class="mt-1">
-              <Icon src="animation-slider.svg" style="width: 16px; height: 16px" />
-            </span>
-          </button>
-        </a-tooltip>
-      </p>
       <p class="control menu-group-item">
         <a-tooltip title="Move speed" placement="bottom">
           <button
@@ -484,6 +475,12 @@ export default {
       </a-tooltip>
     </template>
 
+    <a class="panel-block" @click="openExitSetting">
+      <span class="panel-icon">
+        <Icon src="clear.svg" />
+      </span>
+      <span>{{ $t("exit_setting") }}</span>
+    </a>
     <a class="panel-block has-text-danger" @click="deleteObject">
       <span class="panel-icon">
         <Icon src="remove.svg" />
@@ -526,6 +523,12 @@ export default {
         </button>
       </p>
     </div>
+    <a class="panel-block" data-testid="close-context-menu" @click="closeMenu()">
+      <span class="panel-icon">
+        <i class="fas fa-times"></i>
+      </span>
+      <span>{{ $t("close_menu") }}</span>
+    </a>
   </div>
 </template>
 

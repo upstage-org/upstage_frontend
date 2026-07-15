@@ -34,6 +34,8 @@ export const stageFragment = gql`
       src
       description
       fileLocation
+      exitAnimation
+      exitSpeed
     }
   }
 `;
@@ -357,6 +359,8 @@ const stageOps = {
               id
               name
               fileLocation
+              exitAnimation
+              exitSpeed
             }
             privilege
           }
@@ -399,6 +403,31 @@ const stageOps = {
         }
       `,
       { id, stageIds },
+    ),
+  updateStageAssignment: (stageId, assetId, exitAnimation, exitSpeed) =>
+    studioClient.request(
+      gql`
+        mutation UpdateStageAssignment(
+          $stageId: ID!
+          $assetId: ID!
+          $exitAnimation: String
+          $exitSpeed: Int
+        ) {
+          updateStageAssignment(
+            stageId: $stageId
+            assetId: $assetId
+            exitAnimation: $exitAnimation
+            exitSpeed: $exitSpeed
+          ) {
+            id
+            stageId
+            childAssetId
+            exitAnimation
+            exitSpeed
+          }
+        }
+      `,
+      { stageId, assetId, exitAnimation, exitSpeed },
     ),
   saveStageConfig: (id, config) =>
     studioClient.request(

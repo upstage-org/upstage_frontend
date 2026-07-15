@@ -120,5 +120,8 @@ export default {
   position: absolute;
   transform: rotate(270deg) translateX(-100%);
   transform-origin: left;
+  /* Parent overlay wrapper is pointer-events:none while the object is
+     selected; the slider must stay draggable. */
+  pointer-events: auto;
 }
 </style>

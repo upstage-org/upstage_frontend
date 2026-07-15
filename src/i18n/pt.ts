@@ -215,6 +215,8 @@ export default {
   registration_button: "Botão de registro",
   enable_upstage_donate: "Activar Doação UpStage",
   shape: "Forma",
+  mute_locally: "Silenciar localmente",
+  unmute_locally: "Reativar o som localmente",
   loop: {
     on: "Ciclo",
     off: "Sem ciclo",

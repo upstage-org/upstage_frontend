@@ -60,10 +60,12 @@ export const useRequest = (service, ...params) => {
       }
       return data.value;
     } catch (error) {
-      if (error.response.errors[0].message == "Invalid refresh token") {
+      // A pure network failure has no `response`; don't crash extracting it.
+      const gqlMessage = error?.response?.errors?.[0]?.message;
+      if (gqlMessage == "Invalid refresh token") {
         logout();
       }
-      throw error.response.errors[0].message;
+      throw gqlMessage ?? "Network connection problem — please try again.";
     } finally {
       loading.value = false;
     }
@@ -80,10 +82,11 @@ export const useRequest = (service, ...params) => {
       }
       return data.value;
     } catch (error) {
-      if (error.response.errors[0].message == "Invalid refresh token") {
+      const gqlMessage = error?.response?.errors?.[0]?.message;
+      if (gqlMessage == "Invalid refresh token") {
         logout();
       }
-      throw error.response.errors[0].message;
+      throw gqlMessage ?? "Network connection problem — please try again.";
     } finally {
       loading.value = false;
     }

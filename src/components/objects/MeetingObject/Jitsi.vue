@@ -4,15 +4,14 @@ import AppObject from "../Object.vue";
 import Loading from "components/Loading.vue";
 import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { isIOS } from "utils/common";
 import { playMediaElement, retryPlayOnUserGesture } from "@utils/mediaPlayback";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
-import AvatarContextMenu from "../Avatar/ContextMenuAvatar.vue";
+import StreamContextMenu from "../ContextMenuStream.vue";
 import { useStreamFreezeDetector } from "./useStreamFreezeDetector";
 import { useStreamFreezeReporter } from "./useStreamFreezeReporter";
 
 export default {
-  components: { AppObject, Loading, AvatarContextMenu },
+  components: { AppObject, Loading, StreamContextMenu },
   props: {
     object: Object,
     closeMenu: Function,
@@ -72,7 +71,12 @@ export default {
       for (const t of composableLocal) pushUnique(t);
       return remote;
     });
-    const volume = computed(() => props.object.volume);
+    // Listening level for THIS browser only (never broadcast — several
+    // performers in one room each control their own playback; see the
+    // stream store's `_streamLocalAudio`). Set from the context menu's
+    // Volume setting / Mute locally items.
+    const volume = computed(() => stageStore.streamLocalVolume(props.object.id));
+    const localMuted = computed(() => stageStore.streamLocalMuted(props.object.id));
 
     const reloadStreams = computed(() => stageStore.reloadStreams);
     const videoTrack = computed(() => {
@@ -226,25 +230,10 @@ export default {
       { immediate: true },
     );
 
-    const clip = (shape) => {
-      stageStore.shapeObject({
-        ...props.object,
-        shape,
-      });
-    };
-
-    const localMuted = ref(false);
-    const toggleMuted = () => {
-      localMuted.value = !localMuted.value;
-    };
-
-    // Re-apply volume whenever the board object's `volume` changes. The
+    // Re-apply volume whenever this browser's local level changes. The
     // audioEl watcher below only fires when the <audio> element itself is
-    // (re)created, so without this a volume change broadcast by the
-    // performer (shapeObject -> MOVE_TO) would update `props.object.volume`
-    // in every viewer's store but never reach the already-mounted <audio>
-    // element — the audience would keep hearing the old level. This makes
-    // the per-stream volume control carry over to the audience session.
+    // (re)created, so without this a Volume-setting save would land in the
+    // store but never reach the already-mounted <audio> element.
     watch(volume, (v) => {
       if (audioEl.value) {
         audioEl.value.volume = (v || 0) / 100;
@@ -277,32 +266,9 @@ export default {
       interval && clearInterval(interval);
     };
 
-    // `openSettingPopup` is synchronous — call the continuation inline.
-    const openVolumePopup = (slotProps) => {
-      stageStore.openSettingPopup({
-        type: "VolumeParameters",
-      });
-      slotProps.closeMenu();
-    };
-
-    // Transparency uses the same popup pattern as volume so the control is
-    // reachable from the right-click menu without first "holding" the tile
-    // (the inline OpacitySlider only renders for held holdable objects).
-    const openTransparencyPopup = (slotProps) => {
-      stageStore.openSettingPopup({
-        type: "TransparencyParameters",
-      });
-      slotProps.closeMenu();
-    };
-
     const loadeddata = () => {
       loading.value = false;
     };
-
-    // iOS / iPadOS: HTMLMediaElement.volume is read-only, so a per-stream
-    // volume slider would silently do nothing. Hide it on iOS rather than
-    // present a control that lies to the performer.
-    const supportsPerStreamVolume = !isIOS();
 
     usePageWakeRecovery(() => {
       if (audioEl.value) {
@@ -318,16 +284,11 @@ export default {
       audioTrack,
       videoEl,
       audioEl,
-      clip,
       localMuted,
-      toggleMuted,
       isPlayer,
-      supportsPerStreamVolume,
 
       timeupdate,
       loadTrack,
-      openVolumePopup,
-      openTransparencyPopup,
       loadeddata,
       loading,
     };
@@ -371,9 +332,6 @@ export default {
           playsinline
           disablePictureInPicture
           controlslist="nodownload nofullscreen noremoteplayback"
-          :style="{
-            'border-radius': object.shape === 'circle' ? '100%' : '12px',
-          }"
           @timeupdate="timeupdate"
           @loadeddata="loadeddata"
         >
@@ -393,43 +351,9 @@ export default {
       </template>
     </template>
     <template #menu="slotProps">
-      <div class="field has-addons shape-group">
-        <p class="control menu-group-item">Shape</p>
-        <p class="control menu-group-item">
-          <button class="button is-light" @click="clip(null)">
-            <div class="icon">
-              <i class="fas fa-square"></i>
-            </div>
-          </button>
-        </p>
-        <p class="control menu-group-item" @click="clip('circle')">
-          <button class="button is-light">
-            <div class="icon">
-              <i class="fas fa-circle"></i>
-            </div>
-          </button>
-        </p>
-      </div>
-      <a class="panel-block" @click="toggleMuted">
-        <span class="panel-icon">
-          <i v-if="localMuted" class="fas fa-volume-mute has-text-danger"></i>
-          <i v-else class="fas fa-volume-up has-text-primary"></i>
-        </span>
-        <span>{{ localMuted ? "UnMute locally" : "Mute locally" }}</span>
-      </a>
-      <a v-if="supportsPerStreamVolume" class="panel-block" @click="openVolumePopup(slotProps)">
-        <span class="panel-icon">
-          <Icon src="voice-setting.svg" />
-        </span>
-        <span>{{ $t("volumn_setting") }}</span>
-      </a>
-      <a class="panel-block" @click="openTransparencyPopup(slotProps)">
-        <span class="panel-icon">
-          <Icon src="opacity-slider.svg" />
-        </span>
-        <span>{{ $t("transparency_setting") }}</span>
-      </a>
-      <AvatarContextMenu :object="object" v-bind="slotProps" />
+      <!-- One standardised menu for every live stream tile — jitsi and RTMP
+           share ContextMenuStream, so both kinds behave identically. -->
+      <StreamContextMenu :object="object" v-bind="slotProps" />
     </template>
   </AppObject>
 </template>
@@ -438,7 +362,11 @@ export default {
 video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  // The picture stretches with the freely-resizable frame (Moveable exempts
+  // stream tiles from keepRatio) — distortion is a creative choice. The
+  // context menu's Stretch/Crop toggle overrides via --stream-fit (set on
+  // the .object wrapper in Object.vue; "cover" crops instead).
+  object-fit: var(--stream-fit, fill);
   display: block;
 }
 </style>
@@ -469,20 +397,6 @@ video {
   }
 }
 
-.shape-group {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  text-align: center;
-
-  .menu-group-item {
-    flex: 1;
-
-    button {
-      width: 100%;
-    }
-  }
-}
 .loading {
   width: 100%;
   height: 100%;

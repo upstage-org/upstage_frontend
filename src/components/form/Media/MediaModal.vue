@@ -80,12 +80,25 @@ export default {
         }
         const stageIds = form.assignedStages.map((s) => s.id);
         const { id, multi, frames, voice, link, src, w, h, uploadedFrames } = form;
+        // This dialog only edits a few description keys; the Studio editor
+        // stores others (note, isRTMP, ...) in the same blob. Start from the
+        // saved attributes so an unrelated save here doesn't wipe them.
+        let preservedAttributes = {};
+        try {
+          preservedAttributes = form.description ? JSON.parse(form.description) : {};
+        } catch {
+          preservedAttributes = {};
+        }
+        // Exit animations moved to the stage assignment; drop legacy keys.
+        delete preservedAttributes.exitAnimation;
+        delete preservedAttributes.exitSpeed;
         const payload = {
           id,
           name,
           mediaType: assetType,
           base64,
           description: JSON.stringify({
+            ...preservedAttributes,
             multi,
             frames,
             voice,

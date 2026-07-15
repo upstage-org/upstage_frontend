@@ -2,6 +2,7 @@
 import { ref, inject } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
+import { isJitsiBoardType } from "@utils/common";
 import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 
@@ -123,11 +124,16 @@ export default {
           moveable.setState(
             {
               target: el.value,
-              // Live RTMP tiles resize freely: the tile's shape is the
-              // performer's framing tool (the <video> uses object-fit: fill),
-              // so locking the ratio would force the initial drop shape on
-              // every feed regardless of the source's real aspect.
-              keepRatio: !["text", "meeting"].includes(props.object.type) && !props.object.isRTMP,
+              // Live stream tiles (jitsi + RTMP) resize freely: the frame
+              // stretches in any direction and the picture fills it
+              // (object-fit: fill in Jitsi.vue / LiveStreamPlayer.vue) —
+              // distortion is a creative choice, superseding the old
+              // "reshape in OBS, keep proportions on stage" rule. Avatars,
+              // props, images and VoD clips stay ratio-locked.
+              keepRatio:
+                !["text", "meeting"].includes(props.object.type) &&
+                !isJitsiBoardType(props.object.type) &&
+                props.object.isRTMP !== true,
             },
             () => {
               // Adopt the in-flight gesture so a single mousedown both

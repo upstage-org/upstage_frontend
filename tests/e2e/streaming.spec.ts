@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 
 import { findPersona } from "./personas";
+import { gql } from "./graphql";
 import { LoginPage } from "./pages/LoginPage";
 import { LiveStagePage } from "./pages/LiveStagePage";
 import { readRuntime } from "./fixtures/runtime";
@@ -566,6 +567,83 @@ test.describe("streaming: performer streams, audience views @full", () => {
         path: path.join(SCREENSHOT_DIR, "yourself-preview.png"),
         fullPage: true,
       });
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Regression: a stage whose URL slug is literally "demo" must still start
+   * the Jitsi conference.
+   *
+   * `stageStore.url` used to fall back to the string "demo" while the stage
+   * model was loading, and useJitsi's one-shot watcher treated that value as
+   * the not-loaded placeholder — permanently, for a real stage whose
+   * fileLocation IS "demo" (the dev/prod "Demo Stage"). `startConnection()`
+   * (and `JitsiMeetJS.init()`) then never ran: no conference, no room, no
+   * publish, and every jitsi tile on that stage buffered forever. The
+   * placeholder is now the empty string only.
+   *
+   * Assertion target: the composable's own first-line diagnostics. Both
+   * "[diag] useJitsi: starting connection" (endpoint configured) and the
+   * "VITE_JITSI_ENDPOINT is unset" warning are emitted only after the
+   * placeholder gate has passed — with the old bug neither ever appears on
+   * /demo. The local-camera preview is asserted too, proving the stage is
+   * fully usable as a publisher surface.
+   */
+  test("stage slugged 'demo' still starts the jitsi conference", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    await ensureDemoSlugStage(runtime.adminToken, persona.username);
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const page = await performerCtx.newPage();
+      // Attach before navigation — the connection attempt fires as soon as
+      // loadStage resolves, well before the board is interactable.
+      const consoleLines: string[] = [];
+      page.on("console", (msg) => consoleLines.push(msg.text()));
+
+      const loginPage = new LoginPage(page);
+      await loginPage.login(persona.username, persona.password);
+      const live = new LiveStagePage(page);
+      await live.goto("demo");
+
+      await expect
+        .poll(
+          () =>
+            consoleLines.find(
+              (l) =>
+                l.includes("useJitsi: starting connection") ||
+                l.includes("VITE_JITSI_ENDPOINT is unset"),
+            ) ?? null,
+          {
+            timeout: 30_000,
+            message:
+              'useJitsi never attempted a connection on /demo — the "demo" slug is being ' +
+              "treated as the unloaded-stage placeholder again",
+          },
+        )
+        .not.toBeNull();
+
+      // The publisher path must work here too: open the Streams tab and wait
+      // for the fake camera to decode into Yourself.vue's <video>.
+      const meetingTab = page
+        .locator('nav#toolbox .panel-block:has(img[src$="meeting.svg"])')
+        .first();
+      await meetingTab.waitFor({ state: "visible", timeout: 15_000 });
+      await meetingTab.click();
+      await page.waitForFunction(
+        () => {
+          const v = document.querySelector(
+            "#topbar video[playsinline][muted]",
+          ) as HTMLVideoElement | null;
+          return Boolean(v && v.videoWidth > 0);
+        },
+        { timeout: 30_000 },
+      );
     } finally {
       await performerCtx?.close().catch(() => {});
     }
@@ -1246,6 +1324,184 @@ test.describe("streaming: performer streams, audience views @full", () => {
   });
 
   /**
+   * Live RTMP feed tile controls — the tile follows jitsi-window
+   * semantics, not the VoD video contract:
+   *
+   *   • reduced context menu: Volume only — no Play/Pause, Restart, Loop
+   *     (a live feed has no timeline; playback starts on connect)
+   *   • jitsi-style fit: `object-fit: fill` — the picture stretches with
+   *     the freely-resizable frame (stream tiles are keepRatio-exempt)
+   *   • frame-shape row: the shared Shape swatches in the context menu
+   *     clip the tile wrapper (border-radius / %-clip-path)
+   *   • the Refresh-streams button appears for an RTMP tile (previously
+   *     jitsi-only) and its force-reload signal makes LiveStreamPlayer
+   *     reconnect immediately instead of waiting out the 5s retry timer.
+   *
+   * The feed itself is never live: every MediaMTX request (WHEP + HLS,
+   * raw and -opus mirror keys) is intercepted with a 404, which drives
+   * the player's offline retry loop deterministically.
+   */
+  test("RTMP tile: reduced menu, shapes, free resize, refresh reconnects", async ({ browser }) => {
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const tileName = `rtmp-tile-${runtime.runId}`;
+    const streamKey = `e2e-rtmp-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const page = await performerCtx.newPage();
+
+      // Count connect attempts (each connect() bursts 1-3 requests:
+      // -opus WHEP, raw WHEP, HLS manifest — all match this pattern).
+      let feedRequests = 0;
+      await page.route(`**/live/${streamKey}*/**`, async (route) => {
+        feedRequests += 1;
+        await route.fulfill({ status: 404, body: "" });
+      });
+
+      await new LoginPage(page).login(persona.username, persona.password);
+      await new LiveStagePage(page).goto(runtime.stageSlug);
+      await page.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      // Place the RTMP tile store-side (placeObjectOnStage is local-only —
+      // nothing is broadcast, so the shared test stage stays clean).
+      const objectId = await page.evaluate(
+        ({ name, key }) => {
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            placeObjectOnStage: (p: unknown) => { id: string };
+          };
+          const placed = stage.placeObjectOnStage({
+            type: "video",
+            isRTMP: true,
+            name,
+            fileLocation: key,
+            w: 200,
+            h: 150,
+            x: 240,
+            y: 200,
+            liveAction: true,
+            published: true,
+          });
+          return placed.id;
+        },
+        { name: tileName, key: streamKey },
+      );
+
+      // Refresh-streams button shows for an RTMP-only stream set.
+      const refreshButton = page
+        .locator("#reload-stream button")
+        .filter({ has: page.locator("i.fa-sync") });
+      await expect(refreshButton).toBeVisible({ timeout: 10_000 });
+
+      // LiveStreamPlayer stretches the picture with the frame (fill).
+      const video = page.locator(`[id="video${objectId}"]`);
+      await expect(video).toBeAttached({ timeout: 10_000 });
+      expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("fill");
+
+      // Context menu: the standardised stream menu (shared with jitsi
+      // tiles) — Mute locally + Volume present; Play/Pause, Restart, Loop
+      // and the exit-animation override absent.
+      await page.locator(`[data-testid="object-${tileName}"]`).click({ button: "right" });
+      const menu = page.locator(".stream-context-menu");
+      await expect(menu).toBeVisible({ timeout: 5_000 });
+      await expect(menu.locator('[data-testid="stream-mute-locally"]')).toBeVisible();
+      await expect(menu.getByText("Volume setting", { exact: false })).toBeVisible();
+      await expect(menu.getByText("Play", { exact: true })).toHaveCount(0);
+      await expect(menu.getByText("Pause", { exact: true })).toHaveCount(0);
+      await expect(menu.getByText("Restart", { exact: true })).toHaveCount(0);
+      await expect(menu.getByText("Exit animation", { exact: true })).toHaveCount(0);
+      await expect(menu.locator("i.fa-play, i.fa-pause, i.fa-infinity")).toHaveCount(0);
+
+      // Shape row: all presets offered; picking one clips the tile wrapper
+      // (the menu stays open so shapes can be tried in place).
+      const tileWrapper = page.locator(`[data-object-id="${objectId}"]`);
+      await expect(menu.locator('[data-testid^="shape-"]')).toHaveCount(9);
+      await menu.locator('[data-testid="shape-circle"]').click();
+      await expect
+        .poll(() => tileWrapper.evaluate((el) => getComputedStyle(el).borderRadius), {
+          timeout: 5_000,
+        })
+        .toBe("50%");
+      await menu.locator('[data-testid="shape-hexagon"]').click();
+      await expect
+        .poll(() => tileWrapper.evaluate((el) => getComputedStyle(el).clipPath), {
+          timeout: 5_000,
+        })
+        .toMatch(/^polygon\(/);
+      // Close the menu with a click on empty board WELL AWAY from it, so
+      // the click can't land on another menu row (e.g. Remove) and act on
+      // the tile instead of just dismissing the menu.
+      await page.mouse.click(150, 520);
+      await expect(menu).toBeHidden({ timeout: 5_000 });
+      await expect(page.locator(".modal.is-active")).toHaveCount(0);
+
+      // Free resize: stream frames stretch in any direction (keepRatio is
+      // off for RTMP/jitsi tiles). Drag the east handle horizontally and
+      // assert only the width grew. Click the tile's lower-right quarter:
+      // the right-click above left the OpacitySlider overlay active, and it
+      // hugs the tile's top/left edges — a centre click would be intercepted
+      // and retried until the test times out. (The point is also inside the
+      // hexagon clip applied above, so the wrapper still receives it.)
+      const wrapperBox = (await tileWrapper.boundingBox())!;
+      await page.locator(`[data-testid="object-${tileName}"]`).click({
+        position: { x: wrapperBox.width * 0.75, y: wrapperBox.height * 0.75 },
+      });
+      // Every board object owns a Moveable instance whose (hidden) control
+      // box lives on document.body — scope to the visible one.
+      const eastHandle = page.locator(".moveable-control.moveable-e:visible");
+      await expect(eastHandle).toBeVisible({ timeout: 5_000 });
+      const readSize = () =>
+        page.evaluate((id) => {
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            board: { objects: Array<{ id: string; w: number; h: number }> };
+          };
+          const obj = stage.board.objects.find((o) => o.id === id);
+          return obj ? { w: obj.w, h: obj.h } : null;
+        }, objectId);
+      const sizeBefore = await readSize();
+      expect(sizeBefore).not.toBeNull();
+      const handleBox = await eastHandle.boundingBox();
+      expect(handleBox).not.toBeNull();
+      const grabX = handleBox!.x + handleBox!.width / 2;
+      const grabY = handleBox!.y + handleBox!.height / 2;
+      await page.mouse.move(grabX, grabY);
+      await page.mouse.down();
+      await page.mouse.move(grabX + 80, grabY, { steps: 8 });
+      await page.mouse.up();
+      await expect
+        .poll(async () => (await readSize())!.w, {
+          timeout: 5_000,
+          message: "east-handle drag must widen the tile",
+        })
+        .toBeGreaterThan(sizeBefore!.w);
+      const sizeAfter = await readSize();
+      // Height untouched by a pure-horizontal drag → no ratio lock.
+      expect(Math.abs(sizeAfter!.h - sizeBefore!.h)).toBeLessThan(1);
+      // Deselect so the moveable frame can't intercept the refresh click.
+      await page.mouse.click(150, 520);
+
+      // Refresh reconnects immediately. Sync to the 5s offline-retry
+      // cadence first: wait for a fresh attempt, let its request burst
+      // finish, then click — any request inside the next 2.5s window can
+      // only come from the force-reload signal.
+      await expect.poll(() => feedRequests, { timeout: 15_000 }).toBeGreaterThan(0);
+      const settled = feedRequests;
+      await expect.poll(() => feedRequests, { timeout: 15_000 }).toBeGreaterThan(settled);
+      await page.waitForTimeout(500);
+      const beforeClick = feedRequests;
+      await refreshButton.click();
+      await expect
+        .poll(() => feedRequests, { timeout: 2_500, message: "refresh must trigger a reconnect" })
+        .toBeGreaterThan(beforeClick);
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
    * Cross-client WebRTC publish — performer drags Yourself onto the
    * board, audience renders a `Jitsi.vue` tile that subscribes to the
    * remote track. This needs:
@@ -1492,7 +1748,20 @@ test.describe("streaming: performer streams, audience views @full", () => {
     }
   });
 
-  test("reconcileJitsiBoardFromEvents drops destroyed tiles and latest hostId wins", async ({
+  /**
+   * Ghost-tile reconcile contract (computeFinalJitsiObjectsFromEvents).
+   * De-dup is by *generation* (`participantId`), NOT by `hostId`:
+   * lib-jitsi-meet mints a fresh participantId on every CONFERENCE_JOINED
+   * and the publisher re-broadcasts its tiles with the current id, so a
+   * tile carrying an OLDER participantId than its host's latest broadcast
+   * is a leftover of a previous join — drop it. Tiles sharing the CURRENT
+   * participantId are concurrent live streams from one tab and must ALL
+   * survive (keying the de-dup on hostId alone collapsed them to one —
+   * the "multiple streams" regression fixed in c7c4c9c). Tiles with no
+   * host/participant binding are legacy data and are kept; DESTROYed
+   * tiles are dropped.
+   */
+  test("reconcileJitsiBoardFromEvents keeps current-generation streams, drops stale generations and destroyed tiles", async ({
     browser,
   }) => {
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
@@ -1520,27 +1789,24 @@ test.describe("streaming: performer streams, audience views @full", () => {
 
         const boardTopic = `dev/${stage.url}/board`;
         const hostId = "tab-session-host-a";
-        const ghostA = "ghost-jitsi-a";
-        const ghostB = "ghost-jitsi-b";
-        const removed = "ghost-jitsi-removed";
+        const staleGenPid = "participant-gen-1";
+        const currentGenPid = "participant-gen-2";
+        const stale = "jitsi-stale-generation";
+        const liveA = "jitsi-live-a";
+        const liveB = "jitsi-live-b";
+        const legacy = "jitsi-legacy-unbound";
+        const removed = "jitsi-removed";
 
+        // Simulate a stale local board: the prior-generation tile and the
+        // destroyed tile are still present when the archive is replayed.
         stage.PUSH_OBJECT({
-          id: ghostA,
+          id: stale,
           type: "jitsi",
           hostId,
-          name: "old stream",
+          participantId: staleGenPid,
+          name: "previous join",
           x: 10,
           y: 10,
-          w: 100,
-          h: 80,
-        });
-        stage.PUSH_OBJECT({
-          id: ghostB,
-          type: "jitsi",
-          hostId,
-          name: "newer stream",
-          x: 200,
-          y: 200,
           w: 100,
           h: 80,
         });
@@ -1561,7 +1827,13 @@ test.describe("streaming: performer streams, audience views @full", () => {
             mqttTimestamp: 100,
             payload: {
               type: "placeObjectOnStage",
-              object: { id: ghostA, type: "jitsi", hostId, name: "old stream" },
+              object: {
+                id: stale,
+                type: "jitsi",
+                hostId,
+                participantId: staleGenPid,
+                name: "previous join",
+              },
             },
           },
           {
@@ -1569,12 +1841,40 @@ test.describe("streaming: performer streams, audience views @full", () => {
             mqttTimestamp: 200,
             payload: {
               type: "placeObjectOnStage",
-              object: { id: ghostB, type: "jitsi", hostId, name: "newer stream" },
+              object: {
+                id: liveA,
+                type: "jitsi",
+                hostId,
+                participantId: currentGenPid,
+                name: "live stream a",
+              },
             },
           },
           {
             topic: boardTopic,
-            mqttTimestamp: 250,
+            mqttTimestamp: 300,
+            payload: {
+              type: "placeObjectOnStage",
+              object: {
+                id: liveB,
+                type: "jitsi",
+                hostId,
+                participantId: currentGenPid,
+                name: "live stream b",
+              },
+            },
+          },
+          {
+            topic: boardTopic,
+            mqttTimestamp: 350,
+            payload: {
+              type: "placeObjectOnStage",
+              object: { id: legacy, type: "jitsi", name: "legacy unbound" },
+            },
+          },
+          {
+            topic: boardTopic,
+            mqttTimestamp: 400,
             payload: {
               type: "destroy",
               object: { id: removed, type: "jitsi", hostId: "other-tab" },
@@ -1587,15 +1887,22 @@ test.describe("streaming: performer streams, audience views @full", () => {
         const ids = stage.board.objects.filter((o) => o.type === "jitsi").map((o) => o.id);
         return {
           ids,
-          hasGhostA: ids.includes(ghostA),
-          hasGhostB: ids.includes(ghostB),
+          hasStale: ids.includes(stale),
+          hasLiveA: ids.includes(liveA),
+          hasLiveB: ids.includes(liveB),
+          hasLegacy: ids.includes(legacy),
           hasRemoved: ids.includes(removed),
         };
       });
 
-      expect(result.hasGhostA).toBe(false);
-      expect(result.hasGhostB).toBe(true);
-      expect(result.hasRemoved).toBe(false);
+      expect(result.hasStale, "prior-generation tile must be dropped").toBe(false);
+      expect(result.hasLiveA, "current-generation tile must survive").toBe(true);
+      expect(
+        result.hasLiveB,
+        "concurrent same-generation stream must survive (hostId de-dup regression)",
+      ).toBe(true);
+      expect(result.hasLegacy, "legacy tile without host/participant binding is kept").toBe(true);
+      expect(result.hasRemoved, "DESTROYed tile must be dropped").toBe(false);
     } finally {
       await audienceCtx?.close().catch(() => {});
     }
@@ -1864,4 +2171,68 @@ async function waitForAudienceVideoFreshFrames(
   throw new Error(
     `[streaming] audience <video> for "${streamName}" did not advance currentTime within ${timeoutMs}ms`,
   );
+}
+
+/**
+ * Find-or-create a stage whose fileLocation is literally "demo" (idempotent
+ * across reruns in one harness DB), set it live, and grant the performer
+ * player-edit access so `canPlay` is true and the Streams toolbox mounts.
+ * Mirrors the setup.spec.ts flow, minus the UI page objects.
+ */
+async function ensureDemoSlugStage(adminToken: string, performerUsername: string): Promise<string> {
+  const existing = await gql<{ stageList: Array<{ id: string | number }> }>(
+    `query DemoStageByLoc($fileLocation: String!) {
+      stageList(input: { fileLocation: $fileLocation }) { id }
+    }`,
+    { fileLocation: "demo" },
+    adminToken,
+  );
+  let stageId =
+    existing.data?.stageList?.[0]?.id != null ? String(existing.data.stageList[0].id) : null;
+  if (!stageId) {
+    const created = await gql<{ createStage: { id: string | number } }>(
+      `mutation DemoStageCreate($input: StageInput!) {
+        createStage(input: $input) { id }
+      }`,
+      { input: { name: "Demo (sentinel regression)", fileLocation: "demo", status: "live" } },
+      adminToken,
+    );
+    if (created.errors?.length || created.data?.createStage?.id == null) {
+      throw new Error(`[streaming] createStage(demo) failed: ${JSON.stringify(created.errors)}`);
+    }
+    stageId = String(created.data.createStage.id);
+  }
+
+  const users = await gql<{ users: Array<{ id: string; username: string }> }>(
+    `query DemoStageUsers { users(active: true) { id username } }`,
+    {},
+    adminToken,
+  );
+  const performer = users.data?.users?.find(
+    (u) => u.username.toLowerCase() === performerUsername.toLowerCase(),
+  );
+  if (!performer) {
+    throw new Error(`[streaming] performer "${performerUsername}" not found for demo stage`);
+  }
+  // playerAccess is a JSON string of [playerIds, playerEditIds] — same shape
+  // StageManagementPage.grantPlayerAccess writes.
+  const updated = await gql<{ updateStage: { id: string } | null }>(
+    `mutation DemoStageAccess($input: StageInput!) {
+      updateStage(input: $input) { id }
+    }`,
+    {
+      input: {
+        id: stageId,
+        status: "live",
+        playerAccess: JSON.stringify([[], [performer.id]]),
+      },
+    },
+    adminToken,
+  );
+  if (updated.errors?.length) {
+    throw new Error(
+      `[streaming] demo stage access grant failed: ${JSON.stringify(updated.errors)}`,
+    );
+  }
+  return stageId;
 }
