@@ -3,9 +3,31 @@ import { animate } from "animejs";
 // Removal effects for stage objects, set per stage assignment (the
 // stage<->media link). Single source of truth: the assignment editors
 // render these options and Board.vue's leave hook dispatches on the
-// same values. "vanish" (Disappear) is the default when nothing is set.
-export const DEFAULT_EXIT_ANIMATION = "vanish";
-export const DEFAULT_EXIT_SPEED = 1000;
+// same values. "fade" at medium speed is the default when nothing is set.
+export const DEFAULT_EXIT_ANIMATION = "fade";
+
+// Discrete speed choices shown wherever exit settings are edited, as
+// durations in ms. Fast keeps the old slider's fast endpoint; Slow stays
+// under the slider's former 10s ceiling, which dragged too long.
+export const EXIT_SPEED_OPTIONS = [
+  { value: 8000, label: "Slow" },
+  { value: 3000, label: "Medium" },
+  { value: 1000, label: "Fast" },
+];
+export const DEFAULT_EXIT_SPEED = 3000;
+
+// Stored speeds predating the discrete options can be any ms value from
+// the old slider; snap them to the closest option (ratio-wise, since the
+// steps are logarithmic) so the picker always has a selection.
+export const nearestExitSpeed = (speed) => {
+  const duration = Number(speed);
+  if (!Number.isFinite(duration) || duration <= 0) return DEFAULT_EXIT_SPEED;
+  return EXIT_SPEED_OPTIONS.reduce((best, option) =>
+    Math.abs(Math.log(duration / option.value)) < Math.abs(Math.log(duration / best.value))
+      ? option
+      : best,
+  ).value;
+};
 
 // Only these media types render on the board and run a removal animation,
 // so only they get exit settings in the assignment editors. (Streams fold
