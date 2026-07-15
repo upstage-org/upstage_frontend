@@ -152,8 +152,15 @@ const playPreview = () => {
 }
 
 .exit-compact-slider {
-  max-width: 220px;
-  flex: auto;
+  /* Without a real minimum the flex row squeezed this to a ~30px sliver
+     next to the 210px select (media form's assigned-stage rows) — too small
+     to operate at all by touch: every tap landed within the browser's
+     touch-adjustment radius of the handle, so taps grabbed the handle
+     instead of moving it and the slider felt stuck. Forcing a floor makes
+     the row wrap onto its own full-width line instead of shrinking. */
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 260px;
 }
 
 .exit-speed-row {
