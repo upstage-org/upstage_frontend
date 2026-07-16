@@ -21,6 +21,7 @@ import { toRaw } from "vue";
 import { humanFileSize } from "utils/common";
 import { useLoading } from "hooks/mutations";
 import { userGraph } from "services/graphql";
+import StageAccessList from "./StageAccessList.vue";
 
 export default {
   props: {
@@ -328,6 +329,17 @@ export default {
                       "onUpdate:checked": (value) => (values.active = value as boolean),
                     }),
                   ],
+                ),
+              // Read-only overview of the stages this player can enter as
+              // more than audience. Gated on `visible` so the stage query
+              // runs when the profile opens and refreshes on each reopen.
+              visible.value &&
+                h(
+                  Form.Item,
+                  {
+                    label: t("stage_access"),
+                  },
+                  () => [h(StageAccessList, { player: props.player })],
                 ),
             ],
           ),
