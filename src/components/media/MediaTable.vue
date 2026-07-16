@@ -384,7 +384,12 @@ const filterTag = (tag: string) => {
               <VideoCameraOutlined />
               {{ $t("stream_info") }}
             </a-button>
-            <a :href="absolutePath(record.fileLocation)" :download="record.name">
+            <!-- Live RTMP feeds have nothing to download. -->
+            <a
+              v-if="record.assetType?.name !== 'stream'"
+              :href="absolutePath(record.fileLocation)"
+              :download="record.name"
+            >
               <a-button>
                 <template #icon>
                   <DownloadOutlined />

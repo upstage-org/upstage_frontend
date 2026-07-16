@@ -1,58 +1,25 @@
 <script lang="ts" setup>
-import { ref, watch, watchEffect, onMounted, computed } from "vue";
+import { watch, computed } from "vue";
 import { useQuery } from "@vue/apollo-composable";
 import { useDebounceFn } from "@vueuse/core";
 import { gql } from "@apollo/client/core";
 import { StudioGraph } from "models/studio";
 import { inquiryVar } from "apollo";
 import Navbar from "../Navbar.vue";
-import dayjs, { type Dayjs } from "@utils/dayjs";
-import { ALL_STAGE_ACCESS, DEFAULT_STAGE_ACCESS, normalizeStageAccess } from "utils/studioInquiry";
+import dayjs from "@utils/dayjs";
+import { ALL_STAGE_ACCESS, DEFAULT_STAGE_ACCESS, buildStageInquiry } from "utils/studioInquiry";
 import { compareByLabel } from "utils/common";
+import { stageListFilters as filters } from "utils/stageFilterState";
 
 const { result, loading } = useQuery<StudioGraph>(gql`
   query StageFilter {
-    whoami {
-      username
-      displayName
-      roleName
-    }
     users(active: true) {
       id
       username
       displayName
     }
-    stages(input: {}) {
-      edges {
-        id
-        name
-        createdOn
-        owner {
-          username
-          displayName
-        }
-      }
-    }
-    tags {
-      id
-      name
-      color
-      createdOn
-    }
-    mediaTypes {
-      id
-      name
-    }
   }
 `);
-
-const name = ref("");
-const owners = ref([]);
-const types = ref([]);
-const stages = ref([]);
-const tags = ref([]);
-const access = ref<string[]>([...DEFAULT_STAGE_ACCESS]);
-const dates = ref<[Dayjs, Dayjs] | undefined>();
 
 const ranges = [
   {
@@ -90,83 +57,38 @@ const updateInquiry = (vars: any) =>
     ...vars,
   });
 
-const watchInquiryVar = (vars: any) => {
-  if (Array.isArray(vars.mediaTypes)) {
-    types.value = vars.mediaTypes;
-  }
-  if (Array.isArray(vars.tags)) {
-    tags.value = vars.tags;
-  }
-  if (Array.isArray(vars.owners)) {
-    owners.value = vars.owners;
-  }
-  if (typeof vars.name === "string") {
-    name.value = vars.name;
-  }
-  // Only apply `access` when another writer set it; Media/Admin updates
-  // often omit `access`, which previously reset this to [] and blanked the table.
-  if (Object.prototype.hasOwnProperty.call(vars, "access")) {
-    access.value = normalizeStageAccess(vars.access);
-  }
-  inquiryVar.onNextChange(watchInquiryVar);
-};
-inquiryVar.onNextChange(watchInquiryVar);
+const pushInquiry = () => updateInquiry(buildStageInquiry(filters));
 
-watchEffect(() => {
-  updateInquiry({
-    owners: owners.value,
-    stages: stages.value,
-    tags: tags.value,
-    mediaTypes: types.value,
-    access: normalizeStageAccess(access.value),
-  });
-});
+// Full push at setup time: the filter state lives at module scope, so this
+// restores the persisted filters after Back navigation AND overwrites stale
+// shared keys (name/owners/createdBetween) left in the inquiryVar by the
+// Media/Player pages. StageFilter's setup runs before StageTable's, so the
+// table's first fetch already uses these values.
+pushInquiry();
 
-onMounted(() => {
-  updateInquiry({
-    createdBetween: undefined,
-    access: normalizeStageAccess(access.value),
-  });
-});
+// Structural filters apply immediately — the push includes any search text
+// still inside its debounce window, so changing a filter commits the typed
+// text instead of reverting it.
+watch(() => [filters.owners, filters.access, filters.dates], pushInquiry);
 
-watch(
-  name,
-  useDebounceFn(() => {
-    updateInquiry({ name: name.value });
-  }, 500),
-);
-
-const onRangeChange = (_dates: null | (Dayjs | null)[], _dateStrings: string[]) => {
-  updateInquiry({
-    createdBetween: _dates
-      ? [_dates[0]?.format("YYYY-MM-DD"), _dates[1]?.format("YYYY-MM-DD")]
-      : undefined,
-  });
-};
+// Typing stays debounced.
+watch(() => filters.name, useDebounceFn(pushInquiry, 500));
 
 const clearFilters = () => {
-  name.value = "";
-  owners.value = [];
-  types.value = [];
-  stages.value = [];
-  tags.value = [];
-  access.value = [...DEFAULT_STAGE_ACCESS];
-  dates.value = undefined;
+  filters.name = "";
+  filters.owners = [];
+  filters.access = [...DEFAULT_STAGE_ACCESS];
+  filters.dates = undefined;
+  // The watcher covers owners/access/dates; a name-only reset would
+  // otherwise wait out the debounce.
+  pushInquiry();
 };
 
 const hasFilter = computed(() => {
   const accessFiltered =
-    access.value.length !== DEFAULT_STAGE_ACCESS.length ||
-    !DEFAULT_STAGE_ACCESS.every((level) => access.value.includes(level));
-  return (
-    name.value ||
-    owners.value.length ||
-    types.value.length ||
-    stages.value.length ||
-    tags.value.length ||
-    accessFiltered ||
-    dates.value
-  );
+    filters.access.length !== DEFAULT_STAGE_ACCESS.length ||
+    !DEFAULT_STAGE_ACCESS.every((level) => filters.access.includes(level));
+  return Boolean(filters.name || filters.owners.length || accessFiltered || filters.dates);
 });
 
 const handleFilterOwnerName = (keyword: string, option: any) => {
@@ -186,9 +108,14 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
         <RouterLink to="/stages/new-stage">
           <a-button type="primary"> <PlusOutlined /> {{ $t("new") }} {{ $t("stage") }} </a-button>
         </RouterLink>
-        <a-input-search v-model:value="name" allow-clear class="w-48" placeholder="Search stage" />
+        <a-input-search
+          v-model:value="filters.name"
+          allow-clear
+          class="w-48"
+          placeholder="Search name or URL"
+        />
         <a-select
-          v-model:value="owners"
+          v-model:value="filters.owners"
           allow-clear
           show-arrow
           :filter-option="handleFilterOwnerName"
@@ -213,15 +140,16 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
             <div
               class="w-full cursor-pointer text-center"
               @mousedown.prevent
-              @click.stop.prevent="owners = []"
+              @click.stop.prevent="filters.owners = []"
             >
               <team-outlined />&nbsp;All players
             </div>
           </template>
         </a-select>
         <a-select
-          v-model:value="access"
+          v-model:value="filters.access"
           allow-clear
+          show-arrow
           mode="multiple"
           style="min-width: 124px"
           placeholder="Access Level"
@@ -233,17 +161,16 @@ const VNodes = (_: any, { attrs }: { attrs: any }) => {
             <div
               class="w-full cursor-pointer text-center"
               @mousedown.prevent
-              @click.stop.prevent="access = [...ALL_STAGE_ACCESS]"
+              @click.stop.prevent="filters.access = [...ALL_STAGE_ACCESS]"
             >
               <unlock-outlined />&nbsp;All Access
             </div>
           </template>
         </a-select>
         <a-range-picker
-          v-model:value="dates as any"
+          v-model:value="filters.dates as any"
           :placeholder="['Created from', 'to date']"
           :presets="ranges as any"
-          @change="onRangeChange as any"
         />
         <a-button v-if="hasFilter" type="dashed" @click="clearFilters">
           <ClearOutlined />Clear Filters

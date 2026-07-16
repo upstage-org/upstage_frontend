@@ -233,7 +233,12 @@ export default {
   upload_limit: "Limite de téléchargement",
   role: "Rôle",
   delete_player_confirm:
-    "La suppression de ce joueur supprimera également toutes ses étapes. Tous leurs médias vous appartiendront. Cela ne peut pas être annulé!\nÊtes-vou sûr de vouloir continuer?",
+    "Les scènes, états sauvegardés et enregistrements de ce joueur seront définitivement supprimés. Choisissez le sort de ses médias : réattribuer ses avatars, accessoires et décors au compte administrateur, ou tout supprimer.\nLes médias encore utilisés par d'autres scènes ou enregistrements seront remplacés par une image de substitution. Cela ne peut pas être annulé !",
+  delete_player_title: "Supprimer le joueur {name}",
+  delete_player_reassign: "Réattribuer les médias à l'administrateur",
+  delete_player_delete_all: "Tout supprimer",
+  delete_player_no_undo:
+    "Cela supprime définitivement toutes ses scènes ainsi que tous ses médias et enregistrements. Continuer ?",
   profile_title: "{name}'s Profile",
   introduction: "Introduction",
   new_object: "Nouveau {0}",

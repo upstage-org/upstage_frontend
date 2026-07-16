@@ -88,7 +88,11 @@ const onRangeChange = (_dates: null | (Dayjs | null)[], _dateStrings: string[]) 
 };
 
 onMounted(() => {
+  // Also push `name`: the Stages page persists its search term in the shared
+  // inquiryVar, and a stale value would invisibly filter the media table
+  // (this search box starts empty).
   updateInquiry({
+    name: name.value,
     createdBetween: undefined,
   });
 });

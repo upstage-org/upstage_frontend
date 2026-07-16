@@ -231,7 +231,12 @@ export default {
   upload_limit: "Limite de upload",
   role: "Papel",
   delete_player_confirm:
-    "Excluir este jogador também excluirá todos os seus pasos. Todas as suas mídias pertencerão a você. Isso não pode ser desfeito!\nTem certeza de que deseja continuar?",
+    "Os palcos, cenas salvas e gravações deste jogador serão excluídos permanentemente. Escolha o que fazer com suas mídias: reatribuir seus avatares, adereços e cenários à conta de administrador, ou excluir tudo.\nMídias ainda usadas por outros palcos ou gravações serão substituídas por um marcador. Isso não pode ser desfeito!",
+  delete_player_title: "Excluir jogador {name}",
+  delete_player_reassign: "Reatribuir mídias ao administrador",
+  delete_player_delete_all: "Excluir tudo",
+  delete_player_no_undo:
+    "Isso exclui permanentemente todos os seus palcos, mídias e gravações. Continuar?",
   profile_title: "{name}'s Perfil",
   introduction: "Introdução",
   new_object: "Novo {0}",

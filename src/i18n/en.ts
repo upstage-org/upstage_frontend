@@ -267,7 +267,12 @@ export default {
   upload_limit: "Upload Limit",
   role: "Role",
   delete_player_confirm:
-    "Deleting this user will also delete all of this user's stages. All of this user's media will belong to you. This cannot be undone!\nAre you sure you want to continue?",
+    "This player's stages, saved scenes and recordings will be permanently deleted. Choose what happens to their media: reassign their avatars, props and backdrops to the admin account, or delete everything.\nMedia still used by other stages or recordings will be replaced with a placeholder. This cannot be undone!",
+  delete_player_title: "Delete player {name}",
+  delete_player_reassign: "Reassign media to admin",
+  delete_player_delete_all: "Delete everything",
+  delete_player_no_undo:
+    "This permanently deletes all their stages, media and recordings. Continue?",
   profile_title: "{name}'s Profile",
   introduction: "Introduction",
   new_object: "New {0}",

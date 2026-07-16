@@ -231,7 +231,12 @@ export default {
   upload_limit: "Uppladdningsgräns",
   role: "Roll",
   delete_player_confirm:
-    "Att ta bort den här spelaren kommer också att ta bort alla sina steg. Alla deras media kommer att tillhöra dig. Detta kan inte ångras!\nÄr du säker på att du vill fortsätta?",
+    "Spelarens scener, sparade scenlägen och inspelningar raderas permanent. Välj vad som ska hända med deras media: överlåt deras avatarer, rekvisita och bakgrunder till administratörskontot, eller radera allt.\nMedia som fortfarande används av andra scener eller inspelningar ersätts med en platshållare. Detta kan inte ångras!",
+  delete_player_title: "Ta bort spelaren {name}",
+  delete_player_reassign: "Överlåt media till administratören",
+  delete_player_delete_all: "Radera allt",
+  delete_player_no_undo:
+    "Detta raderar permanent alla deras scener, media och inspelningar. Fortsätta?",
   profile_title: "{name}s Profil",
   introduction: "Inledning",
   new_object: "Ny {0}",
