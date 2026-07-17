@@ -423,10 +423,10 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   // Same philosophy as a jitsi window (Jitsi.vue): the tile resizes freely
-  // (Moveable exempts stream tiles from keepRatio) and the picture stretches
-  // to fill it — distortion is a creative choice made on stage. The context
-  // menu's Stretch/Crop toggle overrides via --stream-fit ("cover" crops).
-  object-fit: var(--stream-fit, fill);
+  // (Moveable exempts stream tiles from keepRatio) and by default the
+  // picture is cropped ("cover") — the frame windows into it. The context
+  // menu's Stretch/Crop toggle overrides via --stream-fit ("fill" stretches).
+  object-fit: var(--stream-fit, cover);
   display: block;
   background: #000;
 }

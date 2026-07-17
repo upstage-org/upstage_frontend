@@ -108,11 +108,11 @@ describe("ContextMenuStream — the one menu for jitsi and RTMP tiles", () => {
     ["RTMP", { id: "o2", type: "video", isRTMP: true, name: "feed" }],
   ])("offers the stretch/crop resize choice on a %s tile", (_kind, object) => {
     const wrapper = mountMenu(object);
-    // Historical default: stretch (fill) highlighted, crop not.
-    expect(wrapper.find("[data-testid='fit-fill']").classes()).toContain(
+    // Default: crop (cover) highlighted, stretch not — stretch is opt-in.
+    expect(wrapper.find("[data-testid='fit-cover']").classes()).toContain(
       "has-background-primary-light",
     );
-    expect(wrapper.find("[data-testid='fit-cover']").classes()).not.toContain(
+    expect(wrapper.find("[data-testid='fit-fill']").classes()).not.toContain(
       "has-background-primary-light",
     );
   });

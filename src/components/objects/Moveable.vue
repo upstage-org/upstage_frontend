@@ -126,10 +126,11 @@ export default {
               target: el.value,
               // Live stream tiles (jitsi + RTMP) resize freely: the frame
               // stretches in any direction and the picture fills it
-              // (object-fit: fill in Jitsi.vue / LiveStreamPlayer.vue) —
-              // distortion is a creative choice, superseding the old
-              // "reshape in OBS, keep proportions on stage" rule. Avatars,
-              // props, images and VoD clips stay ratio-locked.
+              // (object-fit via --stream-fit in Jitsi.vue /
+              // LiveStreamPlayer.vue: crop by default, stretch opt-in) —
+              // superseding the old "reshape in OBS, keep proportions on
+              // stage" rule. Avatars, props, images and VoD clips stay
+              // ratio-locked.
               keepRatio:
                 !["text", "meeting"].includes(props.object.type) &&
                 !isJitsiBoardType(props.object.type) &&

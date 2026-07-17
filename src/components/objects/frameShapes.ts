@@ -93,11 +93,12 @@ const SHAPES_BY_ID = new Map(FRAME_SHAPES.map((s) => [s.id, s]));
 /**
  * How the live picture fills a resized frame. Stored as `fit` on the board
  * object (rides shapeObject/MQTT like `shape`); absent/unknown means the
- * historical behaviour: stretch to fill, distortion is a creative choice.
- * "cover" crops instead — the picture keeps its own aspect ratio and the
- * frame windows into it. Applied as the `--stream-fit` CSS variable on the
- * `.object` wrapper (Object.vue) so the <video> element itself is never
- * touched — playback and audio can't be interrupted by toggling it.
+ * default: "cover" crops — the picture keeps its own aspect ratio and the
+ * frame windows into it. "fill" stretches to fill instead, where distortion
+ * is a creative choice; it must be picked explicitly via the menu toggle.
+ * Applied as the `--stream-fit` CSS variable on the `.object` wrapper
+ * (Object.vue) so the <video> element itself is never touched — playback
+ * and audio can't be interrupted by toggling it.
  */
 export type FrameFitId = "fill" | "cover";
 
@@ -108,7 +109,7 @@ export const FRAME_FITS: { id: FrameFitId; title: string; labelKey: string }[] =
 
 /** Effective fit for a stored `fit` value (drives menu highlight + CSS var). */
 export function effectiveFrameFitId(fit: unknown): FrameFitId {
-  return fit === "cover" ? "cover" : "fill";
+  return fit === "fill" ? "fill" : "cover";
 }
 
 /**

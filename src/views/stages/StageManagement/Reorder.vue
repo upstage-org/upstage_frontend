@@ -20,7 +20,9 @@ function assetTypeName(media) {
   return t ?? "";
 }
 
-const types = computed(() => [...new Set(props.modelValue.map((m) => assetTypeName(m)).filter(Boolean))]);
+const types = computed(() => [
+  ...new Set(props.modelValue.map((m) => assetTypeName(m)).filter(Boolean)),
+]);
 
 const mediaGroups = computed(() => {
   const res = {};
@@ -53,18 +55,16 @@ const drop = (e) => {
   e.target.classList.remove("dropzone");
   const fromId = e.dataTransfer.getData("text/plain");
   const toId = e.target.id;
-  const fromIndex = props.modelValue.findIndex((t) => t.id === fromId);
-  const toIndex = props.modelValue.findIndex((t) => t.id === toId);
+  // DOM ids are always strings; media ids may arrive as numbers.
+  const fromIndex = props.modelValue.findIndex((t) => String(t.id) === fromId);
+  const toIndex = props.modelValue.findIndex((t) => String(t.id) === toId);
   if (fromIndex > -1 && toIndex > -1) {
     // Clone first; splice() on props.modelValue would mutate the parent's
     // array (vue/no-mutating-props). The new ordering is communicated via
     // update:modelValue below — the parent owns the canonical array.
     const next = props.modelValue.slice();
     const media = next.splice(fromIndex, 1)[0];
-    emit(
-      "update:modelValue",
-      next.slice(0, toIndex).concat(media).concat(next.slice(toIndex)),
-    );
+    emit("update:modelValue", next.slice(0, toIndex).concat(media).concat(next.slice(toIndex)));
   }
 };
 </script>

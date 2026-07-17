@@ -78,16 +78,17 @@ describe("effectiveFrameFitId (stretch vs crop)", () => {
     expect(FRAME_FITS.map((f) => f.id)).toEqual(["fill", "cover"]);
   });
 
-  it("defaults absent/legacy/unknown values to the historical stretch", () => {
-    // Every tile broadcast before the toggle existed has no `fit` — it must
-    // keep stretching exactly as it always did.
-    expect(effectiveFrameFitId(undefined)).toBe("fill");
-    expect(effectiveFrameFitId(null)).toBe("fill");
-    expect(effectiveFrameFitId("nope")).toBe("fill");
-    expect(effectiveFrameFitId("fill")).toBe("fill");
+  it("defaults absent/legacy/unknown values to crop", () => {
+    // A tile with no stored `fit` (or a value from a newer/older client)
+    // crops: the picture keeps its aspect ratio and the frame windows into
+    // it. Stretching must be an explicit choice.
+    expect(effectiveFrameFitId(undefined)).toBe("cover");
+    expect(effectiveFrameFitId(null)).toBe("cover");
+    expect(effectiveFrameFitId("nope")).toBe("cover");
+    expect(effectiveFrameFitId("cover")).toBe("cover");
   });
 
-  it("honours an explicit crop", () => {
-    expect(effectiveFrameFitId("cover")).toBe("cover");
+  it("honours an explicit stretch", () => {
+    expect(effectiveFrameFitId("fill")).toBe("fill");
   });
 });

@@ -1329,8 +1329,9 @@ test.describe("streaming: performer streams, audience views @full", () => {
    *
    *   • reduced context menu: Volume only — no Play/Pause, Restart, Loop
    *     (a live feed has no timeline; playback starts on connect)
-   *   • jitsi-style fit: `object-fit: fill` — the picture stretches with
-   *     the freely-resizable frame (stream tiles are keepRatio-exempt)
+   *   • jitsi-style fit: `object-fit: cover` by default — the picture is
+   *     cropped by the freely-resizable frame (stream tiles are
+   *     keepRatio-exempt); stretching (fill) is a menu opt-in
    *   • frame-shape row: the shared Shape swatches in the context menu
    *     clip the tile wrapper (border-radius / %-clip-path)
    *   • the Refresh-streams button appears for an RTMP tile (previously
@@ -1396,10 +1397,11 @@ test.describe("streaming: performer streams, audience views @full", () => {
         .filter({ has: page.locator("i.fa-sync") });
       await expect(refreshButton).toBeVisible({ timeout: 10_000 });
 
-      // LiveStreamPlayer stretches the picture with the frame (fill).
+      // LiveStreamPlayer crops the picture by default (cover; stretch is
+      // an explicit Stretch/Crop menu choice).
       const video = page.locator(`[id="video${objectId}"]`);
       await expect(video).toBeAttached({ timeout: 10_000 });
-      expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("fill");
+      expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("cover");
 
       // Context menu: the standardised stream menu (shared with jitsi
       // tiles) — Mute locally + Volume present; Play/Pause, Restart, Loop
