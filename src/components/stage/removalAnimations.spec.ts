@@ -1,40 +1,25 @@
-// Guards the discrete exit-speed contract: the default is a valid option
-// (Medium), and legacy slider durations snap to the closest option so the
-// picker always has a selection.
+// Guards the exit-animation defaults: every assignment without explicit
+// settings must exit as fade at the speed the slider calls medium (3s).
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_EXIT_ANIMATION,
   DEFAULT_EXIT_SPEED,
-  EXIT_SPEED_OPTIONS,
-  nearestExitSpeed,
+  REMOVAL_ANIMATION_OPTIONS,
 } from "./removalAnimations";
 
-describe("exit speed options", () => {
-  it("defaults to fade at the Medium option", () => {
+describe("exit animation defaults", () => {
+  it("defaults to fade at 3000ms", () => {
     expect(DEFAULT_EXIT_ANIMATION).toBe("fade");
-    const medium = EXIT_SPEED_OPTIONS.find((o) => o.label === "Medium");
-    expect(medium?.value).toBe(DEFAULT_EXIT_SPEED);
+    expect(DEFAULT_EXIT_SPEED).toBe(3000);
   });
 
-  it("keeps exact option values unchanged", () => {
-    for (const option of EXIT_SPEED_OPTIONS) {
-      expect(nearestExitSpeed(option.value)).toBe(option.value);
-    }
+  it("offers the default animation as a picker option", () => {
+    expect(REMOVAL_ANIMATION_OPTIONS.map((o) => o.value)).toContain(DEFAULT_EXIT_ANIMATION);
   });
 
-  it("snaps legacy slider durations to the closest option", () => {
-    expect(nearestExitSpeed(1000)).toBe(1000); // old default / fast end
-    expect(nearestExitSpeed(1600)).toBe(1000);
-    expect(nearestExitSpeed(2200)).toBe(3000);
-    expect(nearestExitSpeed(4500)).toBe(3000);
-    expect(nearestExitSpeed(6000)).toBe(8000);
-    expect(nearestExitSpeed(10000)).toBe(8000); // old slow end
-  });
-
-  it("falls back to the default for missing or invalid speeds", () => {
-    expect(nearestExitSpeed(undefined)).toBe(DEFAULT_EXIT_SPEED);
-    expect(nearestExitSpeed(0)).toBe(DEFAULT_EXIT_SPEED);
-    expect(nearestExitSpeed(-500)).toBe(DEFAULT_EXIT_SPEED);
-    expect(nearestExitSpeed("nope")).toBe(DEFAULT_EXIT_SPEED);
+  it("keeps the default speed inside the slider's 1-10s range", () => {
+    const slider = 1000 / DEFAULT_EXIT_SPEED; // ExitSettings.vue mapping
+    expect(slider).toBeGreaterThanOrEqual(0.1);
+    expect(slider).toBeLessThanOrEqual(1);
   });
 });
