@@ -70,7 +70,7 @@
     "@yeger/vue-masonry-wall": "6.1.1",
     "animejs": "^4.4.1",
     "ant-design-vue": "^4.2.6",
-    "axios": "^1.16.0",
+    "axios": "^1.18.1",
     "bulma": "1.0.4",
     "dayjs": "^1.11.20",
     "emoji-picker-element": "^1.29.1",
