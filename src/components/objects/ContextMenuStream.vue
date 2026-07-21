@@ -54,10 +54,12 @@ export default {
       });
     };
 
-    // Crop (cover, the default) vs stretch (fill) when the frame is
+    // Fit (contain) vs crop (cover) vs stretch (fill) when the frame is
     // resized. Pure CSS on the wrapper (--stream-fit) — the <video> and
     // its audio pipeline are never touched. Menu stays open for A/B checks.
-    const activeFitId = computed(() => effectiveFrameFitId(props.object.fit));
+    const activeFitId = computed(() =>
+      effectiveFrameFitId(props.object.fit, isJitsiBoardType(props.object.type) ? "jitsi" : "rtmp"),
+    );
     const setFrameFit = (fit) => {
       stageStore.shapeObject({
         ...props.object,

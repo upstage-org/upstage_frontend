@@ -104,17 +104,21 @@ describe("ContextMenuStream — the one menu for jitsi and RTMP tiles", () => {
   });
 
   it.each([
-    ["jitsi", { id: "o1", type: "jitsi", name: "cam" }],
-    ["RTMP", { id: "o2", type: "video", isRTMP: true, name: "feed" }],
-  ])("offers the stretch/crop resize choice on a %s tile", (_kind, object) => {
+    // Per-kind defaults: jitsi webcams crop, RTMP feeds show the whole
+    // picture in proportion ("contain").
+    ["jitsi", { id: "o1", type: "jitsi", name: "cam" }, "fit-cover"],
+    ["RTMP", { id: "o2", type: "video", isRTMP: true, name: "feed" }, "fit-contain"],
+  ])("offers the fit/crop/stretch choice on a %s tile", (_kind, object, activeTestId) => {
     const wrapper = mountMenu(object);
-    // Default: crop (cover) highlighted, stretch not — stretch is opt-in.
-    expect(wrapper.find("[data-testid='fit-cover']").classes()).toContain(
-      "has-background-primary-light",
-    );
-    expect(wrapper.find("[data-testid='fit-fill']").classes()).not.toContain(
-      "has-background-primary-light",
-    );
+    for (const id of ["fit-contain", "fit-cover", "fit-fill"]) {
+      expect(wrapper.find(`[data-testid='${id}']`).exists()).toBe(true);
+      const active = wrapper.find(`[data-testid='${id}']`).classes();
+      if (id === activeTestId) {
+        expect(active).toContain("has-background-primary-light");
+      } else {
+        expect(active).not.toContain("has-background-primary-light");
+      }
+    }
   });
 
   it("broadcasts a crop pick, leaves the menu open, and never touches audio", async () => {

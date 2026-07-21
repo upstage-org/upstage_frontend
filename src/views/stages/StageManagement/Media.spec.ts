@@ -109,3 +109,55 @@ describe("Stage Management > Media — reorder and save", () => {
     expect(assets.map((a) => a.id)).toEqual(["1", "2", "3"]);
   });
 });
+
+describe("Stage Management > Media — mixed asset types", () => {
+  // Chronological assignment interleaves types in the flat assets array.
+  const mixedAssets = () => [
+    { id: "10", name: "ava-red", assetType: { name: "avatar" } },
+    { id: "20", name: "drum-loop", assetType: { name: "audio" } },
+    { id: "60", name: "Camera One", assetType: { name: "stream" } },
+    { id: "11", name: "ava-blue", assetType: { name: "avatar" } },
+    { id: "21", name: "sea-waves", assetType: { name: "audio" } },
+  ];
+
+  const dragBetween = async (
+    wrapper: ReturnType<typeof mountMedia>,
+    fromId: string,
+    toId: string,
+  ) => {
+    const dataTransfer = makeDataTransfer();
+    const tiles = wrapper.findAll(".media-preview");
+    await tiles.find((t) => t.attributes("id") === fromId)!.trigger("dragstart", { dataTransfer });
+    await tiles.find((t) => t.attributes("id") === toId)!.trigger("drop", { dataTransfer });
+  };
+
+  it("keeps the type rows in a stable order across drags", async () => {
+    const wrapper = mountMedia(mixedAssets());
+    const rowTypes = () => wrapper.findAll(".type-caption").map((c) => c.text().split(" ")[0]);
+    expect(rowTypes()).toEqual(["avatar", "audio", "stream"]);
+
+    // Moving an audio item shifts first-appearance positions in the flat
+    // array; the rendered rows must not jump around because of it.
+    await dragBetween(wrapper, "20", "21");
+    expect(rowTypes()).toEqual(["avatar", "audio", "stream"]);
+    expect(tileIds(wrapper)).toContain("20");
+  });
+
+  it("ignores a drop onto a tile of a different type", async () => {
+    const wrapper = mountMedia(mixedAssets());
+    const before = tileIds(wrapper);
+    await dragBetween(wrapper, "20", "10"); // audio onto avatar
+    expect(tileIds(wrapper)).toEqual(before);
+  });
+
+  it("renders audio and stream tiles as centred name-only labels", () => {
+    const wrapper = mountMedia(mixedAssets());
+    const labels = wrapper.findAll(".name-only-label").map((l) => l.text());
+    expect(labels).toEqual(expect.arrayContaining(["drum-loop", "sea-waves", "Camera One"]));
+    // No icon inside audio tiles and no generic Asset <img> for streams.
+    const audioTile = wrapper.find('[id="20"]');
+    expect(audioTile.findComponent({ name: "Icon" }).exists()).toBe(false);
+    const streamTile = wrapper.find('[id="60"]');
+    expect(streamTile.find("img").exists()).toBe(false);
+  });
+});

@@ -21,6 +21,7 @@ export default {
   resize: "Resize",
   stretch: "Stretch",
   crop: "Crop",
+  fit_whole: "Fit",
   close_menu: "Close menu",
   remove: "Remove",
   you: "you",
@@ -285,12 +286,21 @@ export default {
   stream_feed_name: "Feed name",
   stream_key: "RTMP stream key",
   stream_key_hint: "Letters, numbers, dashes and underscores only",
-  ingest_server: "Server (OBS: Settings → Stream → Server)",
+  ingest_server: 'Server (OBS: Settings → Stream → Service "Custom..." → Server)',
   ingest_stream_key: "Stream key (OBS: Settings → Stream → Stream Key)",
   ingest_panel_intro:
     "Point your encoder (e.g. OBS) at this server with this stream key. The key includes your personal publish token — don't share it.",
-  ingest_encoder_hint:
-    "Encoder settings: use H.264 video with AAC audio, set the keyframe interval to 2 seconds, and disable B-frames — in OBS: Settings → Output → Advanced, Keyframe Interval 2s, and Tune = zerolatency (or add bf=0 to the x264 options). Other settings can make the stream connect but stay black for viewers.",
+  ingest_hint_title: "OBS checklist — each item matters:",
+  ingest_hint_format:
+    "Video: H.264 (x264 or a hardware H.264 encoder). Audio: AAC. Both are OBS defaults.",
+  ingest_hint_keyframe:
+    'Settings → Output → Output Mode "Advanced" → Streaming: Keyframe Interval = 2 s.',
+  ingest_hint_bframes:
+    'Same page, set B-frames to 0: for x264 add bf=0 to "Custom x264 options" (or choose Tune = zerolatency); for NVENC set Max B-frames = 0. With B-frames on, the stream connects but viewers lose the picture within seconds.',
+  ingest_hint_aspect:
+    'Leave "Rescale Output" OFF, and in Settings → Video keep the Output (Scaled) Resolution the same aspect ratio as the Base (Canvas) Resolution — a mismatch distorts the picture. Any standard resolution (e.g. 1920×1080 or 1280×720) is fine; on stage the stream always shows whole and in proportion, and right-clicking the tile offers Fit / Crop / Stretch.',
+  ingest_hint_wizard:
+    "OBS's Auto-Configuration Wizard can quietly change the Output settings above — re-check them after running it.",
   waiting_for_stream: "Waiting for stream…",
   stream_feed_created: "RTMP stream feed created",
   copied_to_clipboard: "Copied to clipboard",

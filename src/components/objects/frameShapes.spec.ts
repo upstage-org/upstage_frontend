@@ -73,22 +73,26 @@ describe("effectiveFrameShapeId", () => {
   });
 });
 
-describe("effectiveFrameFitId (stretch vs crop)", () => {
-  it("offers exactly the stretch and crop choices", () => {
-    expect(FRAME_FITS.map((f) => f.id)).toEqual(["fill", "cover"]);
+describe("effectiveFrameFitId (fit vs crop vs stretch)", () => {
+  it("offers exactly the fit, crop and stretch choices", () => {
+    expect(FRAME_FITS.map((f) => f.id)).toEqual(["contain", "cover", "fill"]);
   });
 
-  it("defaults absent/legacy/unknown values to crop", () => {
-    // A tile with no stored `fit` (or a value from a newer/older client)
-    // crops: the picture keeps its aspect ratio and the frame windows into
-    // it. Stretching must be an explicit choice.
-    expect(effectiveFrameFitId(undefined)).toBe("cover");
-    expect(effectiveFrameFitId(null)).toBe("cover");
-    expect(effectiveFrameFitId("nope")).toBe("cover");
-    expect(effectiveFrameFitId("cover")).toBe("cover");
+  it("defaults absent/legacy/unknown values per kind", () => {
+    // RTMP feeds default to "contain": an encoder canvas (OBS) rarely
+    // matches the frame ratio, and cropping made the stream look wrong no
+    // matter how the frame was resized. Jitsi webcams keep the crop default.
+    for (const legacy of [undefined, null, "nope"]) {
+      expect(effectiveFrameFitId(legacy, "rtmp")).toBe("contain");
+      expect(effectiveFrameFitId(legacy, "jitsi")).toBe("cover");
+    }
   });
 
-  it("honours an explicit stretch", () => {
-    expect(effectiveFrameFitId("fill")).toBe("fill");
+  it("honours explicit choices on both kinds", () => {
+    for (const kind of ["rtmp", "jitsi"] as const) {
+      expect(effectiveFrameFitId("contain", kind)).toBe("contain");
+      expect(effectiveFrameFitId("cover", kind)).toBe("cover");
+      expect(effectiveFrameFitId("fill", kind)).toBe("fill");
+    }
   });
 });

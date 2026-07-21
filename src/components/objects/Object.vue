@@ -153,9 +153,9 @@ export default {
       if (!jitsi && props.object.isRTMP !== true) return {};
       return {
         ...frameShapeStyle(props.object.shape, jitsi ? "jitsi" : "rtmp"),
-        // Stretch/crop choice; the <video> reads it via object-fit:
-        // var(--stream-fit, cover) in Jitsi.vue / LiveStreamPlayer.vue.
-        "--stream-fit": effectiveFrameFitId(props.object.fit),
+        // Fit/crop/stretch choice; the <video> reads it via object-fit:
+        // var(--stream-fit, …) in Jitsi.vue / LiveStreamPlayer.vue.
+        "--stream-fit": effectiveFrameFitId(props.object.fit, jitsi ? "jitsi" : "rtmp"),
       };
     });
 

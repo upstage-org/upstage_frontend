@@ -20,9 +20,22 @@ function assetTypeName(media) {
   return t ?? "";
 }
 
-const types = computed(() => [
-  ...new Set(props.modelValue.map((m) => assetTypeName(m)).filter(Boolean)),
-]);
+// Fixed row order for the type groups. Deriving it from first appearance in
+// the flat list made whole rows jump around after a drag (moving an item can
+// change which type appears first in the flat array).
+const TYPE_ROW_ORDER = ["avatar", "prop", "backdrop", "curtain", "audio", "video", "stream"];
+
+const types = computed(() => {
+  const present = [...new Set(props.modelValue.map((m) => assetTypeName(m)).filter(Boolean))];
+  return present.sort((a, b) => {
+    const ia = TYPE_ROW_ORDER.indexOf(a);
+    const ib = TYPE_ROW_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+});
 
 const mediaGroups = computed(() => {
   const res = {};
@@ -33,18 +46,40 @@ const mediaGroups = computed(() => {
   return res;
 });
 
+// Asset type of the tile being dragged; drops are only valid within the same
+// type group (each on-stage tool bar orders one type — a cross-type drop would
+// silently interleave the flat list without any visible effect in the grid).
+let draggedType = null;
+
+const typeOfTileId = (id) =>
+  assetTypeName(props.modelValue.find((t) => String(t.id) === String(id)));
+
 const dragstart = (e) => {
   e.target.classList.add("dragging");
+  draggedType = typeOfTileId(e.target.id);
   e.dataTransfer.setDragImage(e.target, 0, 0);
   e.dataTransfer.setData("text/plain", e.target.id);
 };
 
+const clearDragMarkers = (root) => {
+  root
+    ?.closest(".reorder-grid")
+    ?.querySelectorAll(".dropzone, .dragging")
+    .forEach((el) => el.classList.remove("dropzone", "dragging"));
+};
+
 const dragend = (e) => {
+  draggedType = null;
   e.target.classList.remove("dragging");
+  // dragleave is unreliable when a drag is cancelled or dropped outside a
+  // tile; sweep any leftover markers so no tile stays highlighted.
+  clearDragMarkers(e.target);
 };
 
 const dragover = (e) => {
-  e.target.classList.add("dropzone");
+  if (draggedType && typeOfTileId(e.target.id) === draggedType) {
+    e.target.classList.add("dropzone");
+  }
 };
 
 const dragleave = (e) => {
@@ -58,7 +93,11 @@ const drop = (e) => {
   // DOM ids are always strings; media ids may arrive as numbers.
   const fromIndex = props.modelValue.findIndex((t) => String(t.id) === fromId);
   const toIndex = props.modelValue.findIndex((t) => String(t.id) === toId);
-  if (fromIndex > -1 && toIndex > -1) {
+  if (
+    fromIndex > -1 &&
+    toIndex > -1 &&
+    assetTypeName(props.modelValue[fromIndex]) === assetTypeName(props.modelValue[toIndex])
+  ) {
     // Clone first; splice() on props.modelValue would mutate the parent's
     // array (vue/no-mutating-props). The new ordering is communicated via
     // update:modelValue below — the parent owns the canonical array.
@@ -70,42 +109,45 @@ const drop = (e) => {
 </script>
 
 <template>
-  <div v-for="assetType in types" :key="assetType" class="columns is-vcentered is-mobile">
-    <div class="column is-narrow has-text-left media-type-label-col">
-      <h4 class="subtitle">
-        <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px" />
-        <span class="type-caption">{{ assetType }} ({{ mediaGroups[assetType]?.length }})</span>
-      </h4>
-    </div>
-    <div class="column">
-      <div class="toolbox">
-        <div class="scroller">
-          <div
-            v-for="item in mediaGroups[assetType]"
-            :id="item.id"
-            :key="item.id"
-            class="media-preview"
-            draggable="true"
-            @dragstart="dragstart"
-            @dragend="dragend"
-            @dragenter.prevent
-            @dragover.prevent="dragover"
-            @dragleave.prevent="dragleave"
-            @drop.prevent="drop"
-          >
-            <div style="pointer-events: none">
-              <div v-if="assetType === 'audio'">
-                <Icon src="audio.svg" />
-                <br />
-                <b>{{ item.name }}</b>
-              </div>
-              <div v-else-if="assetType === 'video'" class="video-reorder-cell">
-                <div class="video-reorder-thumb">
-                  <VideoFirstFrameThumb :media="item" />
+  <div class="reorder-grid">
+    <div v-for="assetType in types" :key="assetType" class="columns is-vcentered is-mobile">
+      <div class="column is-narrow has-text-left media-type-label-col">
+        <h4 class="subtitle">
+          <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px" />
+          <span class="type-caption">{{ assetType }} ({{ mediaGroups[assetType]?.length }})</span>
+        </h4>
+      </div>
+      <div class="column">
+        <div class="toolbox">
+          <div class="scroller">
+            <div
+              v-for="item in mediaGroups[assetType]"
+              :id="item.id"
+              :key="item.id"
+              class="media-preview"
+              draggable="true"
+              @dragstart="dragstart"
+              @dragend="dragend"
+              @dragenter.prevent
+              @dragover.prevent="dragover"
+              @dragleave.prevent="dragleave"
+              @drop.prevent="drop"
+            >
+              <div style="pointer-events: none">
+                <!-- Audio and RTMP streams have no meaningful thumbnail: show
+                   just the name, centred (an icon only misaligns tiles, and
+                   a stream's fileLocation is a bare key — not an image). -->
+                <div v-if="assetType === 'audio' || assetType === 'stream'" class="name-only-cell">
+                  <b class="name-only-label">{{ item.name }}</b>
                 </div>
-                <b class="video-reorder-name">{{ item.name }}</b>
+                <div v-else-if="assetType === 'video'" class="video-reorder-cell">
+                  <div class="video-reorder-thumb">
+                    <VideoFirstFrameThumb :media="item" />
+                  </div>
+                  <b class="video-reorder-name">{{ item.name }}</b>
+                </div>
+                <Asset v-else :asset="item" />
               </div>
-              <Asset v-else :asset="item" />
             </div>
           </div>
         </div>
@@ -165,7 +207,6 @@ const drop = (e) => {
       display: flex;
       justify-content: center;
       align-items: center;
-      transition-duration: 0.25s;
     }
     &:hover {
       img {
@@ -174,14 +215,36 @@ const drop = (e) => {
       }
     }
   }
+  // Drop-target cue: a quiet inset outline. (The previous radial-gradient +
+  // translateX(50%) treatment made the target tile look like a rendering
+  // glitch mid-drag.)
   .dropzone {
-    background: repeating-radial-gradient(circle, green, green 10px, #007011 10px, #007011 20px);
-    > * {
-      transform: translateX(50%) !important;
-    }
+    background: #d9f2df;
+    box-shadow: inset 0 0 0 3px #007011;
+    border-radius: 8px;
   }
   .dragging {
     opacity: 0.5;
+  }
+
+  .name-only-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+  }
+
+  .name-only-label {
+    font-size: 12px;
+    line-height: 1.2;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    line-clamp: 4;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
   }
 
   .video-reorder-cell {

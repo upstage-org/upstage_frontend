@@ -92,24 +92,42 @@ const SHAPES_BY_ID = new Map(FRAME_SHAPES.map((s) => [s.id, s]));
 
 /**
  * How the live picture fills a resized frame. Stored as `fit` on the board
- * object (rides shapeObject/MQTT like `shape`); absent/unknown means the
- * default: "cover" crops — the picture keeps its own aspect ratio and the
- * frame windows into it. "fill" stretches to fill instead, where distortion
- * is a creative choice; it must be picked explicitly via the menu toggle.
+ * object (rides shapeObject/MQTT like `shape`); absent/unknown falls back to
+ * a per-kind default. The three modes map straight onto CSS object-fit:
+ *
+ *   "contain" — Fit: the whole picture stays visible and in proportion,
+ *               letterboxed inside the frame. Default for RTMP feeds: an
+ *               encoder's canvas (OBS screen shares, films, full scenes)
+ *               rarely matches the frame's ratio, and cropping it made
+ *               "the stream is never in proportion" reports.
+ *   "cover"   — Crop: the frame windows into the picture. Default for
+ *               jitsi tiles (webcam head shots crop gracefully).
+ *   "fill"    — Stretch: distortion as a creative choice, opt-in only.
+ *
  * Applied as the `--stream-fit` CSS variable on the `.object` wrapper
  * (Object.vue) so the <video> element itself is never touched — playback
  * and audio can't be interrupted by toggling it.
  */
-export type FrameFitId = "fill" | "cover";
+export type FrameFitId = "fill" | "cover" | "contain";
 
 export const FRAME_FITS: { id: FrameFitId; title: string; labelKey: string }[] = [
-  { id: "fill", title: "Stretch the picture to fill the frame", labelKey: "stretch" },
+  {
+    id: "contain",
+    title: "Fit: the whole picture stays visible and in proportion",
+    labelKey: "fit_whole",
+  },
   { id: "cover", title: "Crop: the frame windows into the picture", labelKey: "crop" },
+  { id: "fill", title: "Stretch the picture to fill the frame", labelKey: "stretch" },
 ];
 
+const FIT_IDS: readonly string[] = FRAME_FITS.map((f) => f.id);
+
 /** Effective fit for a stored `fit` value (drives menu highlight + CSS var). */
-export function effectiveFrameFitId(fit: unknown): FrameFitId {
-  return fit === "fill" ? "fill" : "cover";
+export function effectiveFrameFitId(fit: unknown, kind: FrameKind): FrameFitId {
+  if (typeof fit === "string" && FIT_IDS.includes(fit)) {
+    return fit as FrameFitId;
+  }
+  return kind === "jitsi" ? "cover" : "contain";
 }
 
 /**

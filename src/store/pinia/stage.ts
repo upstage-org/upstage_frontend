@@ -904,20 +904,12 @@ export const useStageStore = defineStore(
             }
             tools.value[key].push(item);
           });
-          // Give the asset palettes a stable alphabetical default order instead
-          // of raw GraphQL/DB order, so an author can find e.g. an avatar by
-          // name. This runs once at load; in-session drag reordering
-          // (REORDER_TOOLBOX) still applies on top and is not persisted, so
-          // nothing the user arranged is lost by sorting here. Scenes
-          // (scene_order), meetings (FIFO) and audio/video strips keep their
-          // own meaningful ordering and are intentionally excluded.
-          (["avatars", "props", "backdrops", "curtains"] as const).forEach((paletteKey) => {
-            tools.value[paletteKey]?.sort((a, b) =>
-              String(a.name ?? "").localeCompare(String(b.name ?? ""), undefined, {
-                sensitivity: "base",
-              }),
-            );
-          });
+          // Palettes keep the server-provided asset order: assignMedia stores
+          // the order arranged in Stage Management > Media (ParentStage PK
+          // order), and that arrangement is the documented way authors control
+          // the on-stage tool bars. Do NOT re-sort here — an alphabetical sort
+          // at load silently discards the saved order. In-session drag
+          // reordering (REORDER_TOOLBOX) still applies on top.
         } else {
           preloading.value = false;
         }
