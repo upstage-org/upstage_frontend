@@ -8,7 +8,8 @@ export const DEFAULT_EXIT_ANIMATION = "fade";
 
 // Exit speed is a continuous slow<->fast slider (see ExitSettings.vue):
 // slider value is 1000/duration in [0.1, 1], i.e. durations of 1-10s.
-export const DEFAULT_EXIT_SPEED = 3000;
+// The default sits at the slider's midpoint (0.55 → ~1.8s).
+export const DEFAULT_EXIT_SPEED = 1818;
 
 // Only these media types render on the board and run a removal animation,
 // so only they get exit settings in the assignment editors. (Streams fold
