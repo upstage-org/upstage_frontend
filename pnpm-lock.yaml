@@ -16,7 +16,7 @@ overrides:
   form-data@>=4.0.0 <4.0.6: 4.0.6
   follow-redirects@<=1.15.11: 1.16.0
   glob@>=10.2.0 <10.5.0: 10.5.0
-  immutable@>=5.0.0 <5.1.5: 5.1.5
+  immutable@>=5.0.0 <5.1.8: 5.1.8
   js-yaml@<3.15.0: 3.15.0
   js-yaml@>=4.0.0 <4.2.0: 4.2.0
   linkifyjs@<4.3.2: 4.3.2
@@ -3419,8 +3419,8 @@ packages:
     engines: {node: '>=0.10.0'}
     hasBin: true
 
-  immutable@5.1.6:
-    resolution: {integrity: sha512-q1swsS8K7L8usSHuOqF2TAoCCkonYz0SG38wLAggaa4Wml70zixIvt2ql4coQ2C2B3hTjltJry4r6bULwgAXLQ==}
+  immutable@5.1.8:
+    resolution: {integrity: sha512-TM5YqrGeTsVIPPpILzeqZ8D2Zc2TvNgSDi88zPF2a4cyqQdWV/wVWBDRDbNzzrLeRWScrFcOX9lW2iX6GOtUDw==}
 
   import-fresh@3.3.1:
     resolution: {integrity: sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ==}
@@ -5598,7 +5598,7 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.29.7
       graphql: 16.14.0
-      immutable: 5.1.6
+      immutable: 5.1.8
       invariant: 2.2.4
 
   '@asamuzakjp/css-color@5.1.11':
@@ -9068,7 +9068,7 @@ snapshots:
   image-size@0.5.5:
     optional: true
 
-  immutable@5.1.6: {}
+  immutable@5.1.8: {}
 
   import-fresh@3.3.1:
     dependencies:
@@ -10370,7 +10370,7 @@ snapshots:
   sass@1.100.0:
     dependencies:
       chokidar: 5.0.0
-      immutable: 5.1.6
+      immutable: 5.1.8
       source-map-js: 1.2.1
     optionalDependencies:
       '@parcel/watcher': 2.5.6
