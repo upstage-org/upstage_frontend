@@ -13,12 +13,12 @@ interface AccessStage {
 
 type Role = "owner" | "editor" | "player";
 
-// Labels match the access columns on the stage General tab; ranks put the
-// strongest access first in the list.
+// Single-word labels keep the tags narrow so long stage names get the
+// space; ranks put the strongest access first in the list.
 const ROLES: Record<Role, { label: string; color: string; rank: number }> = {
   owner: { label: "Owner", color: "gold", rank: 0 },
-  editor: { label: "Player and edit access", color: "green", rank: 1 },
-  player: { label: "Player access", color: "blue", rank: 2 },
+  editor: { label: "Editor", color: "green", rank: 1 },
+  player: { label: "Player", color: "blue", rank: 2 },
 };
 
 export default {
