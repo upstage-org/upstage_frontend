@@ -1397,11 +1397,12 @@ test.describe("streaming: performer streams, audience views @full", () => {
         .filter({ has: page.locator("i.fa-sync") });
       await expect(refreshButton).toBeVisible({ timeout: 10_000 });
 
-      // LiveStreamPlayer crops the picture by default (cover; stretch is
-      // an explicit Stretch/Crop menu choice).
+      // LiveStreamPlayer shows the whole picture in proportion by default
+      // (contain; Crop/Stretch are explicit menu choices — see
+      // effectiveFrameFitId's per-kind defaults in frameShapes.ts).
       const video = page.locator(`[id="video${objectId}"]`);
       await expect(video).toBeAttached({ timeout: 10_000 });
-      expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("cover");
+      expect(await video.evaluate((el) => getComputedStyle(el).objectFit)).toBe("contain");
 
       // Context menu: the standardised stream menu (shared with jitsi
       // tiles) — Mute locally + Volume present; Play/Pause, Restart, Loop

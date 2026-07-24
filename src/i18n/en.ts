@@ -298,7 +298,7 @@ export default {
   ingest_hint_bframes:
     'Same page, set B-frames to 0: for x264 add bf=0 to "Custom x264 options" (or choose Tune = zerolatency); for NVENC set Max B-frames = 0. With B-frames on, the stream connects but viewers lose the picture within seconds.',
   ingest_hint_aspect:
-    'Leave "Rescale Output" OFF, and in Settings → Video keep the Output (Scaled) Resolution the same aspect ratio as the Base (Canvas) Resolution — a mismatch distorts the picture. Any standard resolution (e.g. 1920×1080 or 1280×720) is fine; on stage the stream always shows whole and in proportion, and right-clicking the tile offers Fit / Crop / Stretch.',
+    'Leave "Rescale Output" OFF, and in Settings → Video keep the Output (Scaled) Resolution the same aspect ratio as the Base (Canvas) Resolution — a mismatch distorts the picture. If the stream appears on stage as a squeezed tall-and-narrow strip (or squashed flat), a rescale resolution is mistyped, e.g. 108×1080 where 1080×… was meant: OBS then really encodes that shape and no stage setting can undo it. Any standard resolution (e.g. 1920×1080 or 1280×720) is fine; on stage the stream always shows whole and in proportion, and right-clicking the tile offers Fit / Crop / Stretch.',
   ingest_hint_wizard:
     "OBS's Auto-Configuration Wizard can quietly change the Output settings above — re-check them after running it.",
   waiting_for_stream: "Waiting for stream…",
