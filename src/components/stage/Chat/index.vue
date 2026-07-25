@@ -436,7 +436,7 @@ export default {
     flex-grow: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-top: 36px;
+    padding-top: 0.5em;
   }
 
   /* Popped-out /chat/: short threads stay above the sticky input so the first
@@ -500,7 +500,10 @@ export default {
   }
 
   &.collapsed {
-    height: 108px !important;
+    /* Content-driven height (~108px): the in-flow actions row can wrap
+       on narrow widths, and a hard-coded height would push the input
+       footer out of the card. Bottom-anchored, so it grows upward. */
+    height: auto !important;
 
     .card-content {
       padding: 0;
@@ -516,15 +519,22 @@ export default {
     }
 
     .actions {
-      top: 5px;
+      padding-top: 5px;
     }
   }
 
+  /*
+   * In-flow header row (NOT absolutely positioned): the tool strip
+   * must own its vertical space so scrolled messages can never slide
+   * underneath the buttons.
+   */
   .actions {
-    position: absolute;
-    right: 24px;
-    top: 10px;
-    z-index: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: 10px 24px 0 12px;
 
     button {
       width: 26px;

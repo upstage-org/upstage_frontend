@@ -142,9 +142,7 @@ export default {
     // forcing the computed to `true` there bypasses the on-stage
     // toolbox-toggle state that would otherwise leave the player
     // chat hidden in the popped-out window.
-    const playerChatVisibility = computed(
-      () => isStandalone || stageStore.showPlayerChat,
-    );
+    const playerChatVisibility = computed(() => isStandalone || stageStore.showPlayerChat);
     const minimiseToToolbox = () => {
       // Pinia rename: action `showPlayerChat` → `setShowPlayerChat`
       // (collided with same-named state ref in Pinia setup store).
@@ -332,10 +330,7 @@ export default {
           window name as the public Chat pop-out so we never have
           two duplicate windows per stage.
         -->
-        <a-tooltip
-          v-if="!isStandalone"
-          :title="$t('pop_out_chat') || 'Pop out chat'"
-        >
+        <a-tooltip v-if="!isStandalone" :title="$t('pop_out_chat') || 'Pop out chat'">
           <button class="chat-setting button is-rounded is-outlined" @click="popOut">
             <span class="icon">
               <Icon src="bring-to-front.svg" size="20" />
@@ -401,7 +396,7 @@ export default {
     flex-grow: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-top: 36px;
+    padding-top: 0.5em;
   }
 
   .card-content.card-content--standalone-anchor {
@@ -422,11 +417,18 @@ export default {
     padding-bottom: 6px;
   }
 
+  /*
+   * In-flow header row (NOT absolutely positioned): the tool strip
+   * must own its vertical space so scrolled messages can never slide
+   * underneath the buttons.
+   */
   .actions {
-    position: absolute;
-    right: 24px;
-    top: 10px;
-    z-index: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: 10px 24px 0 12px;
 
     button {
       width: 26px;
