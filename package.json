@@ -130,7 +130,7 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.5",
-    "postcss": "^8.5.14",
+    "postcss": "^8.5.18",
     "prettier": "^3.8.3",
     "sass": "^1.99.0",
     "tailwindcss": "^4.3.0",
