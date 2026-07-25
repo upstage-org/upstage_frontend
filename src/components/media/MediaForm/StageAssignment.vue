@@ -5,7 +5,6 @@ import { computed, PropType, ref } from "vue";
 import { includesIgnoreCase } from "utils/common";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
-import ExitSettings from "components/media/ExitSettings.vue";
 import { DEFAULT_EXIT_ANIMATION, DEFAULT_EXIT_SPEED } from "components/stage/removalAnimations";
 import { StageAssignmentValue } from "models/studio";
 
@@ -13,12 +12,6 @@ const props = defineProps({
   modelValue: {
     type: Array as PropType<StageAssignmentValue[]>,
     required: true,
-  },
-  // Media types that never render on the board (audio, backdrop, curtain)
-  // have no removal animation, so their assignments hide the exit picker.
-  showExitSettings: {
-    type: Boolean,
-    default: true,
   },
 });
 
@@ -99,14 +92,6 @@ function unassignStage(id: string) {
   );
 }
 
-function updateAssignment(id: string, patch: Partial<StageAssignmentValue>) {
-  const sid = String(id);
-  emits(
-    "update:modelValue",
-    props.modelValue.map((a) => (String(a.stageId) === sid ? { ...a, ...patch } : a)),
-  );
-}
-
 function availableEmptyMessage(): string {
   if (stages.value.length === 0) return "No stages available.";
   if (searchAvailable.value.trim()) return "No stages match your search.";
@@ -126,11 +111,7 @@ function assignedEmptyMessage(): string {
   <div>
     <p class="stage-assignment-help help mb-3">
       Click a stage name to move it between the lists — the same interaction as assigning player
-      access on Stage Management.
-      <template v-if="showExitSettings">
-        Each assigned stage has its own exit animation for this item.
-      </template>
-      Use Save on the media form when you are finished.
+      access on Stage Management. Use Save on the media form when you are finished.
     </p>
     <div class="columns stage-assignment-columns">
       <div class="column">
@@ -206,14 +187,6 @@ function assignedEmptyMessage(): string {
               >
                 {{ stage.name }}
               </button>
-              <ExitSettings
-                v-if="showExitSettings"
-                compact
-                :animation="stage.assignment.exitAnimation"
-                :speed="stage.assignment.exitSpeed"
-                @update:animation="updateAssignment(stage.key, { exitAnimation: $event })"
-                @update:speed="updateAssignment(stage.key, { exitSpeed: $event })"
-              />
             </div>
           </div>
         </article>

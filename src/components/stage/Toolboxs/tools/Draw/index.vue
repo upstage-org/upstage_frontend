@@ -112,9 +112,7 @@ export default {
       </div>
       <span class="tag is-light is-block">{{ $t("colour") }}</span>
     </div>
-    <!-- Marking the pen tile active when drawing makes pen/erase read as a
-         radio pair — on touch there is no cursor preview to reveal the mode. -->
-    <div class="drawing-tool" style="width: 200px" :class="{ active: mode === 'draw' }">
+    <div class="drawing-tool" style="width: 200px">
       <div class="size-preview">
         <div
           class="dot"

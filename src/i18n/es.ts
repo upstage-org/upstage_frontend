@@ -232,7 +232,12 @@ export default {
   upload_limit: "Límite de carga",
   role: "Papel",
   delete_player_confirm:
-    "Al eliminar este jugador también se eliminarán todas sus passos. Todos sus medios te pertenecerán. ¡Esto no se puede deshacer!\n¿Estás seguro de que deseas continuar?",
+    "Los escenarios, escenas guardadas y grabaciones de este jugador se eliminarán permanentemente. Elige qué hacer con sus medios: reasignar sus avatares, accesorios y fondos a la cuenta de administrador, o eliminarlo todo.\nLos medios aún usados por otros escenarios o grabaciones serán reemplazados por un marcador de posición. ¡Esto no se puede deshacer!",
+  delete_player_title: "Eliminar jugador {name}",
+  delete_player_reassign: "Reasignar medios al administrador",
+  delete_player_delete_all: "Eliminar todo",
+  delete_player_no_undo:
+    "Esto elimina permanentemente todos sus escenarios, medios y grabaciones. ¿Continuar?",
   profile_title: "{name}'s Perfil",
   introduction: "Introducción",
   new_object: "Nuevo {0}",

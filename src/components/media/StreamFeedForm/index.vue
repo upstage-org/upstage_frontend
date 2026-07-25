@@ -245,10 +245,31 @@ function close() {
           </a-input-group>
         </a-form-item>
       </a-form>
-      <p class="mb-3 text-xs opacity-75">{{ t("ingest_encoder_hint") }}</p>
+      <div class="mb-3 text-xs opacity-75">
+        <p class="mb-1">
+          <b>{{ t("ingest_hint_title") }}</b>
+        </p>
+        <ul class="encoder-checklist">
+          <li>{{ t("ingest_hint_format") }}</li>
+          <li>{{ t("ingest_hint_keyframe") }}</li>
+          <li>{{ t("ingest_hint_bframes") }}</li>
+          <li>{{ t("ingest_hint_aspect") }}</li>
+          <li>{{ t("ingest_hint_wizard") }}</li>
+        </ul>
+      </div>
       <a-space class="w-full justify-end">
         <a-button type="primary" @click="close">{{ t("finish") }}</a-button>
       </a-space>
     </div>
   </a-modal>
 </template>
+
+<style scoped>
+.encoder-checklist {
+  list-style: disc;
+  margin-left: 1.25em;
+}
+.encoder-checklist li {
+  margin-bottom: 0.35em;
+}
+</style>

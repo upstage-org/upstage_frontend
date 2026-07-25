@@ -904,20 +904,12 @@ export const useStageStore = defineStore(
             }
             tools.value[key].push(item);
           });
-          // Give the asset palettes a stable alphabetical default order instead
-          // of raw GraphQL/DB order, so an author can find e.g. an avatar by
-          // name. This runs once at load; in-session drag reordering
-          // (REORDER_TOOLBOX) still applies on top and is not persisted, so
-          // nothing the user arranged is lost by sorting here. Scenes
-          // (scene_order), meetings (FIFO) and audio/video strips keep their
-          // own meaningful ordering and are intentionally excluded.
-          (["avatars", "props", "backdrops", "curtains"] as const).forEach((paletteKey) => {
-            tools.value[paletteKey]?.sort((a, b) =>
-              String(a.name ?? "").localeCompare(String(b.name ?? ""), undefined, {
-                sensitivity: "base",
-              }),
-            );
-          });
+          // Palettes keep the server-provided asset order: assignMedia stores
+          // the order arranged in Stage Management > Media (ParentStage PK
+          // order), and that arrangement is the documented way authors control
+          // the on-stage tool bars. Do NOT re-sort here — an alphabetical sort
+          // at load silently discards the saved order. In-session drag
+          // reordering (REORDER_TOOLBOX) still applies on top.
         } else {
           preloading.value = false;
         }
@@ -1209,12 +1201,31 @@ export const useStageStore = defineStore(
       }
     }
 
-    function BRING_TO_FRONT_OF({ front, back }: { front: ObjectId; back: ObjectId }) {
-      const frontIndex = board.value.objects.findIndex((avatar) => avatar.id === front);
-      const backIndex = board.value.objects.findIndex((avatar) => avatar.id === back);
-      if (frontIndex > -1 && backIndex > -1) {
-        board.value.objects.splice(backIndex, 0, board.value.objects.splice(frontIndex, 1)[0]);
-      }
+    function BRING_TO_FRONT_OF({
+      front,
+      back,
+      side,
+    }: {
+      front: ObjectId;
+      back: ObjectId;
+      side?: "front" | "behind";
+    }) {
+      const objs = board.value.objects;
+      const frontIndex = objs.findIndex((o) => o.id === front);
+      const backIndex = objs.findIndex((o) => o.id === back);
+      if (frontIndex === -1 || backIndex === -1 || frontIndex === backIndex) return;
+      // `side` says which side of `back` the moved object lands on ("front" =
+      // later in the array = painted on top). Wire messages carry it so that
+      // RE-application converges: every performer hears their own MQTT echo
+      // (no noLocal), and without an explicit side the echo would move the
+      // already-moved object to the OTHER side of `back` — visually undoing
+      // the Depth-tool drag on the dragger's own board. Messages from old
+      // builds/recordings lack `side`; deriving it from the current relative
+      // order reproduces the legacy single-application result exactly.
+      const resolvedSide = side ?? (frontIndex < backIndex ? "front" : "behind");
+      const [moved] = objs.splice(frontIndex, 1);
+      const anchorIndex = objs.findIndex((o) => o.id === back);
+      objs.splice(resolvedSide === "front" ? anchorIndex + 1 : anchorIndex, 0, moved);
     }
 
     function boardStackIndexFor(objectId: ObjectId): number {
@@ -2531,7 +2542,7 @@ export const useStageStore = defineStore(
 
     function sendToBack(object: BoardObject) {
       SEND_TO_BACK(object);
-      if (object.liveAction) {
+      if (object.liveAction || object.published) {
         mqtt.sendMessage(TOPICS.BOARD, {
           type: BOARD_ACTIONS.SEND_TO_BACK,
           object: serializeForBroadcast(object),
@@ -2541,7 +2552,7 @@ export const useStageStore = defineStore(
 
     function bringToFront(object: BoardObject) {
       BRING_TO_FRONT(object);
-      if (object.liveAction) {
+      if (object.liveAction || object.published) {
         mqtt.sendMessage(TOPICS.BOARD, {
           type: BOARD_ACTIONS.BRING_TO_FRONT,
           object: serializeForBroadcast(object),
@@ -2550,14 +2561,28 @@ export const useStageStore = defineStore(
     }
 
     function bringToFrontOf({ front, back }: { front: ObjectId; back: ObjectId }) {
-      BRING_TO_FRONT_OF({ front, back });
-      // The "moved" object is `front`; gate the publish on its bulb.
-      const frontObj = board.value.objects.find((o) => o.id === front);
-      if (frontObj?.liveAction) {
+      // Resolve the drop direction ONCE, before mutating, and put it on the
+      // wire: dragging frontward (front currently behind back) lands the
+      // object just in front of `back`, dragging backward lands it just
+      // behind. Every client — including this one, via its own MQTT echo —
+      // then applies the same absolute placement, so double application
+      // (echo, QoS-1 duplicate) is a no-op instead of a toggle.
+      const objs = board.value.objects;
+      const frontIndex = objs.findIndex((o) => o.id === front);
+      const backIndex = objs.findIndex((o) => o.id === back);
+      if (frontIndex === -1 || backIndex === -1 || frontIndex === backIndex) return;
+      const side: "front" | "behind" = frontIndex < backIndex ? "front" : "behind";
+      BRING_TO_FRONT_OF({ front, back, side });
+      // The "moved" object is `front`. Same publish gate as deleteObject:
+      // observers must hear depth changes for any object already on their
+      // boards (`published`), not only while the green bulb is on.
+      const frontObj = objs.find((o) => o.id === front);
+      if (frontObj?.liveAction || frontObj?.published) {
         mqtt.sendMessage(TOPICS.BOARD, {
           type: BOARD_ACTIONS.BRING_TO_FRONT_OF,
           front,
           back,
+          side,
         });
       }
     }
@@ -2585,6 +2610,7 @@ export const useStageStore = defineStore(
       mute?: boolean;
       front?: ObjectId;
       back?: ObjectId;
+      side?: "front" | "behind";
     }
 
     function handleBoardMessage({ message }: { message: BoardMessage }) {
@@ -2640,7 +2666,7 @@ export const useStageStore = defineStore(
           break;
         case BOARD_ACTIONS.BRING_TO_FRONT_OF:
           if (message.front !== undefined && message.back !== undefined) {
-            BRING_TO_FRONT_OF({ front: message.front, back: message.back });
+            BRING_TO_FRONT_OF({ front: message.front, back: message.back, side: message.side });
           }
           break;
         case BOARD_ACTIONS.TOGGLE_AUTOPLAY_FRAMES:

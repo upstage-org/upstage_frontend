@@ -74,9 +74,11 @@ MOUNTS=(
   -v "$UPLOADS_DIR:/usr/app/uploads"
 )
 
+# Single consolidated chain (root alembic.ini, alembic/versions/); requires an
+# image built after the 2026-07 consolidation. Also seeds admin / Secret@123.
 echo "[e2e-backend] running migrations (also seeds admin / Secret@123) ..."
 docker run --rm --network "$NET" --user 1000:1000 "${MOUNTS[@]}" "$IMAGE" \
-  bash -c "cd /usr/app && python -m alembic -c ./scripts/alembic.ini upgrade heads"
+  bash -c "cd /usr/app && python -m alembic -c ./alembic.ini upgrade head"
 
 echo "[e2e-backend] starting $NAME on 127.0.0.1:$PORT ..."
 docker run -d --name "$NAME" --network "$NET" --user 1000:1000 \

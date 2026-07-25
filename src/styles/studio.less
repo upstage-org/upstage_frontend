@@ -9,7 +9,22 @@
 @import './custom.less';
 @import './webkit-compat.less';
 
-blockquote.bubble { 
+// Multi-select filter fields (Access Level, Tags, Owners, Media types, …):
+// antd renders the on-hover clear "x" at the same spot as the dropdown arrow
+// (opaque background + higher z-index), so the arrow can never be clicked.
+// Sit the "x" beside the arrow instead, and widen the selector padding so
+// tags don't run under the two icons. The extra .ant-select class outranks
+// antd's runtime-injected rules of equal specificity.
+.ant-select.ant-select-multiple.ant-select-allow-clear.ant-select-show-arrow {
+  .ant-select-selector {
+    padding-inline-end: 44px;
+  }
+  .ant-select-clear {
+    inset-inline-end: 29px; // 11px arrow inset + 12px icon + 6px gap
+  }
+}
+
+blockquote.bubble {
     display: flex;
     align-items: center;
     background-position: center;

@@ -662,6 +662,29 @@ const stageOps = {
         }
       }
     `),
+  // Every stage with its access lists, for the player-profile "Stage access"
+  // panel. The backend filters the search by the CALLER's permission, so we
+  // pass all four levels to disable that filter — the viewer needs to see
+  // stages they themselves can only enter as audience.
+  stageAccessOverview: () =>
+    studioClient.request(
+      gql`
+        query StageAccessOverview($limit: Int, $access: [String]) {
+          stages(input: { limit: $limit, access: $access }) {
+            edges {
+              id
+              name
+              fileLocation
+              owner {
+                id
+              }
+              playerAccess
+            }
+          }
+        }
+      `,
+      { limit: 100000, access: ["owner", "editor", "player", "audience"] },
+    ),
 };
 
 export default stageOps;

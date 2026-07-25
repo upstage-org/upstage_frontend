@@ -4,16 +4,14 @@
   form's Stages tab and per media row in Stage Management > Media.
 
   There is no "stage default" sentinel: every assignment has a concrete
-  type, "fade" at Medium speed unless chosen otherwise. The speed buttons
-  are disabled for "vanish" since an instant exit has no duration.
+  type, "fade" at medium speed unless chosen otherwise. The speed slider
+  is disabled for "vanish" since an instant exit has no duration.
 -->
 <script lang="ts" setup>
 import { computed, ref } from "vue";
 import {
   DEFAULT_EXIT_ANIMATION,
   DEFAULT_EXIT_SPEED,
-  EXIT_SPEED_OPTIONS,
-  nearestExitSpeed,
   REMOVAL_ANIMATION_OPTIONS,
   runRemovalAnimation,
 } from "components/stage/removalAnimations";
@@ -40,12 +38,13 @@ const animationValue = computed({
   set: (value: string) => emit("update:animation", value),
 });
 
-// Assignments saved before the discrete options existed hold arbitrary
-// slider durations; snap those to the closest option for display, but
-// only emit when the user actually picks one.
-const speedValue = computed({
-  get: () => nearestExitSpeed(props.speed || DEFAULT_EXIT_SPEED),
-  set: (value: number) => emit("update:speed", value),
+// Same slow↔fast mapping the stage Customisation page used: slider value
+// is 1000/duration in [0.1, 1] → duration in [1000, 10000] ms.
+const sliderValue = computed({
+  get: () => 1000 / (props.speed || DEFAULT_EXIT_SPEED),
+  set: (value: number) => {
+    emit("update:speed", Math.round(1000 / Math.min(Math.max(value, 0.1), 1)));
+  },
 });
 
 const instant = computed(() => animationValue.value === "vanish");
@@ -83,14 +82,20 @@ const playPreview = () => {
       size="small"
       class="exit-compact-select"
     />
-    <a-radio-group
-      v-model:value="speedValue"
-      data-testid="exit-settings-speed"
-      :options="EXIT_SPEED_OPTIONS"
-      option-type="button"
-      size="small"
-      :disabled="instant"
-    />
+    <div class="exit-speed-row exit-compact-slider">
+      <span>Slow</span>
+      <a-slider
+        v-model:value="sliderValue"
+        data-testid="exit-settings-speed"
+        :min="0.1"
+        :max="1"
+        :step="0.01"
+        :disabled="instant"
+        :tip-formatter="null"
+        class="exit-speed-slider"
+      />
+      <span>Fast</span>
+    </div>
   </div>
   <a-space v-else direction="vertical" class="w-full mb-4">
     <a-form-item label="Exit animation" :label-col="{ span: 6 }" class="mb-2">
@@ -102,13 +107,20 @@ const playPreview = () => {
       />
     </a-form-item>
     <a-form-item label="Exit speed" :label-col="{ span: 6 }" class="mb-2">
-      <a-radio-group
-        v-model:value="speedValue"
-        data-testid="exit-settings-speed"
-        :options="EXIT_SPEED_OPTIONS"
-        option-type="button"
-        :disabled="instant"
-      />
+      <div class="exit-speed-row">
+        <span>Slow</span>
+        <a-slider
+          v-model:value="sliderValue"
+          data-testid="exit-settings-speed"
+          :min="0.1"
+          :max="1"
+          :step="0.01"
+          :disabled="instant"
+          :tip-formatter="null"
+          class="exit-speed-slider"
+        />
+        <span>Fast</span>
+      </div>
       <div v-if="instant" class="text-gray-500 text-sm">
         "Disappear" is instant; pick another effect to set its speed.
       </div>
@@ -137,6 +149,22 @@ const playPreview = () => {
 
 .exit-compact-select {
   width: 210px;
+}
+
+.exit-compact-slider {
+  max-width: 220px;
+  flex: auto;
+}
+
+.exit-speed-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+}
+
+.exit-speed-slider {
+  flex: auto;
 }
 
 .exit-preview-row {

@@ -163,6 +163,7 @@ export default {
         sorter: {
           multiple: 4,
         },
+        sortDirections: ["descend", "ascend"],
         customRender(opt) {
           return opt.text
             ? h(DDate, {
@@ -178,6 +179,7 @@ export default {
         sorter: {
           multiple: 5,
         },
+        sortDirections: ["descend", "ascend"],
         customRender(opt) {
           return h(DDate, {
             value: opt.text,

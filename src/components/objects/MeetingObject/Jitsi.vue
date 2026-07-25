@@ -362,11 +362,12 @@ export default {
 video {
   width: 100%;
   height: 100%;
-  // The picture stretches with the freely-resizable frame (Moveable exempts
-  // stream tiles from keepRatio) — distortion is a creative choice. The
-  // context menu's Stretch/Crop toggle overrides via --stream-fit (set on
-  // the .object wrapper in Object.vue; "cover" crops instead).
-  object-fit: var(--stream-fit, fill);
+  // The frame resizes freely (Moveable exempts stream tiles from keepRatio)
+  // and by default the picture is cropped ("cover"): it keeps its own
+  // aspect ratio and the frame windows into it. The context menu's
+  // Stretch/Crop toggle overrides via --stream-fit (set on the .object
+  // wrapper in Object.vue; "fill" stretches instead).
+  object-fit: var(--stream-fit, cover);
   display: block;
 }
 </style>

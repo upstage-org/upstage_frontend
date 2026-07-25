@@ -92,9 +92,7 @@ export default {
     </div>
     <span class="tag is-light is-block">{{ $t("colour") }}</span>
   </div>
-  <!-- Marking the pen tile active when drawing makes pen/erase read as a
-       radio pair — on touch there is no cursor preview to reveal the mode. -->
-  <div class="drawing-tool" style="width: 200px" :class="{ active: mode === 'draw' }">
+  <div class="drawing-tool slider-tile" style="width: 200px">
     <div class="size-preview">
       <div
         class="dot"
@@ -116,7 +114,7 @@ export default {
     />
     <span class="tag is-light is-block">{{ $t("size") }}</span>
   </div>
-  <div class="drawing-tool" style="width: 200px">
+  <div class="drawing-tool slider-tile" style="width: 200px">
     <div class="size-preview">
       <div
         class="dot"
@@ -180,6 +178,11 @@ export default {
   z-index: 1001;
   position: relative;
   vertical-align: top;
+}
+/* The size and opacity tiles hold edge-to-edge sliders; without a gap
+   the two ranges visually merge into one long track. */
+.slider-tile + .slider-tile {
+  margin-left: 12px;
 }
 .size-preview {
   display: flex;

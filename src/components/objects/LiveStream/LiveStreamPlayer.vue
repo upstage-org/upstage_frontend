@@ -422,13 +422,16 @@ onBeforeUnmount(() => {
 .the-object-video {
   width: 100%;
   height: 100%;
-  // Same philosophy as a jitsi window (Jitsi.vue): the tile resizes freely
-  // (Moveable exempts stream tiles from keepRatio) and the picture stretches
-  // to fill it — distortion is a creative choice made on stage. The context
-  // menu's Stretch/Crop toggle overrides via --stream-fit ("cover" crops).
-  object-fit: var(--stream-fit, fill);
+  // The tile resizes freely (Moveable exempts stream tiles from keepRatio);
+  // by default the whole picture stays visible and in proportion ("contain",
+  // letterboxed) — an encoder canvas rarely matches the frame's ratio. The
+  // context menu's Fit/Crop/Stretch row overrides via --stream-fit.
+  object-fit: var(--stream-fit, contain);
   display: block;
-  background: #000;
+  // Transparent (not black): with "contain" the letterbox area shows the
+  // stage through, so the picture reads at its true proportions instead of
+  // sitting in black bars.
+  background: transparent;
 }
 
 .live-stream-placeholder {
