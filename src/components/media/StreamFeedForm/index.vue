@@ -254,6 +254,7 @@ function close() {
           <li>{{ t("ingest_hint_keyframe") }}</li>
           <li>{{ t("ingest_hint_bframes") }}</li>
           <li>{{ t("ingest_hint_aspect") }}</li>
+          <li>{{ t("ingest_hint_canvas") }}</li>
           <li>{{ t("ingest_hint_wizard") }}</li>
         </ul>
       </div>

@@ -8,7 +8,8 @@
  *
  * Every shape must be expressed as a border-radius or a %-coordinate
  * clip-path so it stretches with the freely-resizable frame — never px
- * units or `path()` (fixed-size, would not follow the tile).
+ * units or `path()` (fixed-size, would not follow the tile). A px CAP
+ * inside min() is fine: it bounds the radius, the % keeps it relative.
  *
  * Stored `shape` values ride the board object through MQTT unchanged.
  * Legacy values in old broadcasts/archives: `null`/absent (per-kind default
@@ -50,7 +51,13 @@ export const FRAME_SHAPES: FrameShapeDef[] = [
   {
     id: "rounded",
     title: "Rounded",
-    style: { borderRadius: "12px" },
+    // Proportional, not a fixed radius: 12px reads as "nothing happened" on
+    // a stage-sized tile (every other shape scales with the frame). The px
+    // cap keeps wide tiles' corners circular instead of elliptical (a bare
+    // % resolves per-axis: horizontal radius from width, vertical from
+    // height). Untouched jitsi tiles do NOT use this entry — their legacy
+    // 12px default is preserved separately in frameShapeStyle().
+    style: { borderRadius: "min(12%, 36px)" },
     swatchStyle: { borderRadius: "4px" },
   },
   { id: "circle", title: "Circle / Oval", style: { borderRadius: "50%" } },
@@ -149,6 +156,16 @@ export function effectiveFrameShapeId(shape: unknown, kind: FrameKind): FrameSha
 
 /** Wrapper style for a tile's stored `shape` value. */
 export function frameShapeStyle(shape: unknown, kind: FrameKind): FrameShapeStyle {
+  const stored = typeof shape === "string" && SHAPES_BY_ID.has(shape as FrameShapeId);
+  if (!stored && kind === "jitsi") {
+    // Historical default look for untouched jitsi tiles (and replayed
+    // archives): the subtle legacy 12px corners — deliberately NOT the
+    // explicit "Rounded" shape, which is proportional and far more
+    // pronounced. The menu still highlights "Rounded" as the closest match
+    // (effectiveFrameShapeId), and picking it upgrades the tile to the
+    // proportional radius.
+    return { borderRadius: "12px" };
+  }
   const def = SHAPES_BY_ID.get(effectiveFrameShapeId(shape, kind));
   return def ? { ...def.style } : {};
 }

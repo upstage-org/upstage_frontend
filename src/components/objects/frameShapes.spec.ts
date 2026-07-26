@@ -61,6 +61,18 @@ describe("frameShapeStyle legacy/default contract", () => {
     expect(frameShapeStyle("hexagon", "rtmp").clipPath).toMatch(/^polygon\(/);
     expect(frameShapeStyle("arch", "jitsi")).toEqual({ borderRadius: "50% 50% 0 0" });
   });
+
+  it("renders explicit 'rounded' proportional to the tile, not the legacy 12px", () => {
+    // A fixed 12px radius is invisible on a stage-sized tile — the shape
+    // must scale with the frame (capped so wide tiles stay circular).
+    const rtmp = frameShapeStyle("rounded", "rtmp");
+    const jitsi = frameShapeStyle("rounded", "jitsi");
+    expect(rtmp).toEqual(jitsi);
+    expect(rtmp.borderRadius).toMatch(/%/);
+    expect(rtmp.borderRadius).not.toBe("12px");
+    // ...while the untouched-jitsi default stays the historical subtle look.
+    expect(frameShapeStyle(null, "jitsi")).toEqual({ borderRadius: "12px" });
+  });
 });
 
 describe("effectiveFrameShapeId", () => {
