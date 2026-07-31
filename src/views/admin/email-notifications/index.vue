@@ -115,8 +115,10 @@ const { proceed, loading } = useLoading(
     if (!body.value) {
       throw "Please provide a body for your email";
     }
-    const visibleReceivers = receiverEmails.value.filter((email) =>
-      receivers.value.adminPlayers?.edges.some((edge: any) => edge?.email === email),
+    const visibleReceivers = receiverEmails.value.filter(
+      (email) =>
+        customRecipients.value.includes(email) ||
+        receivers.value.adminPlayers?.edges.some((edge: any) => edge?.email === email),
     );
     if (!visibleReceivers.length) {
       throw "Please select at least one recipient";
