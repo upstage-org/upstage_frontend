@@ -58,26 +58,48 @@ describe("ContextMenuAvatar after the stream-menu split", () => {
     expect(text).toContain("loop.off");
   });
 
-  it("offers no frame-shape row (that row lives in ContextMenuStream)", () => {
+  it("shows the frame-shape row for videos only (avatars/props keep none)", () => {
     expect(mountMenu({ id: "o4", type: "avatar" }).findAll("[data-testid^='shape-']")).toHaveLength(
       0,
     );
-    expect(
-      mountMenu({ id: "v1", type: "video", name: "clip" }).findAll("[data-testid^='shape-']"),
-    ).toHaveLength(0);
+    const video = mountMenu({ id: "v1", type: "video", name: "clip" });
+    const swatches = video.findAll("[data-testid^='shape-']");
+    expect(swatches.length).toBeGreaterThan(0);
+    // Untouched videos have always been sharp-cornered rectangles.
+    expect(video.find("[data-testid='shape-rect']").classes()).toContain(
+      "has-background-primary-light",
+    );
+  });
+
+  it("broadcasts the chosen shape via shapeObject and keeps the menu open", async () => {
+    const closeMenu = vi.fn();
+    const wrapper = mount(ContextMenuAvatar, {
+      props: { object: { id: "v1", type: "video", name: "clip" }, closeMenu },
+      global: {
+        mocks: { $t: (key: string) => key },
+        stubs: { "a-tooltip": { template: "<span><slot /></span>" }, Icon: true },
+        provide: { isWearing: ref(false), holdable: ref(false) },
+      },
+    });
+    await wrapper.find("[data-testid='shape-star']").trigger("click");
+    expect(shapeObject).toHaveBeenCalledWith(expect.objectContaining({ id: "v1", shape: "star" }));
+    expect(closeMenu).not.toHaveBeenCalled();
   });
 
   it("keeps the exit-animation override for props/avatars", () => {
     expect(mountMenu({ id: "o4", type: "avatar" }).text()).toContain("exit_setting");
   });
 
-  it("offers no stretch/crop row (that row lives in ContextMenuStream)", () => {
+  it("shows the stretch/crop row for videos only, defaulting to stretch", () => {
     expect(mountMenu({ id: "o4", type: "avatar" }).findAll("[data-testid^='fit-']")).toHaveLength(
       0,
     );
-    expect(
-      mountMenu({ id: "v1", type: "video", name: "clip" }).findAll("[data-testid^='fit-']"),
-    ).toHaveLength(0);
+    const video = mountMenu({ id: "v1", type: "video", name: "clip" });
+    expect(video.findAll("[data-testid^='fit-']")).toHaveLength(3);
+    // <video> has always rendered object-fit: fill by default.
+    expect(video.find("[data-testid='fit-fill']").classes()).toContain(
+      "has-background-primary-light",
+    );
   });
 
   it("offers an explicit close item that only closes the menu", async () => {

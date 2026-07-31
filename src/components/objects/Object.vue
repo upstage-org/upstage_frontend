@@ -142,20 +142,28 @@ export default {
     };
     const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
-    // Frame shape for live stream tiles only (jitsi + RTMP). Applied to the
-    // sized `.object` wrapper so the <video> AND the RTMP "waiting" /
+    // Frame shape for stream tiles (jitsi + RTMP) and video assets. Applied
+    // to the sized `.object` wrapper so the <video> AND the RTMP "waiting" /
     // jitsi loading overlays are clipped together, and the %-based shape
     // stretches live while the frame is resized. A pure style binding on an
     // existing div: the Board key is object.id, so this can never remount
     // the player or touch srcObject.
     const frameStyle = computed(() => {
       const jitsi = isJitsiBoardType(props.object.type);
-      if (!jitsi && props.object.isRTMP !== true) return {};
+      const rtmp = props.object.isRTMP === true;
+      const video =
+        !jitsi &&
+        !rtmp &&
+        (isStreamPlaybackBoardType(props.object.type) ||
+          isStreamPlaybackBoardType(props.object.assetType?.name));
+      if (!jitsi && !rtmp && !video) return {};
+      const kind = jitsi ? "jitsi" : rtmp ? "rtmp" : "video";
       return {
-        ...frameShapeStyle(props.object.shape, jitsi ? "jitsi" : "rtmp"),
+        ...frameShapeStyle(props.object.shape, kind),
         // Fit/crop/stretch choice; the <video> reads it via object-fit:
-        // var(--stream-fit, …) in Jitsi.vue / LiveStreamPlayer.vue.
-        "--stream-fit": effectiveFrameFitId(props.object.fit, jitsi ? "jitsi" : "rtmp"),
+        // var(--stream-fit, …) in Jitsi.vue / LiveStreamPlayer.vue /
+        // .the-object-video below.
+        "--stream-fit": effectiveFrameFitId(props.object.fit, kind),
       };
     });
 
@@ -410,6 +418,9 @@ div[tabindex] {
 .the-object-video {
   width: 100%;
   height: 100%;
+  // "fill" mirrors the element's historical default look; the wrapper's
+  // frameStyle overrides the var when a fit is chosen in the context menu.
+  object-fit: var(--stream-fit, fill);
 }
 
 /*

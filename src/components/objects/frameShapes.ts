@@ -1,10 +1,10 @@
 /**
- * Frame shapes for live stream tiles (jitsi + RTMP).
+ * Frame shapes for stream tiles (jitsi + RTMP) and video assets.
  *
  * Single source of truth for the right-click "Shape" row
- * (Avatar/ContextMenuAvatar.vue) and the tile rendering (Object.vue applies
- * the style to the `.object` wrapper, which clips the <video> and any
- * placeholder/loading overlay together).
+ * (ContextMenuStream.vue and Avatar/ContextMenuAvatar.vue) and the tile
+ * rendering (Object.vue applies the style to the `.object` wrapper, which
+ * clips the <video> and any placeholder/loading overlay together).
  *
  * Every shape must be expressed as a border-radius or a %-coordinate
  * clip-path so it stretches with the freely-resizable frame — never px
@@ -29,7 +29,7 @@ export type FrameShapeId =
   | "heart"
   | "arch";
 
-export type FrameKind = "jitsi" | "rtmp";
+export type FrameKind = "jitsi" | "rtmp" | "video";
 
 type FrameShapeStyle = { borderRadius?: string; clipPath?: string };
 
@@ -134,13 +134,16 @@ export function effectiveFrameFitId(fit: unknown, kind: FrameKind): FrameFitId {
   if (typeof fit === "string" && FIT_IDS.includes(fit)) {
     return fit as FrameFitId;
   }
-  return kind === "jitsi" ? "cover" : "contain";
+  if (kind === "jitsi") return "cover";
+  // Video assets have always rendered with the <video> element's default
+  // object-fit (fill/stretch) — keep that for untouched objects.
+  return kind === "video" ? "fill" : "contain";
 }
 
 /**
  * Per-kind default for `null`/absent/unknown: jitsi tiles have always been
- * 12px-rounded, RTMP tiles sharp — keeping those defaults means untouched
- * tiles (and replayed archives) look exactly as before.
+ * 12px-rounded, RTMP tiles and video assets sharp — keeping those defaults
+ * means untouched tiles (and replayed archives) look exactly as before.
  */
 function defaultShapeId(kind: FrameKind): FrameShapeId {
   return kind === "jitsi" ? "rounded" : "rect";

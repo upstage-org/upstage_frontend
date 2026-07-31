@@ -9,6 +9,12 @@ import {
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "utils/common";
+import {
+  FRAME_FITS,
+  FRAME_SHAPES,
+  effectiveFrameFitId,
+  effectiveFrameShapeId,
+} from "../frameShapes";
 
 // `shapeObject`, `bringToFront`, `sendToBack`, `deleteObject`,
 // `switchFrame`, `toggleAutoplayFrames`, `openSettingPopup` are all
@@ -245,6 +251,23 @@ export default {
         isStreamPlaybackBoardType(props.object.assetType?.name),
     );
 
+    // Shaped frame + fit rows for video assets — same registry and behaviour
+    // as ContextMenuStream (menu stays open so shapes can be tried in place).
+    const activeShapeId = computed(() => effectiveFrameShapeId(props.object.shape, "video"));
+    const setFrameShape = (shape) => {
+      stageStore.shapeObject({
+        ...props.object,
+        shape,
+      });
+    };
+    const activeFitId = computed(() => effectiveFrameFitId(props.object.fit, "video"));
+    const setFrameFit = (fit) => {
+      stageStore.shapeObject({
+        ...props.object,
+        fit,
+      });
+    };
+
     return {
       switchFrame,
       holdAvatar,
@@ -279,6 +302,12 @@ export default {
       restartVideo,
       supportsPerStreamVolume,
       isStreamBoardObject,
+      FRAME_SHAPES,
+      activeShapeId,
+      setFrameShape,
+      FRAME_FITS,
+      activeFitId,
+      setFrameFit,
     };
   },
 };
@@ -315,6 +344,42 @@ export default {
       </a>
     </template>
     <div v-if="isStreamBoardObject">
+      <div class="field has-addons menu-group shape-group">
+        <p class="control menu-group-title">
+          <span>{{ $t("shape") }}</span>
+        </p>
+        <p v-for="s in FRAME_SHAPES" :key="s.id" class="control menu-group-item">
+          <a-tooltip :title="s.title" placement="bottom">
+            <button
+              class="button is-light"
+              :class="{ 'has-background-primary-light': activeShapeId === s.id }"
+              :data-testid="`shape-${s.id}`"
+              @click="setFrameShape(s.id)"
+            >
+              <!-- The swatch IS the shape: the registry's border-radius /
+                   clip-path applied to a small solid span. -->
+              <span class="shape-swatch" :style="s.swatchStyle ?? s.style"></span>
+            </button>
+          </a-tooltip>
+        </p>
+      </div>
+      <div class="field has-addons menu-group">
+        <p class="control menu-group-title">
+          <span>{{ $t("resize") }}</span>
+        </p>
+        <p v-for="f in FRAME_FITS" :key="f.id" class="control menu-group-item">
+          <a-tooltip :title="f.title" placement="bottom">
+            <button
+              class="button is-light"
+              :class="{ 'has-background-primary-light': activeFitId === f.id }"
+              :data-testid="`fit-${f.id}`"
+              @click="setFrameFit(f.id)"
+            >
+              <span class="mt-1">{{ $t(f.labelKey) }}</span>
+            </button>
+          </a-tooltip>
+        </p>
+      </div>
       <a v-if="object.isPlaying" class="panel-block" @click="pauseVideo(slotProps)">
         <span class="panel-icon">
           <i class="fas fa-pause"></i>
@@ -578,6 +643,29 @@ export default {
       padding-top: 2px;
       padding-bottom: 2px;
       height: 28px;
+    }
+
+    // Shape row: 9 swatch buttons don't fit beside the title in the 250px
+    // menu, so they wrap onto extra lines instead of shrinking to slivers.
+    &.shape-group {
+      flex-wrap: wrap;
+
+      .menu-group-item {
+        flex: 0 0 auto;
+      }
+
+      button {
+        width: 34px;
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      .shape-swatch {
+        display: inline-block;
+        width: 18px;
+        height: 14px;
+        background: currentColor;
+      }
     }
   }
 }
