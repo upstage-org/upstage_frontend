@@ -115,7 +115,7 @@ export default {
             h(InputSearch, {
               allowClear: true,
               class: "w-48",
-              placeholder: "Player name",
+              placeholder: "Player name or email",
               value: name.value,
               "onUpdate:value": (value: string) => {
                 name.value = value;

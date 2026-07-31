@@ -367,6 +367,12 @@ div.moveable-control-box {
  * Wrap target <a-transfer> in a div.upstage-transfer--sorter-arrows.
  */
 .upstage-transfer--sorter-arrows {
+    /* Header count ("20/20 recipients") must never wrap or clip to "20/20 re…". */
+    .ant-transfer-list-header-selected {
+        white-space: nowrap;
+        flex: none;
+    }
+
     .ant-transfer-operation {
         align-self: center;
         gap: 6px;

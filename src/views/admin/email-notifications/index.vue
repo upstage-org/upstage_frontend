@@ -212,6 +212,7 @@ const { proceed, loading } = useLoading(
               }"
               :list-style="{
                 flex: '1',
+                minWidth: '260px',
                 height: '300px',
               }"
               :titles="[' available', ' selected']"
