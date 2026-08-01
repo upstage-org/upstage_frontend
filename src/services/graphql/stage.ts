@@ -269,7 +269,9 @@ const stageOps = {
         { fileLocation, performanceId },
       )
       .then((response) => ({
-        stage: deriveActiveRecording(response.stageList[0]),
+        // No matching stage must yield null, not a stub object: callers gate on
+        // truthiness before using stage.id (e.g. updateLastAccess).
+        stage: response.stageList[0] ? deriveActiveRecording(response.stageList[0]) : null,
       })),
   loadPermission: (fileLocation) =>
     studioClient
