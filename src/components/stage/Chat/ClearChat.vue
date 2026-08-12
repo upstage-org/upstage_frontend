@@ -20,8 +20,15 @@ export default {
     console.log(props.option);
     const clearChat = async () => {
       clearing.value = true;
+      // Credentials ride the stage payload the store already loaded.
+      const client = mqttClient.connect(stageStore.model?.mqtt);
+      if (!client) {
+        clearing.value = false;
+        message.error("Could not reach the chat server. Please reload and try again.");
+        return;
+      }
       await new Promise((resolve) => {
-        mqttClient.connect().on("connect", () => {
+        client.on("connect", () => {
           const topicChat = namespaceTopic(TOPICS.CHAT, route.params.url);
           if (props.option == "public-chat") {
             mqttClient.sendMessage(topicChat, { clear: true }, true).then(resolve);

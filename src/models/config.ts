@@ -8,14 +8,19 @@ export interface SharedConfigs {
   STREAMING: Streaming;
 }
 
+/** Transport settings only — see the note on `MQTT_CONNECTION` in config.ts. */
 export interface MqttConnection {
   url: string;
-  username: string;
-  password: string;
   clean: boolean;
   connectTimeout: number;
   reconnectPeriod: number;
   retain: boolean;
+}
+
+/** Broker login served per stage on `Stage.mqtt`, never bundled. */
+export interface MqttCredentials {
+  username: string;
+  password: string;
 }
 
 export interface Streaming {

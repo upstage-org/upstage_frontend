@@ -13,8 +13,10 @@ interface ImportMetaEnv {
   readonly VITE_CLOUDFLARE_CAPTCHA_SITEKEY?: string;
   readonly VITE_MQTT_NAMESPACE?: string;
   readonly VITE_MQTT_ENDPOINT?: string;
-  readonly VITE_MQTT_USERNAME?: string;
-  readonly VITE_MQTT_PASSWORD?: string;
+  // No VITE_MQTT_USERNAME / VITE_MQTT_PASSWORD. Broker credentials are served
+  // at runtime on `Stage.mqtt`; leaving them undeclared here makes any future
+  // `import.meta.env.VITE_MQTT_PASSWORD` a type error rather than a silent
+  // re-inlining of the secret into the public bundle.
   readonly VITE_JITSI_ENDPOINT?: string;
   /**
    * Optional XMPP virtual-host overrides for Jitsi. Production installs

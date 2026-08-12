@@ -17,13 +17,29 @@ export default function buildClient() {
     client: null,
     _connectPromise: null,
     _connectResolve: null,
-    connect() {
+    // `credentials` come from `Stage.mqtt` on the stage payload the caller has
+    // already loaded — deliberately NOT from config, which would put the
+    // password back in the bundle. Synchronous on purpose: every caller already
+    // holds the stage object, so there is no fetch to await here and the
+    // wake-recovery callbacks stay synchronous.
+    connect(credentials) {
       const { url, ...options } = config.MQTT_CONNECTION;
       const connectUrl = url;
       if (!connectUrl || typeof connectUrl !== "string") {
         console.error(
           "[MQTT] No connection URL. Set VITE_MQTT_ENDPOINT to the broker WebSocket URL (e.g. ws://localhost:9001).",
         );
+      }
+      // Fail closed. There is no build-time fallback by design, so without a
+      // credential we cannot connect — return null and let the caller go
+      // OFFLINE and retry, the same path a broker outage already takes.
+      if (!credentials?.username || !credentials?.password) {
+        console.error(
+          "[MQTT] No broker credentials. Expected them on the stage payload (Stage.mqtt); " +
+            "check that the stage query selects `mqtt { username password }` and that the " +
+            "backend has MQTT_USER/MQTT_PASSWORD configured.",
+        );
+        return null;
       }
       const clientId = uuidv4();
       this._connectPromise = new Promise((resolve, reject) => {
@@ -32,6 +48,8 @@ export default function buildClient() {
       });
       this.client = connect(connectUrl, {
         ...options,
+        username: credentials.username,
+        password: credentials.password,
         clientId,
       });
       this.client.on("error", (err) => {

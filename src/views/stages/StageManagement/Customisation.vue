@@ -78,7 +78,8 @@ export default {
         configData,
       );
       const mqtt = buildClient();
-      const client = mqtt.connect();
+      const client = mqtt.connect(stage.value?.mqtt);
+      if (!client) return;
       client.publish(
         namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
         JSON.stringify({

@@ -50,6 +50,7 @@ export default {
         const clearStage = useClearStage(
           stage.value.fileLocation,
           config ? JSON.parse(config.description)?.defaultcolor : null,
+          stage.value.mqtt,
         );
         await clearStage();
         message.success(`${stage.value.name} swept successfully!`);

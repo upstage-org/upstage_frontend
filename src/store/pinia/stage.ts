@@ -1888,8 +1888,16 @@ export const useStageStore = defineStore(
 
     function connect() {
       SET_STATUS("CONNECTING");
-      const client = mqtt.connect() as MqttClient | null;
-      if (!client) return;
+      // Credentials came in on the stage payload that loadStage() already
+      // awaited, so this stays synchronous and wake-recovery re-connects cost
+      // no extra request. A missing credential means the backend is
+      // misconfigured or the stage never loaded: go OFFLINE and let the
+      // existing retry paths (wake recovery, user reload) have another go.
+      const client = mqtt.connect(model.value?.mqtt) as MqttClient | null;
+      if (!client) {
+        SET_STATUS("OFFLINE");
+        return;
+      }
       client.on("connect", () => {
         SET_STATUS("LIVE");
         void reloadMissingEvents();

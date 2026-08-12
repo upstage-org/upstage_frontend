@@ -4,8 +4,6 @@ const {
   VITE_CLOUDFLARE_CAPTCHA_SITEKEY,
   VITE_MQTT_NAMESPACE,
   VITE_MQTT_ENDPOINT,
-  VITE_MQTT_USERNAME,
-  VITE_MQTT_PASSWORD,
   VITE_JITSI_ENDPOINT,
   VITE_RTMP_ENDPOINT,
   VITE_STRIPE_KEY,
@@ -111,10 +109,14 @@ const configs = {
   RTMP_ENDPOINT: rtmpEndpoint,
   RTMP_INGEST_ENDPOINT: rtmpIngestEndpoint,
   MQTT_NAMESPACE: VITE_MQTT_NAMESPACE,
+  // Transport settings only. The broker username/password deliberately do NOT
+  // live here: Vite inlines `import.meta.env.VITE_*` by textual substitution, so
+  // anything referenced here ends up as a literal string in the public bundle.
+  // Credentials arrive at runtime on `Stage.mqtt` and are passed to
+  // `mqtt.connect(credentials)`. Never reintroduce a VITE_ fallback for them —
+  // a fallback branch re-bakes the secret whether or not it ever executes.
   MQTT_CONNECTION: {
     url: VITE_MQTT_ENDPOINT,
-    username: VITE_MQTT_USERNAME,
-    password: VITE_MQTT_PASSWORD,
     clean: true, // Reserved session
     connectTimeout: 4000, // Time out
     reconnectPeriod: 4000, // Reconnection interval (ms); mqtt.js auto-retries on connection loss using this

@@ -1,10 +1,10 @@
 VITE_GRAPHQL_ENDPOINT=http://localhost:3001/api/
 VITE_STATIC_ASSETS_ENDPOINT=/resources/
+# Broker credentials are NOT set here — they are served at runtime on the
+# GraphQL `Stage.mqtt` field. Set MQTT_USER / MQTT_PASSWORD on the backend.
 VITE_MQTT_NAMESPACE=dev
 VITE_MQTT_ENDPOINT=ws://localhost:9001
 #VITE_MQTT_ENDPOINT=wss://mqtt-dev.upstage.live:443
-VITE_MQTT_USERNAME=performance
-VITE_MQTT_PASSWORD=
 VITE_JITSI_ENDPOINT=http://localhost/
 # MediaMTX playback origin for RTMP stream feeds (streaming2). Leave unset to
 # hide all RTMP features.

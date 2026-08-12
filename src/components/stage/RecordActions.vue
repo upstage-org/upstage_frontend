@@ -23,7 +23,7 @@ export default {
       name: "",
     });
 
-    const clearStage = useClearStage(props.stage.fileLocation);
+    const clearStage = useClearStage(props.stage.fileLocation, null, props.stage.mqtt);
 
     const loading = ref(false);
     const { save } = useMutation(stageGraph.startRecording);

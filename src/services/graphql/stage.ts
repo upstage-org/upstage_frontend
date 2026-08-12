@@ -205,6 +205,13 @@ const stageOps = {
         query stage($id: ID!) {
           stage(id: $id) {
             ...stageFragment
+            # Broker login for the Stage Management panels (Clear Chat,
+            # Customisation, Sweep Stage). Rides this existing request, so
+            # those actions cost no extra round trip.
+            mqtt {
+              username
+              password
+            }
             chats {
               payload
               performanceId
@@ -240,6 +247,14 @@ const stageOps = {
           query ListStage($fileLocation: String, $performanceId: ID) {
             stageList(input: { fileLocation: $fileLocation, performanceId: $performanceId }) {
               ...stageFragment
+              # Broker login, served at runtime instead of being compiled into
+              # the bundle. This query already gates mqtt.connect() (both stage
+              # layouts await it), so carrying the credential here adds no
+              # request and no latency.
+              mqtt {
+                username
+                password
+              }
               permission
               performances {
                 id

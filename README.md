@@ -38,8 +38,6 @@ VITE_GRAPHQL_ENDPOINT=https://dev.example.org/api/
 VITE_STATIC_ASSETS_ENDPOINT=/resources/
 VITE_MQTT_NAMESPACE=dev
 VITE_MQTT_ENDPOINT=wss://mqtt-dev.example.org:443
-VITE_MQTT_USERNAME=performance
-VITE_MQTT_PASSWORD=XXXXXXXXXXXXX
 VITE_JITSI_ENDPOINT=https://streaming.example.org
 VITE_RTMP_ENDPOINT=https://streaming2.example.org
 VITE_CLOUDFLARE_CAPTCHA_SITEKEY=XXXXXXXXXXXXXXXXXXXXXXX
@@ -57,24 +55,24 @@ LOCAL_SERVE_STATIC_CONTENT=/app_code_dev/uploads
 All runtime config is baked in at build time (`import.meta.env`), consumed
 centrally in `src/config.ts` (types in `src/env.d.ts`):
 
-| Variable                                                                                                                 | Purpose                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `VITE_GRAPHQL_ENDPOINT`                                                                                                  | Backend API base URL (with trailing slash). Falls back to `window.location.origin + /api/`. |
-| `VITE_STATIC_ASSETS_ENDPOINT`                                                                                            | Uploaded-media URL prefix (default `/resources/`).                                          |
-| `VITE_MQTT_NAMESPACE`                                                                                                    | MQTT topic prefix (must match the stage namespace, e.g. `dev`).                             |
-| `VITE_MQTT_ENDPOINT`                                                                                                     | MQTT **WebSocket** URL (`ws://…:9001` in dev, `wss://…:443` in prod).                       |
-| `VITE_MQTT_USERNAME` / `VITE_MQTT_PASSWORD`                                                                              | Broker credentials — must match the backend Mosquitto `performance` user.                   |
-| `VITE_JITSI_ENDPOINT`                                                                                                    | Jitsi host origin for camera/mic streaming.                                                 |
-| `VITE_JITSI_XMPP_DOMAIN` / `VITE_JITSI_XMPP_MUC_DOMAIN` / `VITE_JITSI_XMPP_FOCUS_DOMAIN` / `VITE_JITSI_PREFER_WEBSOCKET` | Optional Jitsi XMPP overrides for non-default Jitsi installs.                               |
-| `VITE_RTMP_ENDPOINT`                                                                                                     | MediaMTX playback origin for RTMP/OBS stream feeds. **Leave unset to hide all RTMP UI.**    |
-| `VITE_CLOUDFLARE_CAPTCHA_SITEKEY`                                                                                        | Turnstile site key for the login captcha.                                                   |
-| `VITE_STRIPE_KEY`                                                                                                        | Stripe publishable key (donations/subscriptions; optional).                                 |
-| `VITE_RELEASE_VERSION` / `VITE_ALIAS_RELEASE_VERSION`                                                                    | Version strings shown in the UI.                                                            |
-| `VITE_ENV_TYPE`                                                                                                          | `Production` enables captcha + CORS restrictions; anything else relaxes them.               |
-| `VITE_E2E`                                                                                                               | Exposes `window.__UPSTAGE_PINIA__` for Playwright (also on in `pnpm dev`).                  |
-| `LOCAL_SERVE_STATIC_CONTENT`                                                                                             | Dev/test only (not `VITE_`-prefixed): uploads dir for the dev static server.                |
-| `VITE_STUDIO_API_PROXY`                                                                                                  | Dev only: override the `/api` proxy target (default `http://127.0.0.1:9090`).               |
-| `FRONTEND_PORT`                                                                                                          | Port for `pnpm serve:dist` preview (default 4173).                                          |
+| Variable                                                                                                                 | Purpose                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_GRAPHQL_ENDPOINT`                                                                                                  | Backend API base URL (with trailing slash). Falls back to `window.location.origin + /api/`.                                                                                           |
+| `VITE_STATIC_ASSETS_ENDPOINT`                                                                                            | Uploaded-media URL prefix (default `/resources/`).                                                                                                                                    |
+| `VITE_MQTT_NAMESPACE`                                                                                                    | MQTT topic prefix (must match the stage namespace, e.g. `dev`).                                                                                                                       |
+| `VITE_MQTT_ENDPOINT`                                                                                                     | MQTT **WebSocket** URL (`ws://…:9001` in dev, `wss://…:443` in prod).                                                                                                                 |
+| _(no broker credential vars)_                                                                                            | The Mosquitto `performance` login is served at runtime on the GraphQL `Stage.mqtt` field so it never reaches the public bundle. Set `MQTT_USER` / `MQTT_PASSWORD` on the **backend**. |
+| `VITE_JITSI_ENDPOINT`                                                                                                    | Jitsi host origin for camera/mic streaming.                                                                                                                                           |
+| `VITE_JITSI_XMPP_DOMAIN` / `VITE_JITSI_XMPP_MUC_DOMAIN` / `VITE_JITSI_XMPP_FOCUS_DOMAIN` / `VITE_JITSI_PREFER_WEBSOCKET` | Optional Jitsi XMPP overrides for non-default Jitsi installs.                                                                                                                         |
+| `VITE_RTMP_ENDPOINT`                                                                                                     | MediaMTX playback origin for RTMP/OBS stream feeds. **Leave unset to hide all RTMP UI.**                                                                                              |
+| `VITE_CLOUDFLARE_CAPTCHA_SITEKEY`                                                                                        | Turnstile site key for the login captcha.                                                                                                                                             |
+| `VITE_STRIPE_KEY`                                                                                                        | Stripe publishable key (donations/subscriptions; optional).                                                                                                                           |
+| `VITE_RELEASE_VERSION` / `VITE_ALIAS_RELEASE_VERSION`                                                                    | Version strings shown in the UI.                                                                                                                                                      |
+| `VITE_ENV_TYPE`                                                                                                          | `Production` enables captcha + CORS restrictions; anything else relaxes them.                                                                                                         |
+| `VITE_E2E`                                                                                                               | Exposes `window.__UPSTAGE_PINIA__` for Playwright (also on in `pnpm dev`).                                                                                                            |
+| `LOCAL_SERVE_STATIC_CONTENT`                                                                                             | Dev/test only (not `VITE_`-prefixed): uploads dir for the dev static server.                                                                                                          |
+| `VITE_STUDIO_API_PROXY`                                                                                                  | Dev only: override the `/api` proxy target (default `http://127.0.0.1:9090`).                                                                                                         |
+| `FRONTEND_PORT`                                                                                                          | Port for `pnpm serve:dist` preview (default 4173).                                                                                                                                    |
 
 ---
 

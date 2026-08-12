@@ -15,8 +15,16 @@ export default {
     const clearing = ref(false);
     const clearChat = async () => {
       clearing.value = true;
+      // `stage` is injected from StageManagement/index.vue, whose getStage
+      // query now selects `mqtt` — so this costs no extra request.
+      const client = mqttClient.connect(stage.value?.mqtt);
+      if (!client) {
+        clearing.value = false;
+        message.error("Could not reach the chat server. Please reload and try again.");
+        return;
+      }
       await new Promise((resolve) => {
-        mqttClient.connect().on("connect", () => {
+        client.on("connect", () => {
           const topicChat = namespaceTopic(TOPICS.CHAT, stage.value.fileLocation);
           mqttClient.sendMessage(topicChat, { clear: true }, true);
           mqttClient.sendMessage(topicChat, { clearPlayerChat: true }, true).then(resolve);

@@ -4,49 +4,12 @@ import buildClient from "services/mqtt";
 import { BACKGROUND_ACTIONS, COLORS, TOPICS } from "utils/constants";
 import { namespaceTopic } from "store/modules/stage/reusable";
 
-export const useCounter = (stageUrl) => {
-  const players = ref(0);
-  const audiences = ref(0);
-  const loading = ref(true);
-
-  const mqtt = buildClient();
-  const client = mqtt.connect();
-  // `connect` also fires on every reconnect. If one lands after the component
-  // has unmounted (and `mqtt.disconnect()` has run), subscribing throws
-  // `client disconnecting` from mqtt.js `_checkDisconnecting` as an unhandled
-  // rejection. Skip the subscribe once unmounted, and catch the residual race
-  // where disconnect starts mid-subscribe.
-  let active = true;
-  client.on("connect", () => {
-    if (!active) return;
-    const topics = {
-      [TOPICS.STATISTICS]: { qos: 2 },
-    };
-    mqtt
-      .subscribe(topics, stageUrl)
-      .then(() => {
-        loading.value = false;
-      })
-      .catch((e) => {
-        // Subscribe lost the race with a disconnect/reconnect — non-fatal.
-        console.log(e);
-      });
-  });
-  client.on("error", (e) => {
-    console.log(e);
-  });
-  mqtt.receiveMessage(({ message }) => {
-    players.value = message.players;
-    audiences.value = message.audiences;
-  });
-
-  onUnmounted(() => {
-    active = false;
-    mqtt.disconnect();
-  });
-
-  return [players, audiences, loading];
-};
+// `useCounter` lived here and opened its own broker client to read the
+// STATISTICS topic. It was already dead — player/audience counts moved to the
+// upstage_stats-backed GraphQL fields (see PlayerAudienceCounter.vue, which
+// documents that it deliberately opens no MQTT client) — and it was the one
+// caller that could not supply a credential, since it had no stage payload.
+// Removed rather than left as broken dead code.
 
 export const useShortcut = (callback) => {
   const shortcutHandler = (e) => {
@@ -83,11 +46,14 @@ export const useHoldingShift = () => {
   return isHoldingShift;
 };
 
-export const useClearStage = (stageUrl, color) => {
+// `credentials` is the `mqtt` field off the stage the caller already loaded.
+export const useClearStage = (stageUrl, color, credentials) => {
   const mqttClient = buildClient();
   const clearStage = async () => {
+    const client = mqttClient.connect(credentials);
+    if (!client) return;
     await new Promise((resolve) => {
-      mqttClient.connect().on("connect", () => {
+      client.on("connect", () => {
         mqttClient
           .sendMessage(
             namespaceTopic(TOPICS.BACKGROUND, stageUrl),
