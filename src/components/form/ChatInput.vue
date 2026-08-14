@@ -166,6 +166,46 @@ export default {
       console.log("🎯 Final style:", emojiPickerStyle.value);
     };
 
+    // The picker panel is ~344px wide (8 columns). The left/right heuristic
+    // above positions it relative to its wrapper — which sits inside the chat
+    // input row — so on narrow viewports (standalone /chat on a phone) the
+    // "left" branch can hang most of the panel off the right edge of the
+    // screen. Clamp the resolved position to the visual viewport; must run
+    // BEFORE animate() so the rect is measured at natural scale.
+    const clampPickerToViewport = (el) => {
+      // Undo any clamp from a previous open — the element survives via
+      // v-show, and viewport size / orientation may have changed since.
+      el.style.position = "";
+      el.style.top = "";
+      el.style.bottom = "";
+      el.style.height = "";
+      el.style.removeProperty("--num-columns");
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // Fewer columns on very narrow screens so the panel itself fits.
+      if (vw < 380) {
+        el.style.setProperty("--num-columns", "6");
+      }
+      if (vh < 560) {
+        el.style.height = `${Math.max(260, vh - 140)}px`;
+      }
+      let rect = el.getBoundingClientRect();
+      if (rect.right > vw && rect.width <= vw) {
+        el.style.left = "auto";
+        el.style.right = "0px";
+        rect = el.getBoundingClientRect();
+      }
+      if (rect.left < 0 || rect.right > vw) {
+        // Still overflowing (wrapper anchored near a screen edge): escape the
+        // wrapper's positioning context and pin to the viewport instead.
+        el.style.position = "fixed";
+        el.style.left = "8px";
+        el.style.right = "auto";
+        el.style.top = "auto";
+        el.style.bottom = "64px";
+      }
+    };
+
     const pickerEnter = async (el, complete) => {
       await updateEmojiPickerPosition();
       el.addEventListener("emoji-click", handleEmoji);
@@ -173,6 +213,7 @@ export default {
 
       // Apply positioning to the element
       Object.assign(el.style, emojiPickerStyle.value);
+      clampPickerToViewport(el);
 
       animate(el, {
         scaleX: [0, 1],

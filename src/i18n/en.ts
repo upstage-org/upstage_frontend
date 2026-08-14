@@ -291,18 +291,17 @@ export default {
   ingest_panel_intro:
     "Point your encoder (e.g. OBS) at this server with this stream key. The key includes your personal publish token — don't share it.",
   ingest_hint_title: "OBS checklist — each item matters:",
-  ingest_hint_format:
-    "Video: H.264 (x264 or a hardware H.264 encoder). Audio: AAC. Both are OBS defaults.",
-  ingest_hint_keyframe:
-    'Settings → Output → Output Mode "Advanced" → Streaming: Keyframe Interval = 2 s.',
-  ingest_hint_bframes:
-    'Same page, set B-frames to 0: for x264 add bf=0 to "Custom x264 options" (or choose Tune = zerolatency); for NVENC set Max B-frames = 0. With B-frames on, the stream connects but viewers lose the picture within seconds.',
+  ingest_hint_output_heading: 'Settings → Output → Output Mode "Advanced" → Streaming:',
+  ingest_hint_video_encoder: "Video Encoder: x264 (OBS default)",
+  ingest_hint_audio_encoder: "Audio Encoder: AAC (OBS default)",
+  ingest_hint_rescale: 'Rescale Output: OFF (or "disabled")',
+  ingest_hint_keyframe: "Keyframe Interval = 2 s",
+  ingest_hint_tune: 'Tune = zerolatency (or add bf=0 to "Custom x264 options")',
+  ingest_hint_video_heading: "Settings → Video:",
   ingest_hint_aspect:
-    'Leave "Rescale Output" OFF, and in Settings → Video keep the Output (Scaled) Resolution the same aspect ratio as the Base (Canvas) Resolution — a mismatch distorts the picture. If the stream appears on stage as a squeezed tall-and-narrow strip (or squashed flat), a rescale resolution is mistyped, e.g. 108×1080 where 1080×… was meant: OBS then really encodes that shape and no stage setting can undo it. Any standard resolution (e.g. 1920×1080 or 1280×720) is fine; on stage the stream always shows whole and in proportion, and right-clicking the tile offers Fit / Crop / Stretch.',
+    "Ensure the Output (Scaled) Resolution is the same aspect ratio as the Base (Canvas) Resolution — otherwise the on-stage image will be distorted.",
   ingest_hint_canvas:
-    'If the picture sits in one corner of the stage tile with black filling the rest, your OBS source is smaller than the OBS canvas: OBS encodes the whole canvas, black included, so no stage setting (Fit / Crop / Stretch) can remove it. In OBS, right-click the source → Transform → "Fit to screen" (Ctrl+F), or set Settings → Video → Base (Canvas) Resolution to match the source.',
-  ingest_hint_wizard:
-    "OBS's Auto-Configuration Wizard can quietly change the Output settings above — re-check them after running it.",
+    'If your stream in UpStage has the video image in one corner with black filling the rest, your OBS source (the camera or video item in the scene preview) is smaller than the OBS canvas. Right-click the source → Transform → "Fit to screen" (Ctrl+F); or in Settings → Video set the Base (Canvas) Resolution to match the source\'s own resolution.',
   waiting_for_stream: "Waiting for stream…",
   stream_feed_created: "RTMP stream feed created",
   copied_to_clipboard: "Copied to clipboard",

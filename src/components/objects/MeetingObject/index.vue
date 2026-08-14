@@ -113,7 +113,15 @@ export default {
       const { host, httpScheme } = endpoint;
 
       const config = {
+        // Auto-join: the legacy flat key was renamed upstream to
+        // `prejoinConfig.enabled`; current Jitsi Meet ignores
+        // `prejoinPageEnabled` and shows its prejoin ("Join meeting")
+        // screen inside the tile, which reads as the meeting failing to
+        // connect. Send both spellings so old and new web UIs auto-join
+        // (verified against streaming.upstage.live with
+        // tests/e2e/scripts/meet-connect-probe.mjs, 2026-08-14).
         prejoinPageEnabled: false,
+        prejoinConfig: { enabled: false },
         startVideoMuted: 1,
         startAudioMuted: 1,
         disableInitialGUM: !canPlay.value,
@@ -150,6 +158,12 @@ export default {
 
     const onLoad = () => {
       loading.value = false;
+      // Self-heal: on a slow network the TIMEOUT_MS fallback below can flip
+      // `failed` BEFORE the (multi-MB) Jitsi web bundle finishes loading.
+      // Without clearing it here the meeting stays hidden behind the
+      // "service is unavailable" card forever even though the iframe is
+      // fine — clear it the moment the document actually loads.
+      failed.value = false;
       if (loadTimer) {
         clearTimeout(loadTimer);
         loadTimer = null;

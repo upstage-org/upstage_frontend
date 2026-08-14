@@ -249,14 +249,19 @@ function close() {
         <p class="mb-1">
           <b>{{ t("ingest_hint_title") }}</b>
         </p>
+        <p class="mb-0">{{ t("ingest_hint_output_heading") }}</p>
         <ul class="encoder-checklist">
-          <li>{{ t("ingest_hint_format") }}</li>
+          <li>{{ t("ingest_hint_video_encoder") }}</li>
+          <li>{{ t("ingest_hint_audio_encoder") }}</li>
+          <li>{{ t("ingest_hint_rescale") }}</li>
           <li>{{ t("ingest_hint_keyframe") }}</li>
-          <li>{{ t("ingest_hint_bframes") }}</li>
-          <li>{{ t("ingest_hint_aspect") }}</li>
-          <li>{{ t("ingest_hint_canvas") }}</li>
-          <li>{{ t("ingest_hint_wizard") }}</li>
+          <li>{{ t("ingest_hint_tune") }}</li>
         </ul>
+        <p class="mb-0">{{ t("ingest_hint_video_heading") }}</p>
+        <ul class="encoder-checklist">
+          <li>{{ t("ingest_hint_aspect") }}</li>
+        </ul>
+        <p class="mt-1">{{ t("ingest_hint_canvas") }}</p>
       </div>
       <a-space class="w-full justify-end">
         <a-button type="primary" @click="close">{{ t("finish") }}</a-button>

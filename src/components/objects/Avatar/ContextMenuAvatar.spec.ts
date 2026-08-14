@@ -71,7 +71,7 @@ describe("ContextMenuAvatar after the stream-menu split", () => {
     );
   });
 
-  it("broadcasts the chosen shape via shapeObject and keeps the menu open", async () => {
+  it("broadcasts the chosen shape via shapeObject and closes the menu", async () => {
     const closeMenu = vi.fn();
     const wrapper = mount(ContextMenuAvatar, {
       props: { object: { id: "v1", type: "video", name: "clip" }, closeMenu },
@@ -83,7 +83,8 @@ describe("ContextMenuAvatar after the stream-menu split", () => {
     });
     await wrapper.find("[data-testid='shape-star']").trigger("click");
     expect(shapeObject).toHaveBeenCalledWith(expect.objectContaining({ id: "v1", shape: "star" }));
-    expect(closeMenu).not.toHaveBeenCalled();
+    // Every selection closes the menu (user request 2026-08-14).
+    expect(closeMenu).toHaveBeenCalled();
   });
 
   it("keeps the exit-animation override for props/avatars", () => {

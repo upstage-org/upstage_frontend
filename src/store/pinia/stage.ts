@@ -438,13 +438,25 @@ export interface StageSize {
  * tabs and reintroduce the cross-contamination bug we're solving.
  */
 const TAB_SESSION_ID_KEY = "upstage:stage:tabSessionId";
-function readOrMintTabSessionId(): string {
+/**
+ * Standalone /chat/:url windows use a SEPARATE storage key. `window.open()`
+ * copies the opener's sessionStorage into the new window (HTML spec), so a
+ * popped-out chat reading TAB_SESSION_ID_KEY would inherit the main stage
+ * tab's session id and impersonate it on the presence wire — its COUNTER
+ * `leaving: true` on close then evicted the MAIN tab from every client's
+ * roster, and `pruneOrphanJitsiTilesFromOldSessions` destroyed that
+ * performer's live jitsi tiles for everyone (July 2026 rehearsal bug).
+ * The main stage view never writes this key, so a pop-out always mints a
+ * fresh id here while refreshes of the same chat window keep theirs.
+ */
+const CHAT_SESSION_ID_KEY = "upstage:chat:tabSessionId";
+function readOrMintTabSessionId(key: string = TAB_SESSION_ID_KEY): string {
   try {
     const ss = window.sessionStorage;
-    const existing = ss.getItem(TAB_SESSION_ID_KEY);
+    const existing = ss.getItem(key);
     if (existing) return existing;
     const fresh = uuidv4();
-    ss.setItem(TAB_SESSION_ID_KEY, fresh);
+    ss.setItem(key, fresh);
     return fresh;
   } catch {
     // sessionStorage can throw in private-mode / iframes with cookies
@@ -463,6 +475,18 @@ export const useStageStore = defineStore(
     // ====================================================================
 
     const preloading = ref<boolean>(true);
+    // Standalone /chat/:url window mode (pop-out chat + mobile chat). Set by
+    // views/chat/Layout.vue BEFORE loadStage/connect. Standalone chat windows
+    // must never act as performers on the presence wire: they join the roster
+    // as audience (isPlayer: false) under a chat-scoped session id (see
+    // CHAT_SESSION_ID_KEY) and never run the jitsi orphan-tile prune — a
+    // chat-only window has no authority to destroy board objects.
+    const standaloneChat = ref<boolean>(false);
+    // Popped-out chat windows (window.opener set — opened from an already
+    // connected stage tab) additionally skip presence entirely: the human is
+    // already counted by the opener tab, so the pop-out publishes no COUNTER
+    // join/leave and no statistics at all.
+    const standaloneChatPresenceSuppressed = ref<boolean>(false);
     const model = ref<StageModel | null>(null);
     const background = ref<Background | null>(null);
     const curtain = ref<Curtain | null>(null);
@@ -764,6 +788,15 @@ export const useStageStore = defineStore(
       );
     });
 
+    /**
+     * Whether THIS window participates in the roster as a performer.
+     * `canPlay` keeps driving UI permissions (player chat tab, chat "-"
+     * prefix, …) everywhere including the standalone chat window; this
+     * narrower flag drives presence classification and the jitsi
+     * orphan-tile prune, which standalone chat windows must never run.
+     */
+    const countsAsPlayer = computed(() => Boolean(canPlay.value) && !standaloneChat.value);
+
     const players = computed(() => sessions.value.filter((s) => s.isPlayer));
 
     const audiences = computed(() => sessions.value.filter((s) => !s.isPlayer));
@@ -980,6 +1013,7 @@ export const useStageStore = defineStore(
       publicChatPosition.value = null;
       localJitsiParticipantId.value = null;
       pendingJitsiPublish.clear();
+      orphanHostFirstMissingAt.clear();
       // Masquerading is a player-only "preview as audience" affordance.
       // If we leave it true across CLEAN_STAGE, a player who navigates
       // away mid-masquerade and returns to a stage would be silently
@@ -1310,6 +1344,12 @@ export const useStageStore = defineStore(
           return sessions.value.splice(index, 1);
         } else {
           Object.assign(sessions.value[index], s);
+          // A join/heartbeat for this id supersedes any earlier `leaving`
+          // marker (out-of-order QoS-0 leave vs QoS-1 join). Object.assign
+          // cannot clear the flag because live payloads omit the key, and a
+          // sticky `leaving` makes the row permanently invisible to the
+          // jitsi orphan-tile prune's roster.
+          delete sessions.value[index].leaving;
           // Explicit null/undefined in the payload means "no avatar held".
           // Object.assign alone cannot clear a field when the key is
           // omitted from the wire message, so we only force-clear when
@@ -1322,7 +1362,10 @@ export const useStageStore = defineStore(
             sessions.value[index].avatarId = null;
           }
         }
-      } else {
+      } else if (!s.leaving) {
+        // A leave for an id we never saw must not be pushed: it would sit in
+        // the roster as a zombie `leaving` row that blocks the id from ever
+        // counting as live again.
         sessions.value.push(s);
       }
       sessions.value = sessions.value.filter(
@@ -1330,7 +1373,7 @@ export const useStageStore = defineStore(
       );
       sessions.value.sort((a, b) => b.at - a.at);
       reconcileAvatarHolds();
-      if (canPlay.value) {
+      if (countsAsPlayer.value) {
         pruneOrphanJitsiTilesFromOldSessions();
       }
       if (subscribeSuccess.value && sessions.value.length !== beforeLen) {
@@ -1417,7 +1460,7 @@ export const useStageStore = defineStore(
         if (!stillHeld) {
           userStore.$patch({ avatarId: null });
           SET_ACTIVE_MOVABLE(null);
-          if (canPlay.value) {
+          if (countsAsPlayer.value) {
             void publishSessionCounter(buildSessionCounterPayload({ avatarId: null }));
           }
         }
@@ -1427,7 +1470,7 @@ export const useStageStore = defineStore(
 
     function buildSessionCounterPayload(overrides: Partial<Session> = {}): Session {
       const userStore = useUserStore();
-      const isPlayer = Boolean(canPlay.value);
+      const isPlayer = countsAsPlayer.value;
       const id = session.value!;
       const payload = {
         at: +new Date(),
@@ -1458,7 +1501,7 @@ export const useStageStore = defineStore(
      * row, and broadcast `avatarId: null` so teardrops drop everywhere.
      */
     function releaseAvatarHold(sync = false) {
-      if (!canPlay.value || session.value == null) return;
+      if (!countsAsPlayer.value || session.value == null) return;
       const userStore = useUserStore();
       if (userStore.avatarId == null) {
         syncLocalSessionAvatarHold();
@@ -1489,6 +1532,11 @@ export const useStageStore = defineStore(
 
     function SET_CHAT_POSITION(position: string) {
       chatPosition.value = position;
+      // The left/right toggle must win over any free-drag placement: the
+      // template renders `publicChatPosition` (per-client drag offset) in
+      // preference to `chatPosition`, so without clearing it the broadcast
+      // toggle only remounted the panel exactly where it already was.
+      publicChatPosition.value = null;
     }
 
     function SET_BACKDROP_COLOR(color: string) {
@@ -3085,23 +3133,48 @@ export const useStageStore = defineStore(
      * Do not treat `hostId !== mySession` as orphan — that deleted every
      * remote stream on reconnect and when navigating back before the roster
      * repopulated. Only prune when the publisher session id is absent.
+     *
+     * Deletion is destructive AND broadcast (DESTROY on TOPICS.BOARD), so it
+     * must never fire on a transient roster gap (message reordering, a stray
+     * duplicate leave, archived-event replay interleavings). Two guards:
+     *   * this tab's own session id is always treated as live — this tab is
+     *     self-evidently running, its tiles are never roster-orphans;
+     *   * a publisher must be continuously absent for ORPHAN_HOST_GRACE_MS
+     *     before its tiles are dropped. Crashed-tab ghost cleanup therefore
+     *     lags by the grace period, which is fine — ghosts are inert.
      */
+    const ORPHAN_HOST_GRACE_MS = 90_000;
+    const orphanHostFirstMissingAt = new Map<string, number>();
     function pruneOrphanJitsiTilesFromOldSessions() {
       if (replay.value.isReplaying) return;
-      if (!canPlay.value) return;
+      // Standalone chat windows have no authority over board objects.
+      if (!countsAsPlayer.value) return;
       const liveSessionIds = new Set(
         sessions.value
           .filter((s) => !s.leaving)
           .map((s) => (s.id != null ? String(s.id) : ""))
           .filter((id) => id.length > 0),
       );
+      if (session.value != null) {
+        liveSessionIds.add(String(session.value));
+      }
       // Roster not hydrated yet (e.g. right after connect) — avoid wiping tiles.
       if (liveSessionIds.size === 0) return;
+      const now = Date.now();
       for (const o of [...board.value.objects]) {
         if (!isJitsiBoardType(o.type)) continue;
         if (o.hostId == null || o.hostId === "") continue;
         const hostId = String(o.hostId);
-        if (liveSessionIds.has(hostId)) continue;
+        if (liveSessionIds.has(hostId)) {
+          orphanHostFirstMissingAt.delete(hostId);
+          continue;
+        }
+        const firstMissing = orphanHostFirstMissingAt.get(hostId);
+        if (firstMissing === undefined) {
+          orphanHostFirstMissingAt.set(hostId, now);
+          continue;
+        }
+        if (now - firstMissing < ORPHAN_HOST_GRACE_MS) continue;
         pendingJitsiPublish.delete(o.id);
         const wirePayload = serializeForBroadcast(o);
         DELETE_OBJECT(serializeObject(o));
@@ -3446,7 +3519,7 @@ export const useStageStore = defineStore(
 
     async function joinStage() {
       const userStore = useUserStore();
-      const isPlayer = Boolean(canPlay.value);
+      const isPlayer = countsAsPlayer.value;
       syncLocalSessionAvatarHold();
       // Every browser tab gets its own opaque session id, persisted in
       // sessionStorage so refreshes within the tab keep the same id (no
@@ -3467,8 +3540,20 @@ export const useStageStore = defineStore(
       // pruned by the 60-minute trim in `UPDATE_SESSIONS_COUNTER` plus
       // the `leaving:true` publish on pagehide.
       if (!session.value) {
-        session.value = readOrMintTabSessionId();
+        // Standalone chat windows use the chat-scoped key: window.open()
+        // copies sessionStorage, so reading TAB_SESSION_ID_KEY here would
+        // make a pop-out impersonate its opener stage tab (see the
+        // CHAT_SESSION_ID_KEY comment for the stream-destruction fallout).
+        session.value = readOrMintTabSessionId(
+          standaloneChat.value ? CHAT_SESSION_ID_KEY : TAB_SESSION_ID_KEY,
+        );
       }
+      // Popped-out chat windows keep a session id (chat messages use it for
+      // "you" attribution), but never announce presence: the performer is
+      // already in the roster via the stage tab that opened the pop-out.
+      // The matching leave/statistics publishes are suppressed on the way
+      // out (sendCounterLeave / disconnectSync / the statistics guards).
+      if (standaloneChatPresenceSuppressed.value) return;
       if (!isPlayer && userStore.avatarId != null) {
         userStore.$patch({ avatarId: null });
       }
@@ -3487,7 +3572,10 @@ export const useStageStore = defineStore(
     }
 
     async function sendStatisticsBeforeDisconnect() {
-      const isPlayer = Boolean(canPlay.value);
+      // A presence-suppressed pop-out never joined the roster, so it must
+      // not decrement anyone's counts on the way out either.
+      if (standaloneChatPresenceSuppressed.value) return;
+      const isPlayer = countsAsPlayer.value;
       let playerCount = players.value.length;
       let audienceCount = audiences.value.length;
       if (isPlayer) {
@@ -3505,7 +3593,9 @@ export const useStageStore = defineStore(
 
     function sendStatisticsBeforeDisconnectSync() {
       if (!subscribeSuccess.value) return;
-      const isPlayer = Boolean(canPlay.value);
+      // Same guard as sendStatisticsBeforeDisconnect: never joined → no decrement.
+      if (standaloneChatPresenceSuppressed.value) return;
+      const isPlayer = countsAsPlayer.value;
       let playerCount = players.value.length;
       let audienceCount = audiences.value.length;
       if (isPlayer) {
@@ -3531,7 +3621,8 @@ export const useStageStore = defineStore(
       // race the page tear-down and the leave message would never reach
       // the wire. The fallback to retry on dropped sockets is the 60-min
       // client-side trim in UPDATE_SESSIONS_COUNTER.
-      if (id != null) {
+      // Presence-suppressed pop-outs never joined, so they publish no leave.
+      if (id != null && !standaloneChatPresenceSuppressed.value) {
         mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
       }
     }
@@ -3544,7 +3635,8 @@ export const useStageStore = defineStore(
       releaseAvatarBeforeLeave(true);
       sendStatisticsBeforeDisconnectSync();
       const id = session.value;
-      if (id != null) {
+      // Presence-suppressed pop-outs never joined, so they publish no leave.
+      if (id != null && !standaloneChatPresenceSuppressed.value) {
         mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
       }
       session.value = null;
@@ -3596,6 +3688,19 @@ export const useStageStore = defineStore(
 
     function setSuppressAvatarSpeechOutput(value: boolean) {
       suppressAvatarSpeechOutput.value = value;
+    }
+
+    /**
+     * Mark this window as a standalone /chat/:url chat window. Must be
+     * called by views/chat/Layout.vue BEFORE loadStage/connect so the very
+     * first joinStage already uses the chat-scoped session id and audience
+     * presence classification. `suppressPresence` (pop-outs with a
+     * window.opener) skips the COUNTER join/leave and statistics entirely —
+     * the human is already counted by the stage tab that opened the window.
+     */
+    function setStandaloneChatMode({ suppressPresence = false }: { suppressPresence?: boolean }) {
+      standaloneChat.value = true;
+      standaloneChatPresenceSuppressed.value = suppressPresence;
     }
 
     function setTopbarPosition(pos: { x: number; y: number } | null) {
@@ -3953,6 +4058,10 @@ export const useStageStore = defineStore(
       highlightChat,
       setShowPlayerChat,
       setSuppressAvatarSpeechOutput,
+      setStandaloneChatMode,
+      standaloneChat,
+      standaloneChatPresenceSuppressed,
+      countsAsPlayer,
       setTopbarPosition,
       setTopbarCollapsed,
       setPublicChatPosition,

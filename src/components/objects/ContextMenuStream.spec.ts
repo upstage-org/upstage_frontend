@@ -121,13 +121,14 @@ describe("ContextMenuStream — the one menu for jitsi and RTMP tiles", () => {
     }
   });
 
-  it("broadcasts a crop pick, leaves the menu open, and never touches audio", async () => {
+  it("broadcasts a crop pick, closes the menu, and never touches audio", async () => {
     const object = { id: "o1", type: "jitsi", name: "cam" };
     const wrapper = mountMenu(object);
 
     await wrapper.find("[data-testid='fit-cover']").trigger("click");
     expect(shapeObject).toHaveBeenCalledWith({ ...object, fit: "cover" });
-    expect(closeMenu).not.toHaveBeenCalled();
+    // Every selection closes the menu (user request 2026-08-14).
+    expect(closeMenu).toHaveBeenCalled();
     // The toggle is pure frame styling — the local audio state (mute/volume)
     // must be completely unaffected.
     expect(audioState.muted).toBe(false);
@@ -147,13 +148,13 @@ describe("ContextMenuStream — the one menu for jitsi and RTMP tiles", () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
-  it("broadcasts a shape pick and leaves the menu open", async () => {
+  it("broadcasts a shape pick and closes the menu", async () => {
     const object = { id: "o1", type: "video", isRTMP: true, name: "feed" };
     const wrapper = mountMenu(object);
 
     await wrapper.find("[data-testid='shape-hexagon']").trigger("click");
     expect(shapeObject).toHaveBeenCalledWith({ ...object, shape: "hexagon" });
-    expect(closeMenu).not.toHaveBeenCalled();
+    expect(closeMenu).toHaveBeenCalled();
   });
 
   it("highlights the per-kind default swatch (jitsi legacy null = rounded)", () => {
@@ -166,7 +167,7 @@ describe("ContextMenuStream — the one menu for jitsi and RTMP tiles", () => {
     );
   });
 
-  it("mutes locally via the store (no broadcast) and keeps the menu open", async () => {
+  it("mutes locally via the store (no broadcast) and closes the menu", async () => {
     const wrapper = mountMenu({ id: "o1", type: "jitsi" });
     const item = wrapper.find("[data-testid='stream-mute-locally']");
     expect(item.text()).toContain("mute_locally");
@@ -174,7 +175,7 @@ describe("ContextMenuStream — the one menu for jitsi and RTMP tiles", () => {
     await item.trigger("click");
     expect(audioState.muted).toBe(true);
     expect(shapeObject).not.toHaveBeenCalled();
-    expect(closeMenu).not.toHaveBeenCalled();
+    expect(closeMenu).toHaveBeenCalled();
 
     // A muted tile offers the unmute wording (fresh mount: the mock store
     // isn't reactive, so the label is read at render time).
@@ -203,6 +204,36 @@ describe("ContextMenuStream — the one menu for jitsi and RTMP tiles", () => {
     expect(setSliderMode).toHaveBeenCalledWith("opacity");
     expect(setSliderMode).toHaveBeenCalledWith("speed");
     expect(setSliderMode).not.toHaveBeenCalledWith("volume");
+  });
+
+  it("flip picks broadcast the flip AND close the menu (fewer clicks for the player)", async () => {
+    const object = { id: "o1", type: "jitsi", name: "cam" };
+    const wrapper = mountMenu(object);
+    const flipButtons = wrapper
+      .findAll(".menu-group")
+      .find((g) => g.text().includes("flip"))!
+      .findAll("button");
+    expect(flipButtons).toHaveLength(2);
+
+    await flipButtons[0].trigger("click");
+    expect(shapeObject).toHaveBeenCalledWith({ ...object, scaleX: -1 });
+    expect(closeMenu).toHaveBeenCalledTimes(1);
+
+    await flipButtons[1].trigger("click");
+    expect(shapeObject).toHaveBeenCalledWith({ ...object, scaleY: -1 });
+    expect(closeMenu).toHaveBeenCalledTimes(2);
+  });
+
+  it("slider-mode picks close the menu but keep the tile selected", async () => {
+    const wrapper = mountMenu({ id: "o1", type: "jitsi" });
+    const keepActive = wrapper.props("keepActive");
+    const sliderButtons = wrapper
+      .findAll(".menu-group")
+      .find((g) => g.text().includes("slider"))!
+      .findAll("button");
+    await sliderButtons[0].trigger("click");
+    expect(keepActive).toHaveBeenCalledWith(true);
+    expect(closeMenu).toHaveBeenCalled();
   });
 
   it("removes the tile through deleteObject", async () => {

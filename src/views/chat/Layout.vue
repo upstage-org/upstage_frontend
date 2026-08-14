@@ -34,10 +34,9 @@ import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import Chat from "components/stage/Chat/index.vue";
 import PlayerChat from "components/stage/Chat/PlayerChat.vue";
 import LoginPrompt from "../live/LoginPrompt.vue";
-import HiddenStageAssetPreloader from "./HiddenStageAssetPreloader.vue";
 
 export default {
-  components: { Chat, PlayerChat, LoginPrompt, HiddenStageAssetPreloader },
+  components: { Chat, PlayerChat, LoginPrompt },
   setup: () => {
     const stageStore = useStageStore();
     const { loggedIn } = storeToRefs(useAuthStore());
@@ -52,12 +51,29 @@ export default {
     //     lays out inline inside this view.
     provide("isChatStandalone", true);
 
+    // Tell the stage store BEFORE loadStage/connect that this window is a
+    // chat-only window: it must join the roster as audience under a
+    // chat-scoped session id — window.open() copies sessionStorage, so
+    // without this a pop-out inherits the opener stage tab's session id and
+    // its COUNTER `leaving: true` on close evicts the opener from every
+    // client's roster, destroying that performer's live stream tiles for
+    // everyone. Pop-outs (window.opener set) additionally skip presence
+    // entirely: the human is already counted by the tab that opened them.
+    stageStore.setStandaloneChatMode({ suppressPresence: Boolean(window.opener) });
+
     onMounted(() => {
       stageStore.setSuppressAvatarSpeechOutput(true);
       stopSpeaking();
     });
 
     stageStore.loadStage({ url: route.params.url }).then(() => {
+      // Chat needs no stage media: skip the full asset preload the live
+      // stage view performs (views/live/Preloader.vue). Gating `ready` on
+      // it made phones download every avatar/prop/backdrop before the chat
+      // input appeared — minutes on mobile connections, timeouts on slow
+      // ones. Flipping `preloading` off right after the GraphQL load makes
+      // `ready` (model && !preloading) truthy immediately.
+      stageStore.SET_PRELOADING_STATUS(false);
       stageStore.connect();
     });
 
@@ -110,8 +126,6 @@ export default {
 
 <template>
   <div class="chat-standalone">
-    <!-- Keeps Pinia `preloading` in sync with main Live Preloader.vue (stage `ready`). -->
-    <HiddenStageAssetPreloader />
     <div v-if="ready" class="chat-standalone__inner">
       <!--
         LoginPrompt mirrors the main-stage flow: an unauthenticated

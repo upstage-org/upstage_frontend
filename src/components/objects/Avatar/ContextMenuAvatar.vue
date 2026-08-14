@@ -64,6 +64,7 @@ export default {
         ...props.object,
         scaleX,
       });
+      props.closeMenu();
     };
 
     const flipVertical = () => {
@@ -72,6 +73,7 @@ export default {
         ...props.object,
         scaleY,
       });
+      props.closeMenu();
     };
 
     const toggleAutoplayFrames = () => {
@@ -119,6 +121,10 @@ export default {
       props.setSliderMode(mode);
       emit("update:active", true);
       props.keepActive(true);
+      // The slider itself lives on the selected object, not in this menu —
+      // close the menu so it isn't covering the stage while sliding
+      // (keepActive above preserves the selection frame + slider).
+      props.closeMenu();
     };
 
     const holdable = inject("holdable") ?? ref();
@@ -252,13 +258,14 @@ export default {
     );
 
     // Shaped frame + fit rows for video assets — same registry and behaviour
-    // as ContextMenuStream (menu stays open so shapes can be tried in place).
+    // as ContextMenuStream (closes on pick, user request 2026-08-14).
     const activeShapeId = computed(() => effectiveFrameShapeId(props.object.shape, "video"));
     const setFrameShape = (shape) => {
       stageStore.shapeObject({
         ...props.object,
         shape,
       });
+      props.closeMenu();
     };
     const activeFitId = computed(() => effectiveFrameFitId(props.object.fit, "video"));
     const setFrameFit = (fit) => {
@@ -266,6 +273,7 @@ export default {
         ...props.object,
         fit,
       });
+      props.closeMenu();
     };
 
     return {

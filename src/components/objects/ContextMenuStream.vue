@@ -46,17 +46,19 @@ export default {
         isJitsiBoardType(props.object.type) ? "jitsi" : "rtmp",
       ),
     );
-    // Menu stays open so several shapes can be tried in place.
+    // Closes on pick (user request 2026-08-14: every selection closes the
+    // menu — fewer clicks; the tile stays selected so the result is visible).
     const setFrameShape = (shape) => {
       stageStore.shapeObject({
         ...props.object,
         shape,
       });
+      props.closeMenu();
     };
 
     // Fit (contain) vs crop (cover) vs stretch (fill) when the frame is
     // resized. Pure CSS on the wrapper (--stream-fit) — the <video> and
-    // its audio pipeline are never touched. Menu stays open for A/B checks.
+    // its audio pipeline are never touched. Closes on pick (see above).
     const activeFitId = computed(() =>
       effectiveFrameFitId(props.object.fit, isJitsiBoardType(props.object.type) ? "jitsi" : "rtmp"),
     );
@@ -65,12 +67,13 @@ export default {
         ...props.object,
         fit,
       });
+      props.closeMenu();
     };
 
     const localMuted = computed(() => stageStore.streamLocalMuted(props.object.id));
-    // Menu stays open: muting is often an A/B check, same as trying shapes.
     const toggleMuted = () => {
       stageStore.toggleStreamLocalMuted(props.object.id);
+      props.closeMenu();
     };
 
     // iOS / iPadOS: HTMLMediaElement.volume is read-only, so a per-stream
@@ -97,6 +100,9 @@ export default {
     const changeSliderMode = (mode) => {
       props.setSliderMode(mode);
       props.keepActive(true);
+      // Slider renders on the selected tile; close the menu so it isn't in
+      // the way (keepActive preserves the selection frame + slider).
+      props.closeMenu();
     };
 
     const flipHorizontal = () => {
@@ -105,6 +111,7 @@ export default {
         ...props.object,
         scaleX,
       });
+      props.closeMenu();
     };
 
     const flipVertical = () => {
@@ -113,6 +120,7 @@ export default {
         ...props.object,
         scaleY,
       });
+      props.closeMenu();
     };
 
     const deleteObject = () => {

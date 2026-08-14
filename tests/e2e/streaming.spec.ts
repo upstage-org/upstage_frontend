@@ -467,6 +467,72 @@ test.describe("streaming: performer streams, audience views @full", () => {
     }
   });
 
+  /**
+   * Refresh-meeting coverage: the topbar camera-refresh button
+   * (ReloadStream.vue → stageStore.refreshMeeting → REFRESH_MEETING) bumps
+   * `_meetingRefreshKey`, which Board.vue folds into the meeting object's
+   * `:key` — so the whole MeetingObject remounts with a FRESH iframe.
+   * Assert the remount actually replaces the iframe DOM node (a stale
+   * node would mean a frozen/errored meeting cannot be recovered).
+   */
+  test("refresh-meeting button remounts the meeting iframe", async ({ browser }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const roomName = `streaming-test-refresh-${runtime.runId}-${Date.now().toString(36)}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      // Same namespace stub as the iframe-contract test: satisfies our
+      // room's iframe load and neutralises retained stale rooms.
+      await performerCtx.route("**/streaming-test-*", async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: `<!DOCTYPE html><html><head><title>${roomName}</title></head><body></body></html>`,
+        });
+      });
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      await new LiveStagePage(performerPage).goto(runtime.stageSlug);
+
+      await publishMeetingFromPerformer(performerPage, roomName);
+      const frame = performerPage.locator(`.frame:has(iframe.room[src*="${roomName}"])`).first();
+      await frame.waitFor({ state: "attached", timeout: 30_000 });
+
+      // Tag the current iframe DOM node, then press the real refresh
+      // button. After the re-key remount the node must be a different one
+      // (marker gone) while the same room stays on the board.
+      await performerPage.evaluate((room) => {
+        const el = document.querySelector(`iframe.room[src*="${room}"]`) as HTMLIFrameElement & {
+          __beforeRefresh?: boolean;
+        };
+        if (!el) throw new Error("meeting iframe not found before refresh");
+        el.__beforeRefresh = true;
+      }, roomName);
+
+      const refreshMeetingButton = performerPage.locator(
+        '#reload-stream button[aria-label="Refresh meeting"]',
+      );
+      await refreshMeetingButton.waitFor({ state: "visible", timeout: 10_000 });
+      // ReloadStream.vue listens on mousedown, not click.
+      await refreshMeetingButton.dispatchEvent("mousedown");
+
+      await performerPage.waitForFunction(
+        (room) => {
+          const el = document.querySelector(`iframe.room[src*="${room}"]`) as
+            (HTMLIFrameElement & { __beforeRefresh?: boolean }) | null;
+          return Boolean(el && el.__beforeRefresh === undefined);
+        },
+        roomName,
+        { timeout: 15_000 },
+      );
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
   test("WebRTC Yourself preview: performer sees fake-camera local feed", async ({ browser }) => {
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     const runtime = readRuntime();
@@ -1419,26 +1485,29 @@ test.describe("streaming: performer streams, audience views @full", () => {
       await expect(menu.locator("i.fa-play, i.fa-pause, i.fa-infinity")).toHaveCount(0);
 
       // Shape row: all presets offered; picking one clips the tile wrapper
-      // (the menu stays open so shapes can be tried in place).
+      // AND closes the menu (every selection auto-closes, user request
+      // 2026-08-14) — so the second pick re-opens via right-click.
       const tileWrapper = page.locator(`[data-object-id="${objectId}"]`);
       await expect(menu.locator('[data-testid^="shape-"]')).toHaveCount(9);
       await menu.locator('[data-testid="shape-circle"]').click();
+      await expect(menu).toBeHidden({ timeout: 5_000 });
       await expect
         .poll(() => tileWrapper.evaluate((el) => getComputedStyle(el).borderRadius), {
           timeout: 5_000,
         })
         .toBe("50%");
+      await page.locator(`[data-testid="object-${tileName}"]`).click({ button: "right" });
+      await expect(menu).toBeVisible({ timeout: 5_000 });
       await menu.locator('[data-testid="shape-hexagon"]').click();
+      await expect(menu).toBeHidden({ timeout: 5_000 });
       await expect
         .poll(() => tileWrapper.evaluate((el) => getComputedStyle(el).clipPath), {
           timeout: 5_000,
         })
         .toMatch(/^polygon\(/);
-      // Close the menu with a click on empty board WELL AWAY from it, so
-      // the click can't land on another menu row (e.g. Remove) and act on
-      // the tile instead of just dismissing the menu.
+      // Deselect with a click on empty board WELL AWAY from the tile, so
+      // the click can't land on the tile and drag/act on it.
       await page.mouse.click(150, 520);
-      await expect(menu).toBeHidden({ timeout: 5_000 });
       await expect(page.locator(".modal.is-active")).toHaveCount(0);
 
       // Free resize: stream frames stretch in any direction (keepRatio is
@@ -1982,6 +2051,168 @@ test.describe("streaming: performer streams, audience views @full", () => {
       expect(result.participantId).toBe("remote-jitsi-participant");
     } finally {
       await audienceCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Pop-out chat regression (July 2026 rehearsal bug) — `window.open()`
+   * copies the opener's sessionStorage, so the /chat pop-out used to inherit
+   * the stage tab's session id. Closing it published COUNTER
+   * `{id: <stage tab id>, leaving: true}`, every client evicted the MAIN tab
+   * from the roster, and the orphan-tile prune DESTROYed that performer's
+   * jitsi tiles for the whole stage. Post-fix the pop-out mints a
+   * chat-scoped id, publishes no presence at all (window.opener set), and
+   * closing it must leave board tiles and the performer's roster row intact.
+   */
+  test("closing a popped-out chat window keeps jitsi tiles and performer presence", async ({
+    browser,
+  }) => {
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const streamName = `popout-survive-${runtime.runId}`;
+
+    let performerCtx: BrowserContext | null = null;
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      await new LiveStagePage(performerPage).goto(runtime.stageSlug);
+      await performerPage.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+      // Let the async connect-time reloadMissingEvents → reconcile settle:
+      // this harness has NO event archive, so a tile placed into that race
+      // window is wiped by the empty-log reconcile (a harness artifact —
+      // real stages archive events, and humans place tiles seconds later).
+      await performerPage.waitForTimeout(2_000);
+
+      const tileId = await placeJitsiTileFromPerformer(performerPage, streamName, {
+        x: 200,
+        y: 200,
+      });
+      const mainSession = await performerPage.evaluate(() =>
+        String(window.__UPSTAGE_PINIA__!.stage.session),
+      );
+
+      // An audience seat proves stage-wide survival: a wrong prune would
+      // reach it as a broadcast DESTROY. The performer's own jitsi publish
+      // is deferred until a participantId sync, so seed the audience board
+      // with the same tile directly (same pattern as the audience-prune
+      // test above) — the DESTROY we must NOT see still arrives via MQTT.
+      audienceCtx = await browser.newContext();
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+      // Same empty-archive reconcile race as on the performer page above.
+      await audience.page.waitForTimeout(2_000);
+      await audience.page.evaluate(
+        ({ id, hostId, name }) => {
+          window.__UPSTAGE_PINIA__!.stage.handleBoardMessage({
+            message: {
+              type: "placeObjectOnStage",
+              object: {
+                id,
+                type: "jitsi",
+                name,
+                hostId,
+                participantId: "popout-remote-participant",
+                w: 200,
+                h: 150,
+                x: 200,
+                y: 200,
+                rotate: 0,
+              },
+            },
+          });
+        },
+        { id: tileId, hostId: mainSession, name: streamName },
+      );
+
+      // Every MQTT publish is console.logged by services/mqtt.ts — capture
+      // all three windows so a stray broadcast (e.g. a BOARD DESTROY) is
+      // attributable when the assertions below fail.
+      const publishLog: string[] = [];
+      const tapConsole = (label: string, p: Page) =>
+        p.on("console", (m) => {
+          const t = m.text();
+          if (/destroy|DESTROY|leaving|counter/i.test(t)) publishLog.push(`[${label}] ${t}`);
+        });
+      tapConsole("performer", performerPage);
+      tapConsole("audience", audience.page);
+
+      // Open the pop-out exactly like Chat/index.vue popOut() does, so the
+      // new window inherits a sessionStorage COPY from the opener.
+      const [popup] = await Promise.all([
+        performerCtx.waitForEvent("page"),
+        performerPage.evaluate((slug) => {
+          window.open(`/chat/${slug}`, `upstage-chat-${slug}`, "width=420,height=720");
+        }, runtime.stageSlug),
+      ]);
+      tapConsole("popup", popup);
+      await popup.waitForFunction(
+        () => {
+          const stage = window.__UPSTAGE_PINIA__?.stage as
+            { standaloneChat?: boolean; status?: string } | undefined;
+          return Boolean(stage && stage.standaloneChat && stage.status === "LIVE");
+        },
+        { timeout: 30_000 },
+      );
+      const popupSession = await popup.evaluate(() =>
+        String(window.__UPSTAGE_PINIA__!.stage.session),
+      );
+      expect(popupSession, "pop-out must NOT inherit the opener's session id").not.toBe(
+        mainSession,
+      );
+
+      // The tile must still be there while the pop-out is open (a failure
+      // here vs after close() localises which phase went wrong).
+      await performerPage.waitForTimeout(2_000);
+      const whilePopupOpen = await performerPage.evaluate(
+        (id) =>
+          window.__UPSTAGE_PINIA__!.stage.board.objects.some(
+            (o: { id: unknown }) => String(o.id) === id,
+          ),
+        tileId,
+      );
+      expect(
+        whilePopupOpen,
+        `tile vanished while the pop-out was OPEN; publishes: ${publishLog.join(" | ")}`,
+      ).toBe(true);
+
+      await popup.close({ runBeforeUnload: true });
+      // Give the (pre-fix) leave → prune → DESTROY chain ample time to land.
+      await performerPage.waitForTimeout(4_000);
+
+      const performerState = await performerPage.evaluate(
+        ({ id, sid }) => {
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            board: { objects: Array<{ id: unknown }> };
+            sessions: Array<{ id: unknown }>;
+          };
+          return {
+            tileOnBoard: stage.board.objects.some((o) => String(o.id) === id),
+            ownRosterRow: stage.sessions.some((s) => String(s.id) === sid),
+          };
+        },
+        { id: tileId, sid: mainSession },
+      );
+      expect(
+        performerState.tileOnBoard,
+        `performer's jitsi tile must survive; publishes: ${publishLog.join(" | ")}`,
+      ).toBe(true);
+      expect(performerState.ownRosterRow, "performer's roster row must survive").toBe(true);
+
+      const audienceStillHasTile = await audience.page.evaluate(
+        (id) =>
+          window.__UPSTAGE_PINIA__!.stage.board.objects.some(
+            (o: { id: unknown }) => String(o.id) === id,
+          ),
+        tileId,
+      );
+      expect(audienceStillHasTile, "audience must not receive a DESTROY").toBe(true);
+    } finally {
+      await audienceCtx?.close().catch(() => {});
+      await performerCtx?.close().catch(() => {});
     }
   });
 
