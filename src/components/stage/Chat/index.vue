@@ -283,9 +283,12 @@ export default {
           Position is stored in the Pinia stage store and resets on
           stage re-entry via CLEAN_STAGE. Suppressed in the standalone
           /chat/<stage> window where the chat fills its own host
-          browser window.
+          browser window. Players only: the audience must all see the
+          stage the same way, so they cannot reposition the chat —
+          for them the panel stays wherever the players' left/right
+          chat-position setting puts it.
         -->
-        <a-tooltip v-if="!isStandalone" :title="$t('drag_panel') || 'Drag panel'">
+        <a-tooltip v-if="!isStandalone && canPlay" :title="$t('drag_panel') || 'Drag panel'">
           <button
             class="chat-setting button is-rounded is-outlined drag-icon-button"
             @mousedown.prevent="startChatDrag"
@@ -324,9 +327,10 @@ export default {
           window (a working live chat input inside a recording), and
           the settings popup (nickname / chat params / download) isn't
           even mounted by the replay layout — the button would do
-          nothing. The minimise / drag / reset buttons above stay: they
-          only reposition the viewer's own panel, like the replay
-          controls themselves.
+          nothing. The minimise / reset buttons above stay: they only
+          reposition the viewer's own panel, like the replay controls
+          themselves. The drag handle is gated on canPlay, which is
+          false during replay, so it is hidden here too.
         -->
         <a-tooltip v-if="!isStandalone && !replaying" :title="$t('pop_out_chat') || 'Pop out chat'">
           <button class="chat-setting button is-rounded is-outlined" @click="popOut">

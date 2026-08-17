@@ -215,6 +215,23 @@ export default {
       Object.assign(el.style, emojiPickerStyle.value);
       clampPickerToViewport(el);
 
+      // Persist the clamped result back into the reactive :style object.
+      // The element keeps its `:style="emojiPickerStyle"` binding, and Vue
+      // re-applies that object on every re-render of this component (new
+      // messages, tooltips, the other picker instance toggling, …). Without
+      // this write-back a re-render reverts left/right to the pre-clamp
+      // heuristic values, pushing the panel off-screen again — the reaction
+      // "+" picker sits mid-card, so its raw `left: 0` overflows a phone.
+      emojiPickerStyle.value = {
+        ...emojiPickerStyle.value,
+        position: el.style.position,
+        left: el.style.left,
+        right: el.style.right,
+        top: el.style.top,
+        bottom: el.style.bottom,
+        height: el.style.height,
+      };
+
       animate(el, {
         scaleX: [0, 1],
         scaleY: [0, 1],

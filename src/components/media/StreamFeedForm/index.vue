@@ -245,7 +245,9 @@ function close() {
           </a-input-group>
         </a-form-item>
       </a-form>
-      <div class="mb-3 text-xs opacity-75">
+      <!-- No text-xs here: the checklist must match the modal's base font
+           size — 12px read as illegibly tiny on the owner's browser. -->
+      <div class="mb-3 opacity-75">
         <p class="mb-1">
           <b>{{ t("ingest_hint_title") }}</b>
         </p>
