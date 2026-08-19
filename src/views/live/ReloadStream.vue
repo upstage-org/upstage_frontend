@@ -28,7 +28,7 @@ const onRefreshMeeting = () => stageStore.refreshMeeting();
         :aria-label="$t('refresh_meeting')"
         @mousedown="onRefreshMeeting"
       >
-        <i class="fas fa-video" />
+        <i class="fas fa-sync has-text-info" />
       </button>
     </a-tooltip>
     <a-tooltip v-if="hasJitsi || hasRtmp" :title="$t('refresh_streams_tooltip')">
