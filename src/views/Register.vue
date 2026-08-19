@@ -2,7 +2,7 @@
 import Field from "components/form/Field.vue";
 import Password from "components/form/Password.vue";
 import TermsOfService from "components/TermsOfService.vue";
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useMutation } from "services/graphql/composable";
 import { userGraph } from "services/graphql";
 import { useRouter } from "vue-router";
@@ -27,9 +27,36 @@ export default {
     const agreed = ref(false);
     const captcha = ref();
 
+    const introMaxLength = configs.INTRO_MAX_LENGTH;
+    const introHelp = computed(() => {
+      const length = (form.intro || "").length;
+      if (!length) return `Maximum ${introMaxLength} characters.`;
+      return length >= introMaxLength
+        ? `Character limit reached (maximum ${introMaxLength} characters).`
+        : `${length} / ${introMaxLength} characters`;
+    });
+    // One-shot toast when the limit is hit; the counter under the field
+    // keeps showing the state afterwards.
+    watch(
+      () => (form.intro || "").length,
+      (length, previous) => {
+        if (length >= introMaxLength && previous < introMaxLength) {
+          message.warning(
+            `You have reached the introduction limit of ${introMaxLength} characters.`,
+          );
+        }
+      },
+    );
+
     const submit = async () => {
       touched.value = true;
-      if (!form.username || !form.password || !form.email || (form.password || "").length < 8)
+      if (
+        !form.username ||
+        !form.password ||
+        !form.email ||
+        !form.intro ||
+        (form.password || "").length < 8
+      )
         return;
       if (confirmPasswordError.value) return;
       if (form.username.length < 2) {
@@ -75,6 +102,8 @@ export default {
       confirmPasswordError,
       touched,
       agreed,
+      introMaxLength,
+      introHelp,
       siteKey: configs.CLOUDFLARE_CAPTCHA_SITEKEY,
       isProduction: configs.MODE === "Production",
       captcha,
@@ -143,6 +172,8 @@ export default {
                 required
                 required-message="Introduction is required"
                 :touched="touched"
+                :maxlength="introMaxLength"
+                :help="introHelp"
               />
               <label class="checkbox">
                 <input v-model="agreed" type="checkbox" />

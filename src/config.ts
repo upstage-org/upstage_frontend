@@ -101,6 +101,10 @@ const configs = {
     },
   ],
 
+  // Character limit for a player's introduction. Must match the backend's
+  // CreateUserInput/UpdateUserInput `intro` max_length (upstage_backend
+  // users/http/validation.py and studio_management/http/validation.py).
+  INTRO_MAX_LENGTH: 5000,
   GRAPHQL_ENDPOINT: graphqlEndpoint,
   STATIC_ASSETS_ENDPOINT: staticAssetsEndpoint,
   CLOUDFLARE_CAPTCHA_SITEKEY: VITE_CLOUDFLARE_CAPTCHA_SITEKEY,

@@ -225,7 +225,6 @@ export default {
                   ...player,
                 });
               },
-              disabledIntroduction: true,
               noPasswordChange: true,
             }),
             h(ChangePassword, {

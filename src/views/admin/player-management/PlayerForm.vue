@@ -21,6 +21,7 @@ import { toRaw } from "vue";
 import { humanFileSize } from "utils/common";
 import { useLoading } from "hooks/mutations";
 import { userGraph } from "services/graphql";
+import configs from "config";
 import StageAccessList from "./StageAccessList.vue";
 
 export default {
@@ -37,7 +38,6 @@ export default {
     noUploadLimit: Boolean,
     noStatusToggle: Boolean,
     noPasswordChange: Boolean,
-    disabledIntroduction: Boolean,
   },
   setup(props, { slots }) {
     const { t } = useI18n();
@@ -181,8 +181,9 @@ export default {
                 },
                 () => [
                   h(Textarea, {
-                    disabled: props.disabledIntroduction,
                     autoSize: true,
+                    maxlength: configs.INTRO_MAX_LENGTH,
+                    showCount: true,
                     value: values.intro ?? "",
                     "onUpdate:value": (value: string) => (values.intro = value),
                   }),
