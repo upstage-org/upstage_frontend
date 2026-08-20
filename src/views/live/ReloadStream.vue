@@ -17,7 +17,10 @@ const hasRefreshableStreams = computed(() => hasMeeting.value || hasJitsi.value 
 // recovers instead of no-opping. The automatic page-wake reload stays gentle.
 // One button refreshes everything on stage; each signal only fires for the
 // object kinds actually present so the merged handler stays a no-op-free
-// union of the two old per-kind buttons.
+// union of the two old per-kind buttons. Both signals are LOCAL store ticks
+// (nothing is sent over MQTT) — only this browser's tiles react. Meeting
+// tiles only reload when their embed failed to load; a joined meeting is
+// never torn down (that would mute the performer's webcam/mic on rejoin).
 const onRefreshStreams = () => {
   if (hasJitsi.value || hasRtmp.value) {
     stageStore.triggerForceReloadStreams();

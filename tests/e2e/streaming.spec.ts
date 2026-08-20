@@ -468,14 +468,15 @@ test.describe("streaming: performer streams, audience views @full", () => {
   });
 
   /**
-   * Refresh-meeting coverage: the topbar camera-refresh button
+   * Refresh-meeting contract. The topbar refresh button
    * (ReloadStream.vue → stageStore.refreshMeeting → REFRESH_MEETING) bumps
-   * `_meetingRefreshKey`, which Board.vue folds into the meeting object's
-   * `:key` — so the whole MeetingObject remounts with a FRESH iframe.
-   * Assert the remount actually replaces the iframe DOM node (a stale
-   * node would mean a frozen/errored meeting cannot be recovered).
+   * `_meetingRefreshKey`; MeetingObject watches it and reloads its iframe
+   * ONLY when the embed failed to load. A loaded meeting must keep the SAME
+   * iframe node: remounting it leaves/rejoins the Jitsi room, which mutes the
+   * performer's webcam/mic on rejoin and makes every other participant see
+   * them drop out (the 2026-08-21 regression).
    */
-  test("refresh-meeting button remounts the meeting iframe", async ({ browser }) => {
+  test("refresh button leaves a loaded meeting iframe alone", async ({ browser }) => {
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     const runtime = readRuntime();
     const persona = findPersona(PERFORMER_USERNAME);
@@ -484,8 +485,6 @@ test.describe("streaming: performer streams, audience views @full", () => {
     let performerCtx: BrowserContext | null = null;
     try {
       performerCtx = await browser.newContext();
-      // Same namespace stub as the iframe-contract test: satisfies our
-      // room's iframe load and neutralises retained stale rooms.
       await performerCtx.route("**/streaming-test-*", async (route) => {
         await route.fulfill({
           status: 200,
@@ -500,10 +499,10 @@ test.describe("streaming: performer streams, audience views @full", () => {
       await publishMeetingFromPerformer(performerPage, roomName);
       const frame = performerPage.locator(`.frame:has(iframe.room[src*="${roomName}"])`).first();
       await frame.waitFor({ state: "attached", timeout: 30_000 });
+      // Loaded: the spinner overlay is gone and no failed card is shown.
+      await frame.locator("img.overlay").waitFor({ state: "detached", timeout: 20_000 });
+      await expect(frame.locator(".failed")).toHaveCount(0);
 
-      // Tag the current iframe DOM node, then press the real refresh
-      // button. After the re-key remount the node must be a different one
-      // (marker gone) while the same room stays on the board.
       await performerPage.evaluate((room) => {
         const el = document.querySelector(`iframe.room[src*="${room}"]`) as HTMLIFrameElement & {
           __beforeRefresh?: boolean;
@@ -512,13 +511,73 @@ test.describe("streaming: performer streams, audience views @full", () => {
         el.__beforeRefresh = true;
       }, roomName);
 
-      const refreshMeetingButton = performerPage.locator(
+      const refreshButton = performerPage.locator(
         '#reload-stream button[aria-label="Refresh streams"]',
       );
-      await refreshMeetingButton.waitFor({ state: "visible", timeout: 10_000 });
+      await refreshButton.waitFor({ state: "visible", timeout: 10_000 });
       // ReloadStream.vue listens on mousedown, not click.
-      await refreshMeetingButton.dispatchEvent("mousedown");
+      await refreshButton.dispatchEvent("mousedown");
+      await performerPage.waitForTimeout(2_000);
 
+      // Same DOM node ⇒ the performer never left the room.
+      const sameNode = await performerPage.evaluate((room) => {
+        const el = document.querySelector(`iframe.room[src*="${room}"]`) as
+          (HTMLIFrameElement & { __beforeRefresh?: boolean }) | null;
+        return Boolean(el && el.__beforeRefresh === true);
+      }, roomName);
+      expect(sameNode).toBe(true);
+    } finally {
+      await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Counterpart: an embed that never loads (blocked / hung) flips to the
+   * "service is unavailable" card after MeetingObject's 15s TIMEOUT_MS, and
+   * THEN the topbar refresh button must remount the iframe so the user can
+   * recover without a full page reload.
+   */
+  test("refresh button remounts a meeting iframe that failed to load", async ({ browser }) => {
+    test.setTimeout(120_000);
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const roomName = `streaming-test-refresh-${runtime.runId}-${Date.now().toString(36)}`;
+
+    let performerCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext();
+      // Hang the embed: never fulfil or abort, so the iframe sits in
+      // `loading` until the component's own timeout marks it failed.
+      let pending = 0;
+      await performerCtx.route("**/streaming-test-*", () => {
+        pending += 1;
+      });
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      await new LiveStagePage(performerPage).goto(runtime.stageSlug);
+
+      await publishMeetingFromPerformer(performerPage, roomName);
+      const frame = performerPage.locator(`.frame:has(iframe.room[src*="${roomName}"])`).first();
+      await frame.waitFor({ state: "attached", timeout: 30_000 });
+      await frame.locator(".failed").waitFor({ state: "visible", timeout: 30_000 });
+      expect(pending).toBeGreaterThan(0);
+
+      await performerPage.evaluate((room) => {
+        const el = document.querySelector(`iframe.room[src*="${room}"]`) as HTMLIFrameElement & {
+          __beforeRefresh?: boolean;
+        };
+        if (!el) throw new Error("meeting iframe not found before refresh");
+        el.__beforeRefresh = true;
+      }, roomName);
+
+      const refreshButton = performerPage.locator(
+        '#reload-stream button[aria-label="Refresh streams"]',
+      );
+      await refreshButton.waitFor({ state: "visible", timeout: 10_000 });
+      await refreshButton.dispatchEvent("mousedown");
+
+      // Fresh node (marker gone), failed card cleared, spinner back.
       await performerPage.waitForFunction(
         (room) => {
           const el = document.querySelector(`iframe.room[src*="${room}"]`) as
@@ -528,8 +587,121 @@ test.describe("streaming: performer streams, audience views @full", () => {
         roomName,
         { timeout: 15_000 },
       );
+      await expect(frame.locator(".failed")).toHaveCount(0);
+      await expect(frame.locator("img.overlay")).toBeVisible();
     } finally {
       await performerCtx?.close().catch(() => {});
+    }
+  });
+
+  /**
+   * Isolation contract: the refresh button only ever acts in the browser
+   * where it was pressed. Three seats on the same stage — performer A
+   * (presses refresh), performer B (a second logged-in player, the user's
+   * "other browser"), and an anonymous audience seat. After A refreshes,
+   * B and the audience must keep the very same meeting iframe node and none
+   * of their refresh store ticks may move (nothing is published over MQTT).
+   */
+  test("refresh in one browser does not refresh other players or audience", async ({ browser }) => {
+    test.setTimeout(120_000);
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    const runtime = readRuntime();
+    const personaA = findPersona(PERFORMER_USERNAME);
+    const personaB = findPersona("tybalt");
+    const roomName = `streaming-test-iso-${runtime.runId}-${Date.now().toString(36)}`;
+
+    const stubMeetingFor = async (context: BrowserContext) => {
+      await context.route("**/streaming-test-*", async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: `<!DOCTYPE html><html><head><title>${roomName}</title></head><body></body></html>`,
+        });
+      });
+    };
+    const markIframe = (page: Page) =>
+      page.evaluate((room) => {
+        const el = document.querySelector(`iframe.room[src*="${room}"]`) as HTMLIFrameElement & {
+          __beforeRefresh?: boolean;
+        };
+        if (!el) throw new Error("meeting iframe not found");
+        el.__beforeRefresh = true;
+      }, roomName);
+    const iframeStillMarked = (page: Page) =>
+      page.evaluate((room) => {
+        const el = document.querySelector(`iframe.room[src*="${room}"]`) as
+          (HTMLIFrameElement & { __beforeRefresh?: boolean }) | null;
+        return Boolean(el && el.__beforeRefresh === true);
+      }, roomName);
+    const readTicks = (page: Page) =>
+      page.evaluate(() => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          meetingRefreshKey: number;
+          reloadStreams: Date | null;
+          forceReloadStreams: Date | null;
+        };
+        return {
+          meetingRefreshKey: stage.meetingRefreshKey,
+          reloadStreams: stage.reloadStreams ? String(stage.reloadStreams) : null,
+          forceReloadStreams: stage.forceReloadStreams ? String(stage.forceReloadStreams) : null,
+        };
+      });
+
+    let ctxA: BrowserContext | null = null;
+    let ctxB: BrowserContext | null = null;
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      ctxA = await browser.newContext();
+      await stubMeetingFor(ctxA);
+      const pageA = await ctxA.newPage();
+      await new LoginPage(pageA).login(personaA.username, personaA.password);
+      await new LiveStagePage(pageA).goto(runtime.stageSlug);
+
+      ctxB = await browser.newContext();
+      await stubMeetingFor(ctxB);
+      const pageB = await ctxB.newPage();
+      await new LoginPage(pageB).login(personaB.username, personaB.password);
+      await new LiveStagePage(pageB).goto(runtime.stageSlug);
+      expect(await pageB.evaluate(() => Boolean(window.__UPSTAGE_PINIA__!.stage.canPlay))).toBe(
+        true,
+      );
+
+      audienceCtx = await browser.newContext();
+      await stubMeetingFor(audienceCtx);
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      await publishMeetingFromPerformer(pageA, roomName);
+      const frames = [pageA, pageB, audience.page].map((p) =>
+        p.locator(`.frame:has(iframe.room[src*="${roomName}"])`).first(),
+      );
+      for (const f of frames) {
+        await f.waitFor({ state: "attached", timeout: 30_000 });
+        await f.locator("img.overlay").waitFor({ state: "detached", timeout: 20_000 });
+      }
+
+      await markIframe(pageA);
+      await markIframe(pageB);
+      await markIframe(audience.page);
+      const ticksBBefore = await readTicks(pageB);
+      const ticksAudBefore = await readTicks(audience.page);
+
+      const refreshButton = pageA.locator('#reload-stream button[aria-label="Refresh streams"]');
+      await refreshButton.waitFor({ state: "visible", timeout: 10_000 });
+      await refreshButton.dispatchEvent("mousedown");
+      // Generous window for any (unexpected) MQTT round-trip to land.
+      await pageA.waitForTimeout(3_000);
+
+      // A: loaded meeting untouched (no leave/rejoin ⇒ cam/mic state kept).
+      expect(await iframeStillMarked(pageA), "A keeps its own loaded meeting").toBe(true);
+      // B + audience: same iframe node, store ticks unchanged.
+      expect(await iframeStillMarked(pageB), "B's meeting iframe untouched").toBe(true);
+      expect(await iframeStillMarked(audience.page), "audience iframe untouched").toBe(true);
+      expect(await readTicks(pageB)).toEqual(ticksBBefore);
+      expect(await readTicks(audience.page)).toEqual(ticksAudBefore);
+    } finally {
+      await ctxA?.close().catch(() => {});
+      await ctxB?.close().catch(() => {});
+      await audienceCtx?.close().catch(() => {});
     }
   });
 

@@ -1,7 +1,7 @@
 <script>
 // Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppObject from "../Object.vue";
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { useJitsiEndpoint } from "./composable";
@@ -178,18 +178,22 @@ export default {
       }
     };
 
-    onMounted(() => {
-      // Some content blockers (e.g. uBlock Origin in cosmetic mode)
-      // serve a blank document into the iframe rather than firing
-      // `error`. Fall back to a "service unavailable" message after a
-      // generous timeout so the user is not stuck on the spinner.
+    // Some content blockers (e.g. uBlock Origin in cosmetic mode)
+    // serve a blank document into the iframe rather than firing
+    // `error`. Fall back to a "service unavailable" message after a
+    // generous timeout so the user is not stuck on the spinner.
+    const startLoadTimer = () => {
+      if (loadTimer) clearTimeout(loadTimer);
       loadTimer = setTimeout(() => {
+        loadTimer = null;
         if (loading.value) {
           failed.value = true;
           loading.value = false;
         }
       }, TIMEOUT_MS);
-    });
+    };
+
+    onMounted(startLoadTimer);
 
     onUnmounted(() => {
       if (loadTimer) clearTimeout(loadTimer);
@@ -197,7 +201,34 @@ export default {
 
     const activeMovable = computed(() => stageStore.activeMovable);
 
-    const retryMeeting = () => stageStore.refreshMeeting();
+    // Remounting the iframe = leaving and re-joining the Jitsi room. For a
+    // performer that means their camera/mic come back in the room's
+    // start-muted state and every other participant sees them drop out and
+    // return without video. So a remount is ONLY ever done locally, in this
+    // browser, and ONLY when the embed failed to load (blocked / timed out) —
+    // never against a meeting that is up and joined. Nothing here is sent
+    // over MQTT; other browsers are unaffected.
+    const iframeKey = ref(0);
+    const remountIframe = () => {
+      loading.value = true;
+      failed.value = false;
+      iframeKey.value += 1;
+      startLoadTimer();
+    };
+
+    // In-tile "Refresh meeting" button on the failed card.
+    const retryMeeting = () => remountIframe();
+
+    // Topbar "Refresh streams" button (ReloadStream.vue → refreshMeeting()):
+    // treated as a retry for failed embeds only. A loaded meeting is left
+    // alone — it would otherwise kick the performer out of the room and
+    // mute their webcam/mic on rejoin.
+    watch(
+      () => stageStore.meetingRefreshKey,
+      () => {
+        if (failed.value) remountIframe();
+      },
+    );
 
     return {
       meeting,
@@ -206,6 +237,7 @@ export default {
       iframeAllow,
       loading,
       failed,
+      iframeKey,
       onLoad,
       onError,
       canPlay,
@@ -246,6 +278,7 @@ export default {
           </div>
           <iframe
             v-show="!failed"
+            :key="iframeKey"
             class="room"
             :src="iframeSrc"
             :allow="iframeAllow"

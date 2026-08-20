@@ -100,7 +100,6 @@ export default {
     };
 
     const backdropColor = computed(() => stageStore.backdropColor);
-    const meetingRefreshKey = computed(() => stageStore.meetingRefreshKey);
 
     const onBoardPointerDown = (e) => {
       if (!canPlay.value || e.target.id !== "board") return;
@@ -111,10 +110,11 @@ export default {
       stageStore.SET_ACTIVE_MOVABLE(null);
     };
 
-    // Remount embedded conference tiles when the user hits "Refresh
-    // meeting" so a stuck/failed iframe reloads from scratch.
-    const boardObjectKey = (object) =>
-      object.type === "meeting" ? `${object.id}-${meetingRefreshKey.value}` : object.id;
+    // Meeting tiles are NOT re-keyed on "Refresh streams": remounting a
+    // joined meeting iframe kicks the performer out of the room (camera/mic
+    // come back muted, other participants see them drop). MeetingObject
+    // handles the refresh signal itself and only reloads a failed embed.
+    const boardObjectKey = (object) => object.id;
 
     return {
       objects,

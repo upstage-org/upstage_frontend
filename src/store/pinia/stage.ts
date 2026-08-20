@@ -627,7 +627,7 @@ export const useStageStore = defineStore(
      * (and without feeding each other echo). Defaults: unmuted, 100%.
      */
     const _streamLocalAudio = ref<Record<string, { muted: boolean; volume: number }>>({});
-    /** Bumped by `refreshMeeting()` to remount embedded conference iframes. */
+    /** Bumped by `refreshMeeting()`; MeetingObject reloads failed embeds only. */
     const _meetingRefreshKey = ref(0);
     const _enabledLiveStreaming = ref<boolean>(true);
     /**
@@ -3814,7 +3814,12 @@ export const useStageStore = defineStore(
       FORCE_RELOAD_STREAMS();
     }
 
-    /** Remount every on-stage `meeting` iframe (embedded Jitsi conference tile). */
+    /**
+     * Local-only retry signal for embedded `meeting` tiles. MeetingObject
+     * reloads its iframe ONLY if the embed failed to load; a joined meeting
+     * is never remounted (that would leave/rejoin the room and mute the
+     * performer's camera/mic). Not published over MQTT.
+     */
     function refreshMeeting() {
       REFRESH_MEETING();
     }
