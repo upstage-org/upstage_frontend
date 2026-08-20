@@ -513,7 +513,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
       }, roomName);
 
       const refreshMeetingButton = performerPage.locator(
-        '#reload-stream button[aria-label="Refresh meeting"]',
+        '#reload-stream button[aria-label="Refresh streams"]',
       );
       await refreshMeetingButton.waitFor({ state: "visible", timeout: 10_000 });
       // ReloadStream.vue listens on mousedown, not click.

@@ -15,28 +15,27 @@ const hasRefreshableStreams = computed(() => hasMeeting.value || hasJitsi.value 
 // Explicit user click ⇒ force path: re-publishes / re-attaches even when the
 // tracks look "healthy", so a frozen (but not disconnected) stream actually
 // recovers instead of no-opping. The automatic page-wake reload stays gentle.
-const onReloadStreams = () => stageStore.triggerForceReloadStreams();
-const onRefreshMeeting = () => stageStore.refreshMeeting();
+// One button refreshes everything on stage; each signal only fires for the
+// object kinds actually present so the merged handler stays a no-op-free
+// union of the two old per-kind buttons.
+const onRefreshStreams = () => {
+  if (hasJitsi.value || hasRtmp.value) {
+    stageStore.triggerForceReloadStreams();
+  }
+  if (hasMeeting.value) {
+    stageStore.refreshMeeting();
+  }
+};
 </script>
 
 <template>
   <div v-if="hasRefreshableStreams" id="reload-stream">
-    <a-tooltip v-if="hasMeeting" :title="$t('refresh_meeting_tooltip')">
-      <button
-        class="button is-small refresh-icon clickable"
-        type="button"
-        :aria-label="$t('refresh_meeting')"
-        @mousedown="onRefreshMeeting"
-      >
-        <i class="fas fa-sync has-text-info" />
-      </button>
-    </a-tooltip>
-    <a-tooltip v-if="hasJitsi || hasRtmp" :title="$t('refresh_streams_tooltip')">
+    <a-tooltip :title="$t('refresh_streams')">
       <button
         class="button is-small refresh-icon clickable"
         type="button"
         :aria-label="$t('refresh_streams')"
-        @mousedown="onReloadStreams"
+        @mousedown="onRefreshStreams"
       >
         <i class="fas fa-sync" />
       </button>
