@@ -251,6 +251,8 @@ export default {
   close_panel: "Close panel",
   refresh_meeting: "Atualizar reunião",
   refresh_meeting_tooltip: "Recarregar a reunião incorporada se não tiver carregado",
+  refresh_meeting_force_confirm:
+    "A reunião parece estar carregada. Tem a certeza de que quer recarregar esta reunião? Vai sair da reunião e voltar a entrar com a câmara e o microfone desligados, e os outros participantes vão vê-lo sair brevemente.",
   refresh_streams: "Atualizar transmissões",
   refresh_streams_tooltip:
     "Tentar novamente conectar as transmissões de vídeo individuais no palco",

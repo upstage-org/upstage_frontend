@@ -38,6 +38,12 @@ x-common-build: &common_build |
   ARG VITE_E2E
   ENV VITE_E2E=$$VITE_E2E
 
+  # Build stamp for public/version.json (the "new version available" prompt).
+  # A UTC deploy timestamp computed on the host by run_front_end_*.sh (no
+  # git access); see src/update-version.js.
+  ARG UPSTAGE_BUILD_VERSION
+  ENV UPSTAGE_BUILD_VERSION=$$UPSTAGE_BUILD_VERSION
+
   # CACHE_BUST is set to a per-run timestamp by run_front_end_*.sh so the next
   # RUN (and therefore `vite build`) always re-executes even when no source
   # file changed. Earlier layers (base image, pnpm install, COPY . .) remain
@@ -76,6 +82,7 @@ services:
         # Set per-run by run_front_end_*.sh to force the vite-build layer to
         # re-execute every time (see CACHE_BUST in the inline Dockerfile).
         CACHE_BUST: "${CACHE_BUST:-0}"
+        UPSTAGE_BUILD_VERSION: "${UPSTAGE_BUILD_VERSION:-}"
     # Per-site tag: dev and prod must never share an image — different SITE
     # values pick different `vite build` modes (build:dev vs build) and load
     # different `.env` files at build time, producing materially different

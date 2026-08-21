@@ -77,6 +77,8 @@ export default {
   close_panel: "Close panel",
   refresh_meeting: "Meeting neu laden",
   refresh_meeting_tooltip: "Eingebettetes Meeting neu laden, wenn es nicht geladen wurde",
+  refresh_meeting_force_confirm:
+    "Das Meeting scheint geladen zu sein. Möchten Sie dieses Meeting wirklich neu laden? Sie verlassen das Meeting und treten mit stummgeschalteter Kamera und Mikrofon wieder bei; andere Teilnehmer sehen Sie kurz ausscheiden.",
   refresh_streams: "Streams aktualisieren",
   refresh_streams_tooltip: "Einzelne Videostreams auf der Bühne erneut verbinden",
   multiframe_loop_tooltip:

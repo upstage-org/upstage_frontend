@@ -253,6 +253,8 @@ export default {
   close_panel: "Close panel",
   refresh_meeting: "Actualiser la réunion",
   refresh_meeting_tooltip: "Recharger la réunion intégrée si elle n'a pas chargé",
+  refresh_meeting_force_confirm:
+    "La réunion semble chargée. Voulez-vous vraiment recharger cette réunion ? Vous quitterez la réunion et la rejoindrez avec la caméra et le micro coupés, et les autres participants vous verront brièvement disparaître.",
   refresh_streams: "Actualiser les flux",
   refresh_streams_tooltip: "Réessayer de connecter les flux vidéo individuels sur scène",
 };

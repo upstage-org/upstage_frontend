@@ -251,6 +251,8 @@ export default {
   close_panel: "Close panel",
   refresh_meeting: "Uppdatera möte",
   refresh_meeting_tooltip: "Ladda om det inbäddade mötet om det inte laddades",
+  refresh_meeting_force_confirm:
+    "Mötet verkar vara laddat. Är du säker på att du vill ladda om mötet? Du lämnar mötet och går med igen med kamera och mikrofon avstängda, och andra deltagare ser dig försvinna en kort stund.",
   refresh_streams: "Uppdatera strömmar",
   refresh_streams_tooltip: "Försök koppla individuella videoströmmar på scenen igen",
 };

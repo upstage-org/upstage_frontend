@@ -252,6 +252,8 @@ export default {
   close_panel: "Close panel",
   refresh_meeting: "Actualizar reunión",
   refresh_meeting_tooltip: "Volver a cargar la reunión integrada si no se ha cargado",
+  refresh_meeting_force_confirm:
+    "La reunión parece estar cargada. ¿Seguro que quieres volver a cargar esta reunión? Saldrás de la reunión y volverás a entrar con la cámara y el micrófono silenciados, y los demás participantes verán que te desconectas brevemente.",
   refresh_streams: "Actualizar transmisiones",
   refresh_streams_tooltip:
     "Reintentar conectar las transmisiones de video individuales en el escenario",

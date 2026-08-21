@@ -206,4 +206,31 @@ describe("LiveStreamPlayer WHEP stall watchdog", () => {
     expect(connectWhep).toHaveBeenCalledTimes(2);
     wrapper.unmount();
   });
+
+  it("a healthy WHEP session is re-established (not left alone) on the force-reload signal", async () => {
+    framesDecoded.mockResolvedValue(1);
+    let frames = 1;
+    framesDecoded.mockImplementation(async () => (frames += 30));
+    const wrapper = await mountPlaying();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(whepClose).not.toHaveBeenCalled();
+
+    // Explicit user click: tear down and reconnect even though frames flow —
+    // this is what recovers a "frozen last frame" the watchdog can't see.
+    stageStoreMock().forceReloadStreams = new Date();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(whepClose).toHaveBeenCalledTimes(1);
+    expect(connectWhep).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it("does not reconnect when no refresh signal is fired", async () => {
+    let frames = 1;
+    framesDecoded.mockImplementation(async () => (frames += 30));
+    const wrapper = await mountPlaying();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(connectWhep).toHaveBeenCalledTimes(1);
+    expect(whepClose).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
 });

@@ -87,6 +87,13 @@ sudo chown -R "${HOST_UID}:${HOST_GID}" /frontend_app_${SITE}/dist
 # are still cache-hit, keeping the rebuild fast.
 CACHE_BUST=$(date +%s%N)
 
+# Build stamp for public/version.json — App.vue compares it against the value
+# stored in the browser and shows the "new version available, reload" prompt
+# when it changes. A plain UTC deploy timestamp (no git access), passed into
+# the docker build as UPSTAGE_BUILD_VERSION.
+UPSTAGE_BUILD_VERSION="$(date -u +%Y.%m.%d-%H%M%S)"
+echo "Build version stamp: ${UPSTAGE_BUILD_VERSION}" >&2
+
 compose=(docker compose -f docker-compose.yaml -p "upstage-frontend-${SITE}")
 
 "${compose[@]}" down --remove-orphans

@@ -5,6 +5,13 @@ import { useTitle } from "@vueuse/core";
 import { useStageViewport } from "@composables/useStageViewport";
 import { useUserStore } from "@stores/pinia/user";
 import { useConfigStore } from "@stores/pinia/config";
+import {
+  describeBuild,
+  needsReload,
+  parseServedBuild,
+  runningBuild,
+  type BuildInfo,
+} from "@utils/buildVersion";
 import "styles/bulma.css";
 import "styles/bulma_slider.css";
 import "styles/custom.less";
@@ -23,49 +30,38 @@ watch(
   { immediate: true },
 );
 
-// Version state
-interface VersionData {
-  version: string;
-}
-const currentVersion = ref<string | null>(null);
-const latestVersion = ref<string | null>(null);
-const showReloadPrompt = ref<boolean>(false);
+// "New version available" check — see src/utils/buildVersion.ts. The bundle
+// knows its own build (`__UPSTAGE_BUILD__`, baked in by vite.config.ts); the
+// server's current build is /version.json. When they differ the prompt asks
+// the user to reload. Hidden on the Live stage route so it never covers a
+// running performance.
+const running = runningBuild();
+const servedBuild = ref<BuildInfo | null>(null);
+const showReloadPrompt = computed(() => needsReload(running, servedBuild.value));
 
 const hasShowPrompt = computed(() => {
   const isExcludedRoute = ["Live"].includes(route.name as string);
   return showReloadPrompt.value && !isExcludedRoute;
 });
 
-// Check version
+const runningLabel = computed(() => (running ? describeBuild(running) : ""));
+const servedLabel = computed(() => (servedBuild.value ? describeBuild(servedBuild.value) : ""));
+
 const checkVersion = async (): Promise<void> => {
   try {
     const response = await fetch("/version.json", {
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     });
-    const data: VersionData = await response.json();
-    latestVersion.value = data.version;
-
-    if (!localStorage.getItem("appVersion")) {
-      localStorage.setItem("appVersion", latestVersion.value);
-    }
-
-    currentVersion.value = localStorage.getItem("appVersion") || latestVersion.value;
-    showReloadPrompt.value = false;
-
-    if (latestVersion.value && latestVersion.value !== currentVersion.value) {
-      showReloadPrompt.value = true;
-    }
+    if (!response.ok) return;
+    servedBuild.value = parseServedBuild(await response.json());
   } catch (error) {
     console.error("Failed to check version:", error);
   }
 };
 
 const reloadPage = () => {
-  if (latestVersion.value) {
-    localStorage.setItem("appVersion", latestVersion.value);
-    window.location.reload();
-  }
+  window.location.reload();
 };
 
 onMounted(() => {
@@ -74,10 +70,9 @@ onMounted(() => {
     .then((keyList) => Promise.all(keyList.map((key) => caches.delete(key))))
     .catch((err) => console.error("Cache clear failed:", err));
 
-  // Version checking is self-contained: poll /version.json on mount and every
-  // 3 minutes, and surface the reload prompt when it differs from the stored
-  // version. This no longer involves the (now removed) Service Worker.
-  checkVersion();
+  // Poll /version.json on mount and every 3 minutes; the prompt shows while
+  // the served build differs from the one running in this page.
+  void checkVersion();
   setInterval(
     () => {
       void checkVersion();
@@ -106,9 +101,18 @@ onMounted(() => {
     }"
   >
     <router-view />
-    <div v-if="hasShowPrompt" class="reload-prompt">
-      <p>A new version ({{ latestVersion }}) is available!</p>
-      <button @click="reloadPage">Reload Now</button>
+    <div v-if="hasShowPrompt" class="reload-prompt" role="status">
+      <p><strong>A new version of UpStage is available.</strong></p>
+      <p class="versions">
+        You are running: {{ runningLabel }}<br />
+        Server has: {{ servedLabel }}
+      </p>
+      <p class="hint">
+        Please reload to get the latest updates (Shift + Refresh if this message stays).
+      </p>
+      <button class="button is-small is-primary" type="button" @click="reloadPage">
+        Reload Now
+      </button>
     </div>
   </a-config-provider>
 </template>
@@ -204,5 +208,17 @@ body.waiting * {
   border: 1px solid #ccc;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
   z-index: 9999;
+  max-width: 360px;
+  font-size: 14px;
+
+  .versions {
+    margin: 6px 0;
+    font-family: monospace;
+    font-size: 12px;
+  }
+
+  .hint {
+    margin-bottom: 8px;
+  }
 }
 </style>

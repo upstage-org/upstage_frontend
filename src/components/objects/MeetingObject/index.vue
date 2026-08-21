@@ -1,10 +1,12 @@
 <script>
 // Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppObject from "../Object.vue";
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, createVNode, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { useJitsiEndpoint } from "./composable";
+import { Modal } from "ant-design-vue";
+import { useI18n } from "vue-i18n";
 
 // Embed the Jitsi room as a direct <iframe> rather than via the
 // JitsiMeetExternalAPI script. Two reasons:
@@ -95,6 +97,7 @@ export default {
     const meeting = computed(() => props.object);
 
     const canPlay = computed(() => stageStore.canPlay);
+    const { t } = useI18n();
     const loading = ref(true);
     const failed = ref(false);
     let loadTimer = null;
@@ -220,13 +223,35 @@ export default {
     const retryMeeting = () => remountIframe();
 
     // Topbar "Refresh streams" button (ReloadStream.vue → refreshMeeting()):
-    // treated as a retry for failed embeds only. A loaded meeting is left
-    // alone — it would otherwise kick the performer out of the room and
-    // mute their webcam/mic on rejoin.
+    //  - failed embed: always reload (any role).
+    //  - audience (!canPlay): always reload. Their iframe has no camera/mic
+    //    delegation, so a remount is a harmless rejoin-as-viewer and gives
+    //    a real "refresh" for a frozen meeting picture.
+    //  - performer with a (seemingly) loaded meeting: we can't tell from
+    //    outside the iframe whether the meeting is really working, so offer
+    //    a force-reload behind a confirmation. A remount leaves the room
+    //    (the performer drops out for everyone) and rejoins with webcam/mic
+    //    muted, so it must be an explicit choice.
     watch(
       () => stageStore.meetingRefreshKey,
       () => {
-        if (failed.value) remountIframe();
+        if (failed.value || !canPlay.value) {
+          remountIframe();
+          return;
+        }
+        Modal.confirm({
+          title: t("refresh_meeting"),
+          content: createVNode(
+            "div",
+            { style: "color: black; white-space: pre-line;" },
+            t("refresh_meeting_force_confirm"),
+          ),
+          okText: t("refresh_meeting"),
+          okButtonProps: { danger: true },
+          onOk() {
+            remountIframe();
+          },
+        });
       },
     );
 

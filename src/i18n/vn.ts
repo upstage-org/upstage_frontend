@@ -211,6 +211,8 @@ export default {
   close_panel: "Close panel",
   refresh_meeting: "Làm mới cuộc họp",
   refresh_meeting_tooltip: "Tải lại cuộc họp nhúng nếu không tải được",
+  refresh_meeting_force_confirm:
+    "Cuộc họp có vẻ đã được tải. Bạn có chắc muốn tải lại cuộc họp này? Bạn sẽ rời cuộc họp và tham gia lại với camera và micrô bị tắt, và những người tham gia khác sẽ thấy bạn rời đi trong giây lát.",
   refresh_streams: "Làm mới luồng",
   refresh_streams_tooltip: "Thử kết nối lại các luồng video cá nhân trên sân khấu",
 };

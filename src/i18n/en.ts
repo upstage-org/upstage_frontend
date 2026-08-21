@@ -316,6 +316,8 @@ export default {
   close_panel: "Close panel",
   refresh_meeting: "Refresh meeting",
   refresh_meeting_tooltip: "Reload the embedded meeting if it failed to load",
+  refresh_meeting_force_confirm:
+    "The meeting appears to be loaded. Are you sure you want to reload this meeting? You will leave the meeting and rejoin it with your camera and microphone muted, and other participants will see you drop out briefly.",
   refresh_streams: "Refresh streams",
   refresh_streams_tooltip: "Retry attaching individual video streams on stage",
   frozen_viewers: "Frozen for {count} viewer(s)",

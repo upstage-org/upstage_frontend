@@ -134,6 +134,23 @@ const studioApiTarget = process.env.VITE_STUDIO_API_PROXY ?? "http://127.0.0.1:9
 /** Port for `vite preview` / `pnpm serve:dist` (e.g. `FRONTEND_PORT` from docker compose). */
 const previewPort = Number(process.env.FRONTEND_PORT) || 4173;
 
+// Bake the build stamp written by src/update-version.js (run first by the
+// `build` scripts) into the bundle so a running page knows which build it is.
+// App.vue compares it against the served /version.json; see
+// src/utils/buildVersion.ts. Missing file (e.g. a bare vitest run) → null,
+// which disables the prompt rather than failing the build.
+function readBuildStamp(): { version: string; builtAt: string } | null {
+  try {
+    const raw = JSON.parse(
+      fs.readFileSync(fileURLToPath(new URL("./public/version.json", import.meta.url)), "utf8"),
+    );
+    if (typeof raw?.version !== "string") return null;
+    return { version: raw.version, builtAt: typeof raw.builtAt === "string" ? raw.builtAt : "" };
+  } catch {
+    return null;
+  }
+}
+
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const previewAllowedHosts = previewAllowedHostsFromGraphqlEndpoint(env.VITE_GRAPHQL_ENDPOINT);
@@ -161,6 +178,9 @@ export default defineConfig(({ mode, command }) => {
 
   return {
     base: "/",
+    define: {
+      __UPSTAGE_BUILD__: JSON.stringify(readBuildStamp()),
+    },
     plugins: [
       vue(),
       VueDevTools(),
