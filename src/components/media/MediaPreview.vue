@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { PropType, computed } from "vue";
+import { PropType, computed, ref } from "vue";
 import { Media, MediaAttributes } from "models/studio";
 import { absolutePath } from "utils/common";
 import VideoFirstFrameThumb from "./VideoFirstFrameThumb.vue";
@@ -10,6 +10,13 @@ const props = defineProps({
     required: true,
   },
 });
+
+// Video playback preview. The list shows a cheap first-frame thumbnail
+// (VideoFirstFrameThumb); clicking it opens a modal with a playable
+// <video controls>, mirroring how images enlarge on click and audio plays
+// inline. The modal is destroyed on close so playback stops.
+const videoPreviewOpen = ref(false);
+const videoSrc = computed(() => absolutePath(props.media.fileLocation));
 
 const attributes = computed<MediaAttributes>(() => {
   return JSON.parse(props.media.description || "{}");
@@ -22,9 +29,39 @@ const attributes = computed<MediaAttributes>(() => {
     Your browser does not support the audio element.
   </audio>
   <template v-else-if="props.media.assetType.name === 'video'">
-    <div class="video-preview-frame">
+    <button
+      type="button"
+      class="video-preview-frame video-preview-trigger"
+      :title="$t('preview')"
+      :aria-label="`${$t('preview')}: ${props.media.name}`"
+      data-testid="video-preview-trigger"
+      @click="videoPreviewOpen = true"
+    >
       <VideoFirstFrameThumb :media="props.media" />
-    </div>
+      <span class="video-preview-play" aria-hidden="true">
+        <i class="fas fa-play"></i>
+      </span>
+    </button>
+    <a-modal
+      v-model:open="videoPreviewOpen"
+      :title="props.media.name"
+      :footer="null"
+      :width="720"
+      destroy-on-close
+      wrap-class-name="video-preview-modal"
+    >
+      <video
+        class="video-preview-player"
+        controls
+        autoplay
+        playsinline
+        preload="metadata"
+        data-testid="video-preview-player"
+        :src="videoSrc"
+      >
+        Your browser does not support the video tag.
+      </video>
+    </a-modal>
   </template>
   <!-- RTMP feeds: fileLocation is the stream KEY, not an image — an <img>
        would render the browser's broken-image icon. Same camera-on-dark
@@ -59,6 +96,33 @@ const attributes = computed<MediaAttributes>(() => {
   border-radius: 4px;
   overflow: hidden;
   background: #1a1a1a;
+}
+
+.video-preview-trigger {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+.video-preview-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 28px;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.video-preview-player {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
 }
 
 .stream-preview-frame {
