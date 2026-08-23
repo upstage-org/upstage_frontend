@@ -1472,4 +1472,180 @@ test.describe("features: drawing + opacity + depth @features", () => {
     await deleteObjectAdmin(admin, secondId);
     await deleteObjectAdmin(admin, placedId);
   });
+
+  // ---------------------------------------------------------------------
+  // 6. Depth-bar hover selection — the Depth tool must bring up the
+  //    manipulation frame for an UNHELD avatar (the only way to reach an
+  //    avatar buried under other objects, or abandoned by a disconnected
+  //    player), must NOT for an avatar held by another player, and the
+  //    selection must survive joinStage() (which re-runs on the presence
+  //    heartbeat and every MQTT reconnect — the old code re-pointed the
+  //    frame at the held avatar, or dismissed it, on every run).
+  // ---------------------------------------------------------------------
+
+  /** Open the Depth tool via the real left-toolbox icon; idempotent. */
+  async function openDepthTool(): Promise<void> {
+    const strip = admin.page.locator("#Depthtool");
+    if (await strip.isVisible().catch(() => false)) return;
+    await admin.page.locator('#toolbox a:has(img[src*="depth"])').first().click();
+    await strip.waitFor({ state: "visible", timeout: 10_000 });
+  }
+
+  /** Hover the (single) Depth-list tile after parking the mouse elsewhere,
+   *  so mouseenter re-fires even on consecutive calls. */
+  async function hoverOnlyDepthTile(): Promise<void> {
+    await admin.page.locator("#topbar .topbar-header .topbar-title").hover();
+    const tile = admin.page.locator("#Depthtool .skeleton").first();
+    await tile.waitFor({ state: "visible", timeout: 10_000 });
+    await tile.hover();
+  }
+
+  const activeMovable = async () => admin.live.getStageState<string | null>("activeMovable");
+
+  test("depth-bar hover: unheld avatar gets the frame; joinStage keeps it; held-by-other doesn't", async () => {
+    await showBanner(admin.page, "Test 6 — Depth-bar avatar hover", "unheld avatar → frame");
+    await settle(admin.page);
+
+    // Place any toolbox avatar (auto-holds it), then release the hold.
+    const avatarId = await admin.page.evaluate(async () => {
+      type ToolboxAvatar = { id: string | number; name?: string };
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        tools: { avatars?: ToolboxAvatar[] };
+        placeObjectOnStage: (p: unknown) => { id: string };
+      };
+      const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+      let avatar: ToolboxAvatar | undefined;
+      for (let i = 0; i < 40 && !avatar; i += 1) {
+        avatar = (stage.tools.avatars ?? [])[0];
+        if (!avatar) await sleep(250);
+      }
+      if (!avatar) throw new Error("no avatars in toolbox — re-run pnpm e2e:setup");
+      return stage.placeObjectOnStage({ ...avatar, x: 300, y: 300, w: 150, h: 150 }).id;
+    });
+    await admin.live.callStageAction("releaseAvatarHold");
+    expect(await admin.page.evaluate(() => window.__UPSTAGE_PINIA__!.user.avatarId)).toBeNull();
+    expect(await activeMovable()).toBeNull();
+
+    // Unheld avatar: depth-bar rollover brings up the frame.
+    await openDepthTool();
+    await hoverOnlyDepthTile();
+    await pollUntil("depth hover selects the unheld avatar", activeMovable, (v) => v === avatarId);
+    // The frame's resize handles render as .moveable-control dots. Every
+    // Moveable instance keeps a (mostly hidden) control box on
+    // document.body, so filter to the visible handles rather than trusting
+    // DOM order.
+    await expect(
+      admin.page.locator(".moveable-control-box .moveable-control:visible").first(),
+    ).toBeVisible({ timeout: 5_000 });
+
+    // joinStage (presence heartbeat / MQTT reconnect path) must not steal it.
+    await admin.live.callStageAction("joinStage");
+    await settle(admin.page);
+    expect(await activeMovable()).toBe(avatarId);
+
+    // Held by ANOTHER player: no frame from the depth bar.
+    await showBanner(admin.page, "Test 6 — Depth-bar avatar hover", "held by other → no frame");
+    await admin.page.evaluate((id) => {
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        UPDATE_SESSIONS_COUNTER: (s: unknown) => unknown;
+        SET_ACTIVE_MOVABLE: (id: string | null) => void;
+      };
+      stage.UPDATE_SESSIONS_COUNTER({
+        id: "e2e-fake-holder",
+        at: Date.now(),
+        nickname: "Ghost",
+        isPlayer: true,
+        userId: "e2e-fake-user",
+        avatarId: id,
+      });
+      stage.SET_ACTIVE_MOVABLE(null);
+    }, avatarId);
+    await hoverOnlyDepthTile();
+    // Give a would-be selection time to land before asserting it did not.
+    await admin.page.waitForTimeout(500);
+    expect(await activeMovable()).toBeNull();
+
+    // Claim it back: setAvatarId must select the freshly claimed avatar
+    // (claim-time selection moved out of joinStage).
+    await admin.page.evaluate((id) => {
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        UPDATE_SESSIONS_COUNTER: (s: unknown) => unknown;
+      };
+      stage.UPDATE_SESSIONS_COUNTER({ id: "e2e-fake-holder", leaving: true });
+      window.__UPSTAGE_PINIA__!.user.setAvatarId(id);
+    }, avatarId);
+    await pollUntil("claiming the avatar selects it", activeMovable, (v) => v === avatarId);
+
+    await admin.live.callStageAction("releaseAvatarHold");
+    await deleteObjectAdmin(admin, avatarId);
+  });
+
+  // ---------------------------------------------------------------------
+  // 7. Text object via the Depth bar — rollover selects it, the pen
+  //    quick-action enables editing, and typing keeps working across a
+  //    joinStage (the reported "keeps flipping while I type" regression).
+  // ---------------------------------------------------------------------
+  test("text object: depth hover + pen + typing survive joinStage", async () => {
+    await showBanner(admin.page, "Test 7 — Text via Depth bar", "hover, pen, type, heartbeat");
+    await settle(admin.page);
+
+    const textId = uuidv4();
+    await admin.live.callStageAction("addText", {
+      textId,
+      content: "hello",
+      x: 380,
+      y: 320,
+      w: 220,
+      h: 80,
+      fontSize: "32px",
+    });
+    const placedId = await admin.page.evaluate((tid) => {
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        board: { objects: Array<{ id: string; textId?: string }> };
+      };
+      const placed = stage.board.objects.find((o) => o.textId === tid);
+      if (!placed) throw new Error(`addText: no board object with textId=${tid}`);
+      return placed.id;
+    }, textId);
+
+    // Rollover in the Depth bar selects the text object (non-holdable).
+    await admin.live.callStageAction("SET_ACTIVE_MOVABLE", null);
+    await openDepthTool();
+    await hoverOnlyDepthTile();
+    await pollUntil("depth hover selects the text object", activeMovable, (v) => v === placedId);
+
+    // Pen quick-action enables editing.
+    const pen = admin.page.locator(".quick-action button:has(i.fa-pen)").first();
+    await pen.waitFor({ state: "visible", timeout: 10_000 });
+    await pen.click();
+    await pollUntil(
+      "pen toggles object.editing",
+      async () => (await admin.live.getStageState<BoardObject[]>("board.objects")) ?? [],
+      (objs) => objs.find((o) => o.id === placedId)?.editing === true,
+    );
+
+    // Type into the contenteditable text on stage.
+    const editable = admin.page.locator(`[data-object-id="${placedId}"] p[contenteditable="true"]`);
+    await editable.waitFor({ state: "visible", timeout: 10_000 });
+    await editable.click();
+    await admin.page.keyboard.type("AB", { delay: 40 });
+
+    // Heartbeat/reconnect mid-typing must not steal the selection…
+    await admin.live.callStageAction("joinStage");
+    await settle(admin.page);
+    expect(await activeMovable()).toBe(placedId);
+
+    // …and typing keeps landing in the store afterwards.
+    await admin.page.keyboard.type("CD", { delay: 40 });
+    await pollUntil(
+      "typed characters reach the store (liveTyping)",
+      async () => (await admin.live.getStageState<BoardObject[]>("board.objects")) ?? [],
+      (objs) => {
+        const content = String(objs.find((o) => o.id === placedId)?.content ?? "");
+        return content.includes("AB") && content.includes("CD");
+      },
+    );
+
+    await deleteObjectAdmin(admin, placedId);
+  });
 });

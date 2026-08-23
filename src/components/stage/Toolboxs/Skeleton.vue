@@ -148,12 +148,13 @@ export default {
         holder: props.data.holder,
       });
     const showMovable = () => {
-      // Holdable objects (avatars) may only get the manipulation frame when
-      // THIS player holds them — an unheld avatar must not be movable from a
-      // Depth-list hover any more than from an on-stage click (hold first,
-      // then manipulate). Non-holdable objects (props/streams/etc.) keep the
-      // hover frame whenever nobody-relevant blocks it.
-      if (props.real && (holdable.value ? isLocalHolder() : true)) {
+      // Depth-list hover brings up the manipulation frame for every object
+      // EXCEPT an avatar currently held by another player. Unheld avatars
+      // must get the frame too — the Depth bar is the only way to reach an
+      // avatar buried under other objects (to hold it, or to clear one left
+      // behind by a disconnected player). Only a live hold by someone else
+      // blocks the frame, since the frame allows moving/resizing.
+      if (props.real && (!props.data.holder || !holdable.value || isLocalHolder())) {
         stageStore.SET_ACTIVE_MOVABLE(props.data.id);
       }
     };

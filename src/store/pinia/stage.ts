@@ -3556,9 +3556,17 @@ export const useStageStore = defineStore(
       if (standaloneChatPresenceSuppressed.value) return;
       if (!isPlayer && userStore.avatarId != null) {
         userStore.$patch({ avatarId: null });
+        // Losing player status also forfeits any live selection frame.
+        SET_ACTIVE_MOVABLE(null);
       }
       const avatarId = isPlayer ? (userStore.avatarId ?? null) : null;
-      SET_ACTIVE_MOVABLE(avatarId);
+      // NB: do NOT SET_ACTIVE_MOVABLE(avatarId) here. joinStage re-runs on
+      // the 5-minute presence heartbeat, on every MQTT (re)connect, and on
+      // nickname save — an unconditional re-point yanked the selection frame
+      // away from whatever the player was working on (e.g. a text object
+      // opened from the Depth bar) each time, and dismissed it entirely for
+      // players holding no avatar. Claim-time selection lives in
+      // user.ts setAvatarId instead.
       const payload = buildSessionCounterPayload({ avatarId });
       // Apply locally before the broker round-trip so teardrop / holder
       // state updates immediately on release (avatarId: null) and claim.

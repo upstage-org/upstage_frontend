@@ -183,6 +183,17 @@ export const useUserStore = defineStore("user", () => {
     avatarId.value = id;
     stage.syncLocalSessionAvatarHold();
     void Promise.resolve(stage.joinStage());
+    // Select the freshly claimed avatar so its frame appears immediately
+    // (double-click hold on stage / in the Depth bar). This used to be a
+    // side effect inside joinStage, but joinStage also re-runs on the
+    // presence heartbeat and MQTT reconnects, where re-pointing the
+    // selection stole the frame from whatever the player was working on —
+    // so the claim-time selection now happens only here, at the claim.
+    // placeObjectOnStage still deliberately clears the selection right
+    // after its own setAvatarId call (drop should not leave a frame up),
+    // which runs after this line exactly as it ran after joinStage's
+    // synchronous SET_ACTIVE_MOVABLE before.
+    stage.SET_ACTIVE_MOVABLE(id);
   };
 
   const checkIsAdmin = async (): Promise<boolean | undefined> => {
