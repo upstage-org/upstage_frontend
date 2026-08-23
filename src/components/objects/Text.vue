@@ -14,11 +14,32 @@ export default {
 
     const isFocus = ref(false);
 
+    // Grow the object's frame to fit the text as it is typed. The frame
+    // (object.w/h) is only measured once, when the text is first created in
+    // TextTool.vue's saveText; editing on stage used to rely on the text
+    // simply overflowing the fixed-size box, but `.object` now clips its
+    // overflow (overflow: hidden in Object.vue), so without this the typed
+    // text disappears past the frame edge. Grow-only: never shrink, so a
+    // frame the user enlarged by hand is left alone. +10 matches saveText.
+    const fitFrameToText = () => {
+      const node = el.value;
+      if (!node) return {};
+      const neededW = node.scrollWidth + 10;
+      const neededH = node.scrollHeight + 10;
+      const w = Number(props.object.w) || 0;
+      const h = Number(props.object.h) || 0;
+      const grown = {};
+      if (neededW > w) grown.w = neededW;
+      if (neededH > h) grown.h = neededH;
+      return grown;
+    };
+
     const liveTyping = () => {
       const content = el.value.innerHTML;
       stageStore.shapeObject({
         ...props.object,
         content,
+        ...fitFrameToText(),
       });
     };
 
