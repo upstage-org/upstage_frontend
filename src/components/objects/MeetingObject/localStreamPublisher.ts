@@ -109,6 +109,39 @@ export function useLocalStreamPublisher(
     }
   };
 
+  /**
+   * Unpublish from the conference but KEEP the local tracks (and the
+   * camera) alive. Used when the performer removes their own tile from
+   * the stage (context-menu Delete, the Streams tab's Clear, a drag
+   * back off the board): the toolbar self-preview (Yourself.vue)
+   * renders these same JitsiLocalTrack instances, and
+   * `JitsiLocalTrack.dispose()` both stops the camera stream and
+   * detaches ALL attached elements — so the previous
+   * `releaseLocalTracks()` here blanked the toolbar thumbnail the
+   * moment the on-stage tile was closed, with nothing ever
+   * re-acquiring it. `conference.removeTrack()` is
+   * `replaceTrack(track, null)` in lib-jitsi-meet: it stops sending to
+   * the room (and fires TRACK_REMOVED, which cleans the store's
+   * board.tracks) without touching the local MediaStream, so the
+   * preview keeps rendering. Re-placing the tile re-publishes the same
+   * tracks via the board watcher (the same remove+add of one
+   * JitsiLocalTrack the force-republish path already relies on).
+   * Full disposal still happens on route teardown (onUnmounted) and
+   * when publishing becomes disallowed (publishingAllowed watcher).
+   */
+  const unpublishLocalTracks = async () => {
+    pendingPublish.value = false;
+    published.value = false;
+    if (!jitsi?.room) return;
+    for (const t of tracks) {
+      try {
+        await jitsi.room.removeTrack(t);
+      } catch (err) {
+        console.warn("room.removeTrack (unpublish) failed:", err);
+      }
+    }
+  };
+
   const countOwnJitsiOnBoard = (): number => {
     const myId = jitsi?.room?.myUserId?.();
     const mySession = stageStore.session;
@@ -197,7 +230,18 @@ export function useLocalStreamPublisher(
     // so it acquires once and stays put; this makes Chromium behave the same.
     // A genuine device removal ends the track (isEnded → true), so real
     // device changes still fall through and re-acquire.
-    if (published.value && tracksAreHealthy()) return;
+    //
+    // The guard deliberately does NOT require `published`: healthy
+    // preview-only tracks (acquired, not yet dragged on stage — or just
+    // unpublished because the own tile was closed) must survive these
+    // spurious events too. The old `published && healthy` guard let every
+    // DEVICE_LIST_CHANGED / wake-refocus dispose and re-create the
+    // unpublished preview tracks; when the re-getUserMedia then failed
+    // (e.g. an embedded Meeting iframe holding the camera on a
+    // non-sharing device/OS) the `blocked` latch replaced the toolbar
+    // thumbnail — the "thumbnail sometimes disappears when I drag / when
+    // I unmute my cam in a meeting" reports.
+    if (tracksAreHealthy()) return;
     if (typeof window !== "undefined" && !window.isSecureContext) {
       setBlocked(
         "Camera/mic require an HTTPS connection. Reload this page over https:// and try again.",
@@ -413,7 +457,11 @@ export function useLocalStreamPublisher(
         return;
       }
       if (prevOwnJitsiCount > 0 && count === 0) {
-        releaseLocalTracks();
+        // Own tile(s) closed: stop sending to the conference but keep the
+        // local tracks so the toolbar self-preview stays live (see
+        // unpublishLocalTracks above; releaseLocalTracks here killed the
+        // thumbnail permanently).
+        void unpublishLocalTracks();
       } else if (count > 0 && !published.value && publishingAllowed()) {
         pendingPublish.value = true;
         void tryPublishWhenReady("own-jitsi-on-board");

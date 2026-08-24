@@ -65,6 +65,15 @@ export default {
       if (localTracks.value.length > 0) {
         attachPreview();
         loading.value = false;
+      } else {
+        // The publisher released the local tracks while this preview is
+        // visible (e.g. a legacy dispose path or a genuine device loss).
+        // Show the loading state instead of a dead black <video> and ask
+        // the publisher to re-acquire; ensureTracks no-ops when acquiring
+        // is not allowed (audience / streaming off / blocked latch), so
+        // this can never fight the deliberate release paths.
+        loading.value = true;
+        void publisher?.ensureTracks?.();
       }
     });
 
