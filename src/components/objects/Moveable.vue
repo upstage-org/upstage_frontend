@@ -293,7 +293,7 @@ export default {
       }
     });
 
-    return { el, isDragging, clickInside, clickOutside, transformOrigin };
+    return { el, isDragging, clickInside, clickOutside, transformOrigin, activeMovable };
   },
 };
 </script>
@@ -311,6 +311,17 @@ export default {
          the gesture and pans the page instead. Audience (not controlable)
          keeps default scrolling. */
       'touch-action': controlable ? 'none' : 'auto',
+      /* Selected object (green frame) is raised LOCALLY so a Depth-bar
+         rollover makes a buried object clickable/draggable through the
+         objects stacked over it — the whole point of the Depth tool. The
+         raise must live on THIS wrapper: the always-set `filter` above (and
+         `opacity` < 1) makes the wrapper a stacking context, so the old
+         z-index raise on the inner `.object` (Object.vue) could never
+         escape it and clicks kept landing on the covering object. Local
+         render state only — depth order on the board (and for everyone
+         else) is untouched. 30 stays under the object's own control overlay
+         (z-index 100 in Object.vue). */
+      ...(activeMovable ? { zIndex: 30 } : {}),
     }"
     @mousedown="clickInside"
     @touchstart="clickInside"

@@ -1648,4 +1648,138 @@ test.describe("features: drawing + opacity + depth @features", () => {
 
     await deleteObjectAdmin(admin, placedId);
   });
+
+  // ---------------------------------------------------------------------
+  // 8. Depth-bar buried object is actually USABLE — the whole point of the
+  //    tool. Rolling over a buried prop's Depth tile shows its frame, and a
+  //    real mouse click inside that frame must land on the BURIED prop (so
+  //    it can be dragged out from behind), not on the prop covering it.
+  //    Before the wrapper-level z-index raise in Moveable.vue, the covering
+  //    prop won the browser hit-test, stole the selection on mousedown, and
+  //    the buried object could only ever be deleted, never manipulated.
+  // ---------------------------------------------------------------------
+  test("depth-bar selection lets a buried prop be clicked and dragged out", async () => {
+    await showBanner(admin.page, "Test 8 — Buried prop via Depth bar", "click through the cover");
+    await settle(admin.page);
+
+    const propKeys = Object.keys(runtime.props);
+    if (propKeys.length < 1) {
+      test.skip(true, "runtime.json has no props — re-run pnpm e2e:setup");
+    }
+    // Bottom prop first (placement order = z-order), then a bigger prop
+    // fully covering it.
+    const buriedId = await placeProp({
+      admin,
+      runtime,
+      propKey: propKeys[0],
+      to: { x: 330, y: 330 },
+      size: { w: 160, h: 160 },
+    });
+    const coverId = await placeProp({
+      admin,
+      runtime,
+      propKey: propKeys[1] ?? propKeys[0],
+      to: { x: 280, y: 280 },
+      size: { w: 260, h: 260 },
+    });
+
+    const buriedEl = admin.page.locator(`[data-object-id="${buriedId}"]`);
+    await buriedEl.waitFor({ state: "attached", timeout: 10_000 });
+    // Placement runs an enter animation (Board.vue avatarEnter: scale 0→1,
+    // translateY -200→0), so an immediate boundingBox() reads distorted
+    // mid-animation geometry and the computed click point lands on empty
+    // board. Wait until the box holds still between two polls.
+    let prevBox = "";
+    const settledBox = await pollUntil(
+      "buried prop's bounding box settles after the enter animation",
+      async () => {
+        const b = await buriedEl.boundingBox();
+        const cur = b ? [b.x, b.y, b.width, b.height].map((n) => Math.round(n)).join(",") : "none";
+        const stable = b != null && cur === prevBox;
+        prevBox = cur;
+        return stable ? { box: b! } : { settling: cur };
+      },
+      (v) => "box" in v,
+    );
+    const box = ("box" in settledBox ? settledBox.box : null)!;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    // Placement enter-animations translate/scale the props in (Board.vue
+    // avatarEnter); until they settle the covering prop is not actually
+    // over the click point yet. Gate on the browser's own hit-test.
+    await admin.live.callStageAction("SET_ACTIVE_MOVABLE", null);
+    await pollUntil(
+      "covering prop wins the hit-test once placement animations settle",
+      async () =>
+        admin.page.evaluate(
+          ({ x, y }) => {
+            const el = document.elementFromPoint(x, y);
+            return (
+              el?.closest?.("[data-object-id]")?.getAttribute("data-object-id") ??
+              (el ? `MISS:${el.tagName}.${String(el.className)}#${el.id}` : "MISS:none")
+            );
+          },
+          { x: cx, y: cy },
+        ),
+      (v) => v === coverId,
+    );
+
+    // Control: with nothing selected, a click at the overlap goes to the
+    // COVERING prop — proving the covering prop really does win the hit-test
+    // and that this test can catch a regression of the raise.
+    await admin.page.mouse.click(cx, cy);
+    await pollUntil("plain click selects the covering prop", activeMovable, (v) => v === coverId);
+
+    // Depth-bar rollover on the buried prop's tile (board order = tile
+    // order, so the bottom prop is the first tile).
+    await admin.live.callStageAction("SET_ACTIVE_MOVABLE", null);
+    await openDepthTool();
+    await hoverOnlyDepthTile();
+    await pollUntil("depth hover selects the buried prop", activeMovable, (v) => v === buriedId);
+
+    // Click inside the green frame: the buried prop must KEEP the selection.
+    await admin.page.mouse.click(cx, cy);
+    // Give a would-be steal time to land before asserting it did not.
+    await admin.page.waitForTimeout(500);
+    expect(await activeMovable()).toBe(buriedId);
+
+    // Drag it out from behind the cover with a real mouse gesture.
+    const before = await admin.live.getStageState<BoardObject[]>("board.objects");
+    const buriedBefore = before!.find((o) => o.id === buriedId)!;
+    const coverBefore = before!.find((o) => o.id === coverId)!;
+    await admin.page.mouse.move(cx, cy);
+    await admin.page.mouse.down();
+    await admin.page.mouse.move(cx + 220, cy, { steps: 12 });
+    await admin.page.mouse.up();
+
+    await pollUntil(
+      "buried prop moved right; covering prop stayed put",
+      async () => (await admin.live.getStageState<BoardObject[]>("board.objects")) ?? [],
+      (objs) => {
+        const buried = objs.find((o) => o.id === buriedId);
+        const cover = objs.find((o) => o.id === coverId);
+        return (
+          buried != null &&
+          cover != null &&
+          (buried.x ?? 0) > (buriedBefore.x ?? 0) + 120 &&
+          cover.x === coverBefore.x &&
+          cover.y === coverBefore.y
+        );
+      },
+    );
+    // Depth order itself must be untouched — the raise is local render
+    // state only, never published.
+    const after = await admin.live.getStageState<BoardObject[]>("board.objects");
+    const ids = after!.map((o) => o.id);
+    expect(ids.indexOf(buriedId)).toBeLessThan(ids.indexOf(coverId));
+
+    await admin.page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "depth-buried-drag-admin.png"),
+      fullPage: false,
+    });
+
+    await deleteObjectAdmin(admin, buriedId);
+    await deleteObjectAdmin(admin, coverId);
+  });
 });
