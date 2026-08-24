@@ -33,16 +33,21 @@ watch(
 // "New version available" check — see src/utils/buildVersion.ts. The bundle
 // knows its own build (`__UPSTAGE_BUILD__`, baked in by vite.config.ts); the
 // server's current build is /version.json. When they differ the prompt asks
-// the user to reload. Hidden on the Live stage route so it never covers a
-// running performance.
+// the user to reload. Shown on every route, including the Live stage —
+// dismissable (×) so it never has to sit over a running performance; it
+// returns only if the served build changes again after a dismissal.
 const running = runningBuild();
 const servedBuild = ref<BuildInfo | null>(null);
 const showReloadPrompt = computed(() => needsReload(running, servedBuild.value));
 
-const hasShowPrompt = computed(() => {
-  const isExcludedRoute = ["Live"].includes(route.name as string);
-  return showReloadPrompt.value && !isExcludedRoute;
-});
+const dismissedVersion = ref<string | null>(null);
+const dismissPrompt = () => {
+  dismissedVersion.value = servedBuild.value?.version ?? null;
+};
+
+const hasShowPrompt = computed(
+  () => showReloadPrompt.value && servedBuild.value?.version !== dismissedVersion.value,
+);
 
 const runningLabel = computed(() => (running ? describeBuild(running) : ""));
 const servedLabel = computed(() => (servedBuild.value ? describeBuild(servedBuild.value) : ""));
@@ -102,6 +107,15 @@ onMounted(() => {
   >
     <router-view />
     <div v-if="hasShowPrompt" class="reload-prompt" role="status">
+      <button
+        class="dismiss"
+        type="button"
+        aria-label="Dismiss"
+        title="Dismiss until the next new version"
+        @click="dismissPrompt"
+      >
+        &times;
+      </button>
       <p><strong>A new version of UpStage is available.</strong></p>
       <p class="versions">
         You are running: {{ runningLabel }}<br />
@@ -210,6 +224,23 @@ body.waiting * {
   z-index: 9999;
   max-width: 360px;
   font-size: 14px;
+
+  .dismiss {
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    color: #666;
+    cursor: pointer;
+
+    &:hover {
+      color: #000;
+    }
+  }
 
   .versions {
     margin: 6px 0;
