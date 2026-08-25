@@ -5,13 +5,8 @@ import { useTitle } from "@vueuse/core";
 import { useStageViewport } from "@composables/useStageViewport";
 import { useUserStore } from "@stores/pinia/user";
 import { useConfigStore } from "@stores/pinia/config";
-import {
-  describeBuild,
-  needsReload,
-  parseServedBuild,
-  runningBuild,
-  type BuildInfo,
-} from "@utils/buildVersion";
+import { describeBuild, needsReload, runningBuild } from "@utils/buildVersion";
+import { startServedBuildPolling, useServedBuild } from "@composables/useServedBuild";
 import "styles/bulma.css";
 import "styles/bulma_slider.css";
 import "styles/custom.less";
@@ -37,7 +32,7 @@ watch(
 // dismissable (×) so it never has to sit over a running performance; it
 // returns only if the served build changes again after a dismissal.
 const running = runningBuild();
-const servedBuild = ref<BuildInfo | null>(null);
+const servedBuild = useServedBuild();
 const showReloadPrompt = computed(() => needsReload(running, servedBuild.value));
 
 const dismissedVersion = ref<string | null>(null);
@@ -52,19 +47,6 @@ const hasShowPrompt = computed(
 const runningLabel = computed(() => (running ? describeBuild(running) : ""));
 const servedLabel = computed(() => (servedBuild.value ? describeBuild(servedBuild.value) : ""));
 
-const checkVersion = async (): Promise<void> => {
-  try {
-    const response = await fetch("/version.json", {
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) return;
-    servedBuild.value = parseServedBuild(await response.json());
-  } catch (error) {
-    console.error("Failed to check version:", error);
-  }
-};
-
 const reloadPage = () => {
   window.location.reload();
 };
@@ -77,13 +59,7 @@ onMounted(() => {
 
   // Poll /version.json on mount and every 3 minutes; the prompt shows while
   // the served build differs from the one running in this page.
-  void checkVersion();
-  setInterval(
-    () => {
-      void checkVersion();
-    },
-    3 * 60 * 1000,
-  );
+  startServedBuildPolling();
 });
 </script>
 
