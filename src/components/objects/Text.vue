@@ -24,8 +24,17 @@ export default {
     const fitFrameToText = () => {
       const node = el.value;
       if (!node) return {};
-      const neededW = node.scrollWidth + 10;
-      const neededH = node.scrollHeight + 10;
+      // Measure the text's INTRINSIC size, not the scroll box: scrollWidth/
+      // scrollHeight are clamped to the clientWidth/Height of the p (which
+      // fills the frame), so "scrollWidth + 10 > w" held on every keystroke
+      // once the frame tracked instantly and the frame ratcheted +10 per
+      // keyup forever. width: max-content shrink-wraps the p (and its
+      // <div> lines) to the widest line for one synchronous measure.
+      const prevWidth = node.style.width;
+      node.style.width = "max-content";
+      const neededW = node.offsetWidth + 10;
+      const neededH = node.offsetHeight + 10;
+      node.style.width = prevWidth;
       const w = Number(props.object.w) || 0;
       const h = Number(props.object.h) || 0;
       const grown = {};
@@ -45,6 +54,22 @@ export default {
 
     onMounted(() => {
       el.value.innerHTML = props.object.content;
+      // The `.object` wrapper (our parent) clips with overflow: hidden, which
+      // still makes it a scroll container: while the frame is animating to a
+      // fitFrameToText-grown size, the browser scrolls it to keep the typing
+      // caret visible, and that offset PERSISTS after the frame catches up —
+      // the whole text sits shifted up/left inside the frame, so the top of
+      // the first line renders clipped even though the frame is big enough.
+      // Nothing ever scrolls this box on purpose; pin it at 0.
+      const box = el.value.parentElement;
+      if (box) {
+        const unscroll = () => {
+          if (box.scrollTop !== 0) box.scrollTop = 0;
+          if (box.scrollLeft !== 0) box.scrollLeft = 0;
+        };
+        box.addEventListener("scroll", unscroll);
+        unscroll();
+      }
     });
     watch(
       () => props.object.content,

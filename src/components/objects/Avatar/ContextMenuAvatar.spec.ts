@@ -103,6 +103,28 @@ describe("ContextMenuAvatar after the stream-menu split", () => {
     );
   });
 
+  it("commits the animation speed on change and closes the menu; typing keeps it open", async () => {
+    const wrapper = mountMenu({ id: "m1", type: "avatar", multi: true, frames: ["a", "b"] });
+    const input = wrapper.find("input.anmation-input");
+    expect(input.exists()).toBe(true);
+
+    // Live typing (@input) applies the value but must NOT close the menu.
+    (input.element as HTMLInputElement).value = "2";
+    await input.trigger("input");
+    expect(shapeObject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "m1", autoplayFrames: 2 }),
+    );
+    expect(wrapper.props("closeMenu")).not.toHaveBeenCalled();
+
+    // Commit (@change — Enter / blur / spinner) applies AND closes.
+    (input.element as HTMLInputElement).value = "3.5";
+    await input.trigger("change");
+    expect(shapeObject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "m1", autoplayFrames: 3.5 }),
+    );
+    expect(wrapper.props("closeMenu")).toHaveBeenCalled();
+  });
+
   it("offers an explicit close item that only closes the menu", async () => {
     const wrapper = mountMenu({ id: "o4", type: "avatar" });
     const closeItem = wrapper.find("[data-testid='close-context-menu']");

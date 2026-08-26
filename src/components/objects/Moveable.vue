@@ -251,7 +251,13 @@ export default {
           scaleX,
           scaleY,
           ...(moveSpeed > 1000 ? { easing: "linear" } : {}),
-          duration: moveSpeed ?? config.animateDuration,
+          // While a text object is in editing mode its frame is grown by
+          // fitFrameToText on every keystroke; tweening that growth over
+          // moveSpeed leaves the just-typed line clipped for seconds (the
+          // box may not be scrolled to reveal it — Text.vue pins the
+          // clip-box scroll at 0). Track the text instantly instead.
+          // `editing` only ever exists on text objects.
+          duration: x.editing ? 0 : (moveSpeed ?? config.animateDuration),
           onUpdate: () => {
             try {
               moveable.updateRect();

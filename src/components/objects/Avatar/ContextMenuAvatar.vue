@@ -208,6 +208,14 @@ export default {
         autoplayFrames: speed ?? 0,
       });
     };
+    // `change` fires when the value is COMMITTED (Enter, blur, or a spinner
+    // click) — apply once more and dismiss, matching the menu convention
+    // that every pick closes it. Typing still previews live via @input
+    // without closing mid-entry.
+    const commitAnimationSpeed = (e) => {
+      handleChangeAnimationSpeed(e);
+      props.closeMenu();
+    };
 
     const pauseVideo = () => {
       stageStore.shapeObject({
@@ -303,6 +311,7 @@ export default {
 
       animationSpeed,
       handleChangeAnimationSpeed,
+      commitAnimationSpeed,
       pauseVideo,
       playVideo,
       openVolumePopup,
@@ -461,6 +470,7 @@ export default {
         :value="animationSpeed"
         placeholder="seconds"
         @input="handleChangeAnimationSpeed"
+        @change="commitAnimationSpeed"
       />
     </div>
 
