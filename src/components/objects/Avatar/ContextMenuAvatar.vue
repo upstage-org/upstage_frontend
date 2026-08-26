@@ -1,7 +1,7 @@
 <script>
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
-import { computed, inject, ref } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import Icon from "components/Icon.vue";
 import {
   coerceNumber,
@@ -85,7 +85,10 @@ export default {
               lastAutoplayFrames: props.object.autoplayFrames,
             }
           : {
-              autoplayFrames: props.object.lastAutoplayFrames || 1,
+              // A number typed in the speed field but not yet committed
+              // with Enter ("armed") wins — pressing ▶ right after typing
+              // must not silently replay the OLD speed.
+              autoplayFrames: armedAnimationSpeed() || props.object.lastAutoplayFrames || 1,
             }),
       });
       emit("update:active", true);
@@ -195,27 +198,68 @@ export default {
       window.open(url, blank ? "_blank" : "_self").focus();
     };
 
-    const animationSpeed = computed(() => {
-      return props.object.autoplayFrames || "";
-    });
-    const handleChangeAnimationSpeed = (e) => {
-      // Coerce so Firefox / Safari behave like Chromium: bare `e.target.value`
-      // is a string, may contain non-numeric characters in Firefox, and
-      // doesn't honour `step="0.5"` until blur.
-      const speed = coerceNumber(e.target.value, { min: 0, step: 0.5 });
+    // The speed field is LOCAL until committed with Enter (user request
+    // 2026-08-27, "wait for a cue"): a player types the seconds, waits, and
+    // starts the animation on Enter. It used to preview live on @input
+    // (shapeObject per keystroke), which meant the animation started on the
+    // first keystroke — and with Loop off the play-once run it had started
+    // finished a few seconds later, cleared `autoplayFrames`, and the
+    // store-computed :value wiped the field while the player was still
+    // waiting. The spinner arrows arm the value the same way; nothing
+    // starts until Enter.
+    const animationSpeed = ref(props.object.autoplayFrames || "");
+    watch(
+      () => props.object.autoplayFrames,
+      (speed) => {
+        // Reflect real speed changes (another player, the ▶ button); a
+        // clearing (pause, or a play-once run finishing) keeps the typed
+        // number in place so it can be committed on cue.
+        if (speed) animationSpeed.value = speed;
+      },
+    );
+    const handleInputAnimationSpeed = (e) => {
+      animationSpeed.value = e.target.value;
+    };
+    // Coerce so Firefox / Safari behave like Chromium: the raw value is a
+    // string, may contain non-numeric characters in Firefox, and the input
+    // doesn't honour `step="0.5"` until blur.
+    const armedAnimationSpeed = () => coerceNumber(animationSpeed.value, { min: 0, step: 0.5 });
+    const commitAnimationSpeed = () => {
       stageStore.shapeObject({
         ...props.object,
-        autoplayFrames: speed ?? 0,
+        autoplayFrames: armedAnimationSpeed() ?? 0,
       });
-    };
-    // `change` fires when the value is COMMITTED (Enter, blur, or a spinner
-    // click) — apply once more and dismiss, matching the menu convention
-    // that every pick closes it. Typing still previews live via @input
-    // without closing mid-entry.
-    const commitAnimationSpeed = (e) => {
-      handleChangeAnimationSpeed(e);
       props.closeMenu();
     };
+    // Enter closes the menu from anywhere (user request 2026-08-27: switch
+    // frames a few times, then Enter to dismiss). Inside the speed field
+    // Enter also COMMITS the armed value — that is what starts the
+    // animation now. Document-level (capture) rather than a root @keydown:
+    // Safari doesn't focus <button>s on click, so after a thumbnail pick
+    // the keystroke may land on <body> and would never bubble through the
+    // menu. Text-entry targets outside the menu (chat box, text objects)
+    // keep their Enter.
+    const onDocumentEnterKey = (e) => {
+      if (e.key !== "Enter" || e.isComposing) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (target?.closest(".avatar-context-menu")) {
+        // Also swallows the default re-click of a focused thumbnail button.
+        e.preventDefault();
+        if (target.classList.contains("anmation-input")) {
+          commitAnimationSpeed();
+        } else {
+          props.closeMenu();
+        }
+      } else if (
+        target &&
+        !["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) &&
+        !target.isContentEditable
+      ) {
+        props.closeMenu();
+      }
+    };
+    onMounted(() => document.addEventListener("keydown", onDocumentEnterKey, true));
+    onBeforeUnmount(() => document.removeEventListener("keydown", onDocumentEnterKey, true));
 
     const pauseVideo = () => {
       stageStore.shapeObject({
@@ -310,8 +354,7 @@ export default {
       openLink,
 
       animationSpeed,
-      handleChangeAnimationSpeed,
-      commitAnimationSpeed,
+      handleInputAnimationSpeed,
       pauseVideo,
       playVideo,
       openVolumePopup,
@@ -461,6 +504,11 @@ export default {
         </span>
         <span>{{ "Animation speed" }}</span>
       </span>
+      <!-- Typing / spinner clicks only ARM the value; Enter commits it
+           (starts the animation) and closes the menu — handled by the
+           document-level keydown listener in setup. No @change: a blur
+           commit would start the animation off-cue when the player clicks
+           elsewhere after typing. -->
       <input
         class="input anmation-input"
         type="number"
@@ -469,8 +517,8 @@ export default {
         min="0"
         :value="animationSpeed"
         placeholder="seconds"
-        @input="handleChangeAnimationSpeed"
-        @change="commitAnimationSpeed"
+        :title="$t('animation_speed_tooltip')"
+        @input="handleInputAnimationSpeed"
       />
     </div>
 

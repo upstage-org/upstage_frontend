@@ -108,6 +108,8 @@ export default {
   add_to_avatar: "Adicionar o avatar",
   multiframe_loop_tooltip:
     "Repetir: ligado, os quadros repetem sem parar; desligado (ícone esmaecido), percorre todos os quadros uma vez e para.",
+  animation_speed_tooltip:
+    "Velocidade da animação: segundos por quadro. Digite o número e pressione Enter para iniciar a animação e fechar este menu.",
   volume_setting: "Ajustar o volume",
   bring_forward: "Avançar",
   send_back: "Mandar de volta",

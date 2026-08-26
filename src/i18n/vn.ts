@@ -83,6 +83,8 @@ export default {
   add_to_avatar: "Thêm vào hình đại diện",
   multiframe_loop_tooltip:
     "Lặp: bật thì các khung chạy lại liên tục; tắt (biểu tượng mờ) thì chỉ phát một lần qua hết các khung rồi dừng.",
+  animation_speed_tooltip:
+    "Tốc độ hoạt hình: số giây cho mỗi khung. Nhập số rồi nhấn Enter để bắt đầu hoạt hình và đóng menu này.",
   volumn_setting: "Cài đặt cột",
   bring_forward: "Mang về phía trước",
   send_back: "Gửi lại",

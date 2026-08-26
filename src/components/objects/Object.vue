@@ -9,6 +9,7 @@ import {
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "@utils/common";
+import { autoplayStartFrame } from "@utils/frameAnimation";
 import { effectiveFrameFitId, frameShapeStyle } from "./frameShapes";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
@@ -86,6 +87,13 @@ export default {
             frameAnimation.currentFrame = src ?? frames?.[0] ?? null;
             const intervalMs = parseFloat(String(autoplayFrames)) * 1000;
             if (!(intervalMs > 0) || !frames?.length) return;
+            // Rewind only once the run is actually starting (guards above),
+            // so an invalid speed can't jump the displayed frame.
+            frameAnimation.currentFrame = autoplayStartFrame(
+              frames,
+              frameAnimation.currentFrame,
+              props.object.frameLoop,
+            );
             _warmFrames = frames.map((frame) => {
               const img = new Image();
               img.src = frame;

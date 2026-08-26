@@ -95,6 +95,8 @@ export default {
   add_to_avatar: "Add to avatar",
   multiframe_loop_tooltip:
     "Loop: when on, frames repeat continuously. When off (dimmed), play runs through all frames once then stops.",
+  animation_speed_tooltip:
+    "Animation speed: seconds per frame. Type the number, then press Enter to start the animation and close this menu.",
   volumn_setting: "Volume setting (local)",
   mute_locally: "Mute locally",
   unmute_locally: "Unmute locally",

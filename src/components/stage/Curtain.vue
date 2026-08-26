@@ -2,6 +2,7 @@
 import { computed, onUnmounted, reactive, watch } from "vue";
 import { animate } from "animejs";
 import { useStageStore } from "@stores/pinia/stage";
+import { autoplayStartFrame } from "@utils/frameAnimation";
 export default {
   setup: () => {
     const stageStore = useStageStore();
@@ -55,31 +56,35 @@ export default {
           const holdSec = parseFloat(String(dwell ?? 0));
           const cycleMs = (fadeSec + (Number.isFinite(holdSec) ? holdSec : 0)) * 1000;
           if (cycleMs <= 0) return;
-          frameAnimation.interval = setInterval(
-            () => {
-              const c = stageStore.curtain;
-              if (!c?.frames?.length) return;
-              const fr = c.frames;
-              const idx = fr.indexOf(frameAnimation.currentFrame);
-              let next = idx + 1;
-              if (next >= fr.length) {
-                if (c.frameLoop !== false) {
-                  next = 0;
-                } else {
-                  clearFrameInterval();
-                  stageStore.drawCurtain({
-                    ...c,
-                    speed: 0,
-                    lastSpeed: c.lastSpeed ?? c.speed ?? 0.5,
-                    currentFrame: frameAnimation.currentFrame ?? fr[fr.length - 1],
-                  });
-                  return;
-                }
-              }
-              frameAnimation.currentFrame = fr[next];
-            },
-            cycleMs,
+          // A play-once run parked on the final frame would stop on its
+          // first tick without advancing — rewind it to frame one.
+          frameAnimation.currentFrame = autoplayStartFrame(
+            frames,
+            frameAnimation.currentFrame,
+            value.frameLoop,
           );
+          frameAnimation.interval = setInterval(() => {
+            const c = stageStore.curtain;
+            if (!c?.frames?.length) return;
+            const fr = c.frames;
+            const idx = fr.indexOf(frameAnimation.currentFrame);
+            let next = idx + 1;
+            if (next >= fr.length) {
+              if (c.frameLoop !== false) {
+                next = 0;
+              } else {
+                clearFrameInterval();
+                stageStore.drawCurtain({
+                  ...c,
+                  speed: 0,
+                  lastSpeed: c.lastSpeed ?? c.speed ?? 0.5,
+                  currentFrame: frameAnimation.currentFrame ?? fr[fr.length - 1],
+                });
+                return;
+              }
+            }
+            frameAnimation.currentFrame = fr[next];
+          }, cycleMs);
         }
       },
       { immediate: true },
@@ -206,11 +211,7 @@ export default {
 <template>
   <div :style="{ opacity: canPlay ? 0.5 : 1 }">
     <transition @enter="curtainEnter" @leave="curtainLeave">
-      <div
-        v-if="curtain && displaySrc"
-        class="curtain"
-        :class="{ 'dual-left': dualCurtain }"
-      >
+      <div v-if="curtain && displaySrc" class="curtain" :class="{ 'dual-left': dualCurtain }">
         <transition name="frame-fade">
           <img :key="displaySrc" :src="displaySrc" class="curtain-img" />
         </transition>

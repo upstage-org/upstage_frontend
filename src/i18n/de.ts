@@ -83,4 +83,6 @@ export default {
   refresh_streams_tooltip: "Einzelne Videostreams auf der Bühne erneut verbinden",
   multiframe_loop_tooltip:
     "Wiederholung: eingeschaltet laufen die Bilder endlos. Aus (ausgegraut): alle Bilder einmal abspielen, dann Stopp.",
+  animation_speed_tooltip:
+    "Animationstempo: Sekunden pro Bild. Zahl eingeben und mit Enter die Animation starten (schließt das Menü).",
 };

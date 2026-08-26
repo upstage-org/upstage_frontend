@@ -206,6 +206,34 @@ try {
   check(state2.obj.h >= state2.p.h, `re-edit: frame h ${state2.obj.h} >= text h ${state2.p.h}`);
   check(state2.scrollTop === 0 && state2.scrollLeft === 0, `re-edit: clip box not scrolled (${state2.scrollTop},${state2.scrollLeft})`);
 
+  // --- Shrink round: still editing — replace the whole multi-line text with
+  // one short line and verify the frame shrinks back to fit (two-way fit;
+  // a stale oversized frame would invisibly cover the stage). ---
+  await stageP.click();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("shrunk back", { delay: 5 });
+  await page.waitForTimeout(800);
+  const state3 = await obj.evaluate((el) => {
+    const p = el.querySelector("p");
+    const o = el.getBoundingClientRect();
+    const pr = p.getBoundingClientRect();
+    const stage = window.__UPSTAGE_PINIA__.stage;
+    const bo = stage.board.objects.find((x) => x.type === "text");
+    return {
+      obj: { top: o.top, h: o.height, w: o.width },
+      p: { top: pr.top, h: pr.height, w: pr.width },
+      store: bo ? { w: bo.w, h: bo.h } : null,
+    };
+  });
+  log("after shrink:", JSON.stringify(state3));
+  check(state3.obj.h < state2.obj.h - 5, `shrink: frame h ${state3.obj.h} < pre-shrink ${state2.obj.h}`);
+  check(state3.obj.w < state2.obj.w - 5, `shrink: frame w ${state3.obj.w} < pre-shrink ${state2.obj.w}`);
+  check(state3.p.top >= state3.obj.top - 0.5, `shrink: p top ${state3.p.top} within frame top ${state3.obj.top}`);
+  check(state3.obj.h >= state3.p.h - 0.5, `shrink: frame h ${state3.obj.h} still fits text h ${state3.p.h}`);
+  if (state3.store) {
+    check(Math.abs(state3.store.h - state3.obj.h) < 3, `shrink: store h ${state3.store.h} ≈ DOM h ${state3.obj.h}`);
+  }
+
   // --- Broadcast + audience view: light the bulb, then look from a second
   // browser context (not logged in => audience). ---
   await pen.click(); // leave editing mode first
@@ -243,7 +271,7 @@ try {
     log("audience view:", JSON.stringify(aud));
     check(aud.p.top >= aud.obj.top - 0.5, `audience: p top ${aud.p.top} within frame top ${aud.obj.top}`);
     check(aud.obj.h >= aud.p.h - 0.5, `audience: frame h ${aud.obj.h} >= text h ${aud.p.h}`);
-    check(aud.text.includes("re-entering"), "audience sees the full latest content");
+    check(aud.text.includes("shrunk back"), "audience sees the full latest content");
     const audBox = await audObj.boundingBox();
     await page2.screenshot({
       path: `${SHOT_DIR}/text-fit-audience.png`,

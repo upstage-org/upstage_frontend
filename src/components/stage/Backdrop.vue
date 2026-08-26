@@ -2,6 +2,7 @@
 import { computed, reactive } from "vue";
 import { watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { autoplayStartFrame } from "@utils/frameAnimation";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "../Image.vue";
 
@@ -49,32 +50,36 @@ export default {
           const holdSec = parseFloat(dwell || 0);
           const cycleMs = (fadeSec + holdSec) * 1000;
           if (cycleMs <= 0) return;
-          frameAnimation.interval = setInterval(
-            () => {
-              const bg = stageStore.background;
-              if (!bg?.frames?.length) return;
-              const fr = bg.frames;
-              const idx = fr.indexOf(frameAnimation.currentFrame);
-              let next = idx + 1;
-              if (next >= fr.length) {
-                if (bg.frameLoop !== false) {
-                  next = 0;
-                } else {
-                  clearInterval(frameAnimation.interval);
-                  frameAnimation.interval = null;
-                  stageStore.setBackground({
-                    ...bg,
-                    speed: 0,
-                    lastSpeed: bg.lastSpeed ?? bg.speed ?? 0.5,
-                    currentFrame: frameAnimation.currentFrame ?? fr[fr.length - 1],
-                  });
-                  return;
-                }
-              }
-              frameAnimation.currentFrame = fr[next];
-            },
-            cycleMs,
+          // A play-once run parked on the final frame would stop on its
+          // first tick without advancing — rewind it to frame one.
+          frameAnimation.currentFrame = autoplayStartFrame(
+            frames,
+            frameAnimation.currentFrame,
+            value.frameLoop,
           );
+          frameAnimation.interval = setInterval(() => {
+            const bg = stageStore.background;
+            if (!bg?.frames?.length) return;
+            const fr = bg.frames;
+            const idx = fr.indexOf(frameAnimation.currentFrame);
+            let next = idx + 1;
+            if (next >= fr.length) {
+              if (bg.frameLoop !== false) {
+                next = 0;
+              } else {
+                clearInterval(frameAnimation.interval);
+                frameAnimation.interval = null;
+                stageStore.setBackground({
+                  ...bg,
+                  speed: 0,
+                  lastSpeed: bg.lastSpeed ?? bg.speed ?? 0.5,
+                  currentFrame: frameAnimation.currentFrame ?? fr[fr.length - 1],
+                });
+                return;
+              }
+            }
+            frameAnimation.currentFrame = fr[next];
+          }, cycleMs);
         }
       },
       { immediate: true },

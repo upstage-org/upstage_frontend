@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 /**
- * Context-menu auto-close check for the multiframe "Animation speed" input:
- * committing a value (Enter / blur / spinner) must apply it AND close the
- * menu; live typing must keep the menu open (no close mid-entry).
+ * Context-menu stability check for the multiframe controls (contract of
+ * 2026-08-27, the "wait for a cue" model):
+ *  - typing in "Animation speed" only ARMS the number — nothing starts,
+ *    the menu stays open, and the number must not vanish (blur or the
+ *    store clearing autoplayFrames must both leave it in place);
+ *  - Enter commits the armed value (starts the animation) AND closes;
+ *  - frame-thumbnail picks keep the menu open, Enter then dismisses it;
+ *  - ordinary picks (e.g. Flip) still close the menu on click.
  */
 import { chromium } from "@playwright/test";
 
@@ -78,7 +83,14 @@ try {
     await menu.waitFor({ state: "visible", timeout: 5000 });
   };
 
-  // --- 1. Typing keeps the menu open; Enter commits and closes. ---
+  const storedSpeed = () =>
+    page.evaluate(
+      (id) => window.__UPSTAGE_PINIA__.stage.board.objects.find((o) => o.id === id)?.autoplayFrames,
+      objId,
+    );
+
+  // --- 1. Typing only ARMS the number: nothing starts, menu stays open;
+  //        Enter commits and closes. ---
   await openMenu();
   const input = menu.locator("input.anmation-input");
   await input.click();
@@ -86,32 +98,57 @@ try {
   await page.keyboard.type("2", { delay: 50 });
   await page.waitForTimeout(300);
   check(await menu.isVisible(), "menu stays open while typing");
+  check((await storedSpeed()) == null, `typing does not start the animation (autoplayFrames=${await storedSpeed()})`);
   await page.keyboard.press("Enter");
   await menu.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
   check(!(await menu.isVisible().catch(() => false)), "menu closes on Enter");
-  const applied = await page.evaluate(
-    (id) => window.__UPSTAGE_PINIA__.stage.board.objects.find((o) => o.id === id)?.autoplayFrames,
-    objId,
-  );
-  check(String(applied) === "2", `speed applied (autoplayFrames=${applied})`);
+  check(String(await storedSpeed()) === "2", `Enter committed the speed (autoplayFrames=${await storedSpeed()})`);
 
-  // --- 2. Blur (click elsewhere in the menu area) also commits+closes. ---
+  // --- 2. The armed number is stable: blur must not commit or close, and
+  //        the store clearing autoplayFrames (a play-once run finishing)
+  //        must not wipe the field. ---
   await openMenu();
   const input2 = menu.locator("input.anmation-input");
   await input2.click();
   await input2.press("Control+a").catch(() => {});
   await page.keyboard.type("3.5", { delay: 50 });
-  // Click the menu's own header area (not a pick) to blur the input.
-  await menu.click({ position: { x: 5, y: 5 } });
-  await menu.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-  check(!(await menu.isVisible().catch(() => false)), "menu closes on blur after typing");
-  const applied2 = await page.evaluate(
-    (id) => window.__UPSTAGE_PINIA__.stage.board.objects.find((o) => o.id === id)?.autoplayFrames,
-    objId,
+  // Click the non-interactive "Animation speed" label (not a pick, not the
+  // first panel item) — blurs the input without triggering any action.
+  await menu.locator("span.panel-block", { hasText: /animation speed/i }).click();
+  await page.waitForTimeout(400);
+  check(await menu.isVisible(), "menu stays open on blur after typing");
+  // Simulate the end of a play-once run clearing the speed in the store.
+  await page.evaluate((id) => {
+    const stage = window.__UPSTAGE_PINIA__.stage;
+    const o = stage.board.objects.find((x) => x.id === id);
+    stage.toggleAutoplayFrames({ ...o, autoplayFrames: null, lastAutoplayFrames: 2 });
+  }, objId);
+  await page.waitForTimeout(400);
+  check(
+    (await input2.inputValue()) === "3.5",
+    `armed number survives the store clearing (field="${await input2.inputValue()}")`,
   );
-  check(String(applied2) === "3.5", `blur-committed speed applied (autoplayFrames=${applied2})`);
+  // Enter on cue: commits the armed 3.5 and closes.
+  await input2.click();
+  await page.keyboard.press("Enter");
+  await menu.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+  check(!(await menu.isVisible().catch(() => false)), "menu closes on Enter after the wait");
+  check(String(await storedSpeed()) === "3.5", `armed speed committed on cue (autoplayFrames=${await storedSpeed()})`);
 
-  // --- 3. Sanity: a normal pick (Flip horizontal) still closes the menu. ---
+  // --- 3. Frame thumbnails keep the menu open; Enter then dismisses it. ---
+  await openMenu();
+  // The frame thumbnails are the imgs whose src is the frame itself (a
+  // data URI here) — other .menu-group-item imgs are Icon svgs (sliders,
+  // play/loop) and several of those CLOSE the menu by design.
+  const thumb = menu.locator('.menu-group-item img[src^="data:"]').first();
+  await thumb.click();
+  await page.waitForTimeout(300);
+  check(await menu.isVisible(), "menu stays open after a frame pick");
+  await page.keyboard.press("Enter");
+  await menu.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+  check(!(await menu.isVisible().catch(() => false)), "menu closes on Enter after frame picks");
+
+  // --- 4. Sanity: a normal pick (Flip horizontal) still closes the menu. ---
   await openMenu();
   await menu.locator("button", { hasText: /horizontal/i }).first().click();
   await menu.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});

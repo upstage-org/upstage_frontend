@@ -14,13 +14,17 @@ export default {
 
     const isFocus = ref(false);
 
-    // Grow the object's frame to fit the text as it is typed. The frame
+    // Fit the object's frame to the text as it is typed. The frame
     // (object.w/h) is only measured once, when the text is first created in
     // TextTool.vue's saveText; editing on stage used to rely on the text
     // simply overflowing the fixed-size box, but `.object` now clips its
     // overflow (overflow: hidden in Object.vue), so without this the typed
-    // text disappears past the frame edge. Grow-only: never shrink, so a
-    // frame the user enlarged by hand is left alone. +10 matches saveText.
+    // text disappears past the frame edge. The fit is TWO-WAY: it grows for
+    // new text and shrinks back when text is deleted — a stale oversized
+    // frame sits invisibly over the stage and blocks access to objects
+    // behind it. Exact fit is always right for texts: the font doesn't
+    // scale with the frame, so a hand-stretched frame buys nothing.
+    // +10 matches saveText.
     const fitFrameToText = () => {
       const node = el.value;
       if (!node) return {};
@@ -32,15 +36,17 @@ export default {
       // <div> lines) to the widest line for one synchronous measure.
       const prevWidth = node.style.width;
       node.style.width = "max-content";
-      const neededW = node.offsetWidth + 10;
+      // 40px floor so a fully-emptied text doesn't collapse into an
+      // ungrabbable sliver.
+      const neededW = Math.max(node.offsetWidth + 10, 40);
       const neededH = node.offsetHeight + 10;
       node.style.width = prevWidth;
       const w = Number(props.object.w) || 0;
       const h = Number(props.object.h) || 0;
-      const grown = {};
-      if (neededW > w) grown.w = neededW;
-      if (neededH > h) grown.h = neededH;
-      return grown;
+      const fit = {};
+      if (neededW !== w) fit.w = neededW;
+      if (neededH !== h) fit.h = neededH;
+      return fit;
     };
 
     const liveTyping = () => {

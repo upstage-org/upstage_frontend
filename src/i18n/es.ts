@@ -109,6 +109,8 @@ export default {
   add_to_avatar: "Añadir el avatar",
   multiframe_loop_tooltip:
     "Bucle: activado, los fotogramas se repiten sin fin; desactivado (icono atenuado), se recorren todos los fotogramas una vez y se detiene.",
+  animation_speed_tooltip:
+    "Velocidad de animación: segundos por fotograma. Escriba el número y pulse Intro para iniciar la animación y cerrar este menú.",
   volume_setting: "Ajustar el volumen",
   bring_forward: "Avanzar",
   send_back: "Enviar hacia atrás",

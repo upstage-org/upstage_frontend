@@ -111,6 +111,8 @@ export default {
   add_to_avatar: "Ajouter à l’avatar",
   multiframe_loop_tooltip:
     "Boucle : activée, les images défilent en continu ; désactivée (icône grisée), la lecture parcourt toutes les images une fois puis s’arrête.",
+  animation_speed_tooltip:
+    "Vitesse d’animation : secondes par image. Saisissez le nombre puis appuyez sur Entrée pour lancer l’animation et fermer ce menu.",
   volume_setting: "Réglage du volume",
   bring_forward: "Faire avancer",
   send_back: "Envoyer en arrière",

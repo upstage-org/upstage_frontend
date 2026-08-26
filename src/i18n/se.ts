@@ -108,6 +108,8 @@ export default {
   add_to_avatar: "Lägg till avatar",
   multiframe_loop_tooltip:
     "Loop: på upprepas bildrutorna. Av (nedtonad ikon): alla bildrutor spelas en gång och spelningen stoppar.",
+  animation_speed_tooltip:
+    "Animeringshastighet: sekunder per bildruta. Skriv talet och tryck Enter för att starta animeringen och stänga menyn.",
   volume_setting: "Volyminställning",
   bring_forward: "Föra framåt",
   send_back: "Skicka tillbak",
