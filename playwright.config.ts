@@ -71,6 +71,13 @@ export default defineConfig({
       dependencies: ["setup"],
     },
     {
+      // Per-user upload caps through the real dropzone (admin uncapped up to
+      // the 500 MB server max; player default / increase / decrease).
+      name: "upload-limit",
+      testMatch: /upload-limit\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
       name: "webkit",
       testMatch: /stage\.spec\.ts$/,
       use: {

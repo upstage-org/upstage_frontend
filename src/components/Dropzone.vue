@@ -4,7 +4,7 @@ import configs from "config";
 import { message } from "ant-design-vue";
 import { useLazyQuery } from "@vue/apollo-composable";
 import { gql } from "@apollo/client/core";
-import { uploadDefault } from "models/studio";
+import { isWithinUploadLimit, resolveUploadLimit, whoamiFromQueryResult } from "utils/uploadLimit";
 import i18n from "../i18n";
 import { humanFileSize } from "utils/common";
 import { UPLOAD_LIMIT_MESSAGE_KEY } from "@utils/constants";
@@ -17,6 +17,7 @@ const { load, refetch } = useLazyQuery<StudioGraph>(
     query WhoAmI {
       whoami {
         uploadLimit
+        effectiveUploadLimit
       }
     }
   `,
@@ -54,11 +55,14 @@ watch(visible as Ref, () => {
 
 const handleUpload = async (file: UploadFile) => {
   let fileType = file.file.type;
+  // First call: load() resolves with bare data. Later calls: load() returns
+  // false and refetch() resolves with an ApolloQueryResult — two different
+  // shapes, normalised by whoamiFromQueryResult (see utils/uploadLimit.ts).
   const profile = (await (load as any)()) || (await refetch());
-  const uploadLimit = (profile?.data || profile?.whoami)?.uploadLimit ?? uploadDefault;
+  const uploadLimit = resolveUploadLimit(whoamiFromQueryResult(profile));
 
   if (!fileType.includes("video")) {
-    const canUpload = file.file.size <= uploadLimit;
+    const canUpload = isWithinUploadLimit(file.file.size, uploadLimit);
     if (!canUpload) {
       const hide = message.error({
         key: UPLOAD_LIMIT_MESSAGE_KEY,

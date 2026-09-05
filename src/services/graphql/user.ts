@@ -68,6 +68,7 @@ export default {
           createdOn
           role
           uploadLimit
+          effectiveUploadLimit
           intro
         }
       }

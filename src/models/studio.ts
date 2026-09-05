@@ -53,6 +53,8 @@ export interface User {
   displayName: string;
   createdOn: string;
   uploadLimit: number;
+  /** Backend-computed cap actually enforced (whoami / currentUser only). */
+  effectiveUploadLimit?: number | null;
   intro: string | null;
   dbId: number;
 }
