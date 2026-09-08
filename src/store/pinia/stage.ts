@@ -990,6 +990,8 @@ export const useStageStore = defineStore(
       }
       status.value = "OFFLINE";
       replay.value.isReplaying = false;
+      liveMoves.clear();
+      lastOwnMoveSeq.clear();
       background.value = null;
       curtain.value = null;
       backdropColor.value = "gray";
@@ -1032,8 +1034,12 @@ export const useStageStore = defineStore(
           (background.value.at ?? 0) < (bg.at ?? 0)
         ) {
           if (!background.value || background.value.id !== bg.id) {
-            // Not playing animation if only opacity change
-            animateIfPresent("#board", { opacity: [0, 1], duration: 5000 });
+            // Not playing animation if only opacity change.
+            // Fade ONLY the backdrop layer (Backdrop.vue wrapper). This used
+            // to target `#board`, which also holds every avatar/prop/stream
+            // on the stage — so changing or clearing a backdrop blanked all
+            // of them and faded them back in over 5s.
+            animateIfPresent("#stage-backdrop", { opacity: [0, 1], duration: 5000 });
           }
           background.value = bg;
         }
@@ -2351,17 +2357,13 @@ export const useStageStore = defineStore(
     }
 
     /** Push jitsi tile metadata to audience when participantId is known. */
-    function mqttBroadcastJitsiTile(object: BoardObject, note?: string) {
+    function mqttBroadcastJitsiTile(object: BoardObject, note?: string, live = false) {
       if (!canPlay.value || !isJitsiBoardType(object.type) || jitsiParticipantIdMissing(object)) {
         return;
       }
       if (object.published) {
         diagMqttJitsiBoard("out", BOARD_ACTIONS.MOVE_TO, object, note ? { note } : undefined);
-        mqtt.sendMessage(TOPICS.BOARD, {
-          type: BOARD_ACTIONS.MOVE_TO,
-          object: serializeForBroadcast(object),
-          zIndex: boardStackIndexFor(object.id),
-        });
+        publishMoveTo(object, live);
         return;
       }
       const payload = {
@@ -2444,7 +2446,84 @@ export const useStageStore = defineStore(
       flushPendingJitsiPublish(id);
     }
 
-    function shapeObject(object: BoardObject) {
+    // ------------------------------------------------------------------
+    // Real-time movement.
+    //
+    // While a performer drags an object, Moveable.vue publishes throttled
+    // intermediate positions (`live: true`) so the audience sees the object
+    // travel the same path at the same time, instead of one jump on
+    // release. Receivers (Moveable.vue's object watcher) tween a live
+    // position over the publish interval rather than the object's
+    // `moveSpeed`, which still governs the final release move and every
+    // other move (scene switches, costume follow, ...). The marker is
+    // transient store state — it never touches the object itself, so it
+    // can't leak into scenes, snapshots or recordings.
+    //
+    // Because the broker echoes our own publishes back to us (no noLocal)
+    // and a drag now sends many MOVE_TOs per second, an echo of an OLDER
+    // position can arrive after we have already applied a newer one
+    // locally. Applying it would jerk the object back for a moment, so
+    // every MOVE_TO we publish carries our tab session id and a
+    // monotonic sequence number, and echoes older than our latest send for
+    // that object are dropped. Messages from other senders are never
+    // dropped, and neither is our newest one — so the sender still
+    // converges to broker order if someone else moved the same object
+    // in between.
+    // ------------------------------------------------------------------
+    const LIVE_MOVE_TTL_MS = 1500;
+    const liveMoves = new Map<ObjectId, number>();
+    const lastOwnMoveSeq = new Map<ObjectId, number>();
+    let moveSeq = 0;
+
+    function noteLiveMove(id: ObjectId, live: boolean) {
+      const ids: ObjectId[] = [
+        id,
+        ...board.value.objects.filter((o) => o.wornBy === id).map((o) => o.id),
+      ];
+      if (live) {
+        const now = Date.now();
+        ids.forEach((i) => liveMoves.set(i, now));
+      } else {
+        ids.forEach((i) => liveMoves.delete(i));
+      }
+    }
+
+    /**
+     * True while `id` is being dragged live by some performer (its last
+     * MOVE_TO was flagged `live` less than LIVE_MOVE_TTL_MS ago). The TTL
+     * covers a drag whose final (non-live) message never arrives — e.g. the
+     * performer's tab died mid-drag — so later moves fall back to
+     * `moveSpeed` on their own.
+     */
+    function isLiveMoving(id: ObjectId): boolean {
+      const at = liveMoves.get(id);
+      return at !== undefined && Date.now() - at < LIVE_MOVE_TTL_MS;
+    }
+
+    function publishMoveTo(object: BoardObject, live: boolean) {
+      const seq = ++moveSeq;
+      lastOwnMoveSeq.set(object.id, seq);
+      mqtt.sendMessage(TOPICS.BOARD, {
+        type: BOARD_ACTIONS.MOVE_TO,
+        object: serializeForBroadcast(object),
+        zIndex: boardStackIndexFor(object.id),
+        live,
+        sender: session.value,
+        seq,
+      });
+    }
+
+    /** Own echo of a MOVE_TO older than our latest publish for that object. */
+    function isStaleOwnMove(message: BoardMessage): boolean {
+      if (replay.value.isReplaying) return false;
+      if (!message.object || typeof message.seq !== "number") return false;
+      if (!message.sender || !session.value || message.sender !== session.value) return false;
+      const latest = lastOwnMoveSeq.get(message.object.id);
+      return latest !== undefined && message.seq < latest;
+    }
+
+    function shapeObject(object: BoardObject, options: { live?: boolean } = {}) {
+      const live = options.live === true;
       // Sender always reflects their own change locally. This used to live
       // only in the `else` branch and the live branch relied on the broker
       // echo to update the sender's store. Now that `serializeForBroadcast`
@@ -2456,6 +2535,7 @@ export const useStageStore = defineStore(
       if (isJitsiBoardType(object.type)) {
         payload = stampJitsiParticipantId(object);
       }
+      noteLiveMove(payload.id, live);
       UPDATE_OBJECT(serializeObject(payload));
       if (payload.liveAction) {
         const isJitsi = isJitsiBoardType(payload.type);
@@ -2469,13 +2549,10 @@ export const useStageStore = defineStore(
               payload.published
                 ? undefined
                 : "first publish — remote clients get tile metadata only; video uses Jitsi WebRTC",
+              live,
             );
           } else if (payload.published) {
-            mqtt.sendMessage(TOPICS.BOARD, {
-              type: BOARD_ACTIONS.MOVE_TO,
-              object: serializeForBroadcast(payload),
-              zIndex: boardStackIndexFor(payload.id),
-            });
+            publishMoveTo(payload, live);
           } else {
             const toPublish = {
               ...payload,
@@ -2667,6 +2744,10 @@ export const useStageStore = defineStore(
       front?: ObjectId;
       back?: ObjectId;
       side?: "front" | "behind";
+      // MOVE_TO only — see the "Real-time movement" block above shapeObject.
+      live?: boolean;
+      sender?: string | null;
+      seq?: number;
     }
 
     function handleBoardMessage({ message }: { message: BoardMessage }) {
@@ -2696,7 +2777,9 @@ export const useStageStore = defineStore(
           break;
         case BOARD_ACTIONS.MOVE_TO:
           if (message.object) {
+            if (isStaleOwnMove(message)) break;
             diagMqttJitsiBoard("in", BOARD_ACTIONS.MOVE_TO, message.object);
+            noteLiveMove(message.object.id, message.live === true);
             UPDATE_OBJECT(message.object);
           }
           break;
@@ -3019,7 +3102,17 @@ export const useStageStore = defineStore(
         audio.saken = true;
         updateAudioStatus(audio);
       });
-      if (masterAudioVolume.value !== 1) applyMasterAudioVolume(1, 0, true);
+      if (masterAudioVolume.value !== 1) {
+        // The per-track stops above only take effect when their broker echo
+        // comes back (AudioPlayer.vue pauses on the `changed` flag), so the
+        // master reset must travel the same road: applying it locally here
+        // set every still-playing element back to full volume for the
+        // split second before the pause landed — the "jumps back to full
+        // at the very last moment" of Fade out. Published after the stops
+        // on the same connection, the echo lands after them everywhere,
+        // and handleAudioMasterMessage applies it (sender included).
+        mqtt.sendMessage(TOPICS.AUDIO_MASTER, { volume: 1, duration: 0 });
+      }
     }
 
     /**
@@ -4012,6 +4105,7 @@ export const useStageStore = defineStore(
       ensureJitsiTileParticipantBroadcast,
       reconcileJitsiBoardFromEvents,
       shapeObject,
+      isLiveMoving,
       deleteObject,
       clearStageObjectsOfKind,
       switchFrame,

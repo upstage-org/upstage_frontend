@@ -2,9 +2,17 @@
 import { ref, inject } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
-import { isJitsiBoardType } from "@utils/common";
+import { isJitsiBoardType, throttle } from "@utils/common";
 import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
+
+// Real-time movement: while the performer drags, the object's position is
+// published every LIVE_MOVE_INTERVAL_MS (see the "Real-time movement" block
+// in the stage store). Receivers tween each live position over
+// LIVE_MOVE_TWEEN_MS — a touch longer than the interval so consecutive
+// updates chain into continuous motion instead of stop-start steps.
+export const LIVE_MOVE_INTERVAL_MS = 100;
+export const LIVE_MOVE_TWEEN_MS = 150;
 
 export default {
   props: {
@@ -15,7 +23,14 @@ export default {
   emits: ["update:active"],
   setup: (props, { emit }) => {
     const el = ref();
+    // Any moveable gesture in flight (drag / resize / rotate).
     const isDragging = ref(false);
+    // A drag-move specifically. Its positions are published live, so the
+    // element under the pointer IS the object everyone else is watching:
+    // no ghost copy at the "old" position and no half-opacity preview.
+    // Resize/rotate still publish on release and keep the ghost.
+    const liveDragging = ref(false);
+    const ghosting = computed(() => isDragging.value && !liveDragging.value);
 
     const stageStore = useStageStore();
     const replaying = inject("replaying", false);
@@ -39,9 +54,23 @@ export default {
         y: top,
       });
     };
+    // Leading-edge throttle: the first move publishes at once, later ones
+    // at most every LIVE_MOVE_INTERVAL_MS. Whatever falls inside the last
+    // window is covered by dragEnd's final (non-live) sendMovement.
+    const sendLiveMovement = throttle((left, top) => {
+      stageStore.shapeObject(
+        {
+          ...props.object,
+          x: left,
+          y: top,
+        },
+        { live: true },
+      );
+    }, LIVE_MOVE_INTERVAL_MS);
     moveable
       .on("dragStart", () => {
         isDragging.value = true;
+        liveDragging.value = true;
         if (animation) {
           animation.pause(true);
         }
@@ -49,12 +78,14 @@ export default {
       .on("drag", ({ target, left, top }) => {
         target.style.left = `${left}px`;
         target.style.top = `${top}px`;
+        sendLiveMovement(left, top);
       })
       .on("dragEnd", ({ lastEvent, target }) => {
         if (lastEvent) {
           sendMovement(target, lastEvent);
         }
         isDragging.value = false;
+        liveDragging.value = false;
       });
 
     const sendResize = (target, { width, height, left, top }) => {
@@ -226,6 +257,14 @@ export default {
         if (!el.value) {
           return;
         }
+        // Our own live publishes come straight back as store updates; the
+        // drag handler already owns the element's position, and tweening
+        // it toward a (slightly older) published point would fight the
+        // pointer. Resize/rotate don't publish mid-gesture, so they keep
+        // reacting to remote updates as before.
+        if (liveDragging.value) {
+          return;
+        }
         const x = props.object;
         const {
           x: left,
@@ -241,6 +280,11 @@ export default {
         if (animation) {
           animation.pause(true);
         }
+        // Another performer is dragging this object live (or its wearer):
+        // follow at the publish cadence, linearly, so the path they trace
+        // is what the audience sees — `moveSpeed` applies to the release
+        // move and every other move, not to the drag itself.
+        const liveMove = stageStore.isLiveMoving(x.id);
         animation = animate(el.value, {
           left,
           top,
@@ -250,14 +294,23 @@ export default {
           opacity,
           scaleX,
           scaleY,
-          ...(moveSpeed > 1000 ? { easing: "linear" } : {}),
+          // Slow, deliberate moves travel at constant speed; quick ones keep
+          // animejs's default decelerating `out(2)`. animejs v4 reads
+          // `ease` — the v3 `easing` key this used to carry was silently
+          // ignored since the v4 upgrade, so every slow glide coasted.
+          ...(moveSpeed > 1000 ? { ease: "linear" } : {}),
+          ...(liveMove ? { ease: "linear" } : {}),
           // While a text object is in editing mode its frame is grown by
           // fitFrameToText on every keystroke; tweening that growth over
           // moveSpeed leaves the just-typed line clipped for seconds (the
           // box may not be scrolled to reveal it — Text.vue pins the
           // clip-box scroll at 0). Track the text instantly instead.
           // `editing` only ever exists on text objects.
-          duration: x.editing ? 0 : (moveSpeed ?? config.animateDuration),
+          duration: x.editing
+            ? 0
+            : liveMove
+              ? LIVE_MOVE_TWEEN_MS
+              : (moveSpeed ?? config.animateDuration),
           onUpdate: () => {
             try {
               moveable.updateRect();
@@ -299,7 +352,7 @@ export default {
       }
     });
 
-    return { el, isDragging, clickInside, clickOutside, transformOrigin, activeMovable };
+    return { el, ghosting, clickInside, clickOutside, transformOrigin, activeMovable };
   },
 };
 </script>
@@ -310,7 +363,7 @@ export default {
     v-click-outside="clickOutside"
     :style="{
       position: 'absolute',
-      opacity: object.opacity * (isDragging ? 0.5 : 1),
+      opacity: object.opacity * (ghosting ? 0.5 : 1),
       filter: `grayscale(${object.liveAction === false ? 1 : 0})`,
       'transform-origin': transformOrigin,
       /* Players drag objects with a finger: without this the browser claims
@@ -335,7 +388,7 @@ export default {
     <slot />
   </div>
   <div
-    v-if="isDragging"
+    v-if="ghosting"
     :style="{
       position: 'absolute',
       left: object.x + 'px',

@@ -65,6 +65,15 @@ export default defineConfig({
       dependencies: ["setup"],
     },
     {
+      // Real-time stage sync: live drag positions reach observers before the
+      // pointer is released, and a backdrop change fades only the backdrop
+      // layer (never the objects on the board).
+      name: "realtime",
+      testMatch: /realtime\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+    {
       name: "replay-studio",
       testMatch: /replay-studio\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"] },

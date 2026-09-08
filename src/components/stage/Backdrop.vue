@@ -91,20 +91,36 @@ export default {
 </script>
 
 <template>
-  <AppImage
-    v-if="src"
-    class="background-image"
-    :src="src"
-    :style="{
-      opacity: backgroundOpacity,
-    }"
-    :transition="transitionDuration"
-    :no-fallback="true"
-    fit="cover"
-  />
+  <!--
+    #stage-backdrop is the layer the store fades (SET_BACKGROUND animates
+    its opacity 0 -> 1 on a backdrop change). It has to be a wrapper: the
+    <img> inside is re-keyed per src by AppImage and carries the user's own
+    opacity binding, and fading #board instead took every object on the
+    stage down with the backdrop. The wrapper is always present (so the
+    fade also plays for "no backdrop -> backdrop") and lets pointer events
+    through, while the image itself stays a hit target exactly as before.
+  -->
+  <div id="stage-backdrop" class="backdrop-layer">
+    <AppImage
+      v-if="src"
+      class="background-image"
+      :src="src"
+      :style="{
+        opacity: backgroundOpacity,
+      }"
+      :transition="transitionDuration"
+      :no-fallback="true"
+      fit="cover"
+    />
+  </div>
 </template>
 
 <style scoped>
+.backdrop-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 .background-image {
   position: absolute;
   left: 0;
@@ -112,5 +128,6 @@ export default {
   width: 100%;
   height: 100%;
   object-position: top;
+  pointer-events: auto;
 }
 </style>

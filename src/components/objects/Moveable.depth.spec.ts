@@ -50,6 +50,7 @@ vi.mock("@stores/pinia/stage", async () => {
     config: { animateDuration: 500 },
     board: { objects: [] as Array<{ id: string }> },
     shapeObject: vi.fn(),
+    isLiveMoving: () => false,
     SET_ACTIVE_MOVABLE: (id: string | null) => {
       store.activeMovable = id;
     },
