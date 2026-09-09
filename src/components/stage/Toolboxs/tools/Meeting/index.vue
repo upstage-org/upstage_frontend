@@ -112,23 +112,33 @@ const clearAll = () => stageStore.clearStageObjectsOfKind("stream");
     </div>
     <span class="tag is-light is-block">{{ $t("new_room") }}</span>
   </div>
-  <div v-if="jitsiEnabled" class="yourself-with-server">
-    <Yourself :title="currentServerLabel" />
-    <div v-if="showServerPicker" class="server-picker" :title="t('streaming_server')">
-      <div class="select is-small">
-        <select
-          ref="selectEl"
-          :value="currentServer"
-          :disabled="switching"
-          data-testid="jitsi-server-picker"
-          @change="onServerPicked"
-        >
-          <option v-for="origin in jitsiServers" :key="origin" :value="origin">
-            {{ endpointHostLabel(origin) }}
-          </option>
-        </select>
-      </div>
+  <Yourself v-if="jitsiEnabled" :title="currentServerLabel" />
+  <!--
+    The server picker is its own 100x100 tile, NOT nested under the
+    self-preview: every direct child of .card-content is a fixed 100px
+    tile with overflow hidden, so stacking the <select> under the preview
+    inside one tile pushed the preview up out of the box and hid the
+    select below it (2026-09-10).
+  -->
+  <div
+    v-if="jitsiEnabled && showServerPicker"
+    class="room-skeleton server-tile"
+    :title="t('streaming_server')"
+  >
+    <div class="select is-small server-select">
+      <select
+        ref="selectEl"
+        :value="currentServer"
+        :disabled="switching"
+        data-testid="jitsi-server-picker"
+        @change="onServerPicked"
+      >
+        <option v-for="origin in jitsiServers" :key="origin" :value="origin">
+          {{ endpointHostLabel(origin) }}
+        </option>
+      </select>
     </div>
+    <span class="tag is-light is-block">{{ $t("streaming_server") }}</span>
   </div>
   <Skeleton v-for="(room, i) in rooms" :key="i" :data="room">
     <div class="room-skeleton">
@@ -162,19 +172,20 @@ const clearAll = () => stageStore.clearStageObjectsOfKind("stream");
   margin: 0 auto;
 }
 
-.yourself-with-server {
-  flex: none;
+/* The panel's generic `#topbar .card-content > div > div { padding: 12px }`
+   (ID selector, so it outranks this scoped rule without !important) would
+   leave the select only 64px wide; host names need the room. The 48px band
+   matches `.icon.is-large` on the neighbouring tiles so the labels line up. */
+.server-tile > .server-select {
+  padding: 0 !important;
+  width: 88px;
+  height: 48px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-}
-
-.server-picker {
-  margin-top: 2px;
-  max-width: 120px;
 
   select {
-    max-width: 120px;
+    width: 100%;
+    max-width: 100%;
     text-overflow: ellipsis;
   }
 }
