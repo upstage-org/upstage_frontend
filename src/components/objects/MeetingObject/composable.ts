@@ -1,8 +1,7 @@
 // @ts-nocheck
 import configs from "config";
-import { nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
+import { onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { isJitsiBoardType } from "@utils/common";
 
 export const useLowLevelAPI = () => {
   const { JitsiMeetJS } = window;
@@ -197,23 +196,22 @@ export const useJitsi = () => {
   // identity checks or thrash recompute. We only need to know when
   // the *array* changes, not when individual track internals change.
   const localTracks = shallowRef([]);
-  // Multi-server streaming additions on the same object (so every
+  // Multi-server streaming addition on the same object (so every
   // `inject("jitsi")` consumer keeps its reference):
-  //   server         — origin this tab publishes to (ref)
-  //   switchServer   — performer picks another server (see below)
-  //   viewerSessions — read-only view of the extra receive-only sessions
-  //   switching      — a switch is in flight (ref, disables the picker)
-  const server = ref(configs.JITSI_ENDPOINT);
-  const switching = ref(false);
-  const viewerSessions = new Map();
+  //   sessions — origin → session for EVERY Jitsi server this tab is joined
+  //              to. The default server's session is `jitsi` itself
+  //              (`jitsi.room` / `jitsi.connection`, unchanged); the others
+  //              are opened on demand (see syncSessions) and are used both
+  //              to receive other performers' tracks and to publish this
+  //              performer's own tiles placed on that server
+  //              (extraServerPublishers.ts). Not reactive: the store's
+  //              `localJitsiParticipantIds` is the reactive join signal.
+  const sessions = new Map();
   const jitsi = {
     room: null,
     connection: null,
     localTracks,
-    server,
-    switching,
-    viewerSessions,
-    switchServer: async (_origin: string) => false,
+    sessions,
   };
   const stageStore = useStageStore();
 
@@ -225,11 +223,10 @@ export const useJitsi = () => {
   const multiServer = (configs.JITSI_SERVER_COUNT ?? 1) > 1;
   const jitsiServers = (configs.JITSI_ENDPOINTS ?? [configs.JITSI_ENDPOINT]).filter(Boolean);
 
-  // The session whose room/connection are exposed as `jitsi.room` /
-  // `jitsi.connection` and whose join state drives the shared `joined` ref.
-  // Viewer sessions (other servers) and a not-yet-swapped-in switch target
-  // never touch the shared state.
-  let activeSession = null;
+  // The default server's session is the one whose room/connection are
+  // exposed as `jitsi.room` / `jitsi.connection` and whose join state drives
+  // the shared `joined` ref. Sessions on other servers never touch that
+  // shared state.
   let currentStageUrl = "";
 
   /**
@@ -254,14 +251,14 @@ export const useJitsi = () => {
    * One XMPP connection + one conference on ONE Jitsi server. The body is
    * the previous `startConnection`, parameterised by `origin` and by the
    * object (`target`) whose `room` / `connection` it fills in:
-   *   - the initial publish session targets `jitsi` itself (unchanged
+   *   - the default server's session targets `jitsi` itself (unchanged
    *     behaviour: Jitsi.vue / Yourself.vue / the publisher read
-   *     `jitsi.room`), and is the `activeSession` from creation;
-   *   - viewer sessions (multi-server only) target a private object and are
-   *     never active — they only feed `stageStore.addTrack` /
-   *     `removeJitsiParticipantLocally`, tagged with their origin;
-   *   - a `switchServer` target starts inactive and is swapped into `jitsi`
-   *     once joined.
+   *     `jitsi.room`) and owns the shared `joined`;
+   *   - sessions on other servers (multi-server only) target a private
+   *     object; they feed `stageStore.addTrack` /
+   *     `removeJitsiParticipantLocally` tagged with their origin, record
+   *     this tab's participant id on that server, and are where
+   *     extraServerPublishers.ts publishes own tiles placed on that server.
    * `initLib` runs `JitsiMeetJS.init` exactly as the old code did for the
    * first session; extra sessions must not re-init the global lib.
    */
@@ -271,12 +268,12 @@ export const useJitsi = () => {
       target,
       joined: ref(false),
       leave: () => {},
-      isActive: () => activeSession === session,
+      isDefault: target === jitsi,
       // Session-local join state, mirrored into the shared `joined` only
-      // while this is the active publish session.
+      // for the default server's session.
       markJoined: (value: boolean) => {
         session.joined.value = value;
-        if (session.isActive()) joined.value = value;
+        if (session.isDefault) joined.value = value;
       },
     };
     const markJoined = session.markJoined;
@@ -681,10 +678,11 @@ export const useJitsi = () => {
             e,
           });
           const myId = target.room?.myUserId?.();
-          // Only the active publish session heals own tiles / owns the shared
-          // `joined`. A switch target does this explicitly once swapped in;
-          // viewer sessions never own tiles on their server.
-          if (myId != null && session.isActive()) {
+          // Record this tab's id on this server and heal own tiles placed
+          // there. Single-server: the one session, no tag (legacy path).
+          // Multi-server: every session, tagged, so a tile on server B is
+          // healed with B's id and never with A's.
+          if (myId != null) {
             stageStore.syncLocalJitsiParticipantId(String(myId), serverTag);
           }
           markJoined(true);
@@ -902,14 +900,14 @@ export const useJitsi = () => {
     target.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, (e) => {
       console.error("Connection failed", e);
       markJoined(false);
-      if (session.isActive()) stageStore.syncLocalJitsiParticipantId(null);
+      stageStore.syncLocalJitsiParticipantId(null, serverTag);
     });
     target.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
       (e) => {
         console.error("Connection disconnected", e);
         markJoined(false);
-        if (session.isActive()) stageStore.syncLocalJitsiParticipantId(null);
+        stageStore.syncLocalJitsiParticipantId(null, serverTag);
       },
     );
 
@@ -930,78 +928,75 @@ export const useJitsi = () => {
     target.connection.connect();
   };
 
-  // Which server this tab should publish to. Single-server builds always
-  // get entry 0 (identical to before). Otherwise: an own tile already on the
-  // board (navigate-away/back keeps the performer where they were) → the
-  // stage's default from Studio > Customisation → entry 0.
-  const pickInitialOrigin = () => {
-    if (!multiServer) return configs.JITSI_ENDPOINT;
-    const mySession = stageStore.session;
-    const own = (stageStore.board?.objects ?? []).find(
-      (o) =>
-        isJitsiBoardType(o.type) &&
-        mySession != null &&
-        o.hostId === mySession &&
-        typeof o.jitsiServer === "string" &&
-        jitsiServers.includes(o.jitsiServer),
-    );
-    if (own) return own.jitsiServer;
-    const stageDefault = stageStore.config?.jitsiServer;
-    if (typeof stageDefault === "string" && jitsiServers.includes(stageDefault)) {
-      return stageDefault;
-    }
-    return configs.JITSI_ENDPOINT;
-  };
-
   const startConnection = (stageUrl: string) => {
     currentStageUrl = stageUrl;
-    const origin = pickInitialOrigin();
-    server.value = origin;
-    const session = createJitsiSession({ origin, stageUrl, target: jitsi, initLib: true });
-    activeSession = session;
-    if (multiServer) syncViewerSessions();
+    const session = createJitsiSession({
+      origin: configs.JITSI_ENDPOINT,
+      stageUrl,
+      target: jitsi,
+      initLib: true,
+    });
+    sessions.set(configs.JITSI_ENDPOINT, session);
+    if (multiServer) syncSessions();
   };
 
   // ------------------------------------------------------------------
-  // Viewer sessions (multi-server only). Every origin that has a live tile
-  // on the board and is not our publish server gets a receive-only session
-  // so its performers' tracks reach this browser. An origin that drops off
-  // the board is left after a grace period (a performer re-placing a tile
-  // must not churn the connection).
-  const VIEWER_LEAVE_GRACE_MS = 30_000;
-  const viewerLeaveTimers = new Map();
+  // Extra sessions (multi-server only). The default server is always joined
+  // (above, exactly as before). Every OTHER configured server gets a session
+  // when
+  //   - a live tile on the board uses it (any performer's — so this browser
+  //     receives that performer's tracks from there), or
+  //   - this tab can publish (a performer): joining every server up front
+  //     gives each per-server Yourself tile its participant id before the
+  //     first drag, the same way the default server has always been joined
+  //     before the first drag.
+  // A server that is no longer wanted is left after a grace period (a
+  // performer re-placing a tile must not churn the connection). Audience
+  // tabs therefore only ever connect to servers that actually carry a tile.
+  const EXTRA_LEAVE_GRACE_MS = 30_000;
+  const extraLeaveTimers = new Map();
 
-  const syncViewerSessions = () => {
+  const canPublish = () => Boolean(stageStore.canPlay) && Boolean(stageStore.jitsiStreamingEnabled);
+
+  const wantedExtraOrigins = () => {
+    const wanted = new Set(stageStore.jitsiServersInUse ?? []);
+    if (canPublish()) for (const origin of jitsiServers) wanted.add(origin);
+    wanted.delete(configs.JITSI_ENDPOINT);
+    return wanted;
+  };
+
+  const syncSessions = () => {
     if (!multiServer || !currentStageUrl) return;
-    const inUse = new Set(stageStore.jitsiServersInUse ?? []);
-    for (const origin of inUse) {
-      if (origin === server.value || !jitsiServers.includes(origin)) continue;
-      const pendingLeave = viewerLeaveTimers.get(origin);
+    const wanted = wantedExtraOrigins();
+    for (const origin of wanted) {
+      if (!jitsiServers.includes(origin)) continue;
+      const pendingLeave = extraLeaveTimers.get(origin);
       if (pendingLeave) {
         clearTimeout(pendingLeave);
-        viewerLeaveTimers.delete(origin);
+        extraLeaveTimers.delete(origin);
       }
-      if (viewerSessions.has(origin)) continue;
-      console.log("[diag] useJitsi: opening viewer session", { origin });
+      if (sessions.has(origin)) continue;
+      console.log("[diag] useJitsi: opening session", { origin });
       const session = createJitsiSession({
         origin,
         stageUrl: currentStageUrl,
         target: { room: null, connection: null },
         initLib: false,
       });
-      viewerSessions.set(origin, session);
+      sessions.set(origin, session);
     }
-    for (const [origin, session] of viewerSessions) {
-      if (inUse.has(origin) || viewerLeaveTimers.has(origin)) continue;
-      viewerLeaveTimers.set(
+    for (const [origin, session] of sessions) {
+      if (session.isDefault || wanted.has(origin) || extraLeaveTimers.has(origin)) continue;
+      extraLeaveTimers.set(
         origin,
         setTimeout(() => {
-          viewerLeaveTimers.delete(origin);
-          if ((stageStore.jitsiServersInUse ?? []).includes(origin)) return;
-          console.log("[diag] useJitsi: closing idle viewer session", { origin });
-          viewerSessions.delete(origin);
+          extraLeaveTimers.delete(origin);
+          if (wantedExtraOrigins().has(origin)) return;
+          console.log("[diag] useJitsi: closing idle session", { origin });
+          sessions.delete(origin);
           session.leave();
-        }, VIEWER_LEAVE_GRACE_MS),
+          stageStore.syncLocalJitsiParticipantId(null, origin);
+        }, EXTRA_LEAVE_GRACE_MS),
       );
     }
   };
@@ -1010,94 +1005,10 @@ export const useJitsi = () => {
     // Join on the sorted string so the handler only runs on real changes,
     // not on every board mutation that re-creates the array.
     watch(
-      () => (stageStore.jitsiServersInUse ?? []).join("|"),
-      () => syncViewerSessions(),
+      () => `${(stageStore.jitsiServersInUse ?? []).join("|")}#${canPublish() ? 1 : 0}`,
+      () => syncSessions(),
     );
   }
-
-  // ------------------------------------------------------------------
-  // Performer switches server mid-show. Order matters (see plan §4.6):
-  // join the NEW server first, heal own tiles to the new participantId +
-  // server (so the audience keeps the tile and moves its media source),
-  // and only then leave the old server — a viewer's USER_LEFT from the old
-  // server would otherwise delete the tile before the heal arrives.
-  const SWITCH_JOIN_TIMEOUT_MS = 20_000;
-
-  const waitForJoin = (session) =>
-    new Promise((resolve) => {
-      if (session.joined.value) return resolve(true);
-      let stop = () => {};
-      const timer = setTimeout(() => {
-        stop();
-        resolve(false);
-      }, SWITCH_JOIN_TIMEOUT_MS);
-      stop = watch(session.joined, (v) => {
-        if (v) {
-          clearTimeout(timer);
-          stop();
-          resolve(true);
-        }
-      });
-    });
-
-  const switchServer = async (next: string): Promise<boolean> => {
-    if (!multiServer || switching.value) return false;
-    if (!next || next === server.value || !jitsiServers.includes(next)) return false;
-    if (!currentStageUrl || !activeSession) return false;
-    switching.value = true;
-    const previous = activeSession;
-    const previousOrigin = server.value;
-    try {
-      // 1. Join the new server (inactive until it is joined).
-      const target = { room: null, connection: null };
-      const candidate = createJitsiSession({
-        origin: next,
-        stageUrl: currentStageUrl,
-        target,
-        initLib: false,
-      });
-      const ok = await waitForJoin(candidate);
-      if (!ok) {
-        console.warn("[diag] useJitsi: switchServer join timed out; staying on", previousOrigin);
-        candidate.leave();
-        return false;
-      }
-      // 2. Stop sending to the old room (tracks + camera stay alive).
-      await jitsi.unpublishForSwap?.();
-      // 3. Swap in place; pulse `joined` so the publisher's watcher fires.
-      activeSession = candidate;
-      jitsi.room = target.room;
-      jitsi.connection = target.connection;
-      server.value = next;
-      joined.value = false;
-      await nextTick();
-      // 4. Heal own tiles → new participantId + server (broadcast to viewers).
-      const myId = target.room?.myUserId?.();
-      if (myId != null) stageStore.syncLocalJitsiParticipantId(String(myId), next);
-      joined.value = true;
-      // 5. Old session: keep it as a viewer session while other tiles still
-      //    use that server, else drop it.
-      const stillUsed = (stageStore.jitsiServersInUse ?? []).includes(previousOrigin);
-      if (stillUsed && !viewerSessions.has(previousOrigin)) {
-        viewerSessions.set(previousOrigin, previous);
-      } else {
-        previous.leave();
-      }
-      // The new publish origin may have had a viewer session — it is now
-      // redundant (same conference).
-      const duplicate = viewerSessions.get(next);
-      if (duplicate) {
-        viewerSessions.delete(next);
-        duplicate.leave();
-      }
-      syncViewerSessions();
-      console.log("[diag] useJitsi: switched publish server", { from: previousOrigin, to: next });
-      return true;
-    } finally {
-      switching.value = false;
-    }
-  };
-  jitsi.switchServer = switchServer;
 
   // One-shot watcher: as soon as `stageStore.url` reports a real stage
   // (anything other than the empty placeholder), kick off the conference
@@ -1142,12 +1053,16 @@ export const useJitsi = () => {
     } catch (err) {
       console.warn("jitsi.connection.disconnect() during unmount:", err);
     }
-    // Multi-server: viewer sessions and any pending idle-leave timers.
-    for (const timer of viewerLeaveTimers.values()) clearTimeout(timer);
-    viewerLeaveTimers.clear();
-    for (const session of viewerSessions.values()) session.leave();
-    viewerSessions.clear();
-    activeSession = null;
+    // Multi-server: sessions on the other servers and any pending
+    // idle-leave timers.
+    for (const timer of extraLeaveTimers.values()) clearTimeout(timer);
+    extraLeaveTimers.clear();
+    for (const [origin, session] of sessions) {
+      if (session.isDefault) continue;
+      session.leave();
+      stageStore.syncLocalJitsiParticipantId(null, origin);
+    }
+    sessions.clear();
     joined.value = false;
     stageStore.syncLocalJitsiParticipantId(null);
   });

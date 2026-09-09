@@ -484,3 +484,29 @@ export function endpointHostLabel(origin: unknown): string {
     return origin;
   }
 }
+
+/**
+ * Short label telling servers of one list apart: the host with the domain
+ * suffix every server in the list shares stripped off (dot-boundary), e.g.
+ * `streaming.upstage.live` + `streaming3.upstage.live` → `streaming` /
+ * `streaming3`. Falls back to the full host when the list has one entry, when
+ * the origin is not in the list, or when stripping would leave a host empty.
+ */
+export function shortServerLabel(origin: unknown, origins: readonly unknown[]): string {
+  const host = endpointHostLabel(origin);
+  if (!host) return "";
+  const hosts = origins.map(endpointHostLabel).filter(Boolean);
+  if (hosts.length < 2 || !hosts.includes(host)) return host;
+  const parts = hosts.map((h) => h.split("."));
+  let common = 0;
+  const shortest = Math.min(...parts.map((p) => p.length));
+  // Only strip while EVERY host keeps at least one label.
+  while (common < shortest - 1) {
+    const label = parts[0][parts[0].length - 1 - common];
+    if (!parts.every((p) => p[p.length - 1 - common] === label)) break;
+    common += 1;
+  }
+  if (common === 0) return host;
+  const own = host.split(".");
+  return own.slice(0, own.length - common).join(".");
+}

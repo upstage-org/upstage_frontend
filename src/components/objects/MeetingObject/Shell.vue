@@ -2,6 +2,7 @@
 import { provide } from "vue";
 import { useJitsi } from "./composable";
 import { useLocalStreamPublisher } from "./localStreamPublisher";
+import { useExtraServerPublishers } from "./extraServerPublishers";
 
 export default {
   setup(_, { slots }) {
@@ -17,10 +18,10 @@ export default {
     // no-op and tracks were never published to the conference.
     const publisher = useLocalStreamPublisher(jitsi, joined);
     provide("localStreamPublisher", publisher);
-    // Multi-server streaming: `jitsi.switchServer()` needs to stop sending
-    // to the old room between "new room joined" and "swap room in place";
-    // the publisher owns the local tracks, so hand it that one hook here.
-    jitsi.unpublishForSwap = publisher.unpublishForSwap;
+    // Multi-server streaming: own tiles bound to a server other than the
+    // default are published there from the same camera (cloned tracks).
+    // No-op on single-server builds.
+    useExtraServerPublishers(jitsi, publisher);
 
     return () => slots.default();
   },

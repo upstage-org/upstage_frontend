@@ -310,15 +310,7 @@ export default {
   streaming_server: "Streaming server",
   streaming_server_hint:
     "Which server this feed is published to and played from. Fixed once the feed is created.",
-  jitsi_server: "Video streaming server",
-  jitsi_server_default_hint:
-    "Server pre-selected for performers on this stage; they can switch on stage (Streams tab).",
-  first_configured_server: "First configured server",
   configured_servers: "Configured servers: {jitsi} Jitsi, {rtmp} RTMP",
-  switch_stream_server_confirm:
-    "Switch your stream to {server}?\n\nYour on-stage stream will drop for the audience for a few seconds while it moves to the other server.",
-  stream_server_switch_failed: "Could not connect to {server}; staying on {current}.",
-  stream_server_switched: "Now streaming via {server}",
   copied_to_clipboard: "Copied to clipboard",
   stream_info: "Stream info",
   default_backgroundcolor: "Default Background Colour",

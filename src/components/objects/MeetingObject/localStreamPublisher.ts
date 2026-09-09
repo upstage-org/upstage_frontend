@@ -1,7 +1,8 @@
 // @ts-nocheck
 import { onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { isJitsiBoardType } from "@utils/common";
+import { isJitsiBoardType, resolveJitsiOrigin } from "@utils/common";
+import configs from "config";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import { useLowLevelAPI } from "./composable";
 
@@ -41,14 +42,6 @@ export type LocalStreamPublisherApi = {
   join: () => Promise<void>;
   ensureTracks: () => Promise<void>;
   retryAcquire: () => Promise<void>;
-  /**
-   * Multi-server streaming: stop sending to the CURRENT room while keeping
-   * the local tracks (and camera) alive, and clear the published flag so the
-   * next `joined` pulse re-publishes into whatever `jitsi.room` is by then.
-   * Called by `jitsi.switchServer()` between "new room joined" and "swap the
-   * room in place". Same technique as closing the own tile.
-   */
-  unpublishForSwap: () => Promise<void>;
   blocked: Ref<boolean>;
   blockedMessage: Ref<string>;
   pendingPublish: Ref<boolean>;
@@ -150,11 +143,22 @@ export function useLocalStreamPublisher(
     }
   };
 
+  // Multi-server streaming: this publisher owns the DEFAULT server's room
+  // only. Own tiles bound to another server are published there by
+  // extraServerPublishers.ts, so they must not count here — otherwise a
+  // performer whose only tile is on server B would also send to A's room.
+  // Single-server builds never carry `jitsiServer`, so the filter is inert.
+  const multiServer = (configs.JITSI_SERVER_COUNT ?? 1) > 1;
+  const defaultServerTag = multiServer ? configs.JITSI_ENDPOINT : undefined;
+  const onDefaultServer = (o: { jitsiServer?: string }): boolean =>
+    !multiServer || resolveJitsiOrigin(o.jitsiServer) === configs.JITSI_ENDPOINT;
+
   const countOwnJitsiOnBoard = (): number => {
     const myId = jitsi?.room?.myUserId?.();
     const mySession = stageStore.session;
     return stageStore.board.objects.filter((o) => {
       if (!isJitsiBoardType(o.type)) return false;
+      if (!onDefaultServer(o)) return false;
       if (myId != null && o.participantId === myId) return true;
       return mySession != null && o.hostId === mySession;
     }).length;
@@ -197,7 +201,7 @@ export function useLocalStreamPublisher(
     published.value = true;
     const myUserId = jitsi?.room?.myUserId?.();
     if (myUserId) {
-      stageStore.ensureJitsiTileParticipantBroadcast(myUserId);
+      stageStore.ensureJitsiTileParticipantBroadcast(myUserId, defaultServerTag);
     }
   };
 
@@ -350,7 +354,7 @@ export function useLocalStreamPublisher(
       syncLocalTracksRef();
       const myUserId = jitsi?.room?.myUserId?.();
       if (myUserId) {
-        stageStore.ensureJitsiTileParticipantBroadcast(myUserId);
+        stageStore.ensureJitsiTileParticipantBroadcast(myUserId, defaultServerTag);
       }
     } finally {
       republishing = false;
@@ -510,7 +514,6 @@ export function useLocalStreamPublisher(
     join,
     ensureTracks,
     retryAcquire,
-    unpublishForSwap: unpublishLocalTracks,
     blocked,
     blockedMessage,
     pendingPublish,

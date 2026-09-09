@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 /**
- * Multi-server streaming (several Jitsi servers per performance): the store
- * tags own tiles with the publish server, resolves every tile to a server
- * for the viewer sessions, and only deletes tiles for a USER_LEFT that came
- * from the tile's own server. With a single configured server none of the
- * new fields are ever written — those cases pin the legacy payload shape.
+ * Multi-server streaming (several Jitsi servers per performance): a tile is
+ * bound to ONE server (`jitsiServer`, carried in the per-server Yourself
+ * tile's drag payload), the store keeps this tab's participant id PER server
+ * and heals own tiles only with the id of their own server, resolves every
+ * tile to a server for the sessions, and only deletes tiles for a USER_LEFT
+ * that came from the tile's own server. With a single configured server none
+ * of the new fields are ever written — those cases pin the legacy payload
+ * shape.
  */
 
 const { sendMessage } = vi.hoisted(() => ({ sendMessage: vi.fn(() => Promise.resolve()) }));
@@ -64,39 +67,72 @@ function fakeTrack(participantId: string, id: string) {
 }
 
 describe("multi-server jitsi (two servers configured)", () => {
-  it("syncLocalJitsiParticipantId(id, server) records the publish server and stamps own tiles", () => {
+  it("syncLocalJitsiParticipantId(id, server) records the id per server and heals only that server's own tiles", () => {
     const s = useStageStore();
     s.session = "sess-A";
-    const placed = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10 });
-    expect(placed.jitsiServer).toBeUndefined(); // server unknown yet
-    s.syncLocalJitsiParticipantId("p1", J2);
-    expect(s.localJitsiServer).toBe(J2);
-    const tile = s.board.objects.find((o) => o.id === placed.id)!;
-    expect(tile.participantId).toBe("p1");
-    expect(tile.jitsiServer).toBe(J2);
+    const onDefault = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10 });
+    const onJ2 = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10, jitsiServer: J2 });
+    expect(onDefault.jitsiServer).toBeUndefined(); // no server is ever inferred
+    s.syncLocalJitsiParticipantId("p2", J2);
+    expect(s.localJitsiParticipantIds).toEqual({ [J2]: "p2" });
+    const tile2 = s.board.objects.find((o) => o.id === onJ2.id)!;
+    const tile1 = s.board.objects.find((o) => o.id === onDefault.id)!;
+    expect(tile2.participantId).toBe("p2");
+    expect(tile2.jitsiServer).toBe(J2);
+    // The default-server tile is untouched by server B's join.
+    expect(tile1.participantId).toBeUndefined();
+    expect("jitsiServer" in tile1).toBe(false);
+    s.syncLocalJitsiParticipantId("p1", J1);
+    expect(s.localJitsiParticipantIds).toEqual({ [J2]: "p2", [J1]: "p1" });
+    expect(s.board.objects.find((o) => o.id === onDefault.id)!.participantId).toBe("p1");
+    expect(s.board.objects.find((o) => o.id === onJ2.id)!.participantId).toBe("p2");
   });
 
-  it("placeObjectOnStage stamps jitsiServer once the publish server is known", () => {
+  it("placeObjectOnStage stamps the participant id of the tile's OWN server", () => {
     const s = useStageStore();
-    s.syncLocalJitsiParticipantId("p1", J2);
-    const placed = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10 });
-    expect(placed.jitsiServer).toBe(J2);
-    expect(placed.participantId).toBe("p1");
-    // A tile that already names a server keeps it (e.g. re-placed from a payload).
-    const explicit = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10, jitsiServer: J1 });
-    expect(explicit.jitsiServer).toBe(J1);
+    s.syncLocalJitsiParticipantId("p1", J1);
+    s.syncLocalJitsiParticipantId("p2", J2);
+    const onJ2 = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10, jitsiServer: J2 });
+    expect(onJ2.participantId).toBe("p2");
+    expect(onJ2.jitsiServer).toBe(J2);
+    const onJ1 = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10, jitsiServer: J1 });
+    expect(onJ1.participantId).toBe("p1");
+    // A legacy tile without a server resolves to the default server's id.
+    const legacy = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10 });
+    expect(legacy.participantId).toBe("p1");
+    expect("jitsiServer" in legacy).toBe(false);
   });
 
-  it("switching servers re-stamps own tiles (same id, new participantId + server)", () => {
+  it("a tile on a server this tab has not joined yet waits for that server's id", () => {
     const s = useStageStore();
     s.session = "sess-A";
     s.syncLocalJitsiParticipantId("p1", J1);
-    const placed = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10 });
+    const onJ2 = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10, jitsiServer: J2 });
+    expect(onJ2.participantId).toBeUndefined(); // never server A's id
     s.syncLocalJitsiParticipantId("p2", J2);
-    const tile = s.board.objects.find((o) => o.id === placed.id)!;
-    expect(tile.participantId).toBe("p2");
-    expect(tile.jitsiServer).toBe(J2);
-    expect(s.board.objects).toHaveLength(1);
+    expect(s.board.objects.find((o) => o.id === onJ2.id)!.participantId).toBe("p2");
+  });
+
+  it("ensureJitsiTileParticipantBroadcast(id, server) leaves own tiles on other servers alone", () => {
+    const s = useStageStore();
+    // Minimal model making `canPlay` truthy (the broadcast is player-only).
+    s.model = { permission: "player", attributes: [] } as never;
+    s.session = "sess-A";
+    s.syncLocalJitsiParticipantId("p1", J1);
+    s.syncLocalJitsiParticipantId("p2", J2);
+    const onJ1 = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10, jitsiServer: J1 });
+    const onJ2 = s.placeObjectOnStage({ type: "jitsi", w: 10, h: 10, jitsiServer: J2 });
+    s.ensureJitsiTileParticipantBroadcast("p2-new", J2);
+    expect(s.board.objects.find((o) => o.id === onJ2.id)!.participantId).toBe("p2-new");
+    expect(s.board.objects.find((o) => o.id === onJ1.id)!.participantId).toBe("p1");
+  });
+
+  it("leaving a server (id null) forgets only that server's id", () => {
+    const s = useStageStore();
+    s.syncLocalJitsiParticipantId("p1", J1);
+    s.syncLocalJitsiParticipantId("p2", J2);
+    s.syncLocalJitsiParticipantId(null, J2);
+    expect(s.localJitsiParticipantIds).toEqual({ [J1]: "p1" });
   });
 
   it("jitsiServersInUse resolves tiles to origins (absent = default) and is sorted", () => {
@@ -208,11 +244,11 @@ describe("multi-server jitsi (two servers configured)", () => {
     expect(s.trackServer(s.jitsiTracks[1])).toBeUndefined();
   });
 
-  it("CLEAN_STAGE forgets the publish server", () => {
+  it("CLEAN_STAGE forgets every per-server participant id", () => {
     const s = useStageStore();
     s.syncLocalJitsiParticipantId("p1", J2);
     s.CLEAN_STAGE();
-    expect(s.localJitsiServer).toBeNull();
+    expect(s.localJitsiParticipantIds).toEqual({});
   });
 });
 
@@ -232,6 +268,6 @@ describe("single-server install (legacy payload shape)", () => {
     const tile = s.board.objects.find((o) => o.id === placed.id)!;
     expect(tile.participantId).toBe("p2");
     expect("jitsiServer" in tile).toBe(false);
-    expect(s.localJitsiServer).toBeNull();
+    expect(s.localJitsiParticipantIds).toEqual({});
   });
 });

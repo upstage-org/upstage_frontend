@@ -5,76 +5,21 @@ import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import Skeleton from "../../Skeleton.vue";
 import StreamToolboxThumb from "../Streams/StreamToolboxThumb.vue";
-import { computed, createVNode, inject, ref } from "vue";
-import { Modal, message } from "ant-design-vue";
-import { useI18n } from "vue-i18n";
+import { computed } from "vue";
 import configs from "config";
-import { endpointHostLabel, isJitsiBoardType } from "@utils/common";
+import { endpointHostLabel } from "@utils/common";
 import Yourself from "components/objects/MeetingObject/Yourself.vue";
 
 const stageStore = useStageStore();
-const { t } = useI18n();
 
-// Multi-server streaming: which Jitsi server this performer publishes to.
-// Rendered only when the build lists more than one server; `jitsi` is the
-// composable object provided by MeetingObject/Shell.vue.
-const jitsi = inject("jitsi", null);
-const jitsiServers = computed(() => configs.JITSI_ENDPOINTS ?? []);
-const showServerPicker = computed(
-  () => (configs.JITSI_SERVER_COUNT ?? 1) > 1 && !!jitsi?.server && !!jitsi?.switchServer,
-);
-const currentServer = computed(() => jitsi?.server?.value ?? configs.JITSI_ENDPOINT);
-const currentServerLabel = computed(() => endpointHostLabel(currentServer.value));
-const switching = computed(() => jitsi?.switching?.value ?? false);
-// Native <select> rather than the Bulma Dropdown: the toolbox is a narrow
-// horizontal strip and a positioned menu gets clipped there.
-const selectEl = ref(null);
+// Multi-server streaming: one self-preview tile PER configured Jitsi server.
+// Each tile is a distinct stream bound to its server (like an RTMP feed is
+// bound to its MediaMTX), so a performer can have tiles live on several
+// servers at once. With a single server the classic lone Yourself tile is
+// rendered exactly as before.
+const multiServer = computed(() => (configs.JITSI_SERVER_COUNT ?? 1) > 1);
+const jitsiServers = computed(() => configs.JITSI_ENDPOINTS ?? [configs.JITSI_ENDPOINT]);
 
-const ownJitsiTilesOnBoard = () => {
-  const myId = jitsi?.room?.myUserId?.();
-  const mySession = stageStore.session;
-  return stageStore.board.objects.filter(
-    (o) =>
-      isJitsiBoardType(o.type) &&
-      ((myId != null && o.participantId === myId) || (mySession != null && o.hostId === mySession)),
-  ).length;
-};
-
-const doSwitch = async (next) => {
-  const label = endpointHostLabel(next);
-  const ok = await jitsi.switchServer(next);
-  if (ok) {
-    message.success(t("stream_server_switched", { server: label }));
-  } else {
-    message.error(
-      t("stream_server_switch_failed", { server: label, current: currentServerLabel.value }),
-    );
-  }
-};
-
-const onServerPicked = (event) => {
-  const next = event?.target?.value;
-  // Reset the control to the live value; it follows `jitsi.server` on success.
-  if (selectEl.value) selectEl.value.value = currentServer.value;
-  if (!next || next === currentServer.value || switching.value) return;
-  if (ownJitsiTilesOnBoard() === 0) {
-    void doSwitch(next);
-    return;
-  }
-  Modal.confirm({
-    title: t("streaming_server"),
-    content: createVNode(
-      "div",
-      { style: "color: black; white-space: pre-line;" },
-      t("switch_stream_server_confirm", { server: endpointHostLabel(next) }),
-    ),
-    okText: t("yes"),
-    cancelText: t("no"),
-    onOk() {
-      void doSwitch(next);
-    },
-  });
-};
 // The stage's streaming mode (Customisation page) picks which halves of this
 // tab exist: Jitsi rooms/self-preview, RTMP feeds, or both.
 const jitsiEnabled = computed(() => stageStore.jitsiStreamingEnabled);
@@ -112,34 +57,15 @@ const clearAll = () => stageStore.clearStageObjectsOfKind("stream");
     </div>
     <span class="tag is-light is-block">{{ $t("new_room") }}</span>
   </div>
-  <Yourself v-if="jitsiEnabled" :title="currentServerLabel" />
-  <!--
-    The server picker is its own 100x100 tile, NOT nested under the
-    self-preview: every direct child of .card-content is a fixed 100px
-    tile with overflow hidden, so stacking the <select> under the preview
-    inside one tile pushed the preview up out of the box and hid the
-    select below it (2026-09-10).
-  -->
-  <div
-    v-if="jitsiEnabled && showServerPicker"
-    class="room-skeleton server-tile"
-    :title="t('streaming_server')"
-  >
-    <div class="select is-small server-select">
-      <select
-        ref="selectEl"
-        :value="currentServer"
-        :disabled="switching"
-        data-testid="jitsi-server-picker"
-        @change="onServerPicked"
-      >
-        <option v-for="origin in jitsiServers" :key="origin" :value="origin">
-          {{ endpointHostLabel(origin) }}
-        </option>
-      </select>
-    </div>
-    <span class="tag is-light is-block">{{ $t("streaming_server") }}</span>
-  </div>
+  <Yourself v-if="jitsiEnabled && !multiServer" />
+  <template v-else-if="jitsiEnabled">
+    <Yourself
+      v-for="origin in jitsiServers"
+      :key="origin"
+      :server="origin"
+      :title="`${$t('streaming_server')}: ${endpointHostLabel(origin)}`"
+    />
+  </template>
   <Skeleton v-for="(room, i) in rooms" :key="i" :data="room">
     <div class="room-skeleton">
       <!--
@@ -170,23 +96,5 @@ const clearAll = () => stageStore.clearStageObjectsOfKind("stream");
   width: 76px;
   height: 48px;
   margin: 0 auto;
-}
-
-/* The panel's generic `#topbar .card-content > div > div { padding: 12px }`
-   (ID selector, so it outranks this scoped rule without !important) would
-   leave the select only 64px wide; host names need the room. The 48px band
-   matches `.icon.is-large` on the neighbouring tiles so the labels line up. */
-.server-tile > .server-select {
-  padding: 0 !important;
-  width: 88px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-
-  select {
-    width: 100%;
-    max-width: 100%;
-    text-overflow: ellipsis;
-  }
 }
 </style>

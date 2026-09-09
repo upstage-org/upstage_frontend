@@ -39,7 +39,13 @@ const mocks = vi.hoisted(() => {
 const storeMocks = vi.hoisted(() => ({ store: null as unknown as Record<string, unknown> }));
 
 vi.mock("./composable", () => ({ useLowLevelAPI: () => mocks.JitsiMeetJS }));
-vi.mock("@utils/common", () => ({ isJitsiBoardType: (t: string) => t === "jitsi" }));
+// Partial mock: the publisher also reads `resolveJitsiOrigin` (multi-server
+// tile filter), which must stay real — the build under test may list more
+// than one server via .env.
+vi.mock("@utils/common", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@utils/common")>()),
+  isJitsiBoardType: (t: string) => t === "jitsi",
+}));
 vi.mock("@composables/usePageWakeRecovery", () => ({ usePageWakeRecovery: vi.fn() }));
 vi.mock("@stores/pinia/stage", async () => {
   const { reactive } = await import("vue");

@@ -17,6 +17,7 @@ import {
   resolveJitsiOrigin,
   resolveRtmpOrigin,
   rtmpEndpointFromDescription,
+  shortServerLabel,
 } from "./common";
 
 describe("rtmpEndpointFromDescription", () => {
@@ -63,5 +64,28 @@ describe("endpointHostLabel", () => {
     expect(endpointHostLabel("http://localhost:8000")).toBe("localhost:8000");
     expect(endpointHostLabel("")).toBe("");
     expect(endpointHostLabel("weird")).toBe("weird");
+  });
+});
+
+describe("shortServerLabel", () => {
+  const list = ["https://streaming.upstage.live", "https://streaming3.upstage.live"];
+  it("strips the domain suffix the servers share", () => {
+    expect(shortServerLabel(list[0], list)).toBe("streaming");
+    expect(shortServerLabel(list[1], list)).toBe("streaming3");
+  });
+  it("keeps the full host when nothing is shared, for a lone server, or an unknown origin", () => {
+    expect(
+      shortServerLabel("https://a.example.org", ["https://a.example.org", "https://b.test"]),
+    ).toBe("a.example.org");
+    expect(shortServerLabel(list[0], [list[0]])).toBe("streaming.upstage.live");
+    expect(shortServerLabel("https://other.host", list)).toBe("other.host");
+    expect(shortServerLabel("", list)).toBe("");
+  });
+  it("always leaves every host at least one label", () => {
+    const nested = ["https://upstage.live", "https://s3.upstage.live"];
+    expect(shortServerLabel(nested[0], nested)).toBe("upstage");
+    expect(shortServerLabel(nested[1], nested)).toBe("s3.upstage");
+    const same = ["https://x.test", "https://x.test"];
+    expect(shortServerLabel(same[0], same)).toBe("x");
   });
 });

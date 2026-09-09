@@ -2,7 +2,7 @@
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { reactive, computed, inject } from "vue";
+import { reactive, computed } from "vue";
 import HorizontalField from "components/form/HorizontalField.vue";
 import Dropdown from "components/form/Dropdown.vue";
 import configs from "config";
@@ -14,9 +14,9 @@ export default {
     const stageStore = useStageStore();
     const stageSize = computed(() => stageStore.stageSize);
 
-    // Multi-server streaming: a meeting room lives on one Jitsi server.
-    // Default = the server this performer currently publishes to.
-    const jitsi = inject("jitsi", null);
+    // Multi-server streaming: a meeting room lives on one Jitsi server,
+    // picked per room here (streams pick theirs per tile in the Streams
+    // tab). Default = the first configured server.
     const showServerPicker = (configs.JITSI_SERVER_COUNT ?? 1) > 1;
     const serverOptions = (configs.JITSI_ENDPOINTS ?? []).map((origin) => ({
       value: origin,
@@ -25,7 +25,7 @@ export default {
 
     const form = reactive({
       name: "",
-      jitsiServer: jitsi?.server?.value ?? configs.JITSI_ENDPOINT,
+      jitsiServer: configs.JITSI_ENDPOINT,
     });
     const createRoom = async () => {
       stageStore.CREATE_ROOM({

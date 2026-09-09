@@ -526,11 +526,27 @@ export const useStageStore = defineStore(
     /** Set when lib-jitsi-meet reports CONFERENCE_JOINED; used to fill jitsi board objects dragged before myUserId existed. */
     const localJitsiParticipantId = ref<string | null>(null);
     /**
-     * Multi-server streaming: origin of the Jitsi server this tab publishes
-     * to (set alongside `localJitsiParticipantId` by the composable). Null in
-     * single-server installs — nothing below ever stamps `jitsiServer` then.
+     * Multi-server streaming: this tab's participant id on EACH Jitsi server
+     * it has joined (origin → myUserId), written by the composable on every
+     * CONFERENCE_JOINED. A performer publishes the same camera into every
+     * server that has one of their tiles, and ids are per-conference, so a
+     * tile is healed with the id of *its* server. Empty in single-server
+     * installs — the composable never passes a server there.
      */
-    const localJitsiServer = ref<string | null>(null);
+    const localJitsiParticipantIds = ref<Record<string, string>>({});
+    const multiJitsiServer = () => (configs.JITSI_SERVER_COUNT ?? 1) > 1;
+    /**
+     * Participant id this tab has on the server a tile lives on. Single-server
+     * (or a tile without a server on a multi-server build, which resolves to
+     * the default) → the classic `localJitsiParticipantId`.
+     */
+    const localParticipantIdForTile = (object: { jitsiServer?: string }): string | null => {
+      if (!multiJitsiServer()) return localJitsiParticipantId.value;
+      const origin = resolveJitsiOrigin(object.jitsiServer);
+      const mapped = localJitsiParticipantIds.value[origin];
+      if (mapped) return mapped;
+      return origin === configs.JITSI_ENDPOINT ? localJitsiParticipantId.value : null;
+    };
     /**
      * Which Jitsi server each remote track came from. A WeakMap keyed by the
      * raw JitsiTrack (deliberately NOT reactive / serialised): `Jitsi.vue`
@@ -712,6 +728,11 @@ export const useStageStore = defineStore(
       }
       if (hasOwnerlessTrack && localJitsiParticipantId.value != null) {
         ids.add(String(localJitsiParticipantId.value));
+      }
+      if (hasOwnerlessTrack) {
+        // Multi-server: a local (cloned) track published into a second
+        // server has no participant id until that conference accepts it.
+        for (const id of Object.values(localJitsiParticipantIds.value)) ids.add(String(id));
       }
       return ids;
     });
@@ -1076,7 +1097,7 @@ export const useStageStore = defineStore(
       topbarCollapsed.value = false;
       publicChatPosition.value = null;
       localJitsiParticipantId.value = null;
-      localJitsiServer.value = null;
+      localJitsiParticipantIds.value = {};
       pendingJitsiPublish.clear();
       orphanHostFirstMissingAt.clear();
       // Masquerading is a player-only "preview as audience" affordance.
@@ -2315,7 +2336,11 @@ export const useStageStore = defineStore(
         // lookup resolves to Jitsi.vue (keys are lowercase).
         type: resolvedBoardType,
       };
-      const inferredJitsiId = localJitsiParticipantId.value;
+      // Multi-server: the Yourself tile for server B carries `jitsiServer: B`
+      // in its drag payload, so the id is looked up for THAT server.
+      const inferredJitsiId = isJitsiBoardType(object.type)
+        ? localParticipantIdForTile(object)
+        : localJitsiParticipantId.value;
       if (
         isJitsiBoardType(object.type) &&
         (object.participantId == null || object.participantId === "") &&
@@ -2335,18 +2360,11 @@ export const useStageStore = defineStore(
       if (isJitsiBoardType(object.type) && session.value) {
         object.hostId = session.value;
       }
-      // Multi-server streaming: record which Jitsi server this tile's media
-      // is on so viewers can connect there. Only when several servers are
-      // configured — single-server installs never write the field, so their
+      // Multi-server streaming: `jitsiServer` (which server the tile's media
+      // is on, so viewers connect there) arrives in the drag payload from the
+      // per-server Yourself tile (Meeting tab) — it is deliberately NOT
+      // inferred here. Single-server installs never carry the field, so their
       // MQTT payloads / archives are byte-identical to before.
-      if (
-        isJitsiBoardType(object.type) &&
-        object.jitsiServer == null &&
-        localJitsiServer.value != null &&
-        (configs.JITSI_SERVER_COUNT ?? 1) > 1
-      ) {
-        object.jitsiServer = localJitsiServer.value;
-      }
       // Stream tiles placed WITHOUT explicit coordinates (programmatic / future
       // flows) all default to the origin and would stack invisibly on top of
       // each other. Cascade each additional own jitsi tile by a small offset so
@@ -2429,7 +2447,7 @@ export const useStageStore = defineStore(
       if (!isJitsiBoardType(object.type) || !jitsiParticipantIdMissing(object)) {
         return object;
       }
-      const inferred = localJitsiParticipantId.value;
+      const inferred = localParticipantIdForTile(object);
       if (!inferred) return object;
       return { ...object, participantId: inferred };
     }
@@ -2462,12 +2480,18 @@ export const useStageStore = defineStore(
       });
     }
 
-    function flushPendingJitsiPublish(participantId: string) {
+    function flushPendingJitsiPublish(participantId: string, server?: string) {
       const ids = [...pendingJitsiPublish];
       pendingJitsiPublish.clear();
       for (const objectId of ids) {
         const o = board.value.objects.find((obj) => obj.id === objectId);
         if (!o || !isJitsiBoardType(o.type) || !o.liveAction) continue;
+        // Multi-server: `participantId` belongs to `server`; a tile waiting on
+        // another server's join stays pending for that server's flush.
+        if (server != null && resolveJitsiOrigin(o.jitsiServer) !== server) {
+          pendingJitsiPublish.add(objectId);
+          continue;
+        }
         shapeObject({ ...o, participantId });
       }
     }
@@ -2476,11 +2500,14 @@ export const useStageStore = defineStore(
      * After tracks are published, ensure every own on-stage jitsi tile
      * carries the current myUserId and audience has received it over MQTT.
      */
-    function ensureJitsiTileParticipantBroadcast(myUserId: string) {
+    function ensureJitsiTileParticipantBroadcast(myUserId: string, server?: string) {
       if (!canPlay.value || !myUserId) return;
       const mySession = session.value;
       for (const o of board.value.objects) {
         if (!isJitsiBoardType(o.type)) continue;
+        // Multi-server: `myUserId` is only valid on `server`; own tiles on
+        // another server keep the id that server gave them.
+        if (server != null && resolveJitsiOrigin(o.jitsiServer) !== server) continue;
         const isOwnTile =
           (mySession != null && o.hostId === mySession) || o.participantId === myUserId;
         if (!isOwnTile) continue;
@@ -2506,27 +2533,31 @@ export const useStageStore = defineStore(
      * `xyz789` unless we proactively rewrite it.
      */
     function syncLocalJitsiParticipantId(id: string | null, server?: string) {
-      localJitsiParticipantId.value = id;
       // `server` is only passed by multi-server builds (composable guards on
-      // JITSI_SERVER_COUNT > 1); it stamps `jitsiServer` on every own tile so
-      // viewers learn where to fetch the media — including after the
-      // performer switches servers mid-show (the tile keeps its id, only
-      // participantId + jitsiServer change).
-      if (server) localJitsiServer.value = server;
+      // JITSI_SERVER_COUNT > 1): the id is this tab's participant id on THAT
+      // server only, so record it per origin and heal only the own tiles
+      // whose media lives there. The classic single id tracks the default
+      // server so every legacy reader keeps working.
+      if (server) {
+        const next = { ...localJitsiParticipantIds.value };
+        if (id == null) delete next[server];
+        else next[server] = id;
+        localJitsiParticipantIds.value = next;
+        if (server === configs.JITSI_ENDPOINT) localJitsiParticipantId.value = id;
+      } else {
+        localJitsiParticipantId.value = id;
+      }
       if (id == null) return;
       const mySession = session.value;
       for (const o of board.value.objects) {
         if (!isJitsiBoardType(o.type)) continue;
+        if (server != null && resolveJitsiOrigin(o.jitsiServer) !== server) continue;
         const missing = jitsiParticipantIdMissing(o);
-        const staleOwn =
-          mySession != null &&
-          o.hostId === mySession &&
-          (o.participantId !== id || (server != null && o.jitsiServer !== server));
+        const staleOwn = mySession != null && o.hostId === mySession && o.participantId !== id;
         if (missing || staleOwn) {
           const healed = {
             ...o,
             participantId: id,
-            ...(server ? { jitsiServer: server } : {}),
           } as BoardObject;
           UPDATE_OBJECT(healed);
           if ((healed.published || healed.liveAction) && canPlay.value) {
@@ -2534,7 +2565,7 @@ export const useStageStore = defineStore(
           }
         }
       }
-      flushPendingJitsiPublish(id);
+      flushPendingJitsiPublish(id, server);
     }
 
     // ------------------------------------------------------------------
@@ -4119,7 +4150,7 @@ export const useStageStore = defineStore(
       jitsiTracks,
       jitsiServersInUse,
       trackServer,
-      localJitsiServer,
+      localJitsiParticipantIds,
       liveJitsiParticipantIds,
       reloadStreams,
       forceReloadStreams,

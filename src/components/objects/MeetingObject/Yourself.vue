@@ -2,19 +2,48 @@
 import Skeleton from "components/stage/Toolboxs/Skeleton.vue";
 import { computed, inject, onActivated, onDeactivated, onMounted, reactive, ref, watch } from "vue";
 import { useUserStore } from "@stores/pinia/user";
+import { useStageStore } from "@stores/pinia/stage";
 import { playMediaElement, retryPlayOnUserGesture } from "@utils/mediaPlayback";
+import { endpointHostLabel, shortServerLabel } from "@utils/common";
+import configs from "config";
 
 export default {
   components: { Skeleton },
-  setup() {
+  props: {
+    /**
+     * Multi-server streaming: the Jitsi server this preview tile publishes
+     * to (one of `configs.JITSI_ENDPOINTS`). The Meeting tab renders one
+     * tile per configured server, so a dragged tile is bound to a server
+     * the way an RTMP feed is bound to its MediaMTX. Omitted (single-server
+     * builds, Playground): the classic tile on the default server.
+     */
+    server: { type: String, default: undefined },
+  },
+  setup(props) {
     const el = ref();
     const loading = ref(true);
+    const stageStore = useStageStore();
+    // Only a multi-server build binds tiles to a server; a single-server
+    // build's drag payload must stay byte-identical (no `jitsiServer`).
+    const serverOrigin =
+      (configs.JITSI_SERVER_COUNT ?? 1) > 1 && props.server ? props.server : null;
+    const isExtraServer = serverOrigin != null && serverOrigin !== configs.JITSI_ENDPOINT;
+    // Badge text over the preview: the part of the host that differs between
+    // the configured servers ("streaming" / "streaming3"); the full host is
+    // in the tile's tooltip (Meeting tab).
+    const hostLabel = computed(() =>
+      serverOrigin
+        ? shortServerLabel(serverOrigin, configs.JITSI_ENDPOINTS ?? []) ||
+          endpointHostLabel(serverOrigin)
+        : "",
+    );
     const data = reactive({
       type: "jitsi",
       participantId: null,
       w: 100,
       h: 100,
       volume: 50,
+      ...(serverOrigin ? { jitsiServer: serverOrigin } : {}),
     });
 
     const jitsi = inject("jitsi");
@@ -95,11 +124,30 @@ export default {
       attachPreview();
     });
 
-    watch(joined, () => (data.participantId = jitsi?.room?.myUserId?.() ?? null), {
-      immediate: true,
-    });
+    if (serverOrigin) {
+      // Per-server tile: the participant id this tab has on THAT server,
+      // recorded by the composable on that server's CONFERENCE_JOINED.
+      watch(
+        () => stageStore.localJitsiParticipantIds?.[serverOrigin] ?? null,
+        (id) => (data.participantId = id),
+        { immediate: true },
+      );
+    } else {
+      watch(joined, () => (data.participantId = jitsi?.room?.myUserId?.() ?? null), {
+        immediate: true,
+      });
+    }
 
     const join = async () => {
+      if (isExtraServer) {
+        // The tile lands on another server: publishing there is driven by
+        // the board watcher in extraServerPublishers.ts once the tile
+        // exists. Only make sure the camera is up — `publisher.join()`
+        // would start sending to the DEFAULT server's room for a tile that
+        // is not there.
+        if (publisher?.ensureTracks) await publisher.ensureTracks();
+        return;
+      }
       if (publisher?.join) {
         await publisher.join();
       }
@@ -138,6 +186,7 @@ export default {
       retryAcquire,
       el,
       nickname,
+      hostLabel,
       loading,
       loadeddata,
     };
@@ -167,7 +216,30 @@ export default {
         during the join handshake — and forever on a stage whose join stalls
         — for an action that actually works.
       -->
+      <!--
+        Multi-server: the server name is a badge OVER the preview (bottom
+        edge), not a third row — the tile is a fixed 100px box shared with
+        the icon tiles, and an extra row shifted the name label off the
+        neighbours' baseline. The wrapper only exists when there is a badge
+        so the single-server tile keeps its exact DOM.
+      -->
+      <div v-if="hostLabel" class="preview-box">
+        <video
+          ref="el"
+          :style="{ cursor: 'pointer', height: '48px' }"
+          :onClick="join"
+          autoplay
+          :muted.attr="true"
+          playsinline
+          disablePictureInPicture
+          controlslist="nodownload nofullscreen noremoteplayback"
+          @loadeddata="loadeddata"
+          @contextmenu.prevent
+        ></video>
+        <span class="server-badge">{{ hostLabel }}</span>
+      </div>
       <video
+        v-else
         ref="el"
         :style="{ cursor: 'pointer', height: '48px', marginBottom: '2px' }"
         :onClick="join"
@@ -212,6 +284,34 @@ video {
   -moz-transform: translateY(-50%);
   -ms-transform: translateY(-50%);
   transform: translateY(-50%);
+}
+
+.preview-box {
+  position: relative;
+  margin-bottom: 2px;
+  line-height: 0;
+
+  video {
+    display: block;
+  }
+}
+
+.server-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px 4px;
+  font-size: 0.6rem;
+  line-height: 1.2;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  pointer-events: none;
 }
 
 .blocked-tag {
