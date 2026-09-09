@@ -27,7 +27,7 @@
  * across with no rename.
  */
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { computed, markRaw, ref } from "vue";
 import { v4 as uuidv4 } from "uuid";
 import hash from "object-hash";
 import { animate } from "animejs";
@@ -887,8 +887,35 @@ export const useStageStore = defineStore(
       return base;
     }
 
+    /**
+     * Keep the archived event log out of Vue's reactivity graph.
+     *
+     * `model.events` is the stage's whole MQTT history (thousands of rows,
+     * hundreds of thousands of nested objects on a busy stage). It is only
+     * ever read as a plain array (replay seek/iterate, jitsi board
+     * reconcile, the replay EventIndicator), never mutated in place, and
+     * the one append path (`reloadMissingEvents`) reassigns the property —
+     * which stays reactive at the `model` level, so those readers still
+     * update. Left reactive, the array is walked by every `deep: true`
+     * watcher on the store — notably Pinia's own `$subscribe`, which
+     * `pinia-plugin-persistedstate` installs because this store declares
+     * `persist` — on EVERY store mutation. Measured on dev (demo stage,
+     * 8,746 events): ~400 ms of main-thread traversal per mutation, i.e.
+     * per audio `timeupdate` tick, per drag move, per chat line; the page
+     * stalled for most of any audio playback. Marking the array raw makes
+     * that traversal skip it (Vue checks `__v_skip`) — 0 ms in the same
+     * measurement. Must run BEFORE anything reads `model.events` through
+     * the proxy, or Vue caches a reactive wrapper for the array.
+     */
+    function rawEvents<T extends { events?: ReplayEvent[] } | null>(target: T): T {
+      if (target && Array.isArray(target.events)) {
+        target.events = markRaw(target.events);
+      }
+      return target;
+    }
+
     function SET_MODEL(newModel: StageModel | null) {
-      model.value = newModel;
+      model.value = rawEvents(newModel);
       if (newModel) {
         const media = newModel.assets;
         if (media && media.length) {
@@ -3348,7 +3375,9 @@ export const useStageStore = defineStore(
       const events = await stageGraph.loadEvents(model.value.fileLocation, lastEventId);
       if (events && model.value.events) {
         events.forEach((event: ReplayEvent) => replicateEvent(event));
-        model.value.events = model.value.events.concat(events);
+        // `concat` returns a fresh (reactive-eligible) array — keep the
+        // appended log raw too, see `rawEvents`.
+        model.value.events = markRaw(model.value.events.concat(events));
         reconcileJitsiBoardFromEvents(model.value.events);
       }
     }

@@ -25,10 +25,10 @@ export default {
     const el = ref();
     // Any moveable gesture in flight (drag / resize / rotate).
     const isDragging = ref(false);
-    // A drag-move specifically. Its positions are published live, so the
-    // element under the pointer IS the object everyone else is watching:
-    // no ghost copy at the "old" position and no half-opacity preview.
-    // Resize/rotate still publish on release and keep the ghost.
+    // A gesture whose intermediate states are published live (drag-move and
+    // rotate). The element under the pointer IS the object everyone else is
+    // watching: no ghost copy at the "old" state and no half-opacity
+    // preview. Resize still publishes on release and keeps the ghost.
     const liveDragging = ref(false);
     const ghosting = computed(() => isDragging.value && !liveDragging.value);
 
@@ -131,22 +131,39 @@ export default {
         rotate,
       });
     };
+    // Same leading-edge throttle as drag-move: the tilt handle publishes the
+    // angle while it is held so everyone watches the object tip over as it
+    // happens (the red bulb state exists for objects that must be posed
+    // before they are shown). rotateEnd's final (non-live) sendRotation
+    // covers whatever fell inside the last throttle window.
+    const sendLiveRotation = throttle((rotate) => {
+      stageStore.shapeObject(
+        {
+          ...props.object,
+          rotate,
+        },
+        { live: true },
+      );
+    }, LIVE_MOVE_INTERVAL_MS);
     moveable
       .on("rotateStart", (e) => {
         e.set(props.object.rotate ?? 0);
         isDragging.value = true;
+        liveDragging.value = true;
         if (animation) {
           animation.pause(true);
         }
       })
       .on("rotate", ({ target, rotate }) => {
         target.style.transform = `rotate(${rotate}deg)`;
+        sendLiveRotation(rotate);
       })
       .on("rotateEnd", ({ target, lastEvent }) => {
         if (lastEvent) {
           sendRotation(target, lastEvent.rotate);
         }
         isDragging.value = false;
+        liveDragging.value = false;
       });
 
     const showControls = (isShowing, e) => {
@@ -258,9 +275,9 @@ export default {
           return;
         }
         // Our own live publishes come straight back as store updates; the
-        // drag handler already owns the element's position, and tweening
-        // it toward a (slightly older) published point would fight the
-        // pointer. Resize/rotate don't publish mid-gesture, so they keep
+        // drag/rotate handler already owns the element's position or angle,
+        // and tweening it toward a (slightly older) published value would
+        // fight the pointer. Resize doesn't publish mid-gesture, so it keeps
         // reacting to remote updates as before.
         if (liveDragging.value) {
           return;

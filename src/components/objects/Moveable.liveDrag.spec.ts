@@ -12,7 +12,9 @@ import { nextTick } from "vue";
  * publishes the final position the old way (no `live` flag). While a
  * drag-move is in flight there is no ghost copy and no half-opacity
  * preview: the element under the pointer is the object everyone is
- * watching. Resize/rotate are unchanged: publish on release, ghost shown.
+ * watching. Rotating with the tilt handle follows the same contract (the
+ * angle is published live while the handle is held). Resize is unchanged:
+ * publish on release, ghost shown.
  */
 
 const { instances, storeState } = vi.hoisted(() => ({
@@ -144,6 +146,63 @@ describe("drag-move", () => {
     const target = wrapper.find("div").element as HTMLElement;
     handlers.dragStart({});
     handlers.dragEnd({ target, lastEvent: undefined });
+    expect(shapeObject()).not.toHaveBeenCalled();
+  });
+});
+
+describe("rotate", () => {
+  it("publishes throttled live angles while the tilt handle is held and the final one on release", () => {
+    const wrapper = mountMoveable();
+    const { handlers } = instances[0];
+    const target = wrapper.find("div").element as HTMLElement;
+
+    handlers.rotateStart({ set: vi.fn() });
+    handlers.rotate({ target, rotate: 10 });
+    handlers.rotate({ target, rotate: 15 }); // inside the throttle window
+    expect(shapeObject()).toHaveBeenCalledTimes(1);
+    expect(shapeObject()).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: OBJECT.id, rotate: 10 }),
+      { live: true },
+    );
+    // The element under the pointer already shows the live angle.
+    expect(target.style.transform).toBe("rotate(15deg)");
+
+    vi.advanceTimersByTime(LIVE_MOVE_INTERVAL_MS);
+    handlers.rotate({ target, rotate: 30 });
+    expect(shapeObject()).toHaveBeenCalledTimes(2);
+    expect(shapeObject()).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: OBJECT.id, rotate: 30 }),
+      { live: true },
+    );
+
+    handlers.rotateEnd({ target, lastEvent: { rotate: 32 } });
+    expect(shapeObject()).toHaveBeenCalledTimes(3);
+    const finalCall = shapeObject().mock.calls[2];
+    expect(finalCall[0]).toEqual(expect.objectContaining({ id: OBJECT.id, rotate: 32 }));
+    expect(finalCall[1]).toBeUndefined();
+  });
+
+  it("shows no ghost and keeps full opacity while the rotation is live", async () => {
+    const wrapper = mountMoveable();
+    const { handlers } = instances[0];
+    const target = wrapper.find("div").element as HTMLElement;
+
+    handlers.rotateStart({ set: vi.fn() });
+    await nextTick();
+    expect(wrapper.findAll(".object")).toHaveLength(1);
+    expect(target.style.opacity).toBe("1");
+
+    handlers.rotateEnd({ target, lastEvent: { rotate: 5 } });
+    await nextTick();
+    expect(wrapper.findAll(".object")).toHaveLength(1);
+  });
+
+  it("does not publish when the handle is grabbed and released without moving", () => {
+    const wrapper = mountMoveable();
+    const { handlers } = instances[0];
+    const target = wrapper.find("div").element as HTMLElement;
+    handlers.rotateStart({ set: vi.fn() });
+    handlers.rotateEnd({ target, lastEvent: undefined });
     expect(shapeObject()).not.toHaveBeenCalled();
   });
 });
