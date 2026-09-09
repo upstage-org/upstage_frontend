@@ -5,6 +5,7 @@ import { computed, createVNode, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { useJitsiEndpoint } from "./composable";
+import { resolveJitsiOrigin } from "@utils/common";
 import { Modal } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
 
@@ -111,7 +112,10 @@ export default {
     //    participant menus, reactions, etc.), `disableInitialGUM`, no
     //    `allowfullscreen`. Performers keep full Jitsi UI + allow= media.
     const iframeSrc = computed(() => {
-      const endpoint = useJitsiEndpoint();
+      // Multi-server streaming: the room was created on one Jitsi server
+      // (`jitsiServer` on the toolbox item / board object); absent or no
+      // longer configured ⇒ the default server, as before.
+      const endpoint = useJitsiEndpoint(resolveJitsiOrigin(props.object.jitsiServer));
       if (!endpoint) return "";
       const { host, httpScheme } = endpoint;
 

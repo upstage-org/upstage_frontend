@@ -9,6 +9,11 @@ VITE_JITSI_ENDPOINT=http://localhost/
 # MediaMTX playback origin for RTMP stream feeds (streaming2). Leave unset to
 # hide all RTMP features.
 VITE_RTMP_ENDPOINT=
+# Optional extra streaming servers (comma-separated origins). The singular
+# values above stay the default server (entry 0). Performers pick a Jitsi
+# server on stage; a stream feed is bound to an RTMP server when created.
+# VITE_JITSI_ENDPOINTS=https://streaming.example.org,https://streaming3.example.org
+# VITE_RTMP_ENDPOINTS=https://streaming2.example.org,https://streaming4.example.org
 VITE_CLOUDFLARE_CAPTCHA_SITEKEY=
 VITE_STRIPE_KEY=
 VITE_RELEASE_VERSION='3.0.0'

@@ -403,3 +403,84 @@ export function handleError(e) {
     message.error(typeof e == "string" ? e : "Error!");
   }
 }
+
+// ---------------------------------------------------------------------------
+// Multi-server streaming helpers (MULTI_SERVER_STREAMING_PLAN_2026-09-10.md).
+// Additive only: nothing above this line changed. A server id is its
+// normalised origin string (`configs.JITSI_ENDPOINTS` / `RTMP_ENDPOINTS`).
+// ---------------------------------------------------------------------------
+
+/**
+ * The MediaMTX origin a stream feed asset was bound to at creation, read
+ * from the same `description` JSON blob that carries `isRTMP`. Absent /
+ * unparseable ⇒ undefined (caller falls back to the default server).
+ */
+export function rtmpEndpointFromDescription(description: unknown): string | undefined {
+  if (typeof description !== "string" || !description) return undefined;
+  try {
+    const meta = JSON.parse(description);
+    const value = meta != null && typeof meta === "object" ? meta.rtmpEndpoint : undefined;
+    if (typeof value !== "string" || !value) return undefined;
+    return value.trim().replace(/\/+$/, "") || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const warnedUnknownServers = new Set<string>();
+
+function resolveConfiguredOrigin(
+  candidate: unknown,
+  list: readonly string[] | undefined,
+  fallback: string,
+  kind: string,
+): string {
+  if (typeof candidate !== "string" || !candidate) return fallback;
+  const wanted = candidate.trim().replace(/\/+$/, "");
+  if (!wanted) return fallback;
+  if (Array.isArray(list) && list.includes(wanted)) return wanted;
+  if (wanted === fallback) return fallback;
+  const key = `${kind}:${wanted}`;
+  if (!warnedUnknownServers.has(key)) {
+    warnedUnknownServers.add(key);
+    console.warn(
+      `[config] ${kind} server "${wanted}" is not in this build's server list; using the default "${fallback}"`,
+    );
+  }
+  return fallback;
+}
+
+/**
+ * Resolve a stored MediaMTX origin (from a feed's description or a board
+ * object) to one this build knows about. Unknown / empty ⇒ the default
+ * server (`configs.RTMP_ENDPOINT`), with a single console warning per
+ * unknown value so a removed server never yields a blank tile.
+ */
+export function resolveRtmpOrigin(candidate: unknown): string {
+  return resolveConfiguredOrigin(
+    candidate,
+    configs.RTMP_ENDPOINTS,
+    configs.RTMP_ENDPOINT ?? "",
+    "RTMP",
+  );
+}
+
+/** Same as {@link resolveRtmpOrigin} for Jitsi origins (`configs.JITSI_ENDPOINTS`). */
+export function resolveJitsiOrigin(candidate: unknown): string {
+  return resolveConfiguredOrigin(
+    candidate,
+    configs.JITSI_ENDPOINTS,
+    configs.JITSI_ENDPOINT ?? "",
+    "Jitsi",
+  );
+}
+
+/** Display label for a server origin: its hostname (falls back to the raw value). */
+export function endpointHostLabel(origin: unknown): string {
+  if (typeof origin !== "string" || !origin) return "";
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+}

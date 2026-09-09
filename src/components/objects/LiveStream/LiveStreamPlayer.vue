@@ -19,6 +19,7 @@ import Hls from "hls.js";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStageStore } from "@stores/pinia/stage";
+import { resolveRtmpOrigin, rtmpEndpointFromDescription } from "@utils/common";
 import {
   connectWhep,
   hlsStreamHasAudio,
@@ -33,6 +34,11 @@ const props = defineProps<{
   object: {
     id?: string;
     fileLocation?: string;
+    /** Asset description JSON (carries `isRTMP` and, for feeds bound to a
+     *  specific MediaMTX, `rtmpEndpoint`). Rides on the board object. */
+    description?: string;
+    /** Explicit server origin (takes precedence over the description). */
+    rtmpEndpoint?: string;
   };
 }>();
 
@@ -88,6 +94,14 @@ let whepBroken = false;
 let disposed = false;
 
 const streamKey = () => props.object.fileLocation ?? "";
+// The MediaMTX this feed lives on. Feeds created before multi-server
+// support (or bound to a server this build no longer lists) resolve to the
+// default origin, which is exactly the single-server behaviour.
+const origin = computed(() =>
+  resolveRtmpOrigin(
+    props.object.rtmpEndpoint ?? rtmpEndpointFromDescription(props.object.description),
+  ),
+);
 
 function clearRetry() {
   if (retryTimer != null) {
@@ -213,13 +227,13 @@ async function tryWhep(key: string): Promise<void> {
   try {
     // The Opus mirror is the WebRTC-audible twin of the feed (the raw
     // feed's AAC audio can't ride WebRTC).
-    connection = await connectWhep(opusMirrorKey(key));
+    connection = await connectWhep(opusMirrorKey(key), origin.value);
   } catch (mirrorError) {
     if (!(mirrorError instanceof StreamOfflineError)) throw mirrorError;
     // Mirror not up (transcoder still warming up, or a server without
     // it) — read the raw feed; the audio checks below reroute audible
     // AAC feeds to HLS so they aren't left silent.
-    connection = await connectWhep(key);
+    connection = await connectWhep(key, origin.value);
   }
   whep = connection;
   await waitForTrack(connection);
@@ -228,7 +242,7 @@ async function tryWhep(key: string): Promise<void> {
     whep = null;
     return;
   }
-  if (!connection.hasAudio && (await hlsStreamHasAudio(key))) {
+  if (!connection.hasAudio && (await hlsStreamHasAudio(key, origin.value))) {
     // The source has audio but WHEP dropped it (AAC over WebRTC).
     // Throwing sends connect() down its existing HLS fallback path,
     // which carries the AAC audio at the cost of a little latency.
@@ -279,7 +293,7 @@ async function probeForLateAudio(key: string, connection: WhepConnection): Promi
   for (let attempt = 0; attempt < AUDIO_PROBE_ATTEMPTS; attempt++) {
     await new Promise((resolve) => window.setTimeout(resolve, AUDIO_PROBE_INTERVAL_MS));
     if (disposed || whep !== connection) return;
-    if (await hlsStreamHasAudio(key)) {
+    if (await hlsStreamHasAudio(key, origin.value)) {
       if (disposed || whep !== connection) return;
       // Reconnect from scratch rather than jumping straight to HLS: the
       // fresh attempt prefers the Opus mirror (WebRTC latency, with
@@ -295,7 +309,7 @@ async function probeForLateAudio(key: string, connection: WhepConnection): Promi
 function tryHls(key: string): Promise<void> {
   const el = video.value;
   if (!el) return Promise.reject(new Error("no video element"));
-  const url = hlsUrlForKey(key);
+  const url = hlsUrlForKey(key, origin.value);
   return new Promise((resolve, reject) => {
     if (Hls.isSupported()) {
       const instance = new Hls({ lowLatencyMode: true });

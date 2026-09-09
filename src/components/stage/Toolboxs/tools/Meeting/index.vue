@@ -5,10 +5,76 @@ import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import Skeleton from "../../Skeleton.vue";
 import StreamToolboxThumb from "../Streams/StreamToolboxThumb.vue";
-import { computed } from "vue";
+import { computed, createVNode, inject, ref } from "vue";
+import { Modal, message } from "ant-design-vue";
+import { useI18n } from "vue-i18n";
+import configs from "config";
+import { endpointHostLabel, isJitsiBoardType } from "@utils/common";
 import Yourself from "components/objects/MeetingObject/Yourself.vue";
 
 const stageStore = useStageStore();
+const { t } = useI18n();
+
+// Multi-server streaming: which Jitsi server this performer publishes to.
+// Rendered only when the build lists more than one server; `jitsi` is the
+// composable object provided by MeetingObject/Shell.vue.
+const jitsi = inject("jitsi", null);
+const jitsiServers = computed(() => configs.JITSI_ENDPOINTS ?? []);
+const showServerPicker = computed(
+  () => (configs.JITSI_SERVER_COUNT ?? 1) > 1 && !!jitsi?.server && !!jitsi?.switchServer,
+);
+const currentServer = computed(() => jitsi?.server?.value ?? configs.JITSI_ENDPOINT);
+const currentServerLabel = computed(() => endpointHostLabel(currentServer.value));
+const switching = computed(() => jitsi?.switching?.value ?? false);
+// Native <select> rather than the Bulma Dropdown: the toolbox is a narrow
+// horizontal strip and a positioned menu gets clipped there.
+const selectEl = ref(null);
+
+const ownJitsiTilesOnBoard = () => {
+  const myId = jitsi?.room?.myUserId?.();
+  const mySession = stageStore.session;
+  return stageStore.board.objects.filter(
+    (o) =>
+      isJitsiBoardType(o.type) &&
+      ((myId != null && o.participantId === myId) || (mySession != null && o.hostId === mySession)),
+  ).length;
+};
+
+const doSwitch = async (next) => {
+  const label = endpointHostLabel(next);
+  const ok = await jitsi.switchServer(next);
+  if (ok) {
+    message.success(t("stream_server_switched", { server: label }));
+  } else {
+    message.error(
+      t("stream_server_switch_failed", { server: label, current: currentServerLabel.value }),
+    );
+  }
+};
+
+const onServerPicked = (event) => {
+  const next = event?.target?.value;
+  // Reset the control to the live value; it follows `jitsi.server` on success.
+  if (selectEl.value) selectEl.value.value = currentServer.value;
+  if (!next || next === currentServer.value || switching.value) return;
+  if (ownJitsiTilesOnBoard() === 0) {
+    void doSwitch(next);
+    return;
+  }
+  Modal.confirm({
+    title: t("streaming_server"),
+    content: createVNode(
+      "div",
+      { style: "color: black; white-space: pre-line;" },
+      t("switch_stream_server_confirm", { server: endpointHostLabel(next) }),
+    ),
+    okText: t("yes"),
+    cancelText: t("no"),
+    onOk() {
+      void doSwitch(next);
+    },
+  });
+};
 // The stage's streaming mode (Customisation page) picks which halves of this
 // tab exist: Jitsi rooms/self-preview, RTMP feeds, or both.
 const jitsiEnabled = computed(() => stageStore.jitsiStreamingEnabled);
@@ -46,7 +112,24 @@ const clearAll = () => stageStore.clearStageObjectsOfKind("stream");
     </div>
     <span class="tag is-light is-block">{{ $t("new_room") }}</span>
   </div>
-  <Yourself v-if="jitsiEnabled" />
+  <div v-if="jitsiEnabled" class="yourself-with-server">
+    <Yourself :title="currentServerLabel" />
+    <div v-if="showServerPicker" class="server-picker" :title="t('streaming_server')">
+      <div class="select is-small">
+        <select
+          ref="selectEl"
+          :value="currentServer"
+          :disabled="switching"
+          data-testid="jitsi-server-picker"
+          @change="onServerPicked"
+        >
+          <option v-for="origin in jitsiServers" :key="origin" :value="origin">
+            {{ endpointHostLabel(origin) }}
+          </option>
+        </select>
+      </div>
+    </div>
+  </div>
   <Skeleton v-for="(room, i) in rooms" :key="i" :data="room">
     <div class="room-skeleton">
       <!--
@@ -77,5 +160,22 @@ const clearAll = () => stageStore.clearStageObjectsOfKind("stream");
   width: 76px;
   height: 48px;
   margin: 0 auto;
+}
+
+.yourself-with-server {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.server-picker {
+  margin-top: 2px;
+  max-width: 120px;
+
+  select {
+    max-width: 120px;
+    text-overflow: ellipsis;
+  }
 }
 </style>

@@ -32,8 +32,13 @@ export interface WhepConnection {
   close: () => Promise<void>;
 }
 
-export function whepEndpointForKey(key: string): string {
-  return `${configs.RTMP_ENDPOINT}/live/${encodeURIComponent(key)}/whep`;
+/**
+ * `origin` selects the MediaMTX server (multi-server streaming: a feed is
+ * bound to one origin at creation, see `resolveRtmpOrigin`). Defaults to
+ * the build's default server so every existing caller is unchanged.
+ */
+export function whepEndpointForKey(key: string, origin: string = configs.RTMP_ENDPOINT): string {
+  return `${origin}/live/${encodeURIComponent(key)}/whep`;
 }
 
 /**
@@ -48,8 +53,8 @@ export function opusMirrorKey(key: string): string {
   return `${key}-opus`;
 }
 
-export function hlsUrlForKey(key: string): string {
-  return `${configs.RTMP_ENDPOINT}/live/${encodeURIComponent(key)}/index.m3u8`;
+export function hlsUrlForKey(key: string, origin: string = configs.RTMP_ENDPOINT): string {
+  return `${origin}/live/${encodeURIComponent(key)}/index.m3u8`;
 }
 
 /**
@@ -59,9 +64,14 @@ export function hlsUrlForKey(key: string): string {
  * (→ worth falling back to HLS) or the source simply has no sound.
  * Best-effort: any fetch/parse failure reads as "no audio detected".
  */
-export async function hlsStreamHasAudio(key: string): Promise<boolean> {
+export async function hlsStreamHasAudio(
+  key: string,
+  origin: string = configs.RTMP_ENDPOINT,
+): Promise<boolean> {
   try {
-    const response = await fetch(hlsUrlForKey(key), { signal: AbortSignal.timeout(8_000) });
+    const response = await fetch(hlsUrlForKey(key, origin), {
+      signal: AbortSignal.timeout(8_000),
+    });
     if (!response.ok) return false;
     const manifest = await response.text();
     return /mp4a|opus|ac-3|ec-3/i.test(manifest);
@@ -111,8 +121,11 @@ function waitForIceGathering(pc: RTCPeerConnection): Promise<void> {
   });
 }
 
-export async function connectWhep(key: string): Promise<WhepConnection> {
-  const endpoint = whepEndpointForKey(key);
+export async function connectWhep(
+  key: string,
+  origin: string = configs.RTMP_ENDPOINT,
+): Promise<WhepConnection> {
+  const endpoint = whepEndpointForKey(key, origin);
   const pc = new RTCPeerConnection();
   const stream = new MediaStream();
 

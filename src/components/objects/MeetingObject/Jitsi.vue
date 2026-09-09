@@ -33,9 +33,17 @@ export default {
     });
 
     const tracks = computed(() => {
-      const remote = stageStore.jitsiTracks.filter(
-        (t) => t.getParticipantId() === props.object.participantId,
-      );
+      // Multi-server streaming: participant ids are per-conference, so when
+      // this tile names its server ignore tracks another server delivered
+      // for the same id. Tiles without `jitsiServer` (every single-server
+      // install) and untagged (local) tracks keep the plain id filter.
+      const tileServer = props.object.jitsiServer;
+      const remote = stageStore.jitsiTracks.filter((t) => {
+        if (t.getParticipantId() !== props.object.participantId) return false;
+        if (!tileServer) return true;
+        const from = stageStore.trackServer?.(t);
+        return from == null || from === tileServer;
+      });
       // Own-tile fast-path tracks: tracks acquired by Yourself.vue and
       // published into the shared composable ref the moment
       // `createLocalTracks` resolved, BEFORE the conference round-trip.

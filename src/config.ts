@@ -5,7 +5,9 @@ const {
   VITE_MQTT_NAMESPACE,
   VITE_MQTT_ENDPOINT,
   VITE_JITSI_ENDPOINT,
+  VITE_JITSI_ENDPOINTS,
   VITE_RTMP_ENDPOINT,
+  VITE_RTMP_ENDPOINTS,
   VITE_STRIPE_KEY,
   VITE_RELEASE_VERSION,
   VITE_ALIAS_RELEASE_VERSION,
@@ -36,10 +38,62 @@ const staticAssetsEndpoint =
     ? ensureTrailingSlash(VITE_STATIC_ASSETS_ENDPOINT)
     : ensureTrailingSlash(`${window.location.origin}/resources/`);
 
-const jitsiEndpoint =
-  typeof VITE_JITSI_ENDPOINT === "string" && VITE_JITSI_ENDPOINT
-    ? VITE_JITSI_ENDPOINT.replace(/\/$/, "")
-    : window.location.origin;
+/**
+ * Normalise one streaming-server origin from `.env`: trimmed, trailing
+ * slashes stripped, must be an absolute http(s) URL with no path/query
+ * (the origin is used as a stable server *id* on board objects and stream
+ * feed assets, so two spellings of one server must collapse to one value).
+ * Returns `null` for anything unusable.
+ */
+export const normaliseEndpointOrigin = (raw: unknown): string | null => {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (url.pathname !== "/" || url.search || url.hash) return null;
+    return trimmed;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Build the ordered, de-duplicated server list for one streaming kind from
+ * the legacy singular env var plus the optional comma-separated plural one
+ * (`VITE_JITSI_ENDPOINTS` / `VITE_RTMP_ENDPOINTS`). The singular value is
+ * always entry 0 so existing single-server installs keep today's default;
+ * malformed entries are dropped (and reported once) rather than failing
+ * the boot.
+ */
+export const parseEndpointList = (singular: unknown, plural: unknown): string[] => {
+  const out: string[] = [];
+  const push = (raw: unknown) => {
+    const origin = normaliseEndpointOrigin(raw);
+    if (origin && !out.includes(origin)) out.push(origin);
+  };
+  if (typeof singular === "string" && singular.trim()) {
+    // Keep the legacy value byte-for-byte (only a single trailing "/" was
+    // ever stripped) so `configs.JITSI_ENDPOINT` / `RTMP_ENDPOINT` do not
+    // change for single-server installs.
+    const legacy = singular.replace(/\/$/, "");
+    if (legacy && !out.includes(legacy)) out.push(legacy);
+  }
+  if (typeof plural === "string") {
+    for (const part of plural.split(",")) push(part);
+  }
+  return out;
+};
+
+const jitsiEndpoints = (() => {
+  const list = parseEndpointList(VITE_JITSI_ENDPOINT, VITE_JITSI_ENDPOINTS);
+  return list.length ? list : [window.location.origin];
+})();
+
+// Entry 0 of the list — identical to the previous single-value derivation
+// (`VITE_JITSI_ENDPOINT` minus a trailing "/", else the page origin).
+const jitsiEndpoint = jitsiEndpoints[0];
 
 /**
  * MediaMTX playback origin for RTMP stream feeds (e.g.
@@ -47,20 +101,31 @@ const jitsiEndpoint =
  * same-origin fallback: when unset, every RTMP feature (studio "New stream
  * feed", live playback) stays hidden and the app behaves exactly as before.
  */
-const rtmpEndpoint =
-  typeof VITE_RTMP_ENDPOINT === "string" && VITE_RTMP_ENDPOINT
-    ? VITE_RTMP_ENDPOINT.replace(/\/$/, "")
-    : "";
+const rtmpEndpoints = parseEndpointList(VITE_RTMP_ENDPOINT, VITE_RTMP_ENDPOINTS);
+const rtmpEndpoint = rtmpEndpoints[0] ?? "";
 
-/** OBS "Server" value: rtmp://<media host>/live (empty when RTMP is disabled). */
-const rtmpIngestEndpoint = (() => {
-  if (!rtmpEndpoint) return "";
+/** OBS "Server" value for one MediaMTX origin: rtmp://<host>/live ("" when unusable). */
+export const rtmpIngestEndpointFor = (origin: string | null | undefined): string => {
+  if (!origin) return "";
   try {
-    return `rtmp://${new URL(rtmpEndpoint).host}/live`;
+    return `rtmp://${new URL(origin).host}/live`;
   } catch {
     return "";
   }
-})();
+};
+
+/** OBS "Server" value: rtmp://<media host>/live (empty when RTMP is disabled). */
+const rtmpIngestEndpoint = rtmpIngestEndpointFor(rtmpEndpoint);
+
+// "Counted at startup": one line so an operator can confirm which servers a
+// deployed bundle knows about without digging through the .env it was built
+// from. Guarded so unit tests that stub `console` stay quiet.
+if (typeof console !== "undefined" && typeof console.info === "function") {
+  console.info(
+    `[config] streaming servers: ${jitsiEndpoints.length} Jitsi, ${rtmpEndpoints.length} RTMP`,
+    { jitsi: jitsiEndpoints, rtmp: rtmpEndpoints },
+  );
+}
 
 const configs = {
   MODE: import.meta.env.VITE_ENV_TYPE as "Development" | "Production",
@@ -112,6 +177,16 @@ const configs = {
   JITSI_ENDPOINT: jitsiEndpoint,
   RTMP_ENDPOINT: rtmpEndpoint,
   RTMP_INGEST_ENDPOINT: rtmpIngestEndpoint,
+  /**
+   * Multi-server streaming (see MULTI_SERVER_STREAMING_PLAN_2026-09-10.md).
+   * Ordered origin lists; entry 0 is always the singular value above. A
+   * server's *id* everywhere (board objects, stream feed assets, stage
+   * config) is its normalised origin string, never its list index.
+   */
+  JITSI_ENDPOINTS: jitsiEndpoints,
+  RTMP_ENDPOINTS: rtmpEndpoints,
+  JITSI_SERVER_COUNT: jitsiEndpoints.length,
+  RTMP_SERVER_COUNT: rtmpEndpoints.length,
   MQTT_NAMESPACE: VITE_MQTT_NAMESPACE,
   // Transport settings only. The broker username/password deliberately do NOT
   // live here: Vite inlines `import.meta.env.VITE_*` by textual substitution, so

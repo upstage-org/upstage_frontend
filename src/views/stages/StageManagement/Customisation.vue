@@ -14,7 +14,8 @@ import ColorPicker from "components/form/ColorPicker.vue";
 import buildClient from "services/mqtt";
 import { namespaceTopic } from "store/modules/stage/reusable";
 import { TOPICS } from "utils/constants";
-import { coerceNumber } from "utils/common";
+import { coerceNumber, endpointHostLabel } from "utils/common";
+import configs from "config";
 
 export default {
   components: { Selectable, SaveButton, HorizontalField, Dropdown, AppSwitch, ColorPicker },
@@ -59,6 +60,25 @@ export default {
     const streamingMode = ref(
       ["jitsi", "rtmp", "both"].includes(config.streamingMode) ? config.streamingMode : "both",
     );
+    // Multi-server streaming: the Jitsi server pre-selected for performers on
+    // this stage ("" = first configured server). Only offered when the build
+    // lists more than one server; a saved value that is no longer configured
+    // falls back to "" so the dropdown never shows a phantom entry.
+    const jitsiServers = configs.JITSI_ENDPOINTS ?? [];
+    const jitsiServerOptions = [
+      { value: "", label: "First configured server" },
+      ...jitsiServers.map((origin) => ({ value: origin, label: endpointHostLabel(origin) })),
+    ];
+    const showJitsiServerPicker = (configs.JITSI_SERVER_COUNT ?? 1) > 1;
+    const jitsiServer = ref(
+      typeof config.jitsiServer === "string" && jitsiServers.includes(config.jitsiServer)
+        ? config.jitsiServer
+        : "",
+    );
+    const configuredServers = {
+      jitsi: configs.JITSI_SERVER_COUNT ?? 1,
+      rtmp: configs.RTMP_SERVER_COUNT ?? (configs.RTMP_ENDPOINT ? 1 : 0),
+    };
 
     const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
     const saveCustomisation = async () => {
@@ -68,6 +88,9 @@ export default {
         defaultcolor: defaultcolor.value,
         enabledLiveStreaming: enabledLiveStreaming.value,
         streamingMode: streamingMode.value,
+        // Only persisted when a specific server is chosen (single-server
+        // installs keep the exact config shape they had).
+        ...(jitsiServer.value ? { jitsiServer: jitsiServer.value } : {}),
       });
       await save(
         () => {
@@ -124,6 +147,10 @@ export default {
       sendBackdropColor,
       enabledLiveStreaming,
       streamingMode,
+      jitsiServer,
+      jitsiServerOptions,
+      showJitsiServerPicker,
+      configuredServers,
       setRatioWidth,
       setRatioHeight,
     };
@@ -222,7 +249,18 @@ export default {
               :render-value="(item) => item.value"
               :render-label="(item) => item.label"
             />
+            <Dropdown
+              v-if="enabledLiveStreaming && streamingMode !== 'rtmp' && showJitsiServerPicker"
+              v-model="jitsiServer"
+              :data="jitsiServerOptions"
+              :render-value="(item) => item.value"
+              :render-label="(item) => item.label"
+              :title="$t('jitsi_server_default_hint')"
+            />
           </div>
+          <p v-if="enabledLiveStreaming" class="configured-servers">
+            {{ $t("configured_servers", configuredServers) }}
+          </p>
         </td>
       </tr>
       <tr>
@@ -355,6 +393,12 @@ export default {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.configured-servers {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  opacity: 0.75;
 }
 
 .title {

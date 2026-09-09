@@ -17,6 +17,10 @@ export default {
     // no-op and tracks were never published to the conference.
     const publisher = useLocalStreamPublisher(jitsi, joined);
     provide("localStreamPublisher", publisher);
+    // Multi-server streaming: `jitsi.switchServer()` needs to stop sending
+    // to the old room between "new room joined" and "swap room in place";
+    // the publisher owns the local tracks, so hand it that one hook here.
+    jitsi.unpublishForSwap = publisher.unpublishForSwap;
 
     return () => slots.default();
   },

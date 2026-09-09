@@ -27,7 +27,8 @@
  * across with no rename.
  */
 import { defineStore } from "pinia";
-import { computed, markRaw, ref } from "vue";
+import { computed, markRaw, ref, toRaw } from "vue";
+import configs from "config";
 import { v4 as uuidv4 } from "uuid";
 import hash from "object-hash";
 import { animate } from "animejs";
@@ -45,6 +46,7 @@ import {
   randomColor,
   randomMessageColor,
   randomRange,
+  resolveJitsiOrigin,
 } from "@utils/common";
 import { BACKGROUND_ACTIONS, BOARD_ACTIONS, COLORS, DRAW_ACTIONS, TOPICS } from "@utils/constants";
 import { loadReplayMarkers } from "@utils/replayMarkers";
@@ -111,6 +113,11 @@ export interface BoardObject {
   frameLoop?: boolean;
   /** Live RTMP feed tile (renders via LiveStreamPlayer, not <video src>). */
   isRTMP?: boolean;
+  /** Origin of the Jitsi server the tile's participant is on (multi-server
+   *  streaming, `configs.JITSI_ENDPOINTS`). Absent = the default server, so
+   *  every pre-existing tile, archived event and replay keeps working. Only
+   *  ever written when more than one server is configured. */
+  jitsiServer?: string;
   /** Frame shape for live stream tiles (jitsi + RTMP): a registry id from
    *  components/objects/frameShapes.ts. Legacy values are null/absent
    *  (per-kind default look) and "circle". Rides MQTT broadcasts untouched. */
@@ -518,6 +525,18 @@ export const useStageStore = defineStore(
 
     /** Set when lib-jitsi-meet reports CONFERENCE_JOINED; used to fill jitsi board objects dragged before myUserId existed. */
     const localJitsiParticipantId = ref<string | null>(null);
+    /**
+     * Multi-server streaming: origin of the Jitsi server this tab publishes
+     * to (set alongside `localJitsiParticipantId` by the composable). Null in
+     * single-server installs — nothing below ever stamps `jitsiServer` then.
+     */
+    const localJitsiServer = ref<string | null>(null);
+    /**
+     * Which Jitsi server each remote track came from. A WeakMap keyed by the
+     * raw JitsiTrack (deliberately NOT reactive / serialised): `Jitsi.vue`
+     * uses it to ignore a same-participantId track from another server.
+     */
+    const trackServers = new WeakMap<object, string>();
     /** Jitsi tile ids waiting for CONFERENCE_JOINED before first MQTT PLACE. */
     const pendingJitsiPublish = new Set<ObjectId>();
 
@@ -824,6 +843,22 @@ export const useStageStore = defineStore(
     const whiteboard = computed(() => board.value.whiteboard);
 
     const jitsiTracks = computed(() => board.value.tracks);
+    /**
+     * Sorted, de-duplicated list of Jitsi origins that have a live tile on
+     * the board (tiles without `jitsiServer` count as the default server).
+     * The composable joins a viewer session on every origin here that is not
+     * its publish server. Sorted so `.join()` is a stable change key.
+     */
+    const jitsiServersInUse = computed(() => {
+      const set = new Set<string>();
+      for (const o of board.value.objects) {
+        if (isJitsiBoardType(o.type)) set.add(resolveJitsiOrigin(o.jitsiServer));
+      }
+      return [...set].sort();
+    });
+    /** Server a track was received from (undefined = local / untagged). */
+    const trackServer = (track: JitsiTrack | null | undefined): string | undefined =>
+      track ? trackServers.get(toRaw(track) as object) : undefined;
 
     const reloadStreams = computed(() => _reloadStreams.value);
     const forceReloadStreams = computed(() => _forceReloadStreams.value);
@@ -1041,6 +1076,7 @@ export const useStageStore = defineStore(
       topbarCollapsed.value = false;
       publicChatPosition.value = null;
       localJitsiParticipantId.value = null;
+      localJitsiServer.value = null;
       pendingJitsiPublish.clear();
       orphanHostFirstMissingAt.clear();
       // Masquerading is a player-only "preview as audience" affordance.
@@ -1829,7 +1865,10 @@ export const useStageStore = defineStore(
       }
     }
 
-    function ADD_TRACK(track: JitsiTrack) {
+    function ADD_TRACK(track: JitsiTrack, server?: string) {
+      // Multi-server: remember which Jitsi server delivered this track. Off
+      // the reactive path (WeakMap on the raw object) so nothing re-renders.
+      if (server) trackServers.set(toRaw(track) as object, server);
       // Re-place by JitsiTrack id rather than skipping a duplicate. The
       // Yourself.vue dragstart path can publish the local track here
       // before lib-jitsi-meet has finished assigning it a participantId;
@@ -2296,6 +2335,18 @@ export const useStageStore = defineStore(
       if (isJitsiBoardType(object.type) && session.value) {
         object.hostId = session.value;
       }
+      // Multi-server streaming: record which Jitsi server this tile's media
+      // is on so viewers can connect there. Only when several servers are
+      // configured — single-server installs never write the field, so their
+      // MQTT payloads / archives are byte-identical to before.
+      if (
+        isJitsiBoardType(object.type) &&
+        object.jitsiServer == null &&
+        localJitsiServer.value != null &&
+        (configs.JITSI_SERVER_COUNT ?? 1) > 1
+      ) {
+        object.jitsiServer = localJitsiServer.value;
+      }
       // Stream tiles placed WITHOUT explicit coordinates (programmatic / future
       // flows) all default to the origin and would stack invisibly on top of
       // each other. Cascade each additional own jitsi tile by a small offset so
@@ -2454,16 +2505,29 @@ export const useStageStore = defineStore(
      * `abc123` last navigation is orphaned the next time we rejoin as
      * `xyz789` unless we proactively rewrite it.
      */
-    function syncLocalJitsiParticipantId(id: string | null) {
+    function syncLocalJitsiParticipantId(id: string | null, server?: string) {
       localJitsiParticipantId.value = id;
+      // `server` is only passed by multi-server builds (composable guards on
+      // JITSI_SERVER_COUNT > 1); it stamps `jitsiServer` on every own tile so
+      // viewers learn where to fetch the media — including after the
+      // performer switches servers mid-show (the tile keeps its id, only
+      // participantId + jitsiServer change).
+      if (server) localJitsiServer.value = server;
       if (id == null) return;
       const mySession = session.value;
       for (const o of board.value.objects) {
         if (!isJitsiBoardType(o.type)) continue;
         const missing = jitsiParticipantIdMissing(o);
-        const staleOwn = mySession != null && o.hostId === mySession && o.participantId !== id;
+        const staleOwn =
+          mySession != null &&
+          o.hostId === mySession &&
+          (o.participantId !== id || (server != null && o.jitsiServer !== server));
         if (missing || staleOwn) {
-          const healed = { ...o, participantId: id } as BoardObject;
+          const healed = {
+            ...o,
+            participantId: id,
+            ...(server ? { jitsiServer: server } : {}),
+          } as BoardObject;
           UPDATE_OBJECT(healed);
           if ((healed.published || healed.liveAction) && canPlay.value) {
             mqttBroadcastJitsiTile(healed, "participantId heal after CONFERENCE_JOINED");
@@ -3893,8 +3957,8 @@ export const useStageStore = defineStore(
       CLOSE_RECEIPT_POPUP();
     }
 
-    function addTrack(track: JitsiTrack) {
-      ADD_TRACK(track);
+    function addTrack(track: JitsiTrack, server?: string) {
+      ADD_TRACK(track, server);
     }
 
     function removeTrack(track: JitsiTrack) {
@@ -3910,9 +3974,16 @@ export const useStageStore = defineStore(
      * When a lib-jitsi-meet peer leaves, drop their on-stage tiles and any
      * lingering tracks on this client (MQTT DESTROY may never arrive).
      */
-    function removeJitsiParticipantLocally(participantId: string) {
+    function removeJitsiParticipantLocally(participantId: string, server?: string) {
+      // Multi-server: participant ids are per-conference (8 random hex), so a
+      // USER_LEFT on server A must not delete a tile whose media is on
+      // server B. Callers without `server` (single-server builds) keep the
+      // exact previous behaviour.
       const targets = board.value.objects.filter(
-        (o) => isJitsiBoardType(o.type) && o.participantId === participantId,
+        (o) =>
+          isJitsiBoardType(o.type) &&
+          o.participantId === participantId &&
+          (server == null || resolveJitsiOrigin(o.jitsiServer) === server),
       );
       for (const o of targets) {
         DELETE_OBJECT(serializeObject(o));
@@ -4046,6 +4117,9 @@ export const useStageStore = defineStore(
       unreadPrivateMessageCount,
       whiteboard,
       jitsiTracks,
+      jitsiServersInUse,
+      trackServer,
+      localJitsiServer,
       liveJitsiParticipantIds,
       reloadStreams,
       forceReloadStreams,

@@ -2,16 +2,31 @@
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { reactive, computed } from "vue";
+import { reactive, computed, inject } from "vue";
 import HorizontalField from "components/form/HorizontalField.vue";
+import Dropdown from "components/form/Dropdown.vue";
+import configs from "config";
+import { endpointHostLabel } from "utils/common";
 export default {
-  components: { Field, SaveButton, HorizontalField },
+  components: { Field, SaveButton, HorizontalField, Dropdown },
   emits: ["close"],
   setup: (_, { emit }) => {
     const stageStore = useStageStore();
     const stageSize = computed(() => stageStore.stageSize);
 
-    const form = reactive({ name: "" });
+    // Multi-server streaming: a meeting room lives on one Jitsi server.
+    // Default = the server this performer currently publishes to.
+    const jitsi = inject("jitsi", null);
+    const showServerPicker = (configs.JITSI_SERVER_COUNT ?? 1) > 1;
+    const serverOptions = (configs.JITSI_ENDPOINTS ?? []).map((origin) => ({
+      value: origin,
+      label: endpointHostLabel(origin),
+    }));
+
+    const form = reactive({
+      name: "",
+      jitsiServer: jitsi?.server?.value ?? configs.JITSI_ENDPOINT,
+    });
     const createRoom = async () => {
       stageStore.CREATE_ROOM({
         type: "meeting",
@@ -19,11 +34,14 @@ export default {
         description: "",
         w: stageSize.value.width / 2,
         h: stageSize.value.height / 2,
+        // Only written with several servers so single-server rooms are
+        // byte-identical to before.
+        ...(showServerPicker ? { jitsiServer: form.jitsiServer } : {}),
       });
       emit("close");
     };
 
-    return { form, createRoom };
+    return { form, createRoom, showServerPicker, serverOptions };
   },
 };
 </script>
@@ -43,6 +61,14 @@ export default {
           title="Meeting name should not contain any of these characters: ?, &, :, ', &quot;, %, #."
         >
         </Field>
+      </HorizontalField>
+      <HorizontalField v-if="showServerPicker" :title="$t('streaming_server')">
+        <Dropdown
+          v-model="form.jitsiServer"
+          :data="serverOptions"
+          :render-value="(item) => item.value"
+          :render-label="(item) => item.label"
+        />
       </HorizontalField>
       <SaveButton :disabled="!form.name.trim()">{{ $t("create_room") }}</SaveButton>
     </form>

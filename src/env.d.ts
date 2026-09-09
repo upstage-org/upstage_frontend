@@ -19,6 +19,14 @@ interface ImportMetaEnv {
   // re-inlining of the secret into the public bundle.
   readonly VITE_JITSI_ENDPOINT?: string;
   /**
+   * Optional comma-separated list of additional Jitsi origins (e.g.
+   * `https://streaming.example.org,https://streaming3.example.org`). The
+   * singular `VITE_JITSI_ENDPOINT` stays entry 0 / the default server;
+   * performers pick one of these on stage (Streams tab). Unset ⇒ one server,
+   * behaviour unchanged.
+   */
+  readonly VITE_JITSI_ENDPOINTS?: string;
+  /**
    * Optional XMPP virtual-host overrides for Jitsi. Production installs
    * usually have the XMPP domain == HTTP hostname (e.g. `meet.example.com`)
    * and can leave these unset — `useJitsiEndpoint()` will derive them from
@@ -39,6 +47,13 @@ interface ImportMetaEnv {
    * `https://streaming2.upstage.live`). Unset ⇒ all RTMP UI hidden.
    */
   readonly VITE_RTMP_ENDPOINT?: string;
+  /**
+   * Optional comma-separated list of additional MediaMTX origins. The
+   * singular `VITE_RTMP_ENDPOINT` stays entry 0 / the default server; a
+   * stream feed is bound to one of these when it is created (Studio "New
+   * stream feed"). Unset ⇒ one server, behaviour unchanged.
+   */
+  readonly VITE_RTMP_ENDPOINTS?: string;
   readonly VITE_STRIPE_KEY?: string;
   readonly VITE_RELEASE_VERSION?: string;
   readonly VITE_ALIAS_RELEASE_VERSION?: string;

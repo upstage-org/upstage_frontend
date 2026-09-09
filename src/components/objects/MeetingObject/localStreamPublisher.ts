@@ -41,6 +41,14 @@ export type LocalStreamPublisherApi = {
   join: () => Promise<void>;
   ensureTracks: () => Promise<void>;
   retryAcquire: () => Promise<void>;
+  /**
+   * Multi-server streaming: stop sending to the CURRENT room while keeping
+   * the local tracks (and camera) alive, and clear the published flag so the
+   * next `joined` pulse re-publishes into whatever `jitsi.room` is by then.
+   * Called by `jitsi.switchServer()` between "new room joined" and "swap the
+   * room in place". Same technique as closing the own tile.
+   */
+  unpublishForSwap: () => Promise<void>;
   blocked: Ref<boolean>;
   blockedMessage: Ref<string>;
   pendingPublish: Ref<boolean>;
@@ -502,6 +510,7 @@ export function useLocalStreamPublisher(
     join,
     ensureTracks,
     retryAcquire,
+    unpublishForSwap: unpublishLocalTracks,
     blocked,
     blockedMessage,
     pendingPublish,

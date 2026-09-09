@@ -17,6 +17,8 @@ import configs from "config";
 import { Media, StageAssignmentValue, StudioGraph } from "models/studio";
 import { computed, inject, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { rtmpIngestEndpointFor } from "config";
+import { endpointHostLabel, resolveRtmpOrigin, rtmpEndpointFromDescription } from "utils/common";
 import { MEDIA_FORM_META_QUERY, MEDIA_PAGE_TOOLBAR_QUERY } from "services/graphql/mediaList";
 import StageAssignment from "../MediaForm/StageAssignment.vue";
 import { apolloErrorText } from "../MediaForm/composable";
@@ -51,6 +53,29 @@ const savedKey = ref("");
 const sign = ref("");
 const signLoading = ref(false);
 
+// Multi-server streaming: a feed is bound to ONE MediaMTX when it is
+// created (stored as `rtmpEndpoint` in the asset description next to
+// `isRTMP`). With a single configured server the picker is hidden and the
+// value is simply the default — identical payload to before, except for the
+// (ignored-by-default) `rtmpEndpoint` field the backend only stores for
+// stream assets.
+const rtmpServers = computed<string[]>(() => configs.RTMP_ENDPOINTS ?? [configs.RTMP_ENDPOINT]);
+const showServerPicker = computed(() => (configs.RTMP_SERVER_COUNT ?? 1) > 1);
+const rtmpEndpoint = ref<string>(configs.RTMP_ENDPOINT);
+const serverOptions = computed(() =>
+  rtmpServers.value.map((origin) => ({ value: origin, label: endpointHostLabel(origin) })),
+);
+/** Server the ingest panel describes: the pick (create) or the asset's binding (info). */
+const effectiveOrigin = computed(() => {
+  const state = streamFeedResult.value?.streamFeed;
+  if (state?.mode === "info") {
+    return resolveRtmpOrigin(rtmpEndpointFromDescription(state.media.description));
+  }
+  return resolveRtmpOrigin(rtmpEndpoint.value);
+});
+const ingestServer = computed(() => rtmpIngestEndpointFor(effectiveOrigin.value));
+const effectiveServerLabel = computed(() => endpointHostLabel(effectiveOrigin.value));
+
 const keyValid = computed(() => STREAM_KEY_PATTERN.test(streamKey.value));
 
 watch(visible, (open) => {
@@ -62,6 +87,7 @@ watch(visible, (open) => {
     name.value = "";
     streamKey.value = generateStreamKey();
     stageAssignments.value = [];
+    rtmpEndpoint.value = configs.RTMP_ENDPOINT;
   } else if (state?.mode === "info") {
     savedKey.value = state.media.fileLocation;
     fetchSign(state.media.fileLocation);
@@ -135,6 +161,10 @@ async function create() {
         tags: [],
         w: 16,
         h: 9,
+        // Only meaningful with several servers; the backend stores it in the
+        // stream asset's description (`rtmpEndpoint`) so playback and the
+        // OBS ingest URL follow the binding.
+        ...(showServerPicker.value ? { rtmpEndpoint: rtmpEndpoint.value } : {}),
       },
     });
     message.success(t("stream_feed_created"));
@@ -184,7 +214,13 @@ function close() {
 <template>
   <a-modal
     :open="visible"
-    :title="savedKey ? t('stream_feed') : t('new_stream_feed')"
+    :title="
+      savedKey
+        ? showServerPicker
+          ? `${t('stream_feed')} — ${effectiveServerLabel}`
+          : t('stream_feed')
+        : t('new_stream_feed')
+    "
     :footer="null"
     @cancel="close"
   >
@@ -201,6 +237,17 @@ function close() {
         required
       >
         <a-input v-model:value="streamKey" :maxlength="64" data-testid="stream-feed-key" />
+      </a-form-item>
+      <a-form-item
+        v-if="showServerPicker"
+        :label="t('streaming_server')"
+        :help="t('streaming_server_hint')"
+      >
+        <a-select
+          v-model:value="rtmpEndpoint"
+          :options="serverOptions"
+          data-testid="stream-feed-server"
+        />
       </a-form-item>
       <a-form-item :label="t('stages')">
         <StageAssignment v-model="stageAssignments" />
@@ -225,8 +272,13 @@ function close() {
       <a-form layout="vertical">
         <a-form-item :label="t('ingest_server')">
           <a-input-group compact class="flex">
-            <a-input :value="configs.RTMP_INGEST_ENDPOINT" readonly class="flex-1" />
-            <a-button @click="copyText(configs.RTMP_INGEST_ENDPOINT)">
+            <a-input
+              :value="ingestServer"
+              readonly
+              class="flex-1"
+              data-testid="stream-feed-ingest-server"
+            />
+            <a-button @click="copyText(ingestServer)">
               <CopyOutlined />
             </a-button>
           </a-input-group>
