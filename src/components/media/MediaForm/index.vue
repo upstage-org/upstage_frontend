@@ -615,8 +615,10 @@ const getUserDisplayName = (user: User) => {
             </SlickItem>
           </SlickList>
         </div>
+        <!-- Frames exist only for image-type media; audio/video never show a
+             frame list, so the reorder/remove hint would be noise there. -->
         <a-alert
-          v-if="files!.length > 1"
+          v-if="files!.length > 1 && !['video', 'audio'].includes(type)"
           :message="
             clearMode ? 'Click a frame to remove it' : 'Drag a frame to reorder its position'
           "

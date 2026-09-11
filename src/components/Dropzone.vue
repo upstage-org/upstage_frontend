@@ -53,12 +53,37 @@ watch(visible as Ref, () => {
   reload();
 });
 
+/** Same picked file, as far as a second <input type=file> pick can tell. */
+const fileKey = (file: File) => `${file.name}|${file.size}|${file.lastModified}`;
+/**
+ * Files whose upload-limit lookup (the awaited whoami below) is still in
+ * flight. Nothing on screen changes until that query answers, so on a slow
+ * connection people re-pick the same file — and Apollo deduplicates the two
+ * identical in-flight queries, so both picks resume together and the file
+ * used to land in `files` twice: two copies uploaded, media size doubled,
+ * and the multi-frame "drag a frame" hint on an audio item (2026-09-11).
+ */
+const pendingPicks = new Set<string>();
+const PREPARING_MESSAGE_KEY = "upload-preparing";
+
 const handleUpload = async (file: UploadFile) => {
   let fileType = file.file.type;
-  // First call: load() resolves with bare data. Later calls: load() returns
-  // false and refetch() resolves with an ApolloQueryResult — two different
-  // shapes, normalised by whoamiFromQueryResult (see utils/uploadLimit.ts).
-  const profile = (await (load as any)()) || (await refetch());
+  const key = fileKey(file.file);
+  if (pendingPicks.has(key)) return;
+  pendingPicks.add(key);
+  // Say so while the limit lookup runs: with nothing visible the pick reads
+  // as "did nothing" and gets repeated.
+  message.loading({ content: "Preparing upload…", key: PREPARING_MESSAGE_KEY, duration: 0 });
+  let profile;
+  try {
+    // First call: load() resolves with bare data. Later calls: load() returns
+    // false and refetch() resolves with an ApolloQueryResult — two different
+    // shapes, normalised by whoamiFromQueryResult (see utils/uploadLimit.ts).
+    profile = (await (load as any)()) || (await refetch());
+  } finally {
+    pendingPicks.delete(key);
+    message.destroy(PREPARING_MESSAGE_KEY);
+  }
   const uploadLimit = resolveUploadLimit(whoamiFromQueryResult(profile));
 
   // Every file type is gated, videos included. The backend's uploadFile
@@ -92,7 +117,18 @@ const handleUpload = async (file: UploadFile) => {
       return;
     }
   }
-  if (model.value) {
+  // Audio and video media are single-file: the form never shows a frame list
+  // for them and the backend would store every extra file as a "frame" and
+  // sum the sizes. A second audio/video pick therefore replaces the first
+  // instead of stacking on it (images keep stacking — that is how
+  // multi-frame media are built).
+  const isSingleFileType = (type: string) => type.includes("audio") || type.includes("video");
+  const singleFile =
+    isSingleFileType(fileType) ||
+    files.value.some(
+      (existing) => existing.status === "local" && isSingleFileType(existing.file.type),
+    );
+  if (model.value || singleFile) {
     files.value = [
       {
         ...file,
@@ -102,7 +138,9 @@ const handleUpload = async (file: UploadFile) => {
       },
     ];
 
-    model.value = !model.value;
+    if (model.value) {
+      model.value = false;
+    }
   } else {
     files.value = files.value.concat({
       ...file,

@@ -95,6 +95,10 @@ export default {
         y: top,
         w: width,
         h: height,
+        // A text's frame otherwise shrink-wraps its widest line on every
+        // keystroke (Text.vue fitFrameToText); a hand-dragged width turns
+        // that into the width the lines wrap inside.
+        ...(props.object.type === "text" ? { wrap: true } : {}),
       });
     };
     moveable
