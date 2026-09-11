@@ -61,23 +61,25 @@ const handleUpload = async (file: UploadFile) => {
   const profile = (await (load as any)()) || (await refetch());
   const uploadLimit = resolveUploadLimit(whoamiFromQueryResult(profile));
 
-  if (!fileType.includes("video")) {
-    const canUpload = isWithinUploadLimit(file.file.size, uploadLimit);
-    if (!canUpload) {
-      const hide = message.error({
-        key: UPLOAD_LIMIT_MESSAGE_KEY,
-        content: i18n.global.t("over_limit_upload", {
-          size: humanFileSize(file.file.size),
-          limit: humanFileSize(uploadLimit ?? 0),
-          name: file.file.name,
-        }),
-        /** Long enough to read; click still dismisses immediately (onClick below). */
-        duration: 10,
-        onClick: () => hide(),
-        class: "cursor-pointer",
-      });
-      return;
-    }
+  // Every file type is gated, videos included. The backend's uploadFile
+  // caps videos by the same per-user limit as everything else, so the old
+  // "skip videos" exemption here only meant a player pushed the whole
+  // base64 payload up and then got a bare server error instead of this
+  // toast (2026-09-11 report).
+  if (!isWithinUploadLimit(file.file.size, uploadLimit)) {
+    const hide = message.error({
+      key: UPLOAD_LIMIT_MESSAGE_KEY,
+      content: i18n.global.t("over_limit_upload", {
+        size: humanFileSize(file.file.size),
+        limit: humanFileSize(uploadLimit ?? 0),
+        name: file.file.name,
+      }),
+      /** Long enough to read; click still dismisses immediately (onClick below). */
+      duration: 10,
+      onClick: () => hide(),
+      class: "cursor-pointer",
+    });
+    return;
   }
   if (editingMediaResult.value?.editingMedia?.id) {
     const { assetType } = editingMediaResult.value.editingMedia;

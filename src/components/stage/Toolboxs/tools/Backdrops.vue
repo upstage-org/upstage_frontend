@@ -151,11 +151,7 @@ export default {
           </button>
         </p>
         <p class="control menu-group-item" @click="toggleFrameLoop">
-          <button
-            type="button"
-            class="button is-light"
-            :title="$t('multiframe_loop_tooltip')"
-          >
+          <button type="button" class="button is-light" :title="$t('multiframe_loop_tooltip')">
             <Icon
               size="24"
               src="loop.svg"
@@ -190,9 +186,13 @@ export default {
         `crossfade.svg` vs `animation-slider.svg` distinguish crossfade
         duration from per-frame hold; placeholders and `title` still spell
         out each field.
+        Both are multi-frame only: on a single-frame backdrop `speed` has
+        nothing to drive (the backdrop-to-backdrop fade is the store's own
+        SET_BACKGROUND animation), so showing the field just invited
+        players to expect an effect that never came.
       -->
       <div
-        v-if="background.id === currentBackground.id"
+        v-if="background.id === currentBackground.id && background.multi"
         class="field has-addons menu-group px-4 my-2"
       >
         <p class="control menu-group-title">
