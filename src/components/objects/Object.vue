@@ -2,7 +2,7 @@
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
-import { computed, inject, onUnmounted, provide, reactive, ref, watch } from "vue";
+import { computed, inject, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
 import {
   isHoldableBoardObject,
   isJitsiBoardType,
@@ -10,7 +10,7 @@ import {
   isStreamPlaybackBoardType,
 } from "@utils/common";
 import { autoplayStartFrame } from "@utils/frameAnimation";
-import { effectiveFrameFitId, frameShapeStyle } from "./frameShapes";
+import { containedPictureBox, effectiveFrameFitId, frameShapeStyle } from "./frameShapes";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
 import ContextMenu from "components/ContextMenu.vue";
@@ -150,13 +150,10 @@ export default {
     };
     const activeMovable = computed(() => stageStore.activeMovable === props.object.id);
 
-    // Frame shape for stream tiles (jitsi + RTMP) and video assets. Applied
-    // to the sized `.object` wrapper so the <video> AND the RTMP "waiting" /
-    // jitsi loading overlays are clipped together, and the %-based shape
-    // stretches live while the frame is resized. A pure style binding on an
-    // existing div: the Board key is object.id, so this can never remount
-    // the player or touch srcObject.
-    const frameStyle = computed(() => {
+    // Which frame-shape/fit family this object belongs to: stream tiles
+    // (jitsi + RTMP) and video assets have one; everything else (images,
+    // text, drawings) renders exactly as before, with no extra wrapper.
+    const frameKind = computed(() => {
       const jitsi = isJitsiBoardType(props.object.type);
       const rtmp = props.object.isRTMP === true;
       const video =
@@ -164,14 +161,87 @@ export default {
         !rtmp &&
         (isStreamPlaybackBoardType(props.object.type) ||
           isStreamPlaybackBoardType(props.object.assetType?.name));
-      if (!jitsi && !rtmp && !video) return {};
-      const kind = jitsi ? "jitsi" : rtmp ? "rtmp" : "video";
+      if (!jitsi && !rtmp && !video) return null;
+      return jitsi ? "jitsi" : rtmp ? "rtmp" : "video";
+    });
+
+    // Fit/crop/stretch choice on the sized `.object` wrapper; the <video>
+    // reads it via object-fit: var(--stream-fit, …) in Jitsi.vue /
+    // LiveStreamPlayer.vue / .the-object-video below. A pure style binding
+    // on an existing div: the Board key is object.id, so this can never
+    // remount the player or touch srcObject.
+    const frameFit = computed(() =>
+      frameKind.value ? effectiveFrameFitId(props.object.fit, frameKind.value) : null,
+    );
+    const frameStyle = computed(() => (frameFit.value ? { "--stream-fit": frameFit.value } : {}));
+
+    // Intrinsic width / height of the picture the tile is showing, learnt
+    // from the <video> element's own media events. They don't bubble, so
+    // the `.object` div listens in the capture phase (see the template) —
+    // one place that covers Jitsi.vue's slot <video>, LiveStreamPlayer's
+    // and the video-asset <video> below without touching any of them.
+    // `resize` (not the window one — that never passes through this div)
+    // fires when a MediaStream's first frame reveals its dimensions and
+    // when a live encoder changes canvas size; `emptied` fires when the
+    // source is dropped (RTMP teardown), so the placeholder gets the full
+    // frame again.
+    const pictureRatio = ref(null);
+    const onVideoDimensions = (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLVideoElement)) return;
+      const { videoWidth, videoHeight } = target;
+      pictureRatio.value = videoWidth > 0 && videoHeight > 0 ? videoWidth / videoHeight : null;
+    };
+
+    // Laid-out size of the frame. Moveable writes the element's width /
+    // height directly during a resize drag and only publishes w / h on
+    // release, so object.w / object.h lag the picture mid-gesture; a
+    // ResizeObserver on the `.object` div (100% of the frame) tracks the
+    // real box live instead.
+    const frameSize = ref(null);
+    let frameObserver = null;
+    onMounted(() => {
+      if (!el.value || typeof ResizeObserver !== "function") return;
+      frameObserver = new ResizeObserver((entries) => {
+        const rect = entries[entries.length - 1]?.contentRect;
+        if (rect) frameSize.value = { width: rect.width, height: rect.height };
+      });
+      frameObserver.observe(el.value);
+    });
+    onUnmounted(() => {
+      frameObserver?.disconnect();
+      frameObserver = null;
+    });
+
+    // Frame shape for stream tiles (jitsi + RTMP) and video assets. Applied
+    // to the `.picture-box` wrapper inside `.object`, which clips the
+    // <video> AND the RTMP "waiting" / jitsi loading overlays together, and
+    // whose %-based shape stretches live while the frame is resized.
+    //
+    // The box IS the frame ("cover" / "fill", the jitsi and video-asset
+    // defaults) — except with "contain" (the RTMP default): there the
+    // letterboxed picture is narrower or shorter than the frame, and a
+    // shape clipped on the frame would cut the picture's edges instead of
+    // following its outline (a circle on a wide RTMP frame lost its
+    // left/right sides). So with "contain" the box shrinks to the picture's
+    // own rectangle, centred, and the shape hugs the picture exactly as it
+    // does on a cropped jitsi tile. Until the picture's dimensions are
+    // known (connecting / waiting placeholder) the box stays the full frame.
+    const pictureBoxStyle = computed(() => {
+      if (!frameKind.value) return {};
+      const shape = frameShapeStyle(props.object.shape, frameKind.value);
+      const box =
+        frameFit.value === "contain" && frameSize.value && pictureRatio.value
+          ? containedPictureBox(frameSize.value.width, frameSize.value.height, pictureRatio.value)
+          : null;
+      if (!box) return { ...shape, width: "100%", height: "100%" };
       return {
-        ...frameShapeStyle(props.object.shape, kind),
-        // Fit/crop/stretch choice; the <video> reads it via object-fit:
-        // var(--stream-fit, …) in Jitsi.vue / LiveStreamPlayer.vue /
-        // .the-object-video below.
-        "--stream-fit": effectiveFrameFitId(props.object.fit, kind),
+        ...shape,
+        position: "relative",
+        left: `${box.left}%`,
+        top: `${box.top}%`,
+        width: `${box.width}%`,
+        height: `${box.height}%`,
       };
     });
 
@@ -255,7 +325,10 @@ export default {
       controlable,
       sliderMode,
       activeMovable,
+      frameKind,
       frameStyle,
+      pictureBoxStyle,
+      onVideoDimensions,
       isWearing,
       hasLink,
       openLink,
@@ -339,54 +412,70 @@ export default {
           @dblclick="hold"
           @click="openLink"
           @dragstart.prevent
+          @loadedmetadata.capture="onVideoDimensions"
+          @resize.capture="onVideoDimensions"
+          @emptied.capture="onVideoDimensions"
         >
-          <slot name="render">
-            <!--
-              The @ended handler writes to object.isPlaying directly.
-              The stage store holds the canonical isPlaying state, but
-              this in-place mutation has been the load-bearing "video
-              stopped naturally" signal for a long time. Reshaping it
-              into a store action is a separate, behaviour-affecting
-              change; suppress the rule on this template line for now.
-            -->
-            <!--
-              Audience-facing video asset (mp4/webm dropped onto the
-              stage as a media item). Same PiP / controls hardening
-              as Jitsi.vue's remote-peer <video>: see the comment
-              block there for the per-browser rationale. We mirror
-              `disablePictureInPicture` as an IDL property via the
-              `video` ref watcher below so Vue 3's property-only
-              patching of HTMLMediaElement doesn't leave the
-              attribute set in the DOM but unread by the engine.
-            -->
-            <!--
-              Live RTMP feed (stream asset with a bare MediaMTX key —
-              `isRTMP` is only ever set for those, so every pre-existing
-              object type falls through to the branches below unchanged).
-            -->
-            <LiveStreamPlayer v-if="object.isRTMP" :object="object" />
-            <!-- eslint-disable-next-line vue/no-mutating-props -->
-            <video
-              v-else-if="
-                isStreamPlaybackBoardType(object.type) ||
-                isStreamPlaybackBoardType(object.assetType?.name)
-              "
-              :id="'video' + object.id"
-              ref="video"
-              class="the-object-video"
-              :src="object.url"
-              preload="auto"
-              :loop="object.loop"
-              playsinline
-              disablePictureInPicture
-              controlslist="nodownload nofullscreen noremoteplayback"
-              @ended="
-                /* eslint-disable-next-line vue/no-mutating-props -- intentional: object.isPlaying is a load-bearing signal mutated in-place by parent contract */
-                object.isPlaying = false
-              "
-              @loadeddata="loadeddata"
-            ></video>
-            <AppImage v-else class="the-object" :src="src" />
+          <!--
+            Stream tiles (jitsi + RTMP) and video assets render inside a
+            `.picture-box` that carries the frame shape (see pictureBoxStyle);
+            everything else keeps the slot directly under `.object` — Text.vue
+            pins its parent's scroll offset, so its parent must stay this div.
+            The <slot> appears in both branches; only one ever renders and an
+            object never changes kind, so nothing remounts.
+          -->
+          <div v-if="frameKind" class="picture-box" :style="pictureBoxStyle">
+            <slot name="render">
+              <!--
+                The @ended handler writes to object.isPlaying directly.
+                The stage store holds the canonical isPlaying state, but
+                this in-place mutation has been the load-bearing "video
+                stopped naturally" signal for a long time. Reshaping it
+                into a store action is a separate, behaviour-affecting
+                change; suppress the rule on this template line for now.
+              -->
+              <!--
+                Audience-facing video asset (mp4/webm dropped onto the
+                stage as a media item). Same PiP / controls hardening
+                as Jitsi.vue's remote-peer <video>: see the comment
+                block there for the per-browser rationale. We mirror
+                `disablePictureInPicture` as an IDL property via the
+                `video` ref watcher below so Vue 3's property-only
+                patching of HTMLMediaElement doesn't leave the
+                attribute set in the DOM but unread by the engine.
+              -->
+              <!--
+                Live RTMP feed (stream asset with a bare MediaMTX key —
+                `isRTMP` is only ever set for those, so every pre-existing
+                object type falls through to the branches below unchanged).
+              -->
+              <LiveStreamPlayer v-if="object.isRTMP" :object="object" />
+              <!-- eslint-disable-next-line vue/no-mutating-props -->
+              <video
+                v-else-if="
+                  isStreamPlaybackBoardType(object.type) ||
+                  isStreamPlaybackBoardType(object.assetType?.name)
+                "
+                :id="'video' + object.id"
+                ref="video"
+                class="the-object-video"
+                :src="object.url"
+                preload="auto"
+                :loop="object.loop"
+                playsinline
+                disablePictureInPicture
+                controlslist="nodownload nofullscreen noremoteplayback"
+                @ended="
+                  /* eslint-disable-next-line vue/no-mutating-props -- intentional: object.isPlaying is a load-bearing signal mutated in-place by parent contract */
+                  object.isPlaying = false
+                "
+                @loadeddata="loadeddata"
+              ></video>
+              <AppImage v-else class="the-object" :src="src" />
+            </slot>
+          </div>
+          <slot v-else name="render">
+            <AppImage class="the-object" :src="src" />
           </slot>
         </div>
       </Moveable>
@@ -421,6 +510,14 @@ div[tabindex] {
   &.link-hover-effect:hover {
     transform: scale(1.2) !important;
   }
+}
+
+// Shaped wrapper for stream tiles and video assets (pictureBoxStyle sets
+// the border-radius / clip-path and, with "contain", the picture's own
+// rectangle). overflow: hidden is what makes border-radius clip the
+// <video> and overlays inside.
+.picture-box {
+  overflow: hidden;
 }
 
 .the-object-video {

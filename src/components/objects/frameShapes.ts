@@ -19,15 +19,7 @@
  */
 
 export type FrameShapeId =
-  | "rect"
-  | "rounded"
-  | "circle"
-  | "diamond"
-  | "hexagon"
-  | "triangle"
-  | "star"
-  | "heart"
-  | "arch";
+  "rect" | "rounded" | "circle" | "diamond" | "hexagon" | "triangle" | "star" | "heart" | "arch";
 
 export type FrameKind = "jitsi" | "rtmp" | "video";
 
@@ -171,4 +163,55 @@ export function frameShapeStyle(shape: unknown, kind: FrameKind): FrameShapeStyl
   }
   const def = SHAPES_BY_ID.get(effectiveFrameShapeId(shape, kind));
   return def ? { ...def.style } : {};
+}
+
+/**
+ * Where the picture actually sits inside a frame, as percentages of the
+ * frame, when the fit is "contain" (letterboxed). Object.vue applies the
+ * frame shape to a box of this size (centred in the frame) instead of to
+ * the whole frame: with "contain" the picture is narrower or shorter than
+ * the frame, so a shape clipped on the frame cuts the picture's edges
+ * instead of following its outline (a circle on a wide RTMP frame lost
+ * its left/right sides — the picture's straight edges showed through the
+ * ellipse). For "cover" / "fill" the picture is the frame, so the box is
+ * simply 100% × 100%.
+ *
+ * `pictureRatio` is the picture's intrinsic width / height (a <video>'s
+ * videoWidth / videoHeight). Returns null when any input is unusable
+ * (frame not laid out yet, no picture decoded yet) — callers fall back to
+ * the full frame.
+ */
+export interface PictureBox {
+  /** Percentages of the frame, 0–100. */
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export function containedPictureBox(
+  frameWidth: number,
+  frameHeight: number,
+  pictureRatio: number,
+): PictureBox | null {
+  if (
+    !Number.isFinite(frameWidth) ||
+    !Number.isFinite(frameHeight) ||
+    !Number.isFinite(pictureRatio) ||
+    frameWidth <= 0 ||
+    frameHeight <= 0 ||
+    pictureRatio <= 0
+  ) {
+    return null;
+  }
+  const frameRatio = frameWidth / frameHeight;
+  if (frameRatio > pictureRatio) {
+    // Frame is wider than the picture: full height, bars left and right.
+    const width = (pictureRatio / frameRatio) * 100;
+    return { left: (100 - width) / 2, top: 0, width, height: 100 };
+  }
+  // Frame is taller than (or the same shape as) the picture: full width,
+  // bars above and below (zero-height bars when the ratios match).
+  const height = (frameRatio / pictureRatio) * 100;
+  return { left: 0, top: (100 - height) / 2, width: 100, height };
 }

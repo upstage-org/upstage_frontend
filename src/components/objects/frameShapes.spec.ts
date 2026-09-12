@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   FRAME_FITS,
   FRAME_SHAPES,
+  containedPictureBox,
   effectiveFrameFitId,
   effectiveFrameShapeId,
   frameShapeStyle,
@@ -106,5 +107,67 @@ describe("effectiveFrameFitId (fit vs crop vs stretch)", () => {
       expect(effectiveFrameFitId("cover", kind)).toBe("cover");
       expect(effectiveFrameFitId("fill", kind)).toBe("fill");
     }
+  });
+});
+
+// The letterboxed ("contain") picture's rectangle inside the frame, in
+// percentages — Object.vue shapes this box instead of the whole frame so a
+// circle on a wide RTMP tile hugs the picture rather than cutting its sides.
+describe("containedPictureBox", () => {
+  it("pillarboxes a picture narrower than the frame (bars left/right)", () => {
+    // 2:1 frame, 4:3 picture → picture is 2/3 of the frame's width, centred.
+    const box = containedPictureBox(400, 200, 4 / 3);
+    expect(box).not.toBeNull();
+    expect(box!.height).toBe(100);
+    expect(box!.top).toBe(0);
+    expect(box!.width).toBeCloseTo(66.6667, 3);
+    expect(box!.left).toBeCloseTo(16.6667, 3);
+  });
+
+  it("letterboxes a picture wider than the frame (bars above/below)", () => {
+    // 1:1 frame, 16:9 picture → picture is 9/16 of the frame's height, centred.
+    const box = containedPictureBox(300, 300, 16 / 9);
+    expect(box).toEqual({ left: 0, top: 21.875, width: 100, height: 56.25 });
+  });
+
+  it("is the full frame when the ratios already match", () => {
+    expect(containedPictureBox(1280, 720, 16 / 9)).toEqual({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+    });
+  });
+
+  it("is independent of the frame's absolute size (stage scaling)", () => {
+    expect(containedPictureBox(400, 200, 4 / 3)).toEqual(containedPictureBox(40, 20, 4 / 3));
+  });
+
+  it("always stays inside the frame and centred", () => {
+    for (const [w, h, r] of [
+      [1000, 100, 1],
+      [100, 1000, 1],
+      [640, 480, 21 / 9],
+      [480, 640, 9 / 21],
+      [333, 777, 1.7777],
+    ] as const) {
+      const box = containedPictureBox(w, h, r)!;
+      expect(box.left).toBeGreaterThanOrEqual(0);
+      expect(box.top).toBeGreaterThanOrEqual(0);
+      expect(box.left + box.width).toBeCloseTo(100 - box.left, 6);
+      expect(box.top + box.height).toBeCloseTo(100 - box.top, 6);
+      // The box has the picture's own proportions.
+      expect(((box.width / 100) * w) / ((box.height / 100) * h)).toBeCloseTo(r, 6);
+    }
+  });
+
+  it("returns null when the frame or picture size is unusable", () => {
+    // Frame not laid out yet / picture not decoded yet (videoWidth 0 → ratio NaN or 0).
+    expect(containedPictureBox(0, 200, 4 / 3)).toBeNull();
+    expect(containedPictureBox(400, 0, 4 / 3)).toBeNull();
+    expect(containedPictureBox(400, 200, 0)).toBeNull();
+    expect(containedPictureBox(400, 200, NaN)).toBeNull();
+    expect(containedPictureBox(400, 200, Infinity)).toBeNull();
+    expect(containedPictureBox(-400, 200, 1)).toBeNull();
   });
 });
