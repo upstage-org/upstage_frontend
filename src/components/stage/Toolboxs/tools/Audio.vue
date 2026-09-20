@@ -1,7 +1,7 @@
 <script>
 import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useShortcut } from "../../composable";
 import { displayTimestamp } from "utils/common";
 import { animate } from "animejs";
@@ -15,6 +15,11 @@ export default {
 
     const togglePlaying = (audio, currentTime) => {
       audio.isPlaying = !audio.isPlaying;
+      // Each Play starts a new "run": the automatic end-of-track stop that
+      // every performer's player publishes names the run it belongs to, so
+      // a late stop for the previous run cannot end this one.
+      if (audio.isPlaying)
+        audio.playId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       audio.currentTime = currentTime;
       audio.saken = true;
       stageStore.updateAudioStatus(audio);
@@ -30,11 +35,70 @@ export default {
       audio.currentTime = currentTime;
       stageStore.updateAudioStatus(audio);
     };
+    // Seek slider. Its `value` used to be bound straight to the player's
+    // `currentTime`, which `timeupdate` rewrites ~4x a second while a track
+    // plays — so every re-render put the thumb back on the playing position
+    // WHILE THE USER WAS HOLDING IT. Measured in Chromium 2026-09-21: a press
+    // held ~400 ms fired no `change` at all (the value had been reset to where
+    // it started), one held longer fired `change` with the PLAYING position,
+    // i.e. a "seek" to where the track already was. Only a very quick click,
+    // or a drag released mid-movement, got through.
+    // While a track is being scrubbed the slider therefore shows the user's
+    // own value (`input`), the seek is committed from that value (`change`),
+    // and the thumb stays there until the player reports the new position
+    // (the seek travels via the broker, so the old time keeps arriving for a
+    // moment) — with a timeout so a lost message cannot strand it.
+    const SEEK_SETTLE_TOLERANCE_S = 1.5;
+    const SEEK_SETTLE_TIMEOUT_MS = 3000;
+    // track src → { value, dragging, timer }
+    const scrubs = ref({});
+    const clearScrub = (src) => {
+      const s = scrubs.value[src];
+      if (!s) return;
+      if (s.timer) clearTimeout(s.timer);
+      delete scrubs.value[src];
+    };
+    const onSeekInput = (audio, e) => {
+      const prev = scrubs.value[audio.src];
+      if (prev?.timer) clearTimeout(prev.timer);
+      scrubs.value[audio.src] = { value: Number(e.target.value), dragging: true, timer: null };
+    };
     const seek = (audio, e) => {
-      audio.currentTime = e.target.value;
+      const scrub = scrubs.value[audio.src];
+      const value = Number(scrub?.dragging ? scrub.value : e.target.value);
+      if (scrub?.timer) clearTimeout(scrub.timer);
+      scrubs.value[audio.src] = {
+        value,
+        dragging: false,
+        timer: setTimeout(() => clearScrub(audio.src), SEEK_SETTLE_TIMEOUT_MS),
+      };
+      audio.currentTime = value;
       audio.saken = true;
       stageStore.updateAudioStatus(audio);
     };
+    // A press that ends where it began fires no `change`; drop the scrub so
+    // the slider follows the player again.
+    const onSeekRelease = (audio) => {
+      setTimeout(() => {
+        if (scrubs.value[audio.src]?.dragging) clearScrub(audio.src);
+      }, 0);
+    };
+    const seekSliderValue = (audio, i) =>
+      scrubs.value[audio.src]?.value ?? audioPlayers.value[i]?.currentTime ?? 0;
+    // Release a committed seek once the player has caught up with it.
+    watch(
+      () => audios.value.map((_, i) => audioPlayers.value[i]?.currentTime),
+      (times) => {
+        audios.value.forEach((audio, i) => {
+          const scrub = scrubs.value[audio.src];
+          if (!scrub || scrub.dragging) return;
+          if (Math.abs((times[i] ?? 0) - scrub.value) <= SEEK_SETTLE_TOLERANCE_S) {
+            clearScrub(audio.src);
+          }
+        });
+      },
+    );
+    onBeforeUnmount(() => Object.keys(scrubs.value).forEach(clearScrub));
     const setVolume = (audio, _e) => {
       //audio.volume = e.target.value;
       stageStore.updateAudioStatus(audio);
@@ -52,7 +116,12 @@ export default {
       if (isFinite(e.key)) {
         const i = e.key - 1;
         if (audios.value.length > i && i >= 0) {
-          togglePlaying(audios.value[i]);
+          // Same as clicking the tile's play/pause button. Without the
+          // position the message carried no `currentTime`: this performer's
+          // track jumped to 0 while every other client sought to whatever
+          // position it had last been sent, so they no longer heard the
+          // same thing.
+          togglePlaying(audios.value[i], audioPlayers.value[i]?.currentTime);
         }
       }
     });
@@ -74,6 +143,9 @@ export default {
       setVolume,
       audioPlayers,
       seek,
+      onSeekInput,
+      onSeekRelease,
+      seekSliderValue,
       displayTimestamp,
       scrollToEnd,
       masterVolume,
@@ -174,9 +246,13 @@ export default {
           class="slider is-fullwidth is-primary mt-0"
           min="0"
           :max="audioPlayers[i]?.duration"
-          :value="audioPlayers[i]?.currentTime ?? 0"
+          :value="seekSliderValue(audio, i)"
           type="range"
+          @input="onSeekInput(audio, $event)"
           @change="seek(audio, $event)"
+          @pointerup="onSeekRelease(audio)"
+          @pointercancel="onSeekRelease(audio)"
+          @blur="onSeekRelease(audio)"
         />
         <div class="addon">
           <span v-if="audio.isPlaying">{{

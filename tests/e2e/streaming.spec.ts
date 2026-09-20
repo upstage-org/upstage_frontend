@@ -936,7 +936,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
    *
    * Assertion target: the composable's own first-line diagnostics. Both
    * "[diag] useJitsi: starting connection" (endpoint configured) and the
-   * "VITE_JITSI_ENDPOINT is unset" warning are emitted only after the
+   * "VITE_JITSI_ENDPOINTS is unset" warning are emitted only after the
    * placeholder gate has passed — with the old bug neither ever appears on
    * /demo. The local-camera preview is asserted too, proving the stage is
    * fully usable as a publisher surface.
@@ -967,7 +967,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
             consoleLines.find(
               (l) =>
                 l.includes("useJitsi: starting connection") ||
-                l.includes("VITE_JITSI_ENDPOINT is unset"),
+                l.includes("VITE_JITSI_ENDPOINTS is unset"),
             ) ?? null,
           {
             timeout: 30_000,
@@ -1862,12 +1862,12 @@ test.describe("streaming: performer streams, audience views @full", () => {
    * board, audience renders a `Jitsi.vue` tile that subscribes to the
    * remote track. This needs:
    *
-   *   • a real Jitsi server (XMPP + JVB) reachable at VITE_JITSI_ENDPOINT
+   *   • a real Jitsi server (XMPP + JVB) reachable at the first VITE_JITSI_ENDPOINTS URL
    *   • Chromium fake-media flags (already on this project)
    *   • lib-jitsi-meet to negotiate ICE end-to-end with the audience seat
    *
    * Skipped by default — set `JITSI_E2E_LIVE=1` (and ensure
-   * VITE_JITSI_ENDPOINT points at a working Jitsi install) to run it.
+   * VITE_JITSI_ENDPOINTS points at a working Jitsi install) to run it.
    * Even with all of that, ICE negotiation on a CI runner behind NAT is
    * notoriously flaky; treat this as an opt-in deep-integration test
    * rather than part of the smoke loop.

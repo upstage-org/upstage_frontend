@@ -63,6 +63,10 @@ let store: StageStore;
 beforeEach(() => {
   setActivePinia(createPinia());
   store = useStageStore();
+  // These actions are a performer's: the store refuses to publish
+  // performance state from a session that is not performing (no model /
+  // audience — see utils/publishPolicy.ts).
+  store.model = { permission: "owner", attributes: [] } as never;
   sendMessage.mockClear();
 });
 

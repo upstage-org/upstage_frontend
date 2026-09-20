@@ -13,24 +13,25 @@ interface ImportMetaEnv {
   readonly VITE_CLOUDFLARE_CAPTCHA_SITEKEY?: string;
   readonly VITE_MQTT_NAMESPACE?: string;
   readonly VITE_MQTT_ENDPOINT?: string;
+  // No singular VITE_JITSI_ENDPOINT / VITE_RTMP_ENDPOINT: streaming servers are
+  // configured ONLY through the plural variables below (cut over 2026-09), so a
+  // stray `import.meta.env.VITE_JITSI_ENDPOINT` is a type error.
   // No VITE_MQTT_USERNAME / VITE_MQTT_PASSWORD. Broker credentials are served
   // at runtime on `Stage.mqtt`; leaving them undeclared here makes any future
   // `import.meta.env.VITE_MQTT_PASSWORD` a type error rather than a silent
   // re-inlining of the secret into the public bundle.
-  readonly VITE_JITSI_ENDPOINT?: string;
   /**
-   * Optional comma-separated list of additional Jitsi origins (e.g.
-   * `https://streaming.example.org,https://streaming3.example.org`). The
-   * singular `VITE_JITSI_ENDPOINT` stays entry 0 / the default server;
-   * performers pick one of these on stage (Streams tab). Unset ⇒ one server,
-   * behaviour unchanged.
+   * Jitsi server URL(s): ONE OR MORE origins, comma-separated when there are
+   * several (e.g. `https://streaming.example.org,https://streaming3.example.org`).
+   * The first URL is the default server; with 2+ entries performers pick one
+   * on stage (Streams tab). Unset ⇒ the page's own origin.
    */
   readonly VITE_JITSI_ENDPOINTS?: string;
   /**
    * Optional XMPP virtual-host overrides for Jitsi. Production installs
    * usually have the XMPP domain == HTTP hostname (e.g. `meet.example.com`)
    * and can leave these unset — `useJitsiEndpoint()` will derive them from
-   * `VITE_JITSI_ENDPOINT`. Local installs (notably the
+   * the server URL in `VITE_JITSI_ENDPOINTS`. Local installs (notably the
    * `jitsi/docker-jitsi-meet` quickstart) fix the XMPP domain at
    * `meet.jitsi` regardless of which HTTP host the web UI is exposed on, so
    * the browser must address its XMPP stream to `meet.jitsi`, not to the
@@ -43,15 +44,11 @@ interface ImportMetaEnv {
   readonly VITE_JITSI_XMPP_FOCUS_DOMAIN?: string;
   readonly VITE_JITSI_PREFER_WEBSOCKET?: string;
   /**
-   * MediaMTX playback origin for RTMP stream feeds (e.g.
-   * `https://streaming2.upstage.live`). Unset ⇒ all RTMP UI hidden.
-   */
-  readonly VITE_RTMP_ENDPOINT?: string;
-  /**
-   * Optional comma-separated list of additional MediaMTX origins. The
-   * singular `VITE_RTMP_ENDPOINT` stays entry 0 / the default server; a
-   * stream feed is bound to one of these when it is created (Studio "New
-   * stream feed"). Unset ⇒ one server, behaviour unchanged.
+   * MediaMTX playback URL(s) for RTMP stream feeds: ONE OR MORE origins,
+   * comma-separated when there are several (e.g.
+   * `https://streaming2.example.org,https://streaming4.example.org`). The
+   * first URL is the default server; a stream feed is bound to one of them
+   * when it is created (Studio "New stream feed"). Unset ⇒ all RTMP UI hidden.
    */
   readonly VITE_RTMP_ENDPOINTS?: string;
   readonly VITE_STRIPE_KEY?: string;

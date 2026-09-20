@@ -69,6 +69,10 @@ let store: StageStore;
 beforeEach(() => {
   setActivePinia(createPinia());
   store = useStageStore();
+  // These actions are a performer's: the store refuses to publish
+  // performance state from a session that is not performing (no model /
+  // audience — see utils/publishPolicy.ts).
+  store.model = { permission: "owner", attributes: [] } as never;
   // Coordinates travel as fractions of the stage width; a zero viewport
   // (jsdom default) would turn every x into NaN.
   store.UPDATE_VIEWPORT({ width: 1000, height: 600 });

@@ -4,9 +4,7 @@ const {
   VITE_CLOUDFLARE_CAPTCHA_SITEKEY,
   VITE_MQTT_NAMESPACE,
   VITE_MQTT_ENDPOINT,
-  VITE_JITSI_ENDPOINT,
   VITE_JITSI_ENDPOINTS,
-  VITE_RTMP_ENDPOINT,
   VITE_RTMP_ENDPOINTS,
   VITE_STRIPE_KEY,
   VITE_RELEASE_VERSION,
@@ -61,38 +59,32 @@ export const normaliseEndpointOrigin = (raw: unknown): string | null => {
 
 /**
  * Build the ordered, de-duplicated server list for one streaming kind from
- * the legacy singular env var plus the optional comma-separated plural one
- * (`VITE_JITSI_ENDPOINTS` / `VITE_RTMP_ENDPOINTS`). The singular value is
- * always entry 0 so existing single-server installs keep today's default;
- * malformed entries are dropped (and reported once) rather than failing
- * the boot.
+ * its `.env` variable — `VITE_JITSI_ENDPOINTS` / `VITE_RTMP_ENDPOINTS`: one
+ * or more server URLs, comma-separated when there are several. The first URL
+ * is the default server. Entries that are not bare http(s) origins are
+ * dropped rather than failing the boot.
+ *
+ * These are the ONLY variables read. The pre-2026-09 singular
+ * `VITE_JITSI_ENDPOINT` / `VITE_RTMP_ENDPOINT` are no longer honoured: an
+ * `.env` that still uses them must be migrated before it is built.
  */
-export const parseEndpointList = (singular: unknown, plural: unknown): string[] => {
+export const parseEndpointList = (value: unknown): string[] => {
   const out: string[] = [];
-  const push = (raw: unknown) => {
-    const origin = normaliseEndpointOrigin(raw);
+  if (typeof value !== "string") return out;
+  for (const part of value.split(",")) {
+    const origin = normaliseEndpointOrigin(part);
     if (origin && !out.includes(origin)) out.push(origin);
-  };
-  if (typeof singular === "string" && singular.trim()) {
-    // Keep the legacy value byte-for-byte (only a single trailing "/" was
-    // ever stripped) so `configs.JITSI_ENDPOINT` / `RTMP_ENDPOINT` do not
-    // change for single-server installs.
-    const legacy = singular.replace(/\/$/, "");
-    if (legacy && !out.includes(legacy)) out.push(legacy);
-  }
-  if (typeof plural === "string") {
-    for (const part of plural.split(",")) push(part);
   }
   return out;
 };
 
 const jitsiEndpoints = (() => {
-  const list = parseEndpointList(VITE_JITSI_ENDPOINT, VITE_JITSI_ENDPOINTS);
+  const list = parseEndpointList(VITE_JITSI_ENDPOINTS);
   return list.length ? list : [window.location.origin];
 })();
 
-// Entry 0 of the list — identical to the previous single-value derivation
-// (`VITE_JITSI_ENDPOINT` minus a trailing "/", else the page origin).
+// Entry 0 of the list: the first URL in `VITE_JITSI_ENDPOINTS`, else the page
+// origin.
 const jitsiEndpoint = jitsiEndpoints[0];
 
 /**
@@ -101,7 +93,7 @@ const jitsiEndpoint = jitsiEndpoints[0];
  * same-origin fallback: when unset, every RTMP feature (studio "New stream
  * feed", live playback) stays hidden and the app behaves exactly as before.
  */
-const rtmpEndpoints = parseEndpointList(VITE_RTMP_ENDPOINT, VITE_RTMP_ENDPOINTS);
+const rtmpEndpoints = parseEndpointList(VITE_RTMP_ENDPOINTS);
 const rtmpEndpoint = rtmpEndpoints[0] ?? "";
 
 /** OBS "Server" value for one MediaMTX origin: rtmp://<host>/live ("" when unusable). */
@@ -179,7 +171,9 @@ const configs = {
   RTMP_INGEST_ENDPOINT: rtmpIngestEndpoint,
   /**
    * Multi-server streaming (see MULTI_SERVER_STREAMING_PLAN_2026-09-10.md).
-   * Ordered origin lists; entry 0 is always the singular value above. A
+   * Ordered origin lists from `VITE_JITSI_ENDPOINTS` / `VITE_RTMP_ENDPOINTS`
+   * (one or more comma-separated URLs); entry 0 is the default server and
+   * equals the singular `JITSI_ENDPOINT` / `RTMP_ENDPOINT` above. A
    * server's *id* everywhere (board objects, stream feed assets, stage
    * config) is its normalised origin string, never its list index.
    */

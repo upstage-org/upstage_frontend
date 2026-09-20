@@ -1,8 +1,9 @@
 <script>
-import { computed, onMounted, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { message } from "ant-design-vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
+import { createGaplessLooper } from "./gaplessLoop";
 
 // See the undecodable-file detection in `setRef` below. Exported for tests.
 export const INSTANT_END_MS = 500;
@@ -11,12 +12,25 @@ export const INSTANT_END_MIN_REMAINING_S = 1;
 export default {
   setup: () => {
     const stageStore = useStageStore();
+    // The automatic stop when THIS client's copy of a track finishes (or
+    // turns out to be unplayable).
+    // - Only a performing session publishes it. This component is mounted
+    //   for everyone, and an audience session must never affect the
+    //   performance: its playback can lag the performer's by seconds, and
+    //   its "stop" used to silence a track the performer had just started
+    //   again. A non-performing session just settles its own copy.
+    // - `endedPlayId` names the run that finished, so that even between
+    //   performers a late stop for an old run cannot end a new one (see
+    //   UPDATE_AUDIO in the stage store).
     const stopAudio = (audio) => {
-      stageStore.updateAudioStatus({
+      const stopped = {
         ...audio,
         isPlaying: false,
         currentTime: 0,
-      });
+        endedPlayId: audio.playId ?? null,
+      };
+      if (stageStore.canPlay) stageStore.updateAudioStatus(stopped);
+      else stageStore.UPDATE_AUDIO(stopped);
     };
     const audios = stageStore.audios;
     // Track → <audio> element. Keyed by the track object itself (the v-for
@@ -32,12 +46,54 @@ export default {
     // and its timer updates landed on a phantom row.
     const elementFor = new Map();
     const wired = new WeakSet();
+    // element → { at, from }: when/where its current run of playback began.
+    // Read by the undecodable-file check in `ended`; `from` is moved by our
+    // own seeks (handleAudioChange) — see the note there.
+    const playWindows = new WeakMap();
+    // Gapless looping (see gaplessLoop.ts). The element stays the transport
+    // and clock; for a looping track a Web Audio voice takes over the SOUND
+    // and the element runs on muted. Best effort: whenever the voice cannot
+    // run, the element loop below is used exactly as before.
+    const looper = createGaplessLooper({
+      onLost: (el) => {
+        el.muted = false;
+      },
+    });
+    const prepareLoop = (audio, el) => {
+      if (audio.loop && audio.src && isFinite(el.duration)) looper.prepare(audio.src, el.duration);
+    };
+    const releaseLoop = (el, { resync = false } = {}) => {
+      if (!looper.isActive(el)) return;
+      // Handing the sound back mid-play (loop switched off): continue from
+      // where the voice is, not from the element's slightly different clock.
+      const position = resync ? looper.position(el) : null;
+      looper.stop(el);
+      if (position != null) el.currentTime = position;
+      el.muted = false;
+    };
+    const takeOverLoop = (audio, el, offset) => {
+      if (!looper.isReady(audio.src)) return false;
+      const started = looper.start(el, audio.src, {
+        offset,
+        volume: el.volume,
+        rate: el.playbackRate,
+      });
+      if (started) el.muted = true;
+      // A restart (seek) that cannot sound must not leave the old voice
+      // playing from the old position behind a muted element.
+      else releaseLoop(el);
+      return started;
+    };
     // Index the toolbox reads `audioPlayers[i]` with — resolved at event
     // time so it always matches the track's current position.
     const indexOf = (audio) => audios.indexOf(audio);
     const setRef = (el, audio) => {
       if (!el) {
-        if (elementFor.get(audio) !== undefined) elementFor.delete(audio);
+        const gone = elementFor.get(audio);
+        if (gone !== undefined) {
+          looper.stop(gone);
+          elementFor.delete(audio);
+        }
         return;
       }
       elementFor.set(audio, el);
@@ -59,13 +115,12 @@ export default {
         // INSTANT_END_MIN_REMAINING_S to play is reported and stopped
         // instead. Seeking near the end and genuinely short clips fall
         // outside both bounds, so normal playback is untouched.
-        let playStartedAt = 0;
-        let playStartedFrom = 0;
+        playWindows.set(el, { at: 0, from: 0 });
         el.addEventListener("play", function () {
-          playStartedAt = performance.now();
-          playStartedFrom = el.currentTime;
+          playWindows.set(el, { at: performance.now(), from: el.currentTime });
         });
         el.addEventListener("ended", function () {
+          const { at: playStartedAt, from: playStartedFrom } = playWindows.get(el);
           const remaining = (isFinite(el.duration) ? el.duration : 0) - playStartedFrom;
           if (
             remaining > INSTANT_END_MIN_REMAINING_S &&
@@ -80,7 +135,16 @@ export default {
             return;
           }
           if (audio.loop) {
-            el.currentTime = 0;
+            if (looper.isActive(el)) {
+              // The voice is carrying the loop seamlessly; the muted element
+              // only keeps time, so put its clock back on the voice's.
+              el.currentTime = looper.position(el) ?? 0;
+            } else {
+              el.currentTime = 0;
+              // First pass after the decode finished: let the voice take
+              // over here, at the seam, so every later pass is gapless.
+              takeOverLoop(audio, el, 0);
+            }
             el.play();
           } else {
             stopAudio(audio);
@@ -92,6 +156,16 @@ export default {
             index: indexOf(audio),
             duration: el.duration,
           });
+          prepareLoop(audio, el);
+        });
+        // A looping voice mirrors the element's level (per-track volume,
+        // master volume and every fade are all animated on `el.volume`)
+        // and its rate (replay speed).
+        el.addEventListener("volumechange", function () {
+          looper.setVolume(el, el.volume);
+        });
+        el.addEventListener("ratechange", function () {
+          looper.setRate(el, el.playbackRate);
         });
         el.addEventListener("timeupdate", function () {
           stageStore.UPDATE_AUDIO_PLAYER_STATUS({
@@ -139,6 +213,24 @@ export default {
           }
           if (audio.saken) {
             el.currentTime = audio.currentTime ?? 0;
+            // The undecodable-file check measures "how much was left when
+            // this run began". A seek moves that point: without this, Play
+            // followed within INSTANT_END_MS by a seek to just before the
+            // end reported a healthy file as "could not decode" (reproduced
+            // in Chromium 2026-09-21). Only OUR seeks count — a broken file
+            // jumping to its own end never passes through here.
+            const playWindow = playWindows.get(el);
+            if (playWindow) playWindow.from = el.currentTime;
+          }
+          prepareLoop(audio, el);
+          if (audio.isPlaying && audio.loop) {
+            // (Re)start the voice on a seek, or take over if it is not
+            // sounding yet; otherwise leave a running voice untouched so
+            // volume/loop-flag echoes cannot put a seam into it.
+            if (audio.saken || !looper.isActive(el)) takeOverLoop(audio, el, el.currentTime);
+          } else {
+            // (A seek in the same update already put the element where it belongs.)
+            releaseLoop(el, { resync: audio.isPlaying && !audio.saken });
           }
           fadeVolume(el, (audio.volume ?? 1) * stageStore.masterAudioVolume);
           audio.changed = false;
@@ -161,6 +253,7 @@ export default {
     watch(audios, handleAudioChange);
     watch(() => stageStore.masterAudioSignal, applyMasterVolume);
     onMounted(handleAudioChange);
+    onBeforeUnmount(() => looper.dispose());
 
     return { audios, setRef };
   },

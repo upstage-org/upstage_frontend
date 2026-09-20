@@ -3,6 +3,7 @@ import { computed } from "vue";
 import Icon from "components/Icon.vue";
 import Asset from "components/Asset.vue";
 import VideoFirstFrameThumb from "@components/media/VideoFirstFrameThumb.vue";
+import { isStreamPlaybackBoardType } from "utils/common";
 
 const props = defineProps({
   modelValue: {
@@ -20,13 +21,45 @@ function assetTypeName(media) {
   return t ?? "";
 }
 
-// Fixed row order for the type groups. Deriving it from first appearance in
-// the flat list made whole rows jump around after a drag (moving an item can
-// change which type appears first in the flat array).
-const TYPE_ROW_ORDER = ["avatar", "prop", "backdrop", "curtain", "audio", "video", "stream"];
+/**
+ * One row per ON-STAGE TOOL BAR, not per asset type. The stage puts `video`
+ * and `stream` assets (uploaded clips and RTMP feeds) into ONE bar —
+ * `tools.videos`, see `resolveToolboxBucketName` in the stage store — in
+ * flat-list order. This grid used to give them a row each and reject drops
+ * across rows, so a feed could never be placed before/between clips (or the
+ * other way round): the tile went back to its own row, Save still said
+ * "saved", and the item stayed where it was in the Streams bar — reported
+ * 2026-09 as "reorder media tool not working" (two items moved, the third
+ * "remained at the end" however often it was tried).
+ * Type names are matched the way the stage does: trimmed, case-insensitive.
+ */
+const STREAMS_ROW = "video";
+
+function rowOf(media) {
+  const name = String(assetTypeName(media)).trim().toLowerCase();
+  return isStreamPlaybackBoardType(name) ? STREAMS_ROW : name;
+}
+
+/** How a tile is drawn — still per asset type, whatever row it sits in. */
+function tileKind(media) {
+  const name = String(assetTypeName(media)).trim().toLowerCase();
+  if (name === "audio") return "name";
+  if (name === "video") return "video";
+  // RTMP feeds (`stream` & aliases): fileLocation is a bare key, not an image.
+  if (isStreamPlaybackBoardType(name)) return "name";
+  return "asset";
+}
+
+const rowLabel = (row) => (row === STREAMS_ROW ? "video & streams" : row);
+const rowIcon = (row) => (row === STREAMS_ROW ? "stream.svg" : `${row}.svg`);
+
+// Fixed row order (the order of the on-stage tool bars). Deriving it from
+// first appearance in the flat list made whole rows jump around after a drag
+// (moving an item can change which type appears first in the flat array).
+const TYPE_ROW_ORDER = ["avatar", "prop", "backdrop", "curtain", "audio", STREAMS_ROW];
 
 const types = computed(() => {
-  const present = [...new Set(props.modelValue.map((m) => assetTypeName(m)).filter(Boolean))];
+  const present = [...new Set(props.modelValue.map((m) => rowOf(m)).filter(Boolean))];
   return present.sort((a, b) => {
     const ia = TYPE_ROW_ORDER.indexOf(a);
     const ib = TYPE_ROW_ORDER.indexOf(b);
@@ -40,19 +73,18 @@ const types = computed(() => {
 const mediaGroups = computed(() => {
   const res = {};
   props.modelValue.forEach((item) => {
-    const key = assetTypeName(item) || "unknown";
+    const key = rowOf(item) || "unknown";
     res[key] = (res[key] ?? []).concat(item);
   });
   return res;
 });
 
-// Asset type of the tile being dragged; drops are only valid within the same
-// type group (each on-stage tool bar orders one type — a cross-type drop would
-// silently interleave the flat list without any visible effect in the grid).
+// Row of the tile being dragged; drops are only valid within the same row
+// (each row is one on-stage tool bar — a cross-row drop would silently
+// interleave the flat list without any visible effect in the grid).
 let draggedType = null;
 
-const typeOfTileId = (id) =>
-  assetTypeName(props.modelValue.find((t) => String(t.id) === String(id)));
+const typeOfTileId = (id) => rowOf(props.modelValue.find((t) => String(t.id) === String(id)));
 
 const dragstart = (e) => {
   e.target.classList.add("dragging");
@@ -96,7 +128,7 @@ const drop = (e) => {
   if (
     fromIndex > -1 &&
     toIndex > -1 &&
-    assetTypeName(props.modelValue[fromIndex]) === assetTypeName(props.modelValue[toIndex])
+    rowOf(props.modelValue[fromIndex]) === rowOf(props.modelValue[toIndex])
   ) {
     // Clone first; splice() on props.modelValue would mutate the parent's
     // array (vue/no-mutating-props). The new ordering is communicated via
@@ -113,8 +145,10 @@ const drop = (e) => {
     <div v-for="assetType in types" :key="assetType" class="columns is-vcentered is-mobile">
       <div class="column is-narrow has-text-left media-type-label-col">
         <h4 class="subtitle">
-          <Icon :src="assetType + '.svg'" style="height: 20px; width: 20px" />
-          <span class="type-caption">{{ assetType }} ({{ mediaGroups[assetType]?.length }})</span>
+          <Icon :src="rowIcon(assetType)" style="height: 20px; width: 20px" />
+          <span class="type-caption"
+            >{{ rowLabel(assetType) }} ({{ mediaGroups[assetType]?.length }})</span
+          >
         </h4>
       </div>
       <div class="column">
@@ -137,10 +171,10 @@ const drop = (e) => {
                 <!-- Audio and RTMP streams have no meaningful thumbnail: show
                    just the name, centred (an icon only misaligns tiles, and
                    a stream's fileLocation is a bare key — not an image). -->
-                <div v-if="assetType === 'audio' || assetType === 'stream'" class="name-only-cell">
+                <div v-if="tileKind(item) === 'name'" class="name-only-cell">
                   <b class="name-only-label">{{ item.name }}</b>
                 </div>
-                <div v-else-if="assetType === 'video'" class="video-reorder-cell">
+                <div v-else-if="tileKind(item) === 'video'" class="video-reorder-cell">
                   <div class="video-reorder-thumb">
                     <VideoFirstFrameThumb :media="item" />
                   </div>

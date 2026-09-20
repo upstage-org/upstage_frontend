@@ -15,7 +15,7 @@ export const useLowLevelAPI = () => {
 // Exported for unit tests.
 export const isPlaceholderStageUrl = (u: unknown) => u == null || u === "";
 
-// Parse `VITE_JITSI_ENDPOINT` into the pieces we actually need at runtime.
+// Parse a Jitsi origin (an entry of `VITE_JITSI_ENDPOINTS`) into the pieces we actually need at runtime.
 // Returns `null` if the env value is missing or unparseable so callers can
 // degrade gracefully without crashing the SPA at mount time.
 //
@@ -301,7 +301,7 @@ export const useJitsi = () => {
     const markJoined = session.markJoined;
     if (!endpoint) {
       console.warn(
-        "useJitsi: VITE_JITSI_ENDPOINT is unset/unparseable; skipping conference connect.",
+        "useJitsi: VITE_JITSI_ENDPOINTS is unset/unparseable; skipping conference connect.",
       );
       return;
     }

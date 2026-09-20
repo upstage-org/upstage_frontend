@@ -60,6 +60,7 @@ import {
   takeSnapshotFromStage,
 } from "@stores/modules/stage/reusable";
 import { unnamespaceTopic } from "@utils/mqttTopics";
+import { audienceMayPublish } from "@utils/publishPolicy";
 import { computeFinalJitsiObjectsFromEvents } from "@utils/jitsiBoardReconcile";
 import { useAttribute } from "@services/graphql/composable";
 import { avatarSpeak, stopSpeaking } from "@services/speech";
@@ -1302,8 +1303,20 @@ export const useStageStore = defineStore(
     function UPDATE_AUDIO(audio: ToolboxItem) {
       const m = tools.value.audios.find((a) => a.src === audio.src);
       if (m) {
-        audio.changed = true;
-        Object.assign(m, audio);
+        // `endedPlayId` marks the automatic "stop" a client publishes when
+        // ITS copy of the track reaches the end: "the run started by this
+        // Play has finished". Playback positions differ between clients, so
+        // such a stop can arrive after a performer has already pressed Play
+        // again; without this check it stopped the fresh run for everyone.
+        // Only a stop for the run that is current may take effect. Tracks
+        // started without a `playId` (older bundles, scenes) and every
+        // deliberate command (no `endedPlayId`) behave exactly as before.
+        const { endedPlayId, ...update } = audio as ToolboxItem & { endedPlayId?: unknown };
+        if (endedPlayId !== undefined && m.playId != null && endedPlayId !== m.playId) {
+          return;
+        }
+        update.changed = true;
+        Object.assign(m, update);
       }
     }
 
@@ -1944,6 +1957,35 @@ export const useStageStore = defineStore(
     // lifetime.
     // ====================================================================
     const mqtt = buildClient();
+
+    // Audience sessions must never affect a performance (only chat text and
+    // reactions — see utils/publishPolicy.ts). Enforced here, at the one
+    // publish function every action in this store goes through, so a code
+    // path that forgets to check `canPlay` cannot leak performance state
+    // from a non-performing session. Found 2026-09: every client's <audio>
+    // `ended` handler published a "stop" for the track, so an audience
+    // session whose playback lagged could stop a track the performer had
+    // just restarted. A refused publish resolves (callers neither await a
+    // result nor expect a rejection) and is logged once per topic.
+    // The Stage Management panels use their own broker clients and are not
+    // affected.
+    const rawSendMessage = mqtt.sendMessage.bind(mqtt);
+    const refusedTopicsLogged = new Set<string>();
+    mqtt.sendMessage = (topic: string, payload: unknown, namespaced = false, retain = false) => {
+      if (!canPlay.value) {
+        const plainTopic = namespaced ? unnamespaceTopic(topic) : topic;
+        if (!audienceMayPublish(plainTopic, payload)) {
+          if (!refusedTopicsLogged.has(plainTopic)) {
+            refusedTopicsLogged.add(plainTopic);
+            console.warn(
+              `[stage] not publishing to "${plainTopic}": this session is not performing`,
+            );
+          }
+          return Promise.resolve(undefined);
+        }
+      }
+      return rawSendMessage(topic, payload, namespaced, retain);
+    };
 
     // ====================================================================
     // ACTIONS

@@ -157,7 +157,7 @@ const onVisibleDropzone = () => {
         >
           <PlusOutlined /> {{ $t("new") }} {{ $t("media") }}
         </a-button>
-        <!-- RTMP stream feed (hidden unless VITE_RTMP_ENDPOINT is configured). -->
+        <!-- RTMP stream feed (hidden unless VITE_RTMP_ENDPOINTS is configured). -->
         <a-button
           v-if="!composingMode && configs.RTMP_ENDPOINT"
           data-testid="new-stream-feed"

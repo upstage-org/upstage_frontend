@@ -19,6 +19,11 @@ export default {
     const stageStore = useStageStore();
     console.log(props.option);
     const clearChat = async () => {
+      // Moderation is a performer's action. This button sits in the PUBLIC
+      // chat panel, which the audience sees too, and it publishes through
+      // its own broker client — i.e. past the stage store's publish gate
+      // (utils/publishPolicy.ts) — so it has to refuse here itself.
+      if (!stageStore.canPlay) return;
       clearing.value = true;
       // Credentials ride the stage payload the store already loaded.
       const client = mqttClient.connect(stageStore.model?.mqtt);
@@ -45,7 +50,9 @@ export default {
       }
     };
 
-    const clearChatVisibility = computed(() => stageStore.showClearChatSetting);
+    const clearChatVisibility = computed(
+      () => Boolean(stageStore.showClearChatSetting) && Boolean(stageStore.canPlay),
+    );
 
     return { clearChat, clearing, clearChatVisibility };
   },

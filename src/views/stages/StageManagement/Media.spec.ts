@@ -134,12 +134,13 @@ describe("Stage Management > Media — mixed asset types", () => {
   it("keeps the type rows in a stable order across drags", async () => {
     const wrapper = mountMedia(mixedAssets());
     const rowTypes = () => wrapper.findAll(".type-caption").map((c) => c.text().split(" ")[0]);
-    expect(rowTypes()).toEqual(["avatar", "audio", "stream"]);
+    // A lone RTMP feed sits in the Streams-bar row ("video & streams").
+    expect(rowTypes()).toEqual(["avatar", "audio", "video"]);
 
     // Moving an audio item shifts first-appearance positions in the flat
     // array; the rendered rows must not jump around because of it.
     await dragBetween(wrapper, "20", "21");
-    expect(rowTypes()).toEqual(["avatar", "audio", "stream"]);
+    expect(rowTypes()).toEqual(["avatar", "audio", "video"]);
     expect(tileIds(wrapper)).toContain("20");
   });
 
@@ -159,5 +160,111 @@ describe("Stage Management > Media — mixed asset types", () => {
     expect(audioTile.findComponent({ name: "Icon" }).exists()).toBe(false);
     const streamTile = wrapper.find('[id="60"]');
     expect(streamTile.find("img").exists()).toBe(false);
+  });
+});
+
+/**
+ * Reported 2026-09, stage "turn": three streams were moved to the front of
+ * the list; two stuck, the third "remained at the end" on every attempt even
+ * though Save reported success each time.
+ *
+ * On stage, `video` assets (uploaded clips) and `stream` assets (RTMP feeds)
+ * share ONE tool bar (`tools.videos`, flat-list order). The grid gave each
+ * type its own row and rejected drops between rows, so an item of the other
+ * type could not be moved relative to them at all — and Save happily
+ * re-saved the unchanged order.
+ */
+describe("Stage Management > Media — clips and feeds share the Streams bar", () => {
+  const streamsBarAssets = () => [
+    { id: "40", name: "Opening clip", assetType: { name: "video" } },
+    { id: "41", name: "Interval clip", assetType: { name: "video" } },
+    { id: "10", name: "ava-red", assetType: { name: "avatar" } },
+    { id: "50", name: "DOhen", assetType: { name: "video" } },
+    { id: "51", name: "DO-alles", assetType: { name: "video" } },
+    { id: "60", name: "DO-eva", assetType: { name: "stream" } },
+  ];
+  /** The Streams bar as the stage builds it: video + stream, flat order. */
+  const streamsBarOrder = (ids: string[], assets: { id: string; assetType: { name: string } }[]) =>
+    ids.filter((id) =>
+      ["video", "stream"].includes(assets.find((a) => a.id === id)!.assetType.name.toLowerCase()),
+    );
+
+  const dragBetween = async (
+    wrapper: ReturnType<typeof mountMedia>,
+    fromId: string,
+    toId: string,
+  ) => {
+    const dataTransfer = makeDataTransfer();
+    const tiles = wrapper.findAll(".media-preview");
+    await tiles.find((t) => t.attributes("id") === fromId)!.trigger("dragstart", { dataTransfer });
+    await tiles.find((t) => t.attributes("id") === toId)!.trigger("dragover", { dataTransfer });
+    await tiles.find((t) => t.attributes("id") === toId)!.trigger("drop", { dataTransfer });
+  };
+
+  it("shows clips and feeds in one row, in Streams-bar order", () => {
+    const wrapper = mountMedia(streamsBarAssets());
+    const rows = wrapper.findAll(".reorder-grid > .columns");
+    expect(rows).toHaveLength(2);
+    expect(rows[1].find(".type-caption").text()).toBe("video & streams (5)");
+    expect(rows[1].findAll(".media-preview").map((t) => t.attributes("id"))).toEqual([
+      "40",
+      "41",
+      "50",
+      "51",
+      "60",
+    ]);
+  });
+
+  it("moves all three items to the front — including the one of the other type — and saves that order", async () => {
+    const assets = streamsBarAssets();
+    const wrapper = mountMedia(assets);
+    await dragBetween(wrapper, "50", "40"); // DOhen first
+    await dragBetween(wrapper, "51", "40"); // DO-alles second
+    await dragBetween(wrapper, "60", "40"); // DO-eva (a feed) third — used to be refused
+
+    await wrapper.find("button").trigger("click");
+    await new Promise((resolve) => setTimeout(resolve));
+
+    const savedIds = save.mock.calls[0][2] as string[];
+    expect(streamsBarOrder(savedIds, assets)).toEqual(["50", "51", "60", "40", "41"]);
+    // Nothing lost, nothing duplicated, other bars untouched.
+    expect([...savedIds].sort()).toEqual(assets.map((a) => a.id).sort());
+    expect(savedIds.filter((id) => id === "10")).toEqual(["10"]);
+  });
+
+  it("marks a tile of the other stream type as a valid drop target", async () => {
+    const wrapper = mountMedia(streamsBarAssets());
+    const dataTransfer = makeDataTransfer();
+    const tiles = wrapper.findAll(".media-preview");
+    const feed = tiles.find((t) => t.attributes("id") === "60")!;
+    const clip = tiles.find((t) => t.attributes("id") === "40")!;
+    await feed.trigger("dragstart", { dataTransfer });
+    await clip.trigger("dragover", { dataTransfer });
+    expect(clip.classes()).toContain("dropzone");
+  });
+
+  it("matches type names the way the stage does (case, legacy aliases)", () => {
+    const wrapper = mountMedia([
+      { id: "1", name: "clip", assetType: { name: "Video" } },
+      { id: "2", name: "feed", assetType: { name: "streaming" } },
+      // Older payloads carried the type as a bare string.
+      { id: "3", name: "feed2", assetType: "stream" as unknown as { name: string } },
+    ]);
+    expect(wrapper.findAll(".reorder-grid > .columns")).toHaveLength(1);
+    expect(tileIds(wrapper)).toEqual(["1", "2", "3"]);
+  });
+
+  it("still draws each tile by its own type inside the shared row", () => {
+    const wrapper = mountMedia(streamsBarAssets());
+    expect(wrapper.find('[id="60"] .name-only-label').text()).toBe("DO-eva");
+    expect(wrapper.find('[id="40"] .video-reorder-cell').exists()).toBe(true);
+    expect(wrapper.find('[id="40"] .name-only-cell').exists()).toBe(false);
+  });
+
+  it("still refuses a drop between different tool bars", async () => {
+    const wrapper = mountMedia(streamsBarAssets());
+    const before = tileIds(wrapper);
+    await dragBetween(wrapper, "60", "10"); // feed onto avatar
+    expect(tileIds(wrapper)).toEqual(before);
   });
 });

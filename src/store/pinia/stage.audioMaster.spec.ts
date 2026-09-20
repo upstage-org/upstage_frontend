@@ -44,6 +44,10 @@ let store: StageStore;
 beforeEach(() => {
   setActivePinia(createPinia());
   store = useStageStore();
+  // These actions are a performer's: the store refuses to publish
+  // performance state from a session that is not performing (no model /
+  // audience — see utils/publishPolicy.ts).
+  store.model = { permission: "owner", attributes: [] } as never;
   store.tools.audios.push(
     { src: "hen1.mp3", name: "Hen 1", isPlaying: true, volume: 1 } as unknown as Audio,
     { src: "hen2.mp3", name: "Hen 2", isPlaying: true, volume: 1 } as unknown as Audio,
