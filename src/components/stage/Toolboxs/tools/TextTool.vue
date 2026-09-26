@@ -6,6 +6,7 @@ import ContextMenu from "components/ContextMenu.vue";
 import Skeleton from "../Skeleton.vue";
 import Icon from "components/Icon.vue";
 import { useStageStore } from "@stores/pinia/stage";
+import { sanitizeRichText } from "@utils/sanitizeHtml";
 import { computed, onUnmounted, ref } from "vue";
 import { v4 as uuidv4 } from "uuid";
 
@@ -150,7 +151,9 @@ export default {
       const textId = uuidv4();
       stageStore.addText({
         ...options,
-        content: el.value.innerHTML,
+        // contenteditable accepts pasted HTML; strip anything executable
+        // before it is broadcast to every viewer.
+        content: sanitizeRichText(el.value.innerHTML),
         w: width + 10,
         h: height + 10,
         textId,

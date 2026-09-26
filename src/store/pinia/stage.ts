@@ -1073,6 +1073,12 @@ export const useStageStore = defineStore(
         tools.value.audios = [];
       }
       status.value = "OFFLINE";
+      // Per-stage presence state. Left over from stage A it was counted in
+      // stage B's STATISTICS publishes and fed the frozen-viewer pruner.
+      sessions.value = [];
+      subscribeSuccess.value = false;
+      reactions.value = [];
+      frozenViewerReports.value = new Map();
       replay.value.isReplaying = false;
       liveMoves.clear();
       lastOwnMoveSeq.clear();
@@ -3444,11 +3450,25 @@ export const useStageStore = defineStore(
       }
     }
 
+    // Monotonic load counter: a slow response for stage A must not overwrite
+    // stage B once the user has moved on (or the Live view has unmounted).
+    let loadStageSeq = 0;
+
+    /**
+     * Load a stage (and optionally a recording) into the store.
+     * Resolves `true` when this load populated the store, `false` when it was
+     * superseded by a newer loadStage() call or failed — callers chaining
+     * `connect()` should check it.
+     */
     async function loadStage({ url, recordId }: { url: string; recordId?: string }) {
+      const seq = ++loadStageSeq;
       CLEAN_STAGE(true);
       SET_PRELOADING_STATUS(true);
       try {
         const { stage } = await stageGraph.loadStage(url, recordId);
+        if (seq !== loadStageSeq) {
+          return false;
+        }
         if (stage) {
           SET_MODEL(stage);
           const { events } = stage as StageModel;
@@ -3468,13 +3488,15 @@ export const useStageStore = defineStore(
             reconcileJitsiBoardFromEvents(archivedEvents);
           }
           await stageGraph.updateLastAccess(stage.id);
+          return seq === loadStageSeq;
         } else {
           SET_PRELOADING_STATUS(false);
         }
       } catch (e) {
         console.error("[stage/loadStage] failed", e);
-        SET_PRELOADING_STATUS(false);
+        if (seq === loadStageSeq) SET_PRELOADING_STATUS(false);
       }
+      return false;
     }
 
     async function reloadPermission() {

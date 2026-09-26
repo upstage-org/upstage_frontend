@@ -37,9 +37,10 @@ FRONTEND_PORT=3002
 HOST_UID=1000
 HOST_GID=1000
 ENV_BACKUP=./env_backup_${SITE}
-# Exposes window.__UPSTAGE_PINIA__ for the Playwright e2e suites.
-# Belt-and-suspenders alongside env_backup_prod so a wiped backup still builds e2e-ready.
-VITE_E2E=1
+# NOTE: VITE_E2E is deliberately NOT set here. It exposes the Pinia stores
+# (including the auth store and its tokens) on `window.__UPSTAGE_PINIA__`
+# for Playwright; a production bundle must never ship that hook. The dev
+# script (run_front_end_dev.sh) keeps it for the e2e suites.
 
 sudo mkdir -p /frontend_app_${SITE}
 env_src="/frontend_app_${SITE}/.env"

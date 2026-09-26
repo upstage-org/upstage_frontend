@@ -44,6 +44,12 @@ const readEnvString = (key: string): string | undefined => {
   return trimmed === "" ? undefined : trimmed;
 };
 
+// Wire-level XMPP/BOSH tracing (the `[diag]` WebSocket / XHR / Strophe hooks
+// below). Dev-only AND explicitly opted in with VITE_JITSI_WIRE_TRACE=true:
+// the hooks monkey-patch globals for the whole SPA and log auth stanzas.
+const JITSI_WIRE_TRACE =
+  Boolean((import.meta as any).env?.DEV) && readEnvString("VITE_JITSI_WIRE_TRACE") === "true";
+
 //
 // Multi-server streaming: `origin` selects one of `configs.JITSI_ENDPOINTS`.
 // Omitted ⇒ the default server (entry 0) — exactly the previous behaviour.
@@ -472,7 +478,12 @@ export const useJitsi = () => {
     // doesn't drown the console.
     // TODO(streaming-diag): remove once the CONFERENCE_JOINED-never-fires
     // root cause is identified.
-    {
+    //
+    // Opt-in only (JITSI_WIRE_TRACE): the wrap replaces the global
+    // WebSocket / XMLHttpRequest for the whole SPA and logs every XMPP
+    // stanza, SASL auth included, so it must never run in a production
+    // bundle. Everything else on this path is untouched.
+    if (JITSI_WIRE_TRACE) {
       const w = window as unknown as {
         WebSocket: typeof WebSocket;
         __upstageWsHooked?: boolean;
@@ -861,40 +872,42 @@ export const useJitsi = () => {
         // capture. Defensive: lib could reorganise this internal path
         // between releases, so wrap in try/catch.
         // TODO(streaming-diag): remove with the rest of the trace.
-        try {
-          const xmppConn = target.connection?.xmpp?.connection;
-          if (xmppConn && typeof xmppConn.xmlInput !== "function") {
-            xmppConn.xmlInput = (elem: { outerHTML?: string }) => {
-              try {
-                const s = elem?.outerHTML ?? String(elem);
-                console.log(
-                  "[diag] strophe xmlInput",
-                  s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
-                );
-              } catch (_) {
-                /* swallow */
-              }
-            };
+        // Opt-in only (JITSI_WIRE_TRACE), same reason as the WebSocket wrap.
+        if (JITSI_WIRE_TRACE)
+          try {
+            const xmppConn = target.connection?.xmpp?.connection;
+            if (xmppConn && typeof xmppConn.xmlInput !== "function") {
+              xmppConn.xmlInput = (elem: { outerHTML?: string }) => {
+                try {
+                  const s = elem?.outerHTML ?? String(elem);
+                  console.log(
+                    "[diag] strophe xmlInput",
+                    s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
+                  );
+                } catch (_) {
+                  /* swallow */
+                }
+              };
+            }
+            if (xmppConn && typeof xmppConn.xmlOutput !== "function") {
+              xmppConn.xmlOutput = (elem: { outerHTML?: string }) => {
+                try {
+                  const s = elem?.outerHTML ?? String(elem);
+                  console.log(
+                    "[diag] strophe xmlOutput",
+                    s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
+                  );
+                } catch (_) {
+                  /* swallow */
+                }
+              };
+            }
+            console.log("[diag] strophe xmlInput/xmlOutput hooks installed", {
+              hasXmppConn: !!xmppConn,
+            });
+          } catch (hookErr) {
+            console.warn("[diag] failed to install strophe xmlInput/xmlOutput", hookErr);
           }
-          if (xmppConn && typeof xmppConn.xmlOutput !== "function") {
-            xmppConn.xmlOutput = (elem: { outerHTML?: string }) => {
-              try {
-                const s = elem?.outerHTML ?? String(elem);
-                console.log(
-                  "[diag] strophe xmlOutput",
-                  s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
-                );
-              } catch (_) {
-                /* swallow */
-              }
-            };
-          }
-          console.log("[diag] strophe xmlInput/xmlOutput hooks installed", {
-            hasXmppConn: !!xmppConn,
-          });
-        } catch (hookErr) {
-          console.warn("[diag] failed to install strophe xmlInput/xmlOutput", hookErr);
-        }
       },
     );
     target.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, (e) => {
@@ -917,7 +930,7 @@ export const useJitsi = () => {
     // (e.g. native "WebSocket"), the patch race is the reason we're
     // not seeing [diag] xmpp lines, NOT a server hang.
     // TODO(streaming-diag): remove with the rest of the trace.
-    {
+    if (JITSI_WIRE_TRACE) {
       const w = window as unknown as { WebSocket: typeof WebSocket; __upstageWsHooked?: boolean };
       console.log("[diag] composable about to connect()", {
         wsHooked: !!w.__upstageWsHooked,

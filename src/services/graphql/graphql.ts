@@ -43,6 +43,7 @@ interface StudioClient {
   request: <TData = unknown, TVars extends Record<string, unknown> | undefined = undefined>(
     query: string | DocumentNode,
     variables?: TVars,
+    headers?: Record<string, string>,
   ) => Promise<TData>;
 }
 
@@ -56,9 +57,14 @@ interface StudioClient {
  * unused; Apollo points at a single `${GRAPHQL_ENDPOINT}studio_graphql` URL.
  */
 export const createClient = (_namespace: string): StudioClient => ({
-  async request(query, variables) {
+  // `headers` (per-request, e.g. the `X-Access-Token` refresh header) used to
+  // be accepted by callers but silently dropped here, so the proactive token
+  // refresh in the auth store always failed. Forwarded via Apollo's context;
+  // `authLink` merges them over the default Authorization header.
+  async request(query, variables, headers) {
     const document = ensureDocument(query);
     const operationIsMutation = isMutation(document);
+    const context = headers ? { headers } : undefined;
 
     if (operationIsMutation) {
       try {
@@ -66,6 +72,7 @@ export const createClient = (_namespace: string): StudioClient => ({
           mutation: document,
           variables: variables as Record<string, unknown> | undefined,
           fetchPolicy: "no-cache",
+          context,
         });
         if (result.errors?.length) {
           throw toLegacyError(result.errors, document);
@@ -81,6 +88,7 @@ export const createClient = (_namespace: string): StudioClient => ({
         query: document,
         variables: variables as Record<string, unknown> | undefined,
         fetchPolicy: "no-cache",
+        context,
       });
       if (result.errors?.length) {
         throw toLegacyError(result.errors, document);

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import Loading from "components/Loading.vue";
 import { absolutePath } from "utils/common";
+import { sanitizeRichText } from "utils/sanitizeHtml";
 import Entry from "components/stage/Entry.vue";
 import { MasonryWall } from "@yeger/vue-masonry-wall";
 import { useQuery } from "@vue/apollo-composable";
@@ -39,6 +40,7 @@ export default {
       loading,
       absolutePath,
       foyer,
+      sanitizeRichText,
     };
   },
 };
@@ -49,8 +51,14 @@ export default {
     <div class="hero-body">
       <div class="container">
         <div class="describe">
-          <h1 class="title" v-html="foyer.title?.value" />
-          <div v-if="foyer.description" class="subtitle" v-html="foyer.description.value" />
+          <!-- Admin-authored site config, still sanitised: a compromised admin
+               account must not become stored XSS on the public landing page. -->
+          <h1 class="title" v-html="sanitizeRichText(foyer.title?.value)" />
+          <div
+            v-if="foyer.description"
+            class="subtitle"
+            v-html="sanitizeRichText(foyer.description.value)"
+          />
         </div>
         <Loading v-if="loading" />
         <div v-else class="stages my-4 pt-6">

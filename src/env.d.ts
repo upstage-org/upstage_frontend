@@ -52,6 +52,8 @@ interface ImportMetaEnv {
    */
   readonly VITE_RTMP_ENDPOINTS?: string;
   readonly VITE_STRIPE_KEY?: string;
+  /** Dev-only: "true" enables the `[diag]` XMPP wire trace in MeetingObject/composable.ts. */
+  readonly VITE_JITSI_WIRE_TRACE?: string;
   readonly VITE_RELEASE_VERSION?: string;
   readonly VITE_ALIAS_RELEASE_VERSION?: string;
   /**

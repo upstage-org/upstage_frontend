@@ -34,8 +34,11 @@ interface LoginResponse {
 }
 
 interface RefreshResponse {
-  refreshToken?: { access_token?: string };
+  refreshToken?: { access_token?: string; refresh_token?: string };
 }
+
+const AUTH_STORAGE_KEY = "upstage-auth";
+const LEGACY_AUTH_STORAGE_KEY = "vuex";
 
 export const useAuthStore = defineStore(
   "auth",
@@ -96,7 +99,14 @@ export const useAuthStore = defineStore(
 
     const logoutLocal = (): void => {
       clear();
-      localStorage.clear();
+      // Only the auth blob: `localStorage.clear()` also wiped the locale,
+      // replay markers and other per-viewer preferences on every logout.
+      try {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+      } catch {
+        /* storage may be unavailable (private mode) */
+      }
       removeToken();
       removeRefreshToken();
     };
@@ -178,14 +188,14 @@ export const useAuthStore = defineStore(
      */
     const fetchRefreshToken = async (): Promise<string | undefined> => {
       try {
-        const response = (await userGraph.refreshUser(
-          { refreshToken: refreshToken.value },
-          { "X-Access-Token": refreshToken.value },
-        )) as RefreshResponse;
+        // The backend rotates the refresh token on every use and deletes the
+        // old one, so BOTH tokens must be stored or the next refresh fails.
+        const response = (await userGraph.refreshUser(undefined, {
+          "X-Access-Token": refreshToken.value,
+        })) as RefreshResponse;
         const newToken = response?.refreshToken?.access_token;
         if (newToken) {
-          token.value = newToken;
-          setToken(newToken);
+          setSession(newToken, response?.refreshToken?.refresh_token ?? refreshToken.value);
         }
         return newToken;
       } catch {

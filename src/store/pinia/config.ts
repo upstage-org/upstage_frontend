@@ -7,7 +7,8 @@ interface ConfigValue {
 }
 
 interface ConfigState {
-  nginx: { uploadLimit?: number };
+  // Field name matches the `nginx { limit }` selection in services/graphql/config.ts.
+  nginx: { limit?: number | null };
   system: {
     termsOfService?: ConfigValue;
     manual?: ConfigValue;
@@ -38,7 +39,7 @@ export const useConfigStore = defineStore("config", () => {
     foyer: null,
   });
 
-  const uploadLimit = computed<number>(() => state.nginx.uploadLimit ?? 1024 * 1024);
+  const uploadLimit = computed<number>(() => state.nginx.limit ?? 1024 * 1024);
   const termsOfService = computed(() => state.system.termsOfService?.value);
   const manual = computed(() => state.system.manual?.value);
   const esp = computed(() => state.system.esp?.value);

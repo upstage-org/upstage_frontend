@@ -1,5 +1,6 @@
 // @ts-nocheck
 import configs from "config";
+import { escapeHtml } from "./sanitizeHtml";
 import { SharedAuth } from "models/config";
 import { User as LegacyUser } from "models/studio";
 import { message } from "ant-design-vue";
@@ -300,22 +301,32 @@ export const randomMessageColor = () => {
 export const randomRange = (min: number, max: number) =>
   Math.floor(Math.random() * (max - min + 1) + min);
 
+/**
+ * Turn plain text into HTML with clickable links.
+ *
+ * The input is HTML-ESCAPED first: chat messages and speech bubbles are
+ * authored by anyone on the stage (anonymous audience included) and the
+ * result is rendered with `v-html` in Linkify.vue, so a raw `<img onerror>`
+ * used to run in every viewer's browser. Only the `<a>` tags produced here
+ * are markup; everything else is text.
+ */
 export function linkify(inputText: string) {
-  var replacedText, replacePattern1, replacePattern2, replacePattern3;
+  const escaped = escapeHtml(inputText);
+  const LINK_ATTRS = 'target="_blank" rel="noopener noreferrer"';
 
   //URLs starting with http://, https://, or ftp://
-  replacePattern1 = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gim;
-  replacedText = inputText.replace(replacePattern1, '<a href="$1" target="_blank">$1</a>');
+  const replacePattern1 = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gim;
+  let replacedText = escaped.replace(replacePattern1, `<a href="$1" ${LINK_ATTRS}>$1</a>`);
 
   //URLs starting with "www." (without // before it, or it'd re-link the ones done above).
-  replacePattern2 = /(^|[^/])(www\.[\S]+(\b|$))/gim;
+  const replacePattern2 = /(^|[^/])(www\.[\S]+(\b|$))/gim;
   replacedText = replacedText.replace(
     replacePattern2,
-    '$1<a href="http://$2" target="_blank">$2</a>',
+    `$1<a href="http://$2" ${LINK_ATTRS}>$2</a>`,
   );
 
   //Change email addresses to mailto:: links.
-  replacePattern3 = /(([a-zA-Z0-9\-_.])+@[a-zA-Z_]+?(\.[a-zA-Z]{2,6})+)/gim;
+  const replacePattern3 = /(([a-zA-Z0-9\-_.])+@[a-zA-Z_]+?(\.[a-zA-Z]{2,6})+)/gim;
   replacedText = replacedText.replace(replacePattern3, '<a href="mailto:$1">$1</a>');
 
   return replacedText;

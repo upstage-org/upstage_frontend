@@ -40,3 +40,11 @@ jobs:
 
       - name: Verify (typecheck + tests + audit)
         run: pnpm run verify
+
+      - name: Lint
+        run: pnpm run lint
+
+      # `pnpm build` also runs check:no-secrets, which previously never ran
+      # server-side. LOCAL_SERVE_STATIC_CONTENT is only needed for `vite dev`.
+      - name: Build (+ bundle secrets scan)
+        run: pnpm run build

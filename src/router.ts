@@ -13,6 +13,8 @@ import { UPLOAD_LIMIT_MESSAGE_KEY } from "@utils/constants";
 declare module "vue-router" {
   interface RouteMeta {
     requireAuth?: boolean;
+    /** Only ADMIN / SUPER_ADMIN may enter (checked against `currentUser`). */
+    requireAdmin?: boolean;
     background?: string;
   }
 }
@@ -140,7 +142,7 @@ const routes: RouteRecordRaw[] = [
         path: "/admin",
         name: "Admin",
         component: () => import("views/admin/index.vue"),
-        meta: { background: "#E6F2FF" },
+        meta: { background: "#E6F2FF", requireAdmin: true },
         children: [
           {
             path: "player",
@@ -189,7 +191,10 @@ router.beforeEach(
     // viewport so phones render at sensible scale.
     setViewportMeta(to.name === "Live" ? "" : "width=device-width,initial-scale=1.0");
 
-    if (to.fullPath.includes("admin") && loggedIn) {
+    // Route meta, not a substring test on the URL: `fullPath.includes("admin")`
+    // also bounced logged-in players off any stage whose slug contained
+    // "admin" (e.g. /badminton).
+    if (to.matched.some((record) => record.meta.requireAdmin) && loggedIn) {
       const isAdmin = await useUserStore().checkIsAdmin();
       if (!isAdmin) {
         return next("/");

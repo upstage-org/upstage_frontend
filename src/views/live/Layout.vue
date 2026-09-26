@@ -40,11 +40,18 @@ export default {
     const { ready, canPlay } = storeToRefs(stageStore);
 
     const route = useRoute();
-    stageStore.loadStage({ url: route.params.url }).then(() => {
-      stageStore.connect();
+    // `alive` + the loadStage() result: a load that resolves after the view
+    // unmounted (or after a newer load started) must not open a broker
+    // connection nobody will close.
+    let alive = true;
+    stageStore.loadStage({ url: route.params.url }).then((loaded) => {
+      if (alive && loaded !== false) {
+        stageStore.connect();
+      }
     });
 
     onUnmounted(() => {
+      alive = false;
       stageStore.disconnect();
     });
 
@@ -96,11 +103,18 @@ export default {
     const onUnload = () => {
       stageStore.disconnectSync();
     };
-    window.addEventListener("beforeunload", onUnload);
-    window.addEventListener("pagehide", (event) => {
+    const onPageHide = (event) => {
       if (!event.persisted) {
         onUnload();
       }
+    };
+    window.addEventListener("beforeunload", onUnload);
+    window.addEventListener("pagehide", onPageHide);
+    // Both listeners were never removed: every stage visit stacked another
+    // pair, which then fired disconnectSync() from unrelated pages.
+    onUnmounted(() => {
+      window.removeEventListener("beforeunload", onUnload);
+      window.removeEventListener("pagehide", onPageHide);
     });
 
     return {

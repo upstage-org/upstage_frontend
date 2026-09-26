@@ -42,6 +42,18 @@ export default function buildClient() {
         return null;
       }
       const clientId = uuidv4();
+      // A previous client (e.g. one still auto-reconnecting after the status
+      // flipped to OFFLINE) must be torn down first; otherwise two live
+      // clients each deliver every message and presence is published twice.
+      if (this.client) {
+        try {
+          this.client.removeAllListeners();
+          this.client.end(true);
+        } catch (err) {
+          console.warn("[MQTT] Failed to end previous client:", err);
+        }
+        this.client = null;
+      }
       this._connectPromise = new Promise((resolve, reject) => {
         this._connectResolve = resolve;
         this._connectReject = reject;

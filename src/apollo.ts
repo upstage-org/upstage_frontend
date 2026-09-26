@@ -6,6 +6,7 @@ import {
   from,
   fromPromise,
   gql,
+  Observable,
 } from "@apollo/client/core";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
@@ -15,6 +16,13 @@ import configs from "config";
 import { getSharedAuth, setSharedAuth } from "utils/common";
 import { fetchWithTimeout, notifyNetworkError, shouldRetry } from "utils/networkResilience";
 import { getAccessTokenForGraphql, getRefreshTokenForGraphql } from "utils/graphqlAuth";
+
+declare module "@apollo/client/core" {
+  interface DefaultContext {
+    /** Set on the refresh mutation itself so an auth error there cannot recurse. */
+    skipAuthRefresh?: boolean;
+  }
+}
 import { Media } from "models/studio";
 import { provideApolloClient } from "@vue/apollo-composable";
 import { logout } from "utils/auth";
@@ -40,84 +48,85 @@ const retryLink = new RetryLink({
   attempts: shouldRetry,
 });
 
-let refreshing = false;
+const REFRESH_TOKEN_MUTATION = gql`
+  mutation RefreshToken {
+    refreshToken {
+      access_token
+      refresh_token
+    }
+  }
+`;
+
+/**
+ * Persist a rotated token pair. Goes through the Pinia auth store when it is
+ * available (so its refs, cookies and the persisted-state plugin all agree);
+ * falls back to the raw localStorage blob otherwise (e.g. unit tests).
+ * Imported lazily to keep the `store → graphql → apollo → store` cycle open.
+ */
+async function persistSession(accessToken: string, refreshToken: string): Promise<void> {
+  try {
+    const { useAuthStore } = await import("./store/pinia/auth");
+    useAuthStore().setSession(accessToken, refreshToken);
+    return;
+  } catch {
+    /* fall through */
+  }
+  setSharedAuth({
+    token: accessToken,
+    refresh_token: refreshToken,
+    username: getSharedAuth()?.username ?? "",
+  });
+}
+
+/**
+ * One refresh at a time. Every request that hits an auth error while a
+ * refresh is in flight awaits the SAME promise, then replays with the new
+ * token. (The previous flag + 500 ms polling loop could get stuck forever
+ * when the refresh response carried no token, and it wrote the OLD refresh
+ * token back even though the backend rotates and deletes it.)
+ */
+let refreshPromise: Promise<string | null> | null = null;
+
+async function doRefresh(): Promise<string | null> {
+  const currentRefresh = getRefreshTokenForGraphql();
+  if (!currentRefresh) return null;
+  try {
+    const { data } = await apolloClient.mutate<{
+      refreshToken?: { access_token?: string; refresh_token?: string } | null;
+    }>({
+      mutation: REFRESH_TOKEN_MUTATION,
+      context: { headers: { "X-Access-Token": currentRefresh }, skipAuthRefresh: true },
+      fetchPolicy: "no-cache",
+    });
+    const accessToken = data?.refreshToken?.access_token;
+    if (!accessToken) return null;
+    await persistSession(accessToken, data?.refreshToken?.refresh_token ?? currentRefresh);
+    return accessToken;
+  } catch {
+    return null;
+  }
+}
+
+export function refreshAccessTokenOnce(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
 
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors) {
-    const sharedAuth = getSharedAuth();
-    const username = sharedAuth?.username ?? "";
-    for (const err of graphQLErrors) {
-      if (!REFRESHABLE_ERRORS.has(err.message)) {
-        continue;
-      }
-      const refreshToken = getRefreshTokenForGraphql();
-      if (!refreshToken) {
-        return;
-      }
-
-      if (!refreshing) {
-        refreshing = true;
-        return fromPromise(
-          apolloClient
-            .mutate({
-              mutation: gql`
-                mutation {
-                  refreshToken {
-                    access_token
-                    refresh_token
-                  }
-                }
-              `,
-              context: {
-                headers: {
-                  "X-Access-Token": refreshToken,
-                },
-              },
-              variables: {
-                refreshToken,
-              },
-            })
-            .catch(() => {
-              refreshing = false;
-              logout();
-              message.error(
-                `Token expired, could not refresh your access token. Please login again!`,
-              );
-              return;
-            }),
-        )
-          .map((value) => value?.data.refreshToken.access_token)
-          .filter((value) => Boolean(value))
-          .flatMap((accessToken) => {
-            refreshing = false;
-            setSharedAuth({
-              token: accessToken,
-              refresh_token: refreshToken ?? "",
-              username,
-            });
-            operation.setContext({
-              headers: {
-                ...operation.getContext().headers,
-                Authorization: `Bearer ${accessToken}`,
-              },
-            });
-            return forward(operation);
-          });
-      }
-      return fromPromise(
-        new Promise<string | undefined>((resolve) => {
-          const loop = () => {
-            if (!refreshing) {
-              resolve(getAccessTokenForGraphql());
-            } else {
-              setTimeout(loop, 500);
-            }
-          };
-          loop();
-        }),
-      ).flatMap((accessToken) => {
+    const needsRefresh = graphQLErrors.some((err) => REFRESHABLE_ERRORS.has(err.message));
+    if (needsRefresh && !operation.getContext().skipAuthRefresh && getRefreshTokenForGraphql()) {
+      return fromPromise(refreshAccessTokenOnce()).flatMap((accessToken) => {
         if (!accessToken) {
-          return forward(operation);
+          logout();
+          message.error(`Token expired, could not refresh your access token. Please login again!`);
+          return new Observable<never>((observer) => {
+            observer.error(new Error("Session expired"));
+          });
         }
         operation.setContext({
           headers: {
@@ -207,5 +216,3 @@ export const apolloClient = new ApolloClient({
 export const installApolloClient = (): void => {
   provideApolloClient(apolloClient);
 };
-
-installApolloClient();

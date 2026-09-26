@@ -1,24 +1,23 @@
-// @ts-nocheck
 import { gql } from "@apollo/client/core";
 import { studioClient } from "../graphql";
 
+export interface PaymentSecretInput {
+  amount: number;
+  token?: string | null;
+}
+
+export interface GenerateReceiptInput {
+  receivedFrom: string;
+  description: string;
+  amount: string;
+  date: string;
+}
+
+// The former `oneTimePurchase` helper (raw card number / CVC interpolated
+// into the query string) was unused and has been removed; donations go
+// through Stripe Elements via `paymentSecret`.
 export default {
-  oneTimePurchase: (input) =>
-    studioClient.request(gql`
-    mutation{
-      oneTimePurchase(
-        input: {
-          cardNumber: "${input.cardNumber}",
-          expYear: "20${input.expYear}",
-          expMonth: "${input.expMonth}",
-          cvc: "${input.cvc}",
-          amount:${input.amount}
-        })
-      {      
-        success 
-      }
-    }`),
-  paymentSecret: (input) =>
+  paymentSecret: (input: PaymentSecretInput) =>
     studioClient.request(
       gql`
         mutation PaymentSecret($amount: Int!, $token: String) {
@@ -27,12 +26,27 @@ export default {
       `,
       { amount: input.amount, token: input.token ?? null },
     ),
-  generateReceipt: (input) =>
-    studioClient.request(gql`
-      mutation{
-        generateReceipt(receivedFrom: "${input.receivedFrom}", description: "${input.description}" , amount: "${input.amount}",  date: "${input.date}") {
-          fileBase64
-          fileName
+  // Variables, not string interpolation: the donor name is free text.
+  generateReceipt: (input: GenerateReceiptInput) =>
+    studioClient.request(
+      gql`
+        mutation GenerateReceipt(
+          $receivedFrom: String!
+          $description: String!
+          $amount: String!
+          $date: String!
+        ) {
+          generateReceipt(
+            receivedFrom: $receivedFrom
+            description: $description
+            amount: $amount
+            date: $date
+          ) {
+            fileBase64
+            fileName
+          }
         }
-      }`),
+      `,
+      { ...input },
+    ),
 };

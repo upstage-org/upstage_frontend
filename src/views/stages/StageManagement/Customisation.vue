@@ -95,13 +95,14 @@ export default {
           color: defaultcolor.value,
         }),
         { qos: 1, retain: false },
-        (error, res) => {
+        (error) => {
+          // `resolve` / `reject` did not exist here: the success path threw a
+          // ReferenceError before disconnecting and leaked one broker
+          // connection per save.
           if (error) {
-            reject(error);
-          } else {
-            resolve(res);
-            mqtt.disconnect();
+            message.error(`Could not broadcast the backdrop colour: ${error.message ?? error}`);
           }
+          mqtt.disconnect();
         },
       );
     };

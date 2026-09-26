@@ -9,6 +9,7 @@ import {
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
 } from "utils/common";
+import { openSafeLink } from "utils/sanitizeHtml";
 import {
   FRAME_FITS,
   FRAME_SHAPES,
@@ -195,7 +196,7 @@ export default {
     const hasLink = computed(() => props.object.link && props.object.link.url);
     const openLink = () => {
       const { url, blank } = props.object.link;
-      window.open(url, blank ? "_blank" : "_self").focus();
+      openSafeLink(url, Boolean(blank));
     };
 
     // The speed field is LOCAL until committed with Enter (user request

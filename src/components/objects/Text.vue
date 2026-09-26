@@ -3,6 +3,7 @@
 import AppObject from "./Object.vue";
 import MenuContent from "./Avatar/ContextMenuAvatar.vue"; // Text should inherit all of avatar behavior
 import { useStageStore } from "@stores/pinia/stage";
+import { sanitizeRichText } from "@utils/sanitizeHtml";
 import { computed, onMounted, ref, watch } from "vue";
 
 export default {
@@ -70,7 +71,9 @@ export default {
     };
 
     const liveTyping = () => {
-      const content = el.value.innerHTML;
+      // Sanitised on the way OUT as well as in: pasted markup must not be
+      // broadcast to other viewers either.
+      const content = sanitizeRichText(el.value.innerHTML);
       stageStore.shapeObject({
         ...props.object,
         content,
@@ -79,7 +82,8 @@ export default {
     };
 
     onMounted(() => {
-      el.value.innerHTML = props.object.content;
+      // `content` arrives over MQTT from other players: never trust it raw.
+      el.value.innerHTML = sanitizeRichText(props.object.content);
       // The `.object` wrapper (our parent) clips with overflow: hidden, which
       // still makes it a scroll container: while the frame is animating to a
       // fitFrameToText-grown size, the browser scrolls it to keep the typing
@@ -101,7 +105,7 @@ export default {
       () => props.object.content,
       () => {
         if (!isFocus.value) {
-          el.value.innerHTML = props.object.content;
+          el.value.innerHTML = sanitizeRichText(props.object.content);
         }
       },
     );
