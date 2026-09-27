@@ -7,6 +7,7 @@ export default {
   backstage: "Backstage",
   logout: "Logout",
   login: "Login",
+  session_expired_login_again: "Your session has expired. Please log in again.",
   register: "Register",
   status: "Status",
   save: "Save",

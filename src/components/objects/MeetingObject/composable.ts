@@ -1,4 +1,3 @@
-// @ts-nocheck
 import configs from "config";
 import { onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
@@ -185,6 +184,9 @@ export const loadJitsiServerConfig = (
   return promise;
 };
 
+// lib-jitsi-meet is vendored and untyped; these are its objects.
+type SessionOptions = { origin: any; stageUrl: any; target: any; initLib: any };
+
 export const useJitsi = () => {
   const joined = ref(false);
   // Reactive ref of the local performer's `JitsiTrack`s the moment
@@ -214,8 +216,8 @@ export const useJitsi = () => {
   //              `localJitsiParticipantIds` is the reactive join signal.
   const sessions = new Map();
   const jitsi = {
-    room: null,
-    connection: null,
+    room: null as any,
+    connection: null as any,
     localTracks,
     sessions,
   };
@@ -273,7 +275,7 @@ export const useJitsi = () => {
   // user has already left.
   let unmounted = false;
 
-  const createJitsiSession = ({ origin, stageUrl, target, initLib }) => {
+  const createJitsiSession = ({ origin, stageUrl, target, initLib }: SessionOptions) => {
     const session = {
       origin,
       target,
@@ -310,7 +312,10 @@ export const useJitsi = () => {
     return session;
   };
 
-  const startSession = async (session, { origin, stageUrl, target, initLib }) => {
+  const startSession = async (
+    session: any,
+    { origin, stageUrl, target, initLib }: SessionOptions,
+  ) => {
     const endpoint = useJitsiEndpoint(origin);
     const serverTag = multiServer ? origin : undefined;
     const markJoined = session.markJoined;
@@ -621,7 +626,7 @@ export const useJitsi = () => {
 
     target.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
-      (e) => {
+      (e: any) => {
         console.log("Connection established", e);
         // NOTE on the Colibri "bridge channel":
         // JVB stable-10888+ has dropped SCTP-DataChannel support for the
@@ -679,7 +684,7 @@ export const useJitsi = () => {
         target.room.on(JitsiMeetJS.events.conference.DATA_CHANNEL_OPENED, () => {
           console.log("[diag] composable DATA_CHANNEL_OPENED (bridge channel up)");
         });
-        target.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track) => {
+        target.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track: any) => {
           console.log("[diag] composable TRACK_ADDED", {
             type: track?.type,
             participantId: track?.getParticipantId?.(),
@@ -688,21 +693,21 @@ export const useJitsi = () => {
           });
           stageStore.addTrack(track, serverTag);
         });
-        target.room.on(JitsiMeetJS.events.conference.TRACK_REMOVED, (track) => {
+        target.room.on(JitsiMeetJS.events.conference.TRACK_REMOVED, (track: any) => {
           console.log("[diag] composable TRACK_REMOVED", {
             type: track?.type,
             participantId: track?.getParticipantId?.(),
           });
           if (track) stageStore.removeTrack(track);
         });
-        target.room.on(JitsiMeetJS.events.conference.USER_JOINED, (id) => {
+        target.room.on(JitsiMeetJS.events.conference.USER_JOINED, (id: any) => {
           console.log("[diag] composable USER_JOINED", id);
         });
-        target.room.on(JitsiMeetJS.events.conference.USER_LEFT, (id) => {
+        target.room.on(JitsiMeetJS.events.conference.USER_LEFT, (id: any) => {
           console.log("[diag] composable USER_LEFT", id);
           if (id != null) stageStore.removeJitsiParticipantLocally(String(id), serverTag);
         });
-        target.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e) => {
+        target.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e: any) => {
           console.log("[diag] composable CONFERENCE_JOINED", {
             myUserId: target.room?.myUserId?.(),
             e,
@@ -741,13 +746,13 @@ export const useJitsi = () => {
                 // no track arrives, JVB is withholding (subscribe-side). If it
                 // shows NO source, the publisher isn't announcing media at all
                 // (publish-side). getSources() returns a Map(mediaType -> Set).
-                const participants = (room?.getParticipants?.() || []).map((p) => {
+                const participants = (room?.getParticipants?.() || []).map((p: any) => {
                   let sources = null;
                   try {
                     const m = p.getSources?.();
                     if (m && typeof m.forEach === "function") {
                       sources = {};
-                      m.forEach((set, mediaType) => {
+                      m.forEach((set: any, mediaType: any) => {
                         sources[mediaType] = [...(set?.keys?.() || [])];
                       });
                     }
@@ -759,7 +764,7 @@ export const useJitsi = () => {
                     displayName: p.getDisplayName?.(),
                     // muted/videoType distinguish "camera off / not sending"
                     // (publish-side) from "JVB withholding live media".
-                    tracks: (p.getTracks?.() || []).map((t) => ({
+                    tracks: (p.getTracks?.() || []).map((t: any) => ({
                       type: t.getType?.(),
                       muted: t.isMuted?.(),
                       videoType: t.getVideoType?.(),
@@ -773,7 +778,7 @@ export const useJitsi = () => {
                 // LOCAL tracks (publisher side): are we actually sending, and
                 // is the camera muted? Empty here on a publisher = addTrack never
                 // ran. muted:true on the video = camera off / not sending RTP.
-                const localTracks = (room?.getLocalTracks?.() || []).map((t) => ({
+                const localTracks = (room?.getLocalTracks?.() || []).map((t: any) => ({
                   type: t.getType?.(),
                   muted: t.isMuted?.(),
                   videoType: t.getVideoType?.(),
@@ -807,7 +812,7 @@ export const useJitsi = () => {
           probe(10000);
           probe(20000);
         });
-        target.room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (...args) => {
+        target.room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (...args: any[]) => {
           console.warn("[diag] composable CONFERENCE_FAILED", ...args);
         });
 
@@ -929,14 +934,17 @@ export const useJitsi = () => {
           }
       },
     );
-    target.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, (e) => {
-      console.error("Connection failed", e);
-      markJoined(false);
-      stageStore.syncLocalJitsiParticipantId(null, serverTag);
-    });
+    target.connection.addEventListener(
+      JitsiMeetJS.events.connection.CONNECTION_FAILED,
+      (e: any) => {
+        console.error("Connection failed", e);
+        markJoined(false);
+        stageStore.syncLocalJitsiParticipantId(null, serverTag);
+      },
+    );
     target.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
-      (e) => {
+      (e: any) => {
         console.error("Connection disconnected", e);
         markJoined(false);
         stageStore.syncLocalJitsiParticipantId(null, serverTag);

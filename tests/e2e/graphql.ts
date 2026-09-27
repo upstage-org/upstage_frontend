@@ -101,6 +101,7 @@ async function loginAsAdminViaBrowser(): Promise<string> {
         throw new Error(
           "[e2e] Turnstile did not resolve during browser login fallback. " +
             "Set E2E_CAPTCHA_TOKEN in .env.test instead (copy a fresh token from the login widget after it completes).",
+          { cause: e },
         );
       }
       throw e;
@@ -127,6 +128,7 @@ export async function loginAsAdmin(): Promise<string> {
       if (captchaBlocked && cfg.captchaToken) {
         throw new Error(
           `${(err as Error).message}\n[e2e] E2E_CAPTCHA_TOKEN was set but rejected — supply a fresh Turnstile token.`,
+          { cause: err },
         );
       }
       throw err;
@@ -137,6 +139,7 @@ export async function loginAsAdmin(): Promise<string> {
       throw new Error(
         `${(err as Error).message}\n[e2e] Set E2E_CAPTCHA_TOKEN in .env.test when the backend requires Turnstile ` +
           "(test-harness only). Tokens expire quickly — copy a fresh value from the login widget after it resolves.",
+        { cause: err },
       );
     }
 

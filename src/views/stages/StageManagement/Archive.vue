@@ -161,7 +161,7 @@ export default {
             }.txt`,
           );
           content = session.publicMessages.map((item) => {
-            let line = "";
+            let line;
             if (item.clear) {
               line = "---------------- Clear Chat ----------------";
             } else {
@@ -192,7 +192,7 @@ export default {
             }.txt`,
           );
           content = session.privateMessages.map((item) => {
-            let line = "";
+            let line;
             if (item.clearPlayerChat) {
               line = "---------------- Clear Chat ----------------";
             } else {

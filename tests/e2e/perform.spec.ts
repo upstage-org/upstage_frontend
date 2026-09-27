@@ -957,10 +957,7 @@ async function runBeat({
         // exact symptom we hit), so we go through text first and parse
         // ourselves. The thrown error is labeled with `op` so the test
         // log says which fetch failed.
-        const gqlFetch = async <T,>(
-          op: string,
-          body: Record<string, unknown>,
-        ): Promise<T> => {
+        const gqlFetch = async <T>(op: string, body: Record<string, unknown>): Promise<T> => {
           const r = await fetch("/api/studio_graphql", {
             method: "POST",
             headers: gqlHeaders,
@@ -986,6 +983,7 @@ async function runBeat({
           } catch (e) {
             throw new Error(
               `[${op}] HTTP ${r.status} ${r.statusText} non-JSON body ct="${ct}" body=${JSON.stringify(snippet)} parseErr=${(e as Error).message}`,
+              { cause: e },
             );
           }
           const j = parsed as { errors?: unknown };

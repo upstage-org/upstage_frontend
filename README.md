@@ -5,8 +5,9 @@ talks GraphQL to the [backend](../upstage_backend) at `/api/studio_graphql`,
 receives live-stage traffic over MQTT WebSockets, and is deployed as a static
 `dist/` bundle served by host nginx.
 
-**Toolchain:** Node `>=22 <23` (`.nvmrc` says 22) and pnpm `>=10`
-(`packageManager: pnpm@11.1.2`; `corepack enable` gives you the right one).
+**Toolchain:** Node `>=26 <27` (`.nvmrc` says 26) and pnpm `>=10`
+(`packageManager: pnpm@12.6.0`; Node 25+ no longer bundles corepack, so
+`npm install -g corepack && corepack enable` gives you the right one).
 
 ---
 
@@ -131,7 +132,7 @@ above). The run scripts copy it into place and build:
 ./run_front_end_dev.sh --build     # or run_front_end_prod.sh
 ```
 
-`--build` runs a one-shot docker compose builder (Node 22 + pnpm, typecheck +
+`--build` runs a one-shot docker compose builder (Node 26 + pnpm, typecheck +
 `vite build`) and writes the result to **`/frontend_app_<site>/dist`** on the
 host. Nothing in this repo serves production traffic — that's nginx's job:
 

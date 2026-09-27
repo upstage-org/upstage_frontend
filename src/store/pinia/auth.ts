@@ -8,6 +8,12 @@ import {
   setRefreshToken,
   setToken,
 } from "@utils/auth";
+import {
+  hardNavigate,
+  loginUrlFor,
+  markSessionExpired,
+  MAX_TIMER_DELAY_MS,
+} from "@utils/sessionExpiry";
 import { userGraph } from "@services/graphql";
 
 /**
@@ -33,10 +39,6 @@ interface LoginResponse {
   errors?: Array<{ message?: string }>;
 }
 
-interface RefreshResponse {
-  refreshToken?: { access_token?: string; refresh_token?: string };
-}
-
 const AUTH_STORAGE_KEY = "upstage-auth";
 const LEGACY_AUTH_STORAGE_KEY = "vuex";
 
@@ -60,7 +62,12 @@ export const useAuthStore = defineStore(
      * cancels the prior timer to prevent stacking.
      */
     const REFRESH_LEAD_MS = 5 * 60 * 1000;
+    // When the server could not be reached, try again this much later (the
+    // token is still valid for the rest of the lead window).
+    const REFRESH_RETRY_MS = 30 * 1000;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    // Set once this page is on its way out (see logout()).
+    let leaving = false;
 
     const cancelRefreshTimer = (): void => {
       if (refreshTimer !== null) {
@@ -77,6 +84,13 @@ export const useAuthStore = defineStore(
       // (e.g. cold-boot resuming a token with <5 min left), fire on next
       // tick — fetchRefreshToken handles the actual server-side renewal.
       const delay = Math.max(0, exp * 1000 - Date.now() - REFRESH_LEAD_MS);
+      if (delay > MAX_TIMER_DELAY_MS) {
+        // A 30-day token is further away than a timer can wait: a longer
+        // delay overflows and fires at once, which renewed the token in a
+        // tight loop. Wait as long as possible, then look again.
+        refreshTimer = setTimeout(() => scheduleRefresh(accessToken), MAX_TIMER_DELAY_MS);
+        return;
+      }
       refreshTimer = setTimeout(() => {
         void fetchRefreshToken();
       }, delay);
@@ -154,11 +168,13 @@ export const useAuthStore = defineStore(
      * (now-empty) auth state.
      */
     const logout = (): void => {
+      // Several requests usually fail together when a session ends; only
+      // the first one navigates.
+      if (leaving) return;
+      leaving = true;
       logoutLocal();
-      const here = window.location.pathname + window.location.search;
-      const isAtRootOrLogin = !here || here === "/" || here.startsWith("/login");
-      const target = isAtRootOrLogin ? "/login" : `/login?redirect=${encodeURIComponent(here)}`;
-      window.location.href = target;
+      markSessionExpired();
+      hardNavigate(loginUrlFor(window.location.pathname + window.location.search));
     };
 
     /**
@@ -172,36 +188,41 @@ export const useAuthStore = defineStore(
      * a deliberate click should drop them on the home page instead.
      */
     const logoutToHome = (): void => {
+      if (leaving) return;
+      leaving = true;
       logoutLocal();
-      window.location.href = `${window.location.origin}/`;
+      hardNavigate(`${window.location.origin}/`);
     };
 
     /**
-     * Exchange the refresh token for a new access token. Used by the
-     * Apollo error link on `Signature has expired` / `Authenticated
-     * Failed` and by the proactive `scheduleRefresh()` timer below.
-     * Resolves with the new access token on success; on failure clears
-     * the session and bounces the user to /login (with redirect=).
+     * Renew the token pair ahead of its expiry (the `scheduleRefresh()`
+     * timer). Goes through the same single-flight refresh as the Apollo
+     * error link: the backend rotates the refresh token on every use, so
+     * two renewals racing each other would make the second one fail and
+     * log the user out for no reason.
      *
-     * The success path re-arms `scheduleRefresh` because we mutate
-     * `token.value`, which the boot-time watcher below observes.
+     * Resolves with the new access token. When the server refuses the
+     * renewal the session is over: it is cleared and the user is sent to
+     * /login (with redirect=). When the server could not be reached the
+     * session is left alone and the renewal is tried again shortly.
      */
     const fetchRefreshToken = async (): Promise<string | undefined> => {
-      try {
-        // The backend rotates the refresh token on every use and deletes the
-        // old one, so BOTH tokens must be stored or the next refresh fails.
-        const response = (await userGraph.refreshUser(undefined, {
-          "X-Access-Token": refreshToken.value,
-        })) as RefreshResponse;
-        const newToken = response?.refreshToken?.access_token;
-        if (newToken) {
-          setSession(newToken, response?.refreshToken?.refresh_token ?? refreshToken.value);
-        }
-        return newToken;
-      } catch {
+      // Imported lazily to keep the `store → apollo → store` cycle open.
+      const { refreshSessionOnce } = await import("../../apollo");
+      const outcome = await refreshSessionOnce();
+      if (outcome.status === "refreshed") {
+        // setSession() has run (apollo's persistSession) and re-armed the timer.
+        return outcome.accessToken;
+      }
+      if (outcome.status === "rejected") {
         logout();
         return undefined;
       }
+      cancelRefreshTimer();
+      refreshTimer = setTimeout(() => {
+        void fetchRefreshToken();
+      }, REFRESH_RETRY_MS);
+      return undefined;
     };
 
     // Boot-time arm: pinia-plugin-persistedstate hydrates `token.value`

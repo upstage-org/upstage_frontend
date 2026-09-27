@@ -1,8 +1,9 @@
 <script lang="tsx">
-// @ts-nocheck
 import { defineComponent } from "vue";
 import { PropType } from "vue";
 import { Editor } from "@tiptap/vue-3";
+import type {} from "@tiptap/starter-kit";
+import type {} from "@tiptap/extension-image";
 import { Button, ButtonGroup, Modal, Space } from "ant-design-vue";
 import { h } from "vue";
 import {

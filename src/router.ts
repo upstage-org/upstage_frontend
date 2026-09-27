@@ -1,3 +1,4 @@
+import { loginUrlFor } from "@utils/sessionExpiry";
 import {
   createRouter,
   createWebHistory,
@@ -184,7 +185,9 @@ router.beforeEach(
     const loggedIn: boolean = useAuthStore().loggedIn;
 
     if (to.matched.some((record) => record.meta.requireAuth) && !loggedIn) {
-      return next("/login");
+      // Same destination the auth store uses when a session ends: the login
+      // page, remembering where the user was going.
+      return next(loginUrlFor(to.fullPath));
     }
 
     if ((to.name === "Login" || to.name === "Register") && loggedIn) {

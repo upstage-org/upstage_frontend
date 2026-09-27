@@ -11,7 +11,6 @@ import {
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
 import { RetryLink } from "@apollo/client/link/retry";
-import { message } from "ant-design-vue";
 import configs from "config";
 import { getSharedAuth, setSharedAuth } from "utils/common";
 import { fetchWithTimeout, notifyNetworkError, shouldRetry } from "utils/networkResilience";
@@ -26,6 +25,13 @@ declare module "@apollo/client/core" {
 import { Media } from "models/studio";
 import { provideApolloClient } from "@vue/apollo-composable";
 import { logout } from "utils/auth";
+
+export type RefreshOutcome =
+  | { status: "refreshed"; accessToken: string }
+  /** The server refused: the session is over. */
+  | { status: "rejected" }
+  /** The server could not be reached: the session may well still be valid. */
+  | { status: "unavailable" };
 
 const REFRESHABLE_ERRORS = new Set(["Signature has expired", "Authenticated Failed"]);
 // Overall per-request deadline. Generous on purpose: slow networks should
@@ -85,11 +91,28 @@ async function persistSession(accessToken: string, refreshToken: string): Promis
  * when the refresh response carried no token, and it wrote the OLD refresh
  * token back even though the backend rotates and deletes it.)
  */
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<RefreshOutcome> | null = null;
 
-async function doRefresh(): Promise<string | null> {
+/**
+ * A refresh that failed because the server said no (a GraphQL error, or an
+ * HTTP 4xx, which is how the backend answers a refused refresh) as opposed
+ * to one that never got an answer (offline, timeout, 5xx).
+ */
+function refusedByServer(error: unknown): boolean {
+  const failure = error as {
+    graphQLErrors?: readonly unknown[];
+    networkError?: { statusCode?: number; result?: { errors?: unknown[] } } | null;
+  };
+  if (failure?.graphQLErrors?.length) return true;
+  const network = failure?.networkError;
+  if (network?.result?.errors?.length) return true;
+  const status = network?.statusCode;
+  return typeof status === "number" && status >= 400 && status < 500;
+}
+
+async function doRefresh(): Promise<RefreshOutcome> {
   const currentRefresh = getRefreshTokenForGraphql();
-  if (!currentRefresh) return null;
+  if (!currentRefresh) return { status: "rejected" };
   try {
     const { data } = await apolloClient.mutate<{
       refreshToken?: { access_token?: string; refresh_token?: string } | null;
@@ -99,15 +122,15 @@ async function doRefresh(): Promise<string | null> {
       fetchPolicy: "no-cache",
     });
     const accessToken = data?.refreshToken?.access_token;
-    if (!accessToken) return null;
+    if (!accessToken) return { status: "rejected" };
     await persistSession(accessToken, data?.refreshToken?.refresh_token ?? currentRefresh);
-    return accessToken;
-  } catch {
-    return null;
+    return { status: "refreshed", accessToken };
+  } catch (error) {
+    return { status: refusedByServer(error) ? "rejected" : "unavailable" };
   }
 }
 
-export function refreshAccessTokenOnce(): Promise<string | null> {
+export function refreshSessionOnce(): Promise<RefreshOutcome> {
   if (!refreshPromise) {
     refreshPromise = doRefresh().finally(() => {
       refreshPromise = null;
@@ -116,26 +139,51 @@ export function refreshAccessTokenOnce(): Promise<string | null> {
   return refreshPromise;
 }
 
+export async function refreshAccessTokenOnce(): Promise<string | null> {
+  const outcome = await refreshSessionOnce();
+  return outcome.status === "refreshed" ? outcome.accessToken : null;
+}
+
+/**
+ * The session is over: leave for the login page. The operation that found
+ * out neither completes nor fails, so the page being left does not flash an
+ * error for a request the user never sees the end of.
+ */
+function leaveForLogin(): Observable<never> {
+  logout();
+  return new Observable<never>(() => {});
+}
+
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors) {
     const needsRefresh = graphQLErrors.some((err) => REFRESHABLE_ERRORS.has(err.message));
-    if (needsRefresh && !operation.getContext().skipAuthRefresh && getRefreshTokenForGraphql()) {
-      return fromPromise(refreshAccessTokenOnce()).flatMap((accessToken) => {
-        if (!accessToken) {
-          logout();
-          message.error(`Token expired, could not refresh your access token. Please login again!`);
-          return new Observable<never>((observer) => {
-            observer.error(new Error("Session expired"));
+    if (needsRefresh && !operation.getContext().skipAuthRefresh) {
+      if (getRefreshTokenForGraphql()) {
+        return fromPromise(refreshSessionOnce()).flatMap((outcome) => {
+          if (outcome.status === "rejected") {
+            return leaveForLogin();
+          }
+          if (outcome.status === "unavailable") {
+            // Not an expiry: the user stays logged in and can retry.
+            notifyNetworkError();
+            return new Observable<never>((observer) => {
+              observer.error(new Error("Network connection problem — please try again."));
+            });
+          }
+          operation.setContext({
+            headers: {
+              ...operation.getContext().headers,
+              Authorization: `Bearer ${outcome.accessToken}`,
+            },
           });
-        }
-        operation.setContext({
-          headers: {
-            ...operation.getContext().headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
+          return forward(operation);
         });
-        return forward(operation);
-      });
+      }
+      if (getAccessTokenForGraphql()) {
+        // A login the server no longer accepts, and nothing to renew it with.
+        return leaveForLogin();
+      }
+      // Not logged in at all: the caller gets the error as usual.
     }
   }
   if (networkError) {

@@ -1,8 +1,52 @@
-// @ts-nocheck
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import type { Ref } from "vue";
 import * as canvasUtil from "utils/canvas";
 
-const eraseDot = (ctx, { x, y, size }) => {
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface Line extends Point {
+  fromX: number;
+  fromY: number;
+}
+
+interface Dot extends Point {
+  size: number;
+  color: string;
+  alpha?: number | null;
+}
+
+type Segment = Dot & Line;
+
+export interface DrawCommand extends Dot {
+  type: string;
+  fromX?: number;
+  fromY?: number;
+  lines?: Line[];
+}
+
+export type StrokeCommand = DrawCommand & { lines: Line[] };
+
+export interface Drawing {
+  commands?: StrokeCommand[];
+  original: { x: number; y: number; w: number; h: number };
+  w: number;
+  h: number;
+}
+
+interface DrawState {
+  lines: Line[];
+  prevX?: number;
+  prevY?: number;
+  currX?: number;
+  currY?: number;
+  flag?: boolean;
+  dot_flag?: boolean;
+}
+
+const eraseDot = (ctx: CanvasRenderingContext2D, { x, y, size }: Omit<Dot, "color">) => {
   ctx.globalCompositeOperation = "destination-out";
   // Erase is always full alpha (destination-out semantics): drawDot would
   // otherwise respect the current globalAlpha and produce partial erases,
@@ -14,7 +58,7 @@ const eraseDot = (ctx, { x, y, size }) => {
   ctx.globalCompositeOperation = "source-over";
 };
 
-const drawDot = (ctx, { x, y, size, color, alpha }) => {
+const drawDot = (ctx: CanvasRenderingContext2D, { x, y, size, color, alpha }: Dot) => {
   const previousAlpha = ctx.globalAlpha;
   if (alpha !== undefined && alpha !== null) {
     ctx.globalAlpha = alpha;
@@ -27,7 +71,10 @@ const drawDot = (ctx, { x, y, size, color, alpha }) => {
   ctx.globalAlpha = previousAlpha;
 };
 
-const draw = (ctx, { fromX, fromY, x, y, size, color, alpha }) => {
+const draw = (
+  ctx: CanvasRenderingContext2D,
+  { fromX, fromY, x, y, size, color, alpha }: Segment,
+) => {
   const previousAlpha = ctx.globalAlpha;
   if (alpha !== undefined && alpha !== null) {
     ctx.globalAlpha = alpha;
@@ -45,13 +92,13 @@ const draw = (ctx, { fromX, fromY, x, y, size, color, alpha }) => {
   ctx.globalAlpha = previousAlpha;
 };
 
-const wait = (milisecond) => new Promise((res) => setTimeout(res, milisecond));
+const wait = (milisecond: number) => new Promise((res) => setTimeout(res, milisecond));
 
 // Delay between line segments when replaying a saved drawing for the audience.
 // Tuned so a typical stroke reads as a live pen rather than an instant flicker.
 const STROKE_SEGMENT_DELAY_MS = 25;
 
-const execute = async (ctx, command, animate) => {
+const execute = async (ctx: CanvasRenderingContext2D, command: DrawCommand, animate?: boolean) => {
   const { type, size, color, alpha, lines } = command;
   if (lines && lines.length) {
     if (type === "draw") {
@@ -82,7 +129,7 @@ const execute = async (ctx, command, animate) => {
   } else {
     if (type === "draw") {
       if (command.fromX && command.fromY) {
-        draw(ctx, command);
+        draw(ctx, command as Segment);
       } else {
         drawDot(ctx, command);
       }
@@ -101,26 +148,26 @@ export const useDrawable = () => {
   // mental model.
   const alpha = ref(1);
   const mode = ref("draw");
-  const el = ref(null);
+  const el = ref<HTMLCanvasElement | null>(null);
 
-  const data = reactive({
+  const data = reactive<DrawState>({
     lines: [],
   });
 
-  const history = reactive([]);
+  const history = reactive<StrokeCommand[]>([]);
 
   const cropImageFromCanvas = () => {
-    return canvasUtil.cropImageFromCanvas(el.value);
+    return canvasUtil.cropImageFromCanvas(el.value!);
   };
 
   const getDrawedArea = () => {
-    return canvasUtil.clipDrawedArea(el.value);
+    return canvasUtil.clipDrawedArea(el.value!);
   };
 
-  const findxy = (res, e) => {
+  const findxy = (res: "down" | "up" | "move", e: PointerEvent) => {
     const { value: canvas } = el;
-    const ctx = canvas.getContext("2d");
-    const { left, top } = canvas.getBoundingClientRect();
+    const ctx = canvas!.getContext("2d")!;
+    const { left, top } = canvas!.getBoundingClientRect();
     if (res == "down") {
       data.prevX = data.currX;
       data.prevY = data.currY;
@@ -149,8 +196,8 @@ export const useDrawable = () => {
         color: color.value,
         alpha: alpha.value,
         lines: data.lines,
-        x: data.currX,
-        y: data.currY,
+        x: data.currX as number,
+        y: data.currY as number,
       });
     }
     if (res == "move") {
@@ -162,8 +209,8 @@ export const useDrawable = () => {
         const coords = {
           x: data.currX,
           y: data.currY,
-          fromX: data.prevX,
-          fromY: data.prevY,
+          fromX: data.prevX!,
+          fromY: data.prevY!,
         };
         let command = {
           type: mode.value,
@@ -260,10 +307,10 @@ export const useDrawable = () => {
 
   onMounted(attachEventLinsteners);
 
-  const clearCanvas = (clearHistory) => {
+  const clearCanvas = (clearHistory?: boolean) => {
     const { value: canvas } = el;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const ctx = canvas!.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas!.width, canvas!.height);
     if (clearHistory) {
       history.length = 0;
     }
@@ -281,7 +328,7 @@ export const useDrawable = () => {
     const canvas = document.createElement("canvas");
     canvas.width = size.value;
     canvas.height = size.value;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d")!;
     ctx.beginPath();
     const r = size.value / 2;
     ctx.arc(r, r, r, 0, Math.PI * 2, true);
@@ -319,7 +366,7 @@ export const useDrawable = () => {
   };
 };
 
-export const useRelativeCommands = (drawing) =>
+export const useRelativeCommands = (drawing: Ref<Drawing>) =>
   computed(() => {
     if (!drawing.value.commands) {
       return [];
@@ -340,17 +387,17 @@ export const useRelativeCommands = (drawing) =>
     }));
   });
 
-export const useDrawing = (drawing) => {
-  const el = ref(null);
+export const useDrawing = (drawing: Ref<Drawing>) => {
+  const el = ref<HTMLCanvasElement | null>(null);
   const commands = useRelativeCommands(drawing);
 
-  const draw = async (newDrawing, oldDrawing) => {
+  const draw = async (newDrawing?: Drawing, oldDrawing?: Drawing) => {
     if (!drawing.value) return;
     const { value: canvas } = el;
-    canvas.width = drawing.value.w;
-    canvas.height = drawing.value.h;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas!.width = drawing.value.w;
+    canvas!.height = drawing.value.h;
+    const ctx = canvas!.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas!.width, canvas!.height);
     for (let i = 0; i < commands.value.length; i++) {
       const command = commands.value[i];
       let shouldAnimate = true;

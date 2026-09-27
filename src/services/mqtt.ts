@@ -1,4 +1,3 @@
-// @ts-nocheck
 import config from "config";
 import { v4 as uuidv4 } from "uuid";
 // mqtt v5's browser ESM bundle (./dist/mqtt.esm.js) ships ONLY a default
@@ -8,11 +7,39 @@ import { v4 as uuidv4 } from "uuid";
 // inside buildClient(), no WS is opened, and mosquitto stats stay at 0.
 // Pull the default and read connect off it.
 import mqtt from "mqtt";
+import type { ISubscriptionGrant, ISubscriptionMap, MqttClient, Packet } from "mqtt";
 const { connect } = mqtt;
 import { namespaceTopic, unnamespaceTopic } from "@utils/mqttTopics";
 import { isJson } from "utils/common";
 
-export default function buildClient() {
+export interface MqttCredentials {
+  username?: string | null;
+  password?: string | null;
+}
+
+export interface MqttService {
+  client: MqttClient | null;
+  _connectPromise: Promise<void> | null;
+  _connectResolve: (() => void) | null;
+  _connectReject?: ((reason?: unknown) => void) | null;
+  connect(credentials?: unknown): MqttClient | null;
+  whenConnected(timeoutMs?: number): Promise<void>;
+  disconnect(): Promise<unknown>;
+  subscribe(
+    topics: Record<string, any>,
+    stageUrl?: string,
+  ): Promise<ISubscriptionGrant[] | undefined>;
+  sendMessage(
+    topic: string,
+    payload: any,
+    namespaced?: boolean,
+    retain?: boolean,
+  ): Promise<Packet | undefined>;
+  sendMessageSync(topic: string, payload: any, namespaced?: boolean, retain?: boolean): void;
+  receiveMessage(handler: (payload: { topic: string; message: any }) => void): void;
+}
+
+export default function buildClient(): MqttService {
   return {
     client: null,
     _connectPromise: null,
@@ -22,7 +49,7 @@ export default function buildClient() {
     // password back in the bundle. Synchronous on purpose: every caller already
     // holds the stage object, so there is no fetch to await here and the
     // wake-recovery callbacks stay synchronous.
-    connect(credentials) {
+    connect(credentials?: MqttCredentials | null) {
       const { url, ...options } = config.MQTT_CONNECTION;
       const connectUrl = url;
       if (!connectUrl || typeof connectUrl !== "string") {
@@ -54,11 +81,11 @@ export default function buildClient() {
         }
         this.client = null;
       }
-      this._connectPromise = new Promise((resolve, reject) => {
+      this._connectPromise = new Promise<void>((resolve, reject) => {
         this._connectResolve = resolve;
         this._connectReject = reject;
       });
-      this.client = connect(connectUrl, {
+      this.client = connect(connectUrl as string, {
         ...options,
         username: credentials.username,
         password: credentials.password,
@@ -86,23 +113,23 @@ export default function buildClient() {
       }
       const connectPromise =
         this._connectPromise ||
-        new Promise((resolve) => {
+        new Promise<void>((resolve) => {
           const onConnect = () => {
-            this.client.removeListener("connect", onConnect);
-            this.client.removeListener("close", onClose);
+            this.client!.removeListener("connect", onConnect);
+            this.client!.removeListener("close", onClose);
             resolve();
           };
           const onClose = () => {
-            this.client.removeListener("connect", onConnect);
-            this.client.removeListener("close", onClose);
+            this.client!.removeListener("connect", onConnect);
+            this.client!.removeListener("close", onClose);
           };
-          this.client.once("connect", onConnect);
-          this.client.once("close", onClose);
+          this.client!.once("connect", onConnect);
+          this.client!.once("close", onClose);
         });
       if (timeoutMs <= 0) {
         return connectPromise;
       }
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error("[MQTT] Connection timeout.")), timeoutMs);
       });
       return Promise.race([connectPromise, timeoutPromise]);
@@ -110,19 +137,19 @@ export default function buildClient() {
     disconnect() {
       if (!this.client) return Promise.resolve();
       return new Promise((resolve) => {
-        this.client.end(false, {}, resolve);
+        this.client!.end(false, {}, resolve);
       });
     },
-    subscribe(topics, stageUrl?) {
+    subscribe(topics: Record<string, any>, stageUrl?: string) {
       if (!this.client) {
         return Promise.reject(new Error("[MQTT] Not connected. Call connect() first."));
       }
-      const namespacedTopics = {};
+      const namespacedTopics: ISubscriptionMap = {};
       Object.keys(topics).forEach(
         (key) => (namespacedTopics[namespaceTopic(key, stageUrl)] = topics[key]),
       );
       return new Promise((resolve, reject) => {
-        this.client.subscribe(namespacedTopics, (error, res) => {
+        this.client!.subscribe(namespacedTopics, (error, res) => {
           if (error) {
             reject(error);
           } else {
@@ -131,7 +158,7 @@ export default function buildClient() {
         });
       });
     },
-    sendMessage(topic, payload, namespaced = false, retain = false) {
+    sendMessage(topic: string, payload: any, namespaced = false, retain = false) {
       if (!this.client) {
         return Promise.reject(
           new Error("[MQTT] Not connected. Call connect() first or check MQTT connection."),
@@ -146,7 +173,7 @@ export default function buildClient() {
       }
       console.log(topic, message);
       return new Promise((resolve, reject) => {
-        this.client.publish(topic, message, { qos: 1, retain }, (error, res) => {
+        this.client!.publish(topic, message, { qos: 1, retain }, (error, res) => {
           if (error) {
             reject(error);
           } else {
@@ -162,7 +189,7 @@ export default function buildClient() {
     // mqtt.js client buffers it but realistically it just gets dropped.
     // Better than the awaited sendMessage path, which would block on a
     // Promise that never resolves before the browser kills the JS VM.
-    sendMessageSync(topic, payload, namespaced = false, retain = false) {
+    sendMessageSync(topic: string, payload: any, namespaced = false, retain = false) {
       if (!this.client) return;
       if (!namespaced) {
         topic = namespaceTopic(topic);
@@ -177,7 +204,7 @@ export default function buildClient() {
         console.warn("[MQTT] sendMessageSync failed:", err);
       }
     },
-    receiveMessage(handler) {
+    receiveMessage(handler: (payload: { topic: string; message: any }) => void) {
       if (!this.client) return;
       this.client.on("message", (topic, rawMessage) => {
         topic = unnamespaceTopic(topic);

@@ -1,6 +1,6 @@
-// @ts-nocheck
 import { onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import type { JitsiTrack } from "@stores/pinia/stage";
 import { isJitsiBoardType, resolveJitsiOrigin } from "@utils/common";
 import configs from "config";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
@@ -180,7 +180,7 @@ export function useLocalStreamPublisher(
         console.warn("room.addTrack failed:", err);
         continue;
       }
-      stageStore.addTrack(t);
+      stageStore.addTrack(t as JitsiTrack);
     }
   };
 
@@ -363,7 +363,7 @@ export function useLocalStreamPublisher(
         }
         try {
           await jitsi.room.addTrack(t);
-          stageStore.addTrack(t);
+          stageStore.addTrack(t as JitsiTrack);
         } catch (err) {
           console.warn("room.addTrack failed:", err);
         }
