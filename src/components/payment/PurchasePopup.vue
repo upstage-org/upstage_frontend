@@ -1,11 +1,10 @@
 <script>
-import { computed, ref, watch, onBeforeMount } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import { paymentGraph } from "services/graphql";
 import { useMutation } from "services/graphql/composable";
 import { message } from "ant-design-vue";
-import { loadStripe } from "@stripe/stripe-js";
 import { StripeElements, StripeElement } from "vue-stripe-js";
 import Turnstile from "vue-turnstile";
 import config from "config";
@@ -56,7 +55,6 @@ export default {
       donorName.value = "";
     };
 
-    const stripe = ref(null);
     const elementsComponent = ref();
     const paymentComponent = ref();
     const stripeOptions = ref({});
@@ -68,9 +66,9 @@ export default {
     });
     const paymentElementOptions = ref({});
 
-    onBeforeMount(async () => {
-      stripe.value = await loadStripe(config.STRIPE_KEY);
-    });
+    // Stripe.js is loaded by <StripeElements> (via `stripe-key`) the first
+    // time the popup opens with a client secret. The previous eager
+    // `loadStripe()` here pulled the 200 KB script on every public page.
 
     const { mutation: paymentSecret } = useMutation(paymentGraph.paymentSecret);
     const { mutation: generateReceiptMutation } = useMutation(paymentGraph.generateReceipt);
@@ -200,7 +198,6 @@ export default {
       amount,
       loading,
       donateToUpstage,
-      stripe,
       stripeKey: config.STRIPE_KEY,
       stripeOptions,
       elementsOptions,

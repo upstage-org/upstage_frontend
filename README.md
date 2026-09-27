@@ -168,7 +168,6 @@ site's env instead of building (dev :3001 / prod :3002).
 | Lint / format              | `pnpm lint` / `pnpm format`                                              |
 | Full local gate (pre-push) | `pnpm verify` (typecheck + test + `pnpm audit`)                          |
 | End-to-end (Playwright)    | `pnpm e2e`, `pnpm e2e:features`, `pnpm e2e:perform`, `pnpm e2e:smoke`, … |
-| GraphQL codegen            | `pnpm codegen` (schema from `GRAPHQL_SCHEMA_URL` or `./schema.graphql`)  |
 
 The e2e suite is documented in [tests/e2e/README.md](tests/e2e/README.md): it
 runs against a **disposable** backend + `upstage_e2e` database on

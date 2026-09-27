@@ -1,7 +1,7 @@
 <script>
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
-import { assign, get, debounce } from "lodash";
+import { assign, get, debounce } from "lodash-es";
 import { editingMediaVar } from "apollo";
 import Modal from "components/Modal.vue";
 import Loading from "components/Loading.vue";

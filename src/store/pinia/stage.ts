@@ -3507,9 +3507,11 @@ export const useStageStore = defineStore(
 
     async function reloadPermission() {
       if (!model.value?.fileLocation) return;
-      const { stage } = await stageGraph.loadStage(model.value.fileLocation);
-      if (stage && model.value) {
-        model.value.permission = stage.permission;
+      // Only the caller's permission is wanted; loadStage would refetch the
+      // whole model (assets, scenes, events) for that one field.
+      const permission = await stageGraph.loadPermission(model.value.fileLocation);
+      if (permission !== undefined && model.value) {
+        model.value.permission = permission;
       }
     }
 

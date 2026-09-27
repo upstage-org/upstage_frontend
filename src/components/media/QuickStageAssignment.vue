@@ -8,7 +8,7 @@ import { compareByLabel } from "utils/common";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 import MediaPreview from "./MediaPreview.vue";
-import { uniq } from "lodash";
+import { uniq } from "lodash-es";
 
 const props = defineProps({
   media: {

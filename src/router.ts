@@ -53,11 +53,17 @@ const routes: RouteRecordRaw[] = [
     name: "Replay Recording",
     component: () => import("views/replay/Layout.vue"),
   },
-  {
-    path: "/playground",
-    name: "Playground",
-    component: () => import("views/Playground.vue"),
-  },
+  // Developer sandbox: not part of the product, so it is only registered in
+  // dev builds (production bundles neither route nor chunk it).
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: "/playground",
+          name: "Playground",
+          component: () => import("views/Playground.vue"),
+        },
+      ]
+    : []),
   {
     // Standalone chat view: same MQTT topic as the main stage, but
     // renders only the chat panes so mobile audience members (and

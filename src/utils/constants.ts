@@ -82,7 +82,7 @@ export const MEDIA_COPYRIGHT_LEVELS = [
   },
   {
     value: 2,
-    name: "🔑 Use with permission",
+    name: "🔐 Use with permission",
     description:
       "Other players must ask the owner for permission if they want to use the media item",
   },

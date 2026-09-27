@@ -1,10 +1,11 @@
 <script>
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import { computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { animate } from "animejs";
 import Icon from "components/Icon.vue";
 import Linkify from "components/Linkify.vue";
+import { useSharedClock } from "@composables/useSharedClock";
 import {
   isHoldableBoardObject,
   isLocalHoldOfBoardObject,
@@ -39,20 +40,8 @@ export default {
 
     const config = computed(() => stageStore.config);
 
-    const now = ref(Date.now());
-    let timer = null;
-
-    onMounted(() => {
-      timer = setInterval(() => {
-        now.value = Date.now();
-      }, 1000);
-    });
-
-    onUnmounted(() => {
-      if (timer) {
-        clearInterval(timer);
-      }
-    });
+    // Shared 1 Hz clock (one interval for the whole board, not one per object).
+    const now = useSharedClock();
 
     const enter = (el, complete) => {
       let pos = outOfViewportPosition(el);

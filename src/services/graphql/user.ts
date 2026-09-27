@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { gql } from "@apollo/client/core";
 import { studioClient } from "../graphql";
-import _ from "lodash";
+import { isNil, omitBy } from "lodash-es";
 
 export const userFragment = gql`
   fragment userFragment on User {
@@ -145,7 +145,7 @@ export default {
         ${userFragment}
       `,
       {
-        ..._.omitBy(variables, _.isNil),
+        ...omitBy(variables, isNil),
         ...(variables.role ? { role: parseInt(variables.role) } : {}),
         binName: "",
       },
