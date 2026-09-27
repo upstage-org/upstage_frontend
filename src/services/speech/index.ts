@@ -1,10 +1,12 @@
-// @ts-nocheck
 import { getDefaultVoice, isValidVoice } from "./voice";
 
 const { loadVoice, speak, stop } = (window as any).meSpeak;
 
-export const avatarSpeak = (avatar, message: string) => {
-  const params = {};
+type SpeakParams = { variant?: string; amplitude?: number; pitch?: number; speed?: number };
+
+// A board avatar object; only `voice` and `speak.behavior` are read here.
+export const avatarSpeak = (avatar: Record<string, any>, message: string) => {
+  const params: SpeakParams = {};
   if (avatar.voice && avatar.voice.voice) {
     const { voice, variant, amplitude, pitch, speed } = avatar.voice;
     params.variant = variant;
@@ -14,7 +16,7 @@ export const avatarSpeak = (avatar, message: string) => {
         return;
       }
       if (avatar.speak.behavior === "shout") {
-        params.amplitude *= 5;
+        params.amplitude = (params.amplitude ?? 100) * 5;
       }
     }
     params.pitch = pitch;

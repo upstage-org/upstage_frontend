@@ -9,9 +9,9 @@
  * keeping the formatting tags the text tool produces (`<b>`, `<i>`, `<u>`,
  * `<div>`, `<br>`, `<font>`, `<span style>`).
  */
-import DOMPurify from "dompurify";
+import DOMPurify, { type Config } from "dompurify";
 
-const RICH_TEXT_OPTIONS: DOMPurify.Config = {
+const RICH_TEXT_OPTIONS: Config = {
   USE_PROFILES: { html: true },
   // Links must never re-target the opener or run script.
   ADD_ATTR: ["target"],
@@ -33,7 +33,9 @@ if (typeof window !== "undefined") {
 /** Sanitise rich text (contenteditable HTML, foyer config) for `innerHTML` / `v-html`. */
 export function sanitizeRichText(html: unknown): string {
   if (html == null) return "";
-  return DOMPurify.sanitize(String(html), RICH_TEXT_OPTIONS);
+  // `RETURN_TRUSTED_TYPE` is off, so the result is a plain string; the ESM
+  // typings widen it to `string | TrustedHTML`.
+  return String(DOMPurify.sanitize(String(html), RICH_TEXT_OPTIONS));
 }
 
 /** Escape a plain string so it can be interpolated into HTML as text. */

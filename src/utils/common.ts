@@ -1,4 +1,3 @@
-// @ts-nocheck
 import configs from "config";
 import { escapeHtml } from "./sanitizeHtml";
 import { SharedAuth } from "models/config";
@@ -332,7 +331,7 @@ export function linkify(inputText: string) {
   return replacedText;
 }
 
-export function outOfViewportPosition(el) {
+export function outOfViewportPosition(el: Element) {
   const rect = el.getBoundingClientRect();
   if (rect.top < 0) {
     return "top";
@@ -348,9 +347,9 @@ export function outOfViewportPosition(el) {
   }
   return false;
 }
-export function throttle(callback, limit) {
+export function throttle<T extends (...args: any[]) => void>(callback: T, limit: number) {
   let wait = false;
-  return function (...args) {
+  return function (this: unknown, ...args: Parameters<T>) {
     if (!wait) {
       callback.call(this, ...args);
       wait = true;
@@ -406,7 +405,7 @@ export function coerceNumber(
   return v;
 }
 
-export function handleError(e) {
+export function handleError(e: any) {
   console.log("====e", e);
   if (e & e.response?.errors && e.response?.errors[0] && e.response?.errors[0].message) {
     message.error(e.response?.errors[0].message);

@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const TOPICS = {
   CHAT: "chat",
   BOARD: "board",
@@ -97,22 +96,24 @@ export const MEDIA_COPYRIGHT_LEVELS = [
 export const imageExtensions = ".svg,.jpg,.jpeg,.png,.gif";
 export const audioExtensions = ".wav,.mpeg,.mp3,.aac,.aacp,.ogg,.webm,.flac,.m4a";
 export const videoExtensions = ".mp4,.webm,.opgg,.3gp,.flv";
+type Orderable = { name: string; createdOn: string | number | Date };
+
 export const orderTitle = [
   {
     label: "Newest",
-    value: (a, b) => {
-      return new Date(b.createdOn) - new Date(a.createdOn);
+    value: (a: Orderable, b: Orderable) => {
+      return new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime();
     },
   },
   {
     label: "Latest",
-    value: (a, b) => {
-      return new Date(a.createdOn) - new Date(b.createdOn);
+    value: (a: Orderable, b: Orderable) => {
+      return new Date(a.createdOn).getTime() - new Date(b.createdOn).getTime();
     },
   },
   {
     label: "A → Z",
-    value: (a, b) => {
+    value: (a: Orderable, b: Orderable) => {
       let fa = a.name.toLowerCase();
       let fb = b.name.toLowerCase();
 
@@ -127,7 +128,7 @@ export const orderTitle = [
   },
   {
     label: "Z ← A",
-    value: (a, b) => {
+    value: (a: Orderable, b: Orderable) => {
       let fa = a.name.toLowerCase();
       let fb = b.name.toLowerCase();
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { gql } from "@apollo/client/core";
 import { studioClient } from "../graphql";
 import { isNil, omitBy } from "lodash-es";
@@ -20,7 +19,7 @@ export const userFragment = gql`
 `;
 
 export default {
-  login: (variables) =>
+  login: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation login($username: String!, $password: String!, $token: String) {
@@ -41,7 +40,7 @@ export default {
       `,
       variables,
     ),
-  refreshUser: (variables, headers) =>
+  refreshUser: (variables: Record<string, any> = {}, headers?: Record<string, string>) =>
     studioClient.request(
       gql`
         mutation {
@@ -74,7 +73,7 @@ export default {
       }
     `),
 
-  createUser: (variables) =>
+  createUser: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation CreateUser(
@@ -106,7 +105,7 @@ export default {
       `,
       variables,
     ),
-  updateUser: (variables) =>
+  updateUser: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation UpdateUser(
@@ -146,7 +145,7 @@ export default {
       `,
       {
         ...omitBy(variables, isNil),
-        ...(variables.role ? { role: parseInt(variables.role) } : {}),
+        ...(variables.role ? { role: parseInt(String(variables.role)) } : {}),
         binName: "",
       },
     ),
@@ -161,7 +160,7 @@ export default {
       ${userFragment}
     `),
 
-  changePassword: (variables) =>
+  changePassword: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation ChangePassword($id: ID!, $oldPassword: String!, $newPassword: String!) {
@@ -173,7 +172,7 @@ export default {
       `,
       variables,
     ),
-  requestPasswordReset: (variables) =>
+  requestPasswordReset: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation RequestPasswordReset($usernameOrEmail: String!) {
@@ -184,7 +183,7 @@ export default {
       `,
       variables,
     ),
-  verifyPasswordReset: (variables) =>
+  verifyPasswordReset: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation verifyPasswordReset($email: String!, $token: String!) {
@@ -195,7 +194,7 @@ export default {
       `,
       variables,
     ),
-  passwordReset: (variables) =>
+  passwordReset: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation resetPassword($email: String!, $token: String!, $password: String) {

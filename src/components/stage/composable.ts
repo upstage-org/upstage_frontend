@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { onUnmounted, ref } from "vue";
 import buildClient from "services/mqtt";
 import { BACKGROUND_ACTIONS, COLORS, TOPICS } from "utils/constants";
@@ -11,10 +10,9 @@ import { namespaceTopic } from "store/modules/stage/reusable";
 // caller that could not supply a credential, since it had no stage payload.
 // Removed rather than left as broken dead code.
 
-export const useShortcut = (callback) => {
-  const shortcutHandler = (e) => {
-    if (!e) e = window.event;
-    callback(e);
+export const useShortcut = (callback: (e: KeyboardEvent) => void) => {
+  const shortcutHandler = (e: KeyboardEvent) => {
+    callback(e ?? (window.event as KeyboardEvent));
   };
 
   window.addEventListener("keydown", shortcutHandler);
@@ -27,8 +25,8 @@ export const useShortcut = (callback) => {
 export const useHoldingShift = () => {
   const isHoldingShift = ref(false);
 
-  const callback = (e) => {
-    if (!e) e = window.event;
+  const callback = (event: KeyboardEvent) => {
+    const e = event ?? (window.event as KeyboardEvent);
     if (e.shiftKey) {
       isHoldingShift.value = true;
     } else {
@@ -47,13 +45,17 @@ export const useHoldingShift = () => {
 };
 
 // `credentials` is the `mqtt` field off the stage the caller already loaded.
-export const useClearStage = (stageUrl, color, credentials) => {
+export const useClearStage = (
+  stageUrl: string,
+  color: string | null | undefined,
+  credentials: Parameters<ReturnType<typeof buildClient>["connect"]>[0],
+) => {
   const mqttClient = buildClient();
   const clearStage = async () => {
     const client = mqttClient.connect(credentials);
     if (!client) return;
     await new Promise((resolve) => {
-      client.on("connect", () => {
+      (client as { on: (event: string, cb: () => void) => void }).on("connect", () => {
         mqttClient
           .sendMessage(
             namespaceTopic(TOPICS.BACKGROUND, stageUrl),

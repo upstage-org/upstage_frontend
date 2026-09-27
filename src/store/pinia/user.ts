@@ -99,7 +99,7 @@ export const useUserStore = defineStore("user", () => {
 
   // -- actions --
 
-  const updateUserProfile = async (payload: unknown): Promise<UserData | undefined> => {
+  const updateUserProfile = async (payload: Record<string, any>): Promise<UserData | undefined> => {
     loadingUser.value = true;
     try {
       const { updateUser } = (await userGraph.updateUser(payload)) as { updateUser: UserData };
