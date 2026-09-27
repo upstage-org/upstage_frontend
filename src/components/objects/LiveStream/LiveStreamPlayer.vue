@@ -92,6 +92,13 @@ let stallTimer: number | null = null;
 let whepSessionFrames = 0;
 let whepBroken = false;
 let disposed = false;
+// Every connect() takes a fresh number; a connect still in flight when a
+// newer one starts (retry timer, late-audio reconnect, Refresh streams)
+// finds its number stale, closes what it opened and stops without touching
+// the newer session's state. Before this the older attempt kept going and
+// its RTCPeerConnection was never closed.
+let connectSeq = 0;
+class SupersededError extends Error {}
 
 const streamKey = () => props.object.fileLocation ?? "";
 // The MediaMTX this feed lives on. Feeds created before multi-server
@@ -222,7 +229,7 @@ function waitForTrack(connection: WhepConnection): Promise<void> {
   });
 }
 
-async function tryWhep(key: string): Promise<void> {
+async function tryWhep(key: string, seq: number): Promise<void> {
   let connection: WhepConnection;
   try {
     // The Opus mirror is the WebRTC-audible twin of the feed (the raw
@@ -235,6 +242,10 @@ async function tryWhep(key: string): Promise<void> {
     // AAC feeds to HLS so they aren't left silent.
     connection = await connectWhep(key, origin.value);
   }
+  if (seq !== connectSeq) {
+    await connection.close();
+    throw new SupersededError();
+  }
   whep = connection;
   await waitForTrack(connection);
   if (disposed || !video.value) {
@@ -242,7 +253,17 @@ async function tryWhep(key: string): Promise<void> {
     whep = null;
     return;
   }
+  if (seq !== connectSeq) {
+    await connection.close();
+    if (whep === connection) whep = null;
+    throw new SupersededError();
+  }
   if (!connection.hasAudio && (await hlsStreamHasAudio(key, origin.value))) {
+    if (seq !== connectSeq) {
+      await connection.close();
+      if (whep === connection) whep = null;
+      throw new SupersededError();
+    }
     // The source has audio but WHEP dropped it (AAC over WebRTC).
     // Throwing sends connect() down its existing HLS fallback path,
     // which carries the AAC audio at the cost of a little latency.
@@ -314,15 +335,27 @@ function tryHls(key: string): Promise<void> {
     if (Hls.isSupported()) {
       const instance = new Hls({ lowLatencyMode: true });
       hls = instance;
+      let started = false;
       instance.on(Hls.Events.MANIFEST_PARSED, () => {
+        started = true;
         state.value = "live";
         ensurePlaying();
         resolve();
       });
       instance.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
+        if (!data.fatal) return;
+        if (!started) {
           reject(new StreamOfflineError(key));
+          return;
         }
+        // Fatal after playback began (publisher stopped, manifest gone):
+        // hls.js gives up on its own, so the tile used to freeze on the
+        // last frame. Tear down and poll for the feed like a WHEP drop.
+        if (disposed || hls !== instance) return;
+        console.info("[stage] live stream HLS session ended; waiting for the feed to return");
+        void teardown().then(() => {
+          if (!disposed) scheduleRetry();
+        });
       });
       instance.loadSource(url);
       instance.attachMedia(el);
@@ -347,6 +380,7 @@ function tryHls(key: string): Promise<void> {
 
 async function connect() {
   if (disposed) return;
+  const seq = ++connectSeq;
   const key = streamKey();
   if (!key) {
     state.value = "waiting";
@@ -367,8 +401,10 @@ async function connect() {
     return;
   }
   try {
-    await tryWhep(key);
+    await tryWhep(key, seq);
   } catch (whepError) {
+    // A newer connect() owns the player now; leave its session alone.
+    if (whepError instanceof SupersededError) return;
     await teardown();
     if (disposed) return;
     if (whepError instanceof StreamOfflineError) {

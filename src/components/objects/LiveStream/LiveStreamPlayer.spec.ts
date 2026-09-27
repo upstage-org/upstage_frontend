@@ -263,7 +263,7 @@ describe("LiveStreamPlayer WHEP stall watchdog", () => {
 describe("LiveStreamPlayer per-feed MediaMTX origin", () => {
   it("connects WHEP and HLS to the feed's own server", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
-    await mountPlaying(true, {
+    const wrapper = await mountPlaying(true, {
       id: "obj2",
       fileLocation: "key2",
       description: JSON.stringify({ isRTMP: true, rtmpEndpoint: "https://rtmp2.test" }),
@@ -273,24 +273,112 @@ describe("LiveStreamPlayer per-feed MediaMTX origin", () => {
     expect(fakeHlsInstances[0].loadSource).toHaveBeenCalledWith(
       "https://rtmp2.test/live/key2/index.m3u8",
     );
+    wrapper.unmount();
   });
 
   it("uses the default server for legacy feeds without a bound server", async () => {
-    await mountPlaying(true, {
+    const wrapper = await mountPlaying(true, {
       id: "obj3",
       fileLocation: "key3",
       description: JSON.stringify({ isRTMP: true }),
     });
     expect(connectWhep).toHaveBeenCalledWith("key3-opus", "https://rtmp1.test");
+    wrapper.unmount();
   });
 
   it("falls back to the default server when the bound server is no longer configured", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    await mountPlaying(true, {
+    const wrapper = await mountPlaying(true, {
       id: "obj4",
       fileLocation: "key4",
       description: JSON.stringify({ isRTMP: true, rtmpEndpoint: "https://gone.test" }),
     });
     expect(connectWhep).toHaveBeenCalledWith("key4-opus", "https://rtmp1.test");
+    wrapper.unmount();
+  });
+});
+
+/**
+ * connect() re-entrancy and post-start HLS failure. A connect still in
+ * flight when a newer one starts must close what it opened and leave the
+ * newer session alone; a fatal hls.js error after playback began must
+ * tear down and poll for the feed instead of freezing on the last frame.
+ */
+describe("LiveStreamPlayer overlapping connects and late HLS failure", () => {
+  it("an older in-flight WHEP connect closes its own session instead of overwriting the newer one", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    let frames = 1;
+    framesDecoded.mockImplementation(async () => (frames += 30));
+    // First connect: WHEP negotiation hangs until we release it.
+    const first: { release: (() => void) | null } = { release: null };
+    const firstClose = vi.fn(async () => {});
+    connectWhep.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          first.release = () =>
+            resolve({
+              stream: { getTracks: () => [{}], getVideoTracks: () => [{}] },
+              pc: { connectionState: "connected", addEventListener: () => undefined },
+              hasAudio: true,
+              close: firstClose,
+            } as never);
+        }),
+    );
+    const wrapper = await mountPlaying();
+    expect(connectWhep).toHaveBeenCalledTimes(1);
+
+    // Refresh streams while the first negotiation is still pending: the
+    // second connect completes normally.
+    stageStoreMock().forceReloadStreams = new Date();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(connectWhep).toHaveBeenCalledTimes(2);
+    expect(whepClose).not.toHaveBeenCalled();
+
+    // Now the stale first negotiation resolves: it must close itself and
+    // must not tear down the live second session or start HLS.
+    first.release?.();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(firstClose).toHaveBeenCalledTimes(1);
+    expect(whepClose).not.toHaveBeenCalled();
+    expect(fakeHlsInstances).toHaveLength(0);
+    // The live session keeps its watchdog: no reconnect on the retry cadence.
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(connectWhep).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it("a fatal HLS error after playback started tears down and retries the feed", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const wrapper = await mountPlaying();
+    // Stalled WHEP → HLS fallback (as in the watchdog tests above).
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(fakeHlsInstances).toHaveLength(1);
+    const first = fakeHlsInstances[0];
+    first.handlers["mp"]?.("mp", {});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(first.destroy).not.toHaveBeenCalled();
+
+    // Publisher stops: hls.js reports a fatal error and gives up.
+    first.handlers["err"]?.("err", { fatal: true });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(first.destroy).toHaveBeenCalledTimes(1);
+    // One retry interval later a fresh HLS session is attempted.
+    await vi.advanceTimersByTimeAsync(5000 + 50);
+    expect(fakeHlsInstances).toHaveLength(2);
+    expect(fakeHlsInstances[1].loadSource).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("a non-fatal HLS error after start is ignored", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const wrapper = await mountPlaying();
+    await vi.advanceTimersByTimeAsync(8000);
+    const first = fakeHlsInstances[0];
+    first.handlers["mp"]?.("mp", {});
+    first.handlers["err"]?.("err", { fatal: false });
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(first.destroy).not.toHaveBeenCalled();
+    expect(fakeHlsInstances).toHaveLength(1);
+    wrapper.unmount();
   });
 });

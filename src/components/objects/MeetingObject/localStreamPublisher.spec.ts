@@ -196,3 +196,37 @@ describe("useLocalStreamPublisher — toolbar preview survival", () => {
     expect(jitsi.localTracks.value).toContain(fresh[0]);
   });
 });
+
+describe("useLocalStreamPublisher — unmount while getUserMedia is pending", () => {
+  it("disposes tracks that resolve after route teardown so the camera does not stay on", async () => {
+    const pair = [fakeTrack("audio"), fakeTrack("video")];
+    let release: ((tracks: FakeTrack[]) => void) | null = null;
+    mocks.createLocalTracks.mockImplementation(
+      () =>
+        new Promise<FakeTrack[]>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const { wrapper, jitsi } = mountPublisher();
+    await flushPromises();
+    expect(mocks.createLocalTracks).toHaveBeenCalledTimes(1);
+
+    // Navigate away before the browser answered the permission prompt.
+    wrapper.unmount();
+    mountedWrappers.pop();
+    (release as unknown as (tracks: FakeTrack[]) => void)(pair);
+    await flushPromises();
+
+    for (const t of pair) expect(t.dispose).toHaveBeenCalledTimes(1);
+    expect(jitsi.localTracks.value).toHaveLength(0);
+  });
+
+  it("keeps tracks that resolve while still mounted (unchanged path)", async () => {
+    const pair = [fakeTrack("audio"), fakeTrack("video")];
+    mocks.createLocalTracks.mockResolvedValue(pair);
+    const { jitsi } = mountPublisher();
+    await flushPromises();
+    for (const t of pair) expect(t.dispose).not.toHaveBeenCalled();
+    expect(jitsi.localTracks.value).toHaveLength(2);
+  });
+});

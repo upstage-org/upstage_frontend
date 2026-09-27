@@ -94,6 +94,10 @@ export function useLocalStreamPublisher(
     }
   };
 
+  // Set by onUnmounted; a getUserMedia call still pending at that point
+  // must not hand its tracks to a publisher that no longer exists.
+  let unmounted = false;
+
   const releaseLocalTracks = () => {
     pendingPublish.value = false;
     published.value = false;
@@ -269,6 +273,19 @@ export function useLocalStreamPublisher(
         ms: Math.round(performance.now() - gumStartedAt),
         types: newTracks.map((t) => t.type),
       });
+      if (unmounted) {
+        // Route teardown ran while getUserMedia was pending: onUnmounted
+        // already released the previous tracks, so keeping these would
+        // leave the camera light on with nothing to publish them.
+        for (const t of newTracks) {
+          try {
+            (t as { dispose?: () => void }).dispose?.();
+          } catch (e) {
+            console.warn("Disposing local track acquired after unmount:", e);
+          }
+        }
+        return;
+      }
       for (const old of tracks) {
         try {
           (old as { dispose?: () => void }).dispose?.();
@@ -504,6 +521,7 @@ export function useLocalStreamPublisher(
   //   * The board-state watcher above (own-jitsi tile removed from board).
 
   onUnmounted(() => {
+    unmounted = true;
     if (deviceEvents && mediaDevicesAPI?.removeEventListener) {
       mediaDevicesAPI.removeEventListener(deviceEvents.DEVICE_LIST_CHANGED, onDeviceListChanged);
     }

@@ -1071,6 +1071,12 @@ export const useStageStore = defineStore(
       if (cleanModel) {
         model.value = null;
         tools.value.audios = [];
+        // SET_MODEL pushes onto these buckets, so without a reset the next
+        // stage's Streams palette listed the previous stage's meetings too,
+        // and audioPlayers (indexed alongside tools.audios) kept stale
+        // positions for tracks that no longer existed.
+        tools.value.meetings = [];
+        audioPlayers.value = [];
       }
       status.value = "OFFLINE";
       // Per-stage presence state. Left over from stage A it was counted in

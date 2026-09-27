@@ -268,11 +268,19 @@ export const useJitsi = () => {
    * `initLib` runs `JitsiMeetJS.init` exactly as the old code did for the
    * first session; extra sessions must not re-init the global lib.
    */
+  // Set once the component unmounts (below); `startSession` consults it
+  // after its only await so a connection is never created for a stage the
+  // user has already left.
+  let unmounted = false;
+
   const createJitsiSession = ({ origin, stageUrl, target, initLib }) => {
     const session = {
       origin,
       target,
       joined: ref(false),
+      // True once `leave()` ran; a still-pending `startSession` for this
+      // session then bails instead of connecting (see below).
+      ended: false,
       leave: () => {},
       isDefault: target === jitsi,
       // Session-local join state, mirrored into the shared `joined` only
@@ -284,6 +292,7 @@ export const useJitsi = () => {
     };
     const markJoined = session.markJoined;
     session.leave = () => {
+      session.ended = true;
       try {
         const leave = target.room?.leave?.();
         if (leave && typeof leave.catch === "function") leave.catch(() => {});
@@ -324,6 +333,16 @@ export const useJitsi = () => {
     // presence is silently dropped and `CONFERENCE_JOINED` never fires
     // (the long "preview works but other browsers can't see me" bug).
     const serverCfg = await loadJitsiServerConfig(httpScheme, host);
+    // That fetch is the only await before the connection is created. If
+    // this session was left meanwhile (idle-close of an extra server, or
+    // the component unmounting mid-fetch), creating and connecting now
+    // would leave an XMPP/WebSocket connection nobody ever tears down.
+    if (session.ended || unmounted) {
+      console.log("[diag] useJitsi: session ended during config fetch; not connecting", {
+        origin,
+      });
+      return;
+    }
     // The env overrides describe the default server only (see useJitsiEndpoint).
     const envXmpp = endpoint.isDefaultServer ? readEnvString("VITE_JITSI_XMPP_DOMAIN") : undefined;
     const envMuc = endpoint.isDefaultServer
@@ -1051,6 +1070,7 @@ export const useJitsi = () => {
   // cleanly after backgrounding) — explicit teardown gives consistent
   // behaviour everywhere.
   onUnmounted(() => {
+    unmounted = true;
     try {
       // `leave()` returns a Promise on lib-jitsi-meet; swallow rejection
       // so an in-flight conference shutdown does not crash unmount.
