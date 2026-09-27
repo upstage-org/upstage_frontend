@@ -34,12 +34,17 @@ import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import Chat from "components/stage/Chat/index.vue";
 import PlayerChat from "components/stage/Chat/PlayerChat.vue";
 import LoginPrompt from "../live/LoginPrompt.vue";
+import ReauthPrompt from "../live/ReauthPrompt.vue";
 
 export default {
-  components: { Chat, PlayerChat, LoginPrompt },
+  components: { Chat, PlayerChat, LoginPrompt, ReauthPrompt },
   setup: () => {
     const stageStore = useStageStore();
-    const { loggedIn } = storeToRefs(useAuthStore());
+    const authStore = useAuthStore();
+    const { loggedIn } = storeToRefs(authStore);
+    // Same rule as the stage itself: a login that ends here never sends the
+    // window to the login page in the middle of a performance.
+    onUnmounted(authStore.holdForStage());
     const { ready, canPlay } = storeToRefs(stageStore);
     const route = useRoute();
 
@@ -135,6 +140,7 @@ export default {
         UX between the main stage and the standalone chat.
       -->
       <LoginPrompt />
+      <ReauthPrompt />
 
       <!--
         Tab bar only when the visitor is authenticated and has on-stage

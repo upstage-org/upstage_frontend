@@ -255,7 +255,7 @@ const { proceed, loading } = useLoading(
         <a-input v-model:value="subject" />
       </a-form-item>
       <a-form-item label="Body" :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
-        <RichTextEditor v-model="body" @click="console.log(body)" />
+        <RichTextEditor v-model="body" />
       </a-form-item>
       <a-form-item
         label="Attach signature"

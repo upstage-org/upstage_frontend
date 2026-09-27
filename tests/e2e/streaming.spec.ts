@@ -1768,10 +1768,13 @@ test.describe("streaming: performer streams, audience views @full", () => {
       await expect(menu.getByText("Exit animation", { exact: true })).toHaveCount(0);
       await expect(menu.locator("i.fa-play, i.fa-pause, i.fa-infinity")).toHaveCount(0);
 
-      // Shape row: all presets offered; picking one clips the tile wrapper
-      // AND closes the menu (every selection auto-closes, user request
-      // 2026-08-14) — so the second pick re-opens via right-click.
-      const tileWrapper = page.locator(`[data-object-id="${objectId}"]`);
+      // Shape row: all presets offered; picking one clips the picture AND
+      // closes the menu (every selection auto-closes, user request
+      // 2026-08-14) — so the second pick re-opens via right-click. The
+      // shape is carried by the `.picture-box` inside the tile (Object.vue
+      // pictureBoxStyle), which hugs the letterboxed picture; the tile
+      // wrapper itself stays a plain rectangle.
+      const tileWrapper = page.locator(`[data-object-id="${objectId}"] .picture-box`);
       await expect(menu.locator('[data-testid^="shape-"]')).toHaveCount(9);
       await menu.locator('[data-testid="shape-circle"]').click();
       await expect(menu).toBeHidden({ timeout: 5_000 });
@@ -1999,6 +2002,12 @@ test.describe("streaming: performer streams, audience views @full", () => {
       process.env.JITSI_E2E_LIVE !== "1",
       "JITSI_E2E_LIVE=1 required (real Jitsi server + JVB reachable)",
     );
+    // The tile has to come back from the archived stage events after the
+    // reload. The disposable e2e backend archives nothing (see README).
+    test.skip(
+      process.env.E2E_EVENT_ARCHIVE !== "1",
+      "E2E_EVENT_ARCHIVE=1 required (an event-archive worker for the e2e database)",
+    );
 
     mkdirSync(SCREENSHOT_DIR, { recursive: true });
     const runtime = readRuntime();
@@ -2128,7 +2137,10 @@ test.describe("streaming: performer streams, audience views @full", () => {
       audienceCtx = await browser.newContext();
       const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
 
-      const result = await audience.page.evaluate(() => {
+      // Must be the namespace the SPA under test was started with
+      // (tests/e2e/env/vite-e2e.sh).
+      const mqttNamespace = process.env.E2E_MQTT_NAMESPACE ?? "dev";
+      const result = await audience.page.evaluate((mqttNamespace) => {
         type BoardObject = Record<string, unknown> & {
           id: string;
           type?: string;
@@ -2143,7 +2155,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
           ) => void;
         };
 
-        const boardTopic = `dev/${stage.url}/board`;
+        const boardTopic = `${mqttNamespace}/${stage.url}/board`;
         const hostId = "tab-session-host-a";
         const staleGenPid = "participant-gen-1";
         const currentGenPid = "participant-gen-2";
@@ -2249,7 +2261,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
           hasLegacy: ids.includes(legacy),
           hasRemoved: ids.includes(removed),
         };
-      });
+      }, mqttNamespace);
 
       expect(result.hasStale, "prior-generation tile must be dropped").toBe(false);
       expect(result.hasLiveA, "current-generation tile must survive").toBe(true);

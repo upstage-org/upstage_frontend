@@ -1,17 +1,18 @@
-<script>
+<script setup lang="ts">
 import { ref } from "vue";
-export default {
-  props: {
-    icon: String,
-    loading: Boolean,
-    modelValue: [String, Number],
-  },
-  emits: ["update:modelValue", "ok"],
-  setup: () => {
-    const el = ref();
-    return { el };
-  },
-};
+
+defineProps<{
+  icon?: string;
+  loading?: boolean;
+  modelValue?: string | number;
+}>();
+
+defineEmits<{
+  (e: "update:modelValue", value: string): void;
+  (e: "ok", value: string | undefined): void;
+}>();
+
+const el = ref<HTMLInputElement>();
 </script>
 
 <template>
@@ -21,14 +22,14 @@ export default {
       class="input is-rounded"
       :value="modelValue"
       v-bind="$attrs"
-      @input="(e) => $emit('update:modelValue', e.target.value)"
-      @keyup.enter="(e) => $emit('ok', e.target.value)"
+      @input="(e) => $emit('update:modelValue', (e.target as HTMLInputElement).value)"
+      @keyup.enter="(e) => $emit('ok', (e.target as HTMLInputElement).value)"
     />
     <button
       class="icon is-right clickable button is-primary is-rounded"
       :class="{ 'is-loading': loading }"
       :disabled="loading"
-      @click="$emit('ok', el.value)"
+      @click="$emit('ok', el?.value)"
     >
       <slot name="icon">
         <i :class="icon"></i>

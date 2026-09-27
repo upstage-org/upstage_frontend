@@ -46,16 +46,19 @@ Running **`pnpm exec playwright test`** directly bypasses preflight entirely.
 
 ## What you need running
 
-1. **Studio / backend** reachable at the URL in `E2E_GRAPHQL_ENDPOINT`
-   (default `http://127.0.0.1:3001/api/studio_graphql`). A typical dev stack is
-   started from the backend repo’s docker compose scripts; keep the same DB
-   between runs if you want `runtime.json` reuse to work.
+1. **Studio / backend** reachable at the URL in `E2E_GRAPHQL_ENDPOINT`.
+   `.env.test.example` sets the disposable backend,
+   `http://127.0.0.1:9092/api/studio_graphql`; the fallback in
+   `e2e-config.ts` when the variable is unset is
+   `http://127.0.0.1:3001/api/studio_graphql` (through the Vite proxy). Keep
+   the same DB between runs if you want `runtime.json` reuse to work.
 
 2. **Frontend** already serving the SPA at **`E2E_BASE_URL`**, or leave it unset to target **`http://127.0.0.1:3000`** (typical `pnpm dev`). Playwright **never** starts the dev server—bring the bundle up yourself first.
 
    The bundle must expose `window.__UPSTAGE_PINIA__` so the e2e helpers in `perform.spec.ts` / `features.spec.ts` / `pages/LiveStagePage.ts` can call stage-store methods (e.g. `__UPSTAGE_PINIA__.stage.placeObjectOnStage(...)`) on each player's seat. Two ways to satisfy this:
    - `pnpm dev` — automatic via `import.meta.env.DEV` (see `src/main.ts`).
-   - `vite build` (e.g. via `run_front_end_dev.sh` / `run_front_end_prod.sh` Docker compose) — the build must see `VITE_E2E=1`. The scripts seed it through two paths: (a) `cp env_backup_${SITE} ./.env` before `docker compose up --build`, so the `vite build` inside the builder container reads it via `loadEnv` (this also brings in `VITE_MQTT_ENDPOINT`, `VITE_GRAPHQL_ENDPOINT`, `VITE_STATIC_ASSETS_ENDPOINT`, etc. — without them MQTT silently no-ops and asset URLs 404); (b) compose `build.args` + Dockerfile `ENV VITE_E2E` as a fallback override. `env.template`, `dotenv_template`, `.env.example`, `.env`, `env_backup_dev`, and `env_backup_prod` all carry `VITE_E2E=1` for parity.
+   - `vite build` via `run_front_end_dev.sh` — the build must see `VITE_E2E=1`. The dev script exports it and compose passes it on as a build arg (`ENV VITE_E2E` in the inline Dockerfile). The other `VITE_*` values (`VITE_MQTT_ENDPOINT`, `VITE_GRAPHQL_ENDPOINT`, `VITE_STATIC_ASSETS_ENDPOINT`, …) come from `env_backup_dev`, which the script copies to `./.env` for the build; without them MQTT silently no-ops and asset URLs 404. The templates (`env.template`, `dotenv_template`, `.env.example`) carry `VITE_E2E=1`.
+   - **Production builds never get the hook.** `run_front_end_prod.sh` deliberately does not set `VITE_E2E`, because the hook exposes the auth store and its tokens. Do not add it to `env_backup_prod`.
 
    Earlier builds installed `window.__UPSTAGE_STORE__` (a Vuex stage
    facade). That hook and the `vuex` dependency itself were removed in
@@ -125,25 +128,35 @@ If you set **`E2E_RUN_ID`** yourself, global-setup **does not** overwrite it.
 Cast accounts are defined in `personas/index.ts`. **`global-setup.ts`** calls
 Studio’s batch user creation **idempotently** (existing usernames are skipped).
 
-| Role        | Source                                                                                  |
-| ----------- | --------------------------------------------------------------------------------------- |
-| Admin       | `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD` (defaults `admin` / `12345678`)             |
-| All players | `E2E_PLAYER_PASSWORD` (default `e2e-pw`) plus per-persona emails in `personas/index.ts` |
+| Role        | Source                                                               |
+| ----------- | -------------------------------------------------------------------- |
+| Admin       | `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD`                          |
+| All players | `E2E_PLAYER_PASSWORD` plus per-persona emails in `personas/index.ts` |
+
+Set all three in `.env.test`. The fallbacks in `e2e-config.ts` (`admin` /
+`12345678`, players `e2e-pw`) do not work against the disposable backend: its
+migrations seed the admin as `admin` / `Secret@123`, and the backend rejects
+passwords shorter than 8 characters.
 
 Passwords are not stored in `runtime.json`; they stay in code and env.
 
 ## Commands (from `upstage_frontend`)
 
-| Command                   | Purpose                                                                                                    |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `pnpm e2e`                | Full suite (`run-e2e` preflight → Playwright lists all projects: smoke + setup + perform + features).      |
-| `pnpm e2e:setup`          | Setup project only (`run-e2e` preflight → `playwright test --project=setup`).                              |
-| `pnpm e2e:perform`        | Perform project (`run-e2e` preflight → `playwright --project=perform`; setup runs first via dependencies). |
-| `pnpm e2e:features`       | Features project (drawing, drawing-as-avatar, opacity, depth; setup runs first via dependencies).          |
-| `pnpm e2e:smoke`          | Short perform slice via `E2E_BEATS=smoke` + `run-e2e` preflight.                                           |
-| `pnpm e2e:smoke:stub`     | Mock smoke specs only + `run-e2e` preflight.                                                               |
-| `pnpm e2e:replay-studio`  | Studio Archive → replay viewer (`replay-studio.spec.ts`; needs setup + archived performance).              |
-| `pnpm e2e:perform:replay` | Perform pass 3 only (`E2E_PHASES=replay`).                                                                 |
+| Command                                                | Purpose                                                                                                    |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `pnpm e2e`                                             | Full suite (`run-e2e` preflight → every Playwright project in the table below).                            |
+| `pnpm e2e:setup`                                       | Setup project only (`run-e2e` preflight → `playwright test --project=setup`).                              |
+| `pnpm e2e:perform`                                     | Perform project (`run-e2e` preflight → `playwright --project=perform`; setup runs first via dependencies). |
+| `pnpm e2e:features`                                    | Features project (drawing, drawing-as-avatar, opacity, depth; setup runs first via dependencies).          |
+| `pnpm e2e:smoke`                                       | Short perform slice via `E2E_BEATS=smoke` + `run-e2e` preflight.                                           |
+| `pnpm e2e:smoke:stub`                                  | Mock smoke specs only + `run-e2e` preflight.                                                               |
+| `pnpm e2e:replay-studio`                               | Studio Archive → replay viewer (`replay-studio.spec.ts`; needs setup + archived performance).              |
+| `pnpm e2e:perform:replay`                              | Perform pass 3 only (`E2E_PHASES=replay`).                                                                 |
+| `pnpm e2e:perform:rehearsal` / `pnpm e2e:perform:live` | Perform pass 1 or pass 2 only (`E2E_PHASES=rehearsal` / `live`).                                           |
+| `pnpm e2e:webkit`                                      | `stage.spec.ts` on Playwright's Desktop Safari.                                                            |
+
+`realtime`, `upload-limit` and `streaming` have no script of their own; run
+them with `pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=<name>`.
 
 ## Environment variables
 
@@ -159,18 +172,49 @@ Passwords are not stored in `runtime.json`; they stay in code and env.
 | `E2E_BEATS`                                | Set to `smoke` for the short perform slice (`e2e:smoke`).                                                                                                           |
 | `E2E_SKIP_CONFIRM`                         | Set to `1` to skip the interactive “proceed?” step in `run-e2e.ts`.                                                                                                 |
 | `PWHEADLESS`                               | `1`/`0`/`false` overrides headed vs headless (CI defaults headless via `CI=1`).                                                                                     |
+| `E2E_PHASES`                               | Comma-separated perform passes to run: `rehearsal`, `live`, `replay`.                                                                                               |
+| `E2E_PACE`                                 | `fast`, `normal` or `slow` pacing of the perform beats.                                                                                                             |
+| `E2E_REPLAY`                               | `1`/`0`: default for the replay pass when `E2E_PHASES` is unset.                                                                                                    |
+| `E2E_CAPTCHA_TOKEN`                        | Optional Turnstile token for the Node-side login in global-setup; only needed when the SPA runs with `VITE_ENV_TYPE=Production`.                                    |
+| `E2E_ALLOW_SHARED_DB`                      | `1` lets the suite write into a shared backend (port 9090, `dev.upstage.live`, `upstage.live`). global-setup refuses those otherwise.                               |
+| `E2E_EVENT_ARCHIVE`                        | `1` when an event-archive worker stores the e2e stage events in the e2e database; enables the replay-dependent streaming test.                                      |
+| `E2E_MQTT_NAMESPACE`                       | MQTT namespace of the SPA under test (default `dev`).                                                                                                               |
+| `JITSI_E2E_LIVE`                           | `1` runs the two `@live` streaming tests, which need a reachable Jitsi server and bridge. They are skipped otherwise.                                               |
 
 ## Playwright projects
 
-| Project         | Files                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| `smoke`         | `auth.spec.ts`, `media.spec.ts`, `stage.spec.ts`                                            |
-| `setup`         | `setup.spec.ts`                                                                             |
-| `perform`       | `perform.spec.ts` (runs after `setup` in one invocation)                                    |
-| `features`      | `features.spec.ts` — drawing, drawing-as-avatar, opacity, depth (runs after `setup`)        |
-| `replay-studio` | `replay-studio.spec.ts` — Studio Archive tab opens `/replay/:slug/:id` (runs after `setup`) |
+| Project         | Files                                                                                                             |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `smoke`         | `auth.spec.ts`, `media.spec.ts`, `stage.spec.ts`                                                                  |
+| `setup`         | `setup.spec.ts`                                                                                                   |
+| `perform`       | `perform.spec.ts` (runs after `setup` in one invocation)                                                          |
+| `features`      | `features.spec.ts` — drawing, drawing-as-avatar, opacity, depth (runs after `setup`)                              |
+| `replay-studio` | `replay-studio.spec.ts` — Studio Archive tab opens `/replay/:slug/:id` (runs after `setup`)                       |
+| `realtime`      | `realtime.spec.ts` — live drag positions and backdrop fade (runs after `setup`)                                   |
+| `upload-limit`  | `upload-limit.spec.ts` — per-user upload caps through the real dropzone                                           |
+| `streaming`     | `streaming.spec.ts` — performer streams, audience views; Chromium fake camera and microphone (runs after `setup`) |
+| `webkit`        | `stage.spec.ts` on Desktop Safari                                                                                 |
 
-`workers: 1` and `fullyParallel: false` keep ordering predictable for setup and MQTT.
+### Streaming project
+
+The streaming tests run in serial mode, so the first failure stops the rest
+of the file. To run only the two tests that use a real Jitsi server:
+
+```sh
+JITSI_E2E_LIVE=1 pnpm exec playwright test --project=streaming -g "@live"
+```
+
+The disposable backend has no event-archive worker, so nothing a test puts on
+the board is stored in its `events` table, and every test starts with an empty
+board. The one test that needs a reloaded stage to be replayed ("persisted
+jitsi tile re-publishes after performer navigates away/back") is skipped
+unless `E2E_EVENT_ARCHIVE=1` says an archive worker is running for the e2e
+database. Running one is not enough to enable it for the whole suite: the
+other tests rely on the empty board and do not clean up after themselves.
+
+The e2e SPA uses the `dev` MQTT namespace (the dev broker's ACL allows the
+stage login `dev/+/+` only), and the dev archive worker subscribes to every
+topic. So e2e stage events ARE stored, in the dev database.
 
 ## Directory layout
 
@@ -197,6 +241,14 @@ tests/e2e/
 ├── media.spec.ts
 ├── stage.spec.ts
 ├── features.spec.ts          drawing / drawing-as-avatar / opacity / depth
+├── realtime.spec.ts
+├── replay-studio.spec.ts
+├── streaming.spec.ts
+├── upload-limit.spec.ts
+├── env/                      e2e-backend-up.sh, e2e-backend-down.sh, vite-e2e.sh
+├── scripts/                  one-off probe scripts (`*.mjs`), not part of the suite
+│   ├── editor/               rich text editor on the admin pages: `node tests/e2e/scripts/editor/rich-text-editor-check.cjs`
+│   └── reauth/               login ending on a live stage: `node tests/e2e/scripts/reauth/reauth-on-stage-check.cjs`
 └── runtime.json               emitted by setup; gitignored
 ```
 
@@ -209,7 +261,6 @@ narrowing beats via `E2E_BEATS=smoke`.
 
 ## Out of scope
 
-- Driving Jitsi beyond basic presence checks where applicable
-- Replay / recording workflows
+- Real cameras, microphones and OBS encoders (the streaming project uses Chromium's fake devices)
 - Mobile viewports
 - Locales other than English for these specs

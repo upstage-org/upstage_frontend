@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { message } from "ant-design-vue";
 import {
   decodeJwtExp,
+  isJwtExpired,
   removeRefreshToken,
   removeToken,
   setRefreshToken,
@@ -14,6 +15,7 @@ import {
   markSessionExpired,
   MAX_TIMER_DELAY_MS,
 } from "@utils/sessionExpiry";
+import { getSharedAuth } from "@utils/common";
 import { userGraph } from "@services/graphql";
 
 /**
@@ -69,6 +71,32 @@ export const useAuthStore = defineStore(
     // Set once this page is on its way out (see logout()).
     let leaving = false;
 
+    /**
+     * A performance must not be interrupted. While a stage is open (the
+     * Live view holds the session, see holdForStage()), a login that ends
+     * is only remembered: nothing is cleared and nothing navigates, so the
+     * player keeps their place, their tools and their broker connection.
+     * The logout is completed when they leave the stage.
+     */
+    let stageHolds = 0;
+    const sessionEndDeferred = ref<boolean>(false);
+
+    /**
+     * Deferring keeps the stage running, but a request that needs a login
+     * would still fail. So the player is asked to log in again on the stage
+     * (views/live/ReauthPrompt.vue); the new tokens replace the dead ones in
+     * the running session, and the requests that were waiting for them are
+     * replayed (apollo.ts). `reauthDismissed` is the player answering
+     * "later": waiting requests are then told the login has expired.
+     */
+    const reauthDismissed = ref<boolean>(false);
+    let reauthWaiters: Array<(accessToken: string | null) => void> = [];
+    const settleReauthWaiters = (accessToken: string | null): void => {
+      const waiters = reauthWaiters;
+      reauthWaiters = [];
+      waiters.forEach((resolve) => resolve(accessToken));
+    };
+
     const cancelRefreshTimer = (): void => {
       if (refreshTimer !== null) {
         clearTimeout(refreshTimer);
@@ -102,13 +130,20 @@ export const useAuthStore = defineStore(
       if (name !== undefined) username.value = name;
       setToken(accessToken);
       setRefreshToken(refresh);
+      // A new token pair is a working login again (e.g. logged in on stage).
+      sessionEndDeferred.value = false;
+      reauthDismissed.value = false;
       scheduleRefresh(accessToken);
+      settleReauthWaiters(accessToken);
     };
 
     const clear = (): void => {
       token.value = "";
       refreshToken.value = "";
+      sessionEndDeferred.value = false;
+      reauthDismissed.value = false;
       cancelRefreshTimer();
+      settleReauthWaiters(null);
     };
 
     const logoutLocal = (): void => {
@@ -166,15 +201,162 @@ export const useAuthStore = defineStore(
      * `/` (Home), which dropped performers off the live stage with no
      * obvious next step. Route guards then re-evaluate from the
      * (now-empty) auth state.
+     *
+     * While a stage is open the logout is deferred instead (see
+     * `stageHolds`). Returns whether the page is leaving for the login page.
      */
-    const logout = (): void => {
+    /**
+     * A player often has several windows on one login: the stage, a
+     * popped-out chat, the studio. They share the stored login but each has
+     * its own copy in memory. When another window has renewed the login or
+     * logged in again, this window takes those tokens over instead of
+     * treating its own, older copy as the end of the session.
+     */
+    const adoptSharedSession = (): boolean => {
+      const shared = getSharedAuth();
+      const sharedToken = shared?.token;
+      if (typeof sharedToken !== "string" || !sharedToken || sharedToken === token.value) {
+        return false;
+      }
+      if (isJwtExpired(sharedToken)) return false;
+      const ours = decodeJwtExp(token.value);
+      const theirs = decodeJwtExp(sharedToken);
+      const newer = ours == null || theirs == null || theirs > ours;
+      if (!newer && !sessionEndDeferred.value && !isJwtExpired(token.value)) return false;
+      setSession(sharedToken, shared?.refresh_token ?? "");
+      return true;
+    };
+
+    const leaveForLogin = (location: string): void => {
       // Several requests usually fail together when a session ends; only
       // the first one navigates.
       if (leaving) return;
       leaving = true;
       logoutLocal();
       markSessionExpired();
-      hardNavigate(loginUrlFor(window.location.pathname + window.location.search));
+      hardNavigate(loginUrlFor(location));
+    };
+
+    const logout = (): boolean => {
+      if (leaving) return true;
+      // Another window holds a working login: this one is not over.
+      if (adoptSharedSession()) return false;
+      if (stageHolds > 0) {
+        // Nothing can renew this login any more: stop trying.
+        cancelRefreshTimer();
+        sessionEndDeferred.value = true;
+        return false;
+      }
+      leaveForLogin(window.location.pathname + window.location.search);
+      return true;
+    };
+
+    /**
+     * For a request that was refused because the login ended on a stage:
+     * resolves with the new access token once the player has logged in
+     * again, or with null when they chose not to (or the login is cleared).
+     */
+    const waitForReauth = (): Promise<string | null> => {
+      if (!sessionEndDeferred.value) return Promise.resolve(token.value || null);
+      if (reauthDismissed.value) return Promise.resolve(null);
+      return new Promise((resolve) => reauthWaiters.push(resolve));
+    };
+
+    /** The player's "later": the prompt closes, waiting requests fail. */
+    const dismissReauth = (): void => {
+      reauthDismissed.value = true;
+      settleReauthWaiters(null);
+    };
+
+    /** Opens the prompt again after a "later". */
+    const requestReauth = (): void => {
+      reauthDismissed.value = false;
+    };
+
+    /**
+     * Logs the SAME player in again inside the running session. Rejects
+     * with a message for the prompt; nothing changes unless it succeeds.
+     */
+    const reauthenticate = async (password: string, captchaToken?: string): Promise<void> => {
+      const expected = username.value;
+      let resp: LoginResponse;
+      try {
+        resp = (await userGraph.login({
+          username: expected,
+          password,
+          ...(captchaToken ? { token: captchaToken } : {}),
+        })) as LoginResponse;
+      } catch (err: unknown) {
+        const e = err as {
+          response?: { errors?: Array<{ message?: string }> };
+          message?: string;
+        };
+        throw new Error(
+          e?.response?.errors?.[0]?.message ??
+            (typeof e?.message === "string" ? e.message : "Login failed"),
+          { cause: err },
+        );
+      }
+      const login = resp?.login;
+      if (!login?.access_token) {
+        throw new Error(resp?.errors?.[0]?.message ?? "Login failed");
+      }
+      if (login.username && login.username.toLowerCase() !== expected.toLowerCase()) {
+        // The stage session belongs to `expected`; another account's tokens
+        // must not be swapped into it.
+        throw new Error("Login failed");
+      }
+      setSession(login.access_token, login.refresh_token ?? "");
+    };
+
+    /** A login that is over but has not been cleared yet. */
+    const logoutPending = (): boolean => {
+      if (!token.value) return false;
+      if (!sessionEndDeferred.value && !isJwtExpired(token.value)) return false;
+      return !adoptSharedSession();
+    };
+
+    /**
+     * Completes a deferred logout. Called when the player leaves the stage:
+     * by the router with the page they are going to (so they arrive there
+     * after logging in), and by the last released hold as a fallback.
+     * Returns whether the page is leaving for the login page.
+     */
+    const finishDeferredLogout = (destination?: string): boolean => {
+      if (leaving) return true;
+      if (!logoutPending()) return false;
+      leaveForLogin(destination ?? window.location.pathname + window.location.search);
+      return true;
+    };
+
+    /**
+     * The stage page itself is going away (a plain link, a reload, the tab
+     * closing) with a logout still deferred. There is nothing left to
+     * protect, so the dead login is cleared now: the next page starts
+     * logged out and the route guard sends it to the login page, instead of
+     * loading with a login the server refuses.
+     */
+    const dropEndedSession = (): boolean => {
+      if (leaving || !logoutPending()) return false;
+      logoutLocal();
+      markSessionExpired();
+      return true;
+    };
+
+    /**
+     * Held by the Live view for as long as a stage is open. Returns the
+     * release function; releasing the last hold completes a logout that was
+     * deferred meanwhile.
+     */
+    const holdForStage = (): (() => void) => {
+      stageHolds += 1;
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        stageHolds -= 1;
+        if (stageHolds === 0) finishDeferredLogout();
+      };
     };
 
     /**
@@ -189,6 +371,7 @@ export const useAuthStore = defineStore(
      */
     const logoutToHome = (): void => {
       if (leaving) return;
+      // The player's own choice: not deferred, even on a stage.
       leaving = true;
       logoutLocal();
       hardNavigate(`${window.location.origin}/`);
@@ -203,8 +386,9 @@ export const useAuthStore = defineStore(
      *
      * Resolves with the new access token. When the server refuses the
      * renewal the session is over: it is cleared and the user is sent to
-     * /login (with redirect=). When the server could not be reached the
-     * session is left alone and the renewal is tried again shortly.
+     * /login (with redirect=), or, on a stage, the logout is deferred. When
+     * the server could not be reached the session is left alone and the
+     * renewal is tried again shortly.
      */
     const fetchRefreshToken = async (): Promise<string | undefined> => {
       // Imported lazily to keep the `store → apollo → store` cycle open.
@@ -224,6 +408,14 @@ export const useAuthStore = defineStore(
       }, REFRESH_RETRY_MS);
       return undefined;
     };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", (event) => {
+        if (event.key === AUTH_STORAGE_KEY && event.newValue && token.value) {
+          adoptSharedSession();
+        }
+      });
+    }
 
     // Boot-time arm: pinia-plugin-persistedstate hydrates `token.value`
     // AFTER this setup function returns (initial state is "" → persisted
@@ -262,12 +454,22 @@ export const useAuthStore = defineStore(
       loggedIn,
       getToken,
       getRefreshToken,
+      sessionEndDeferred,
+      reauthDismissed,
       setSession,
       clear,
       logoutLocal,
       login,
       logout,
       logoutToHome,
+      logoutPending,
+      finishDeferredLogout,
+      dropEndedSession,
+      holdForStage,
+      waitForReauth,
+      dismissReauth,
+      requestReauth,
+      reauthenticate,
       fetchRefreshToken,
     };
   },

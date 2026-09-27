@@ -1,24 +1,22 @@
-<script>
+<script setup lang="ts">
 import { v4 as uuidv4 } from "uuid";
 import Icon from "components/Icon.vue";
 import Loading from "components/Loading.vue";
 
-export default {
-  components: { Icon, Loading },
-  props: {
-    className: String,
-    modelValue: Boolean,
-    label: String,
-    checkedLabel: String,
-    uncheckedLabel: String,
-    loading: Boolean,
-  },
-  emits: ["update:modelValue"],
-  setup: () => {
-    const id = uuidv4();
-    return { id };
-  },
-};
+defineProps<{
+  className?: string;
+  modelValue?: boolean;
+  label?: string;
+  checkedLabel?: string;
+  uncheckedLabel?: string;
+  loading?: boolean;
+}>();
+
+defineEmits<{
+  (e: "update:modelValue", value: boolean): void;
+}>();
+
+const id = uuidv4();
 </script>
 
 <template>
@@ -35,7 +33,7 @@ export default {
       v-bind="$attrs"
       :checked="modelValue"
       style="display: none"
-      @input="$emit('update:modelValue', $event.target.checked)"
+      @input="$emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
     />
     <label class="clickable" :for="id">
       <Loading v-if="loading" height="24px" />

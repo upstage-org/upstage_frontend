@@ -8,6 +8,11 @@ export default {
   logout: "Logout",
   login: "Login",
   session_expired_login_again: "Your session has expired. Please log in again.",
+  session_expired_on_stage: "Your login has expired",
+  session_expired_on_stage_hint:
+    "The performance continues. Log in again to keep all your tools working.",
+  log_in_again: "Log in again",
+  later: "Later",
   register: "Register",
   status: "Status",
   save: "Save",

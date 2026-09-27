@@ -174,6 +174,9 @@ export const router = createRouter({
   routes,
 });
 
+/** The views that hold the login while a performance runs (holdForStage). */
+const isStageRoute = (name: unknown): boolean => name === "Live" || name === "ChatStandalone";
+
 router.beforeEach(
   async (
     to: RouteLocationNormalized,
@@ -181,6 +184,15 @@ router.beforeEach(
     next: NavigationGuardNext,
   ) => {
     document.body.classList.add("waiting");
+
+    // Leaving a stage with a login that ended during the performance: the
+    // deferred logout is completed now, before the next page loads with a
+    // dead token, and the player arrives there after logging in.
+    if (isStageRoute(_from.name) && !isStageRoute(to.name)) {
+      if (useAuthStore().finishDeferredLogout(to.fullPath)) {
+        return next(false);
+      }
+    }
 
     const loggedIn: boolean = useAuthStore().loggedIn;
 

@@ -10,10 +10,17 @@ import { gql } from "@apollo/client/core";
  */
 
 const logout = vi.fn();
+const sessionEndDeferred = vi.fn();
+const waitForReauth = vi.fn();
 const notifyNetworkError = vi.fn();
 
 vi.mock("config", () => ({ default: { GRAPHQL_ENDPOINT: "https://api.test/api/" } }));
-vi.mock("utils/auth", () => ({ logout: () => logout() }));
+vi.mock("utils/auth", () => ({
+  logout: () => logout(),
+  sessionEndDeferred: () => sessionEndDeferred(),
+  waitForReauth: () => waitForReauth(),
+  isJwtExpired: () => false,
+}));
 vi.mock("utils/networkResilience", async (original) => ({
   ...(await original<typeof import("utils/networkResilience")>()),
   notifyNetworkError: () => notifyNetworkError(),
@@ -71,7 +78,7 @@ const expired = () =>
 const refused = () =>
   json({ data: { refreshToken: null }, errors: [{ message: "Invalid refresh token" }] });
 
-const settled = async (promise: Promise<unknown>, withinMs = 50) => {
+const settled = async (promise: Promise<unknown>, withinMs = 1800) => {
   let state = "pending";
   promise.then(
     () => (state = "resolved"),
@@ -84,6 +91,12 @@ const settled = async (promise: Promise<unknown>, withinMs = 50) => {
 beforeEach(async () => {
   calls = [];
   logout.mockReset();
+  // Not on a stage: logout() leaves for the login page.
+  logout.mockReturnValue(true);
+  sessionEndDeferred.mockReset();
+  sessionEndDeferred.mockReturnValue(false);
+  waitForReauth.mockReset();
+  waitForReauth.mockResolvedValue(null);
   notifyNetworkError.mockReset();
   localStorage.clear();
   await apolloClient.clearStore();
@@ -161,6 +174,83 @@ describe("an expired access token", () => {
     expect(await settled(whoami())).toBe("pending");
     expect(logout).toHaveBeenCalledTimes(1);
     expect(calls.map((call) => call.operationName)).toEqual(["Whoami"]);
+  });
+});
+
+describe("a renewal refused because another window renewed first", () => {
+  it("takes over the other window's tokens and replays the request", async () => {
+    respond((call) => {
+      if (call.operationName === "RefreshToken") {
+        // The other window's renewal lands in the shared storage shortly after.
+        setTimeout(
+          () =>
+            setSharedAuth({
+              token: "their-access",
+              refresh_token: "their-refresh",
+              username: "performer",
+            }),
+          300,
+        );
+        return refused();
+      }
+      return call.authorization === "Bearer their-access"
+        ? json({ data: { whoami: { username: "performer" } } })
+        : expired();
+    });
+
+    const { data } = await whoami();
+
+    expect(data.whoami.username).toBe("performer");
+    expect(logout).not.toHaveBeenCalled();
+    expect(getSharedAuth()).toMatchObject({
+      token: "their-access",
+      refresh_token: "their-refresh",
+    });
+  });
+});
+
+describe("a login that ends while a stage is open", () => {
+  it("waits for the player to log in again, then replays with the new token", async () => {
+    logout.mockReturnValue(false);
+    let loggedInAgain: (token: string | null) => void = () => {};
+    waitForReauth.mockReturnValue(new Promise((resolve) => (loggedInAgain = resolve)));
+    respond((call) => {
+      if (call.operationName === "RefreshToken") return refused();
+      return call.authorization === "Bearer fresh-access"
+        ? json({ data: { whoami: { username: "performer" } } })
+        : expired();
+    });
+
+    const request = whoami();
+    expect(await settled(request)).toBe("pending");
+
+    loggedInAgain("fresh-access");
+    const { data } = await request;
+
+    expect(data.whoami.username).toBe("performer");
+    expect(calls.map((call) => call.operationName)).toEqual(["Whoami", "RefreshToken", "Whoami"]);
+    expect(notifyNetworkError).not.toHaveBeenCalled();
+  });
+
+  it("tells the caller the request failed when the player does not log in", async () => {
+    logout.mockReturnValue(false);
+    waitForReauth.mockResolvedValue(null);
+    respond((call) => (call.operationName === "RefreshToken" ? refused() : expired()));
+
+    await expect(whoami()).rejects.toThrow(/login has expired/);
+
+    expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ask for a renewal again once it was refused", async () => {
+    sessionEndDeferred.mockReturnValue(true);
+    waitForReauth.mockResolvedValue(null);
+    respond(() => expired());
+
+    await expect(whoami()).rejects.toThrow(/login has expired/);
+
+    expect(calls.map((call) => call.operationName)).toEqual(["Whoami"]);
+    expect(logout).not.toHaveBeenCalled();
   });
 });
 

@@ -8,6 +8,7 @@ import {
   gql,
   Observable,
 } from "@apollo/client/core";
+import type { FetchResult, NextLink, Operation } from "@apollo/client/core";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
 import { RetryLink } from "@apollo/client/link/retry";
@@ -24,7 +25,8 @@ declare module "@apollo/client/core" {
 }
 import { Media } from "models/studio";
 import { provideApolloClient } from "@vue/apollo-composable";
-import { logout } from "utils/auth";
+import { isJwtExpired, logout, sessionEndDeferred, waitForReauth } from "utils/auth";
+import { SESSION_ENDED_MESSAGE } from "utils/sessionExpiry";
 
 export type RefreshOutcome =
   | { status: "refreshed"; accessToken: string }
@@ -122,11 +124,41 @@ async function doRefresh(): Promise<RefreshOutcome> {
       fetchPolicy: "no-cache",
     });
     const accessToken = data?.refreshToken?.access_token;
-    if (!accessToken) return { status: "rejected" };
+    if (!accessToken) return (await renewedElsewhere(currentRefresh)) ?? { status: "rejected" };
     await persistSession(accessToken, data?.refreshToken?.refresh_token ?? currentRefresh);
     return { status: "refreshed", accessToken };
   } catch (error) {
-    return { status: refusedByServer(error) ? "rejected" : "unavailable" };
+    if (!refusedByServer(error)) return { status: "unavailable" };
+    return (await renewedElsewhere(currentRefresh)) ?? { status: "rejected" };
+  }
+}
+
+// How long a refused renewal waits for another window's renewal to land.
+const RENEWED_ELSEWHERE_GRACE_MS = 1500;
+const RENEWED_ELSEWHERE_POLL_MS = 100;
+
+/**
+ * The backend rotates the refresh token on every use. Two windows of one
+ * player (stage and popped-out chat, say) renew at the same moment, five
+ * minutes before the same expiry, so one of them is refused with a token the
+ * other has just used up. That is not the end of the login: the other
+ * window's new tokens are in the shared storage (or are about to be).
+ */
+async function renewedElsewhere(sentRefresh: string): Promise<RefreshOutcome | null> {
+  const deadline = Date.now() + RENEWED_ELSEWHERE_GRACE_MS;
+  for (;;) {
+    const shared = getSharedAuth();
+    if (
+      shared?.token &&
+      shared.refresh_token &&
+      shared.refresh_token !== sentRefresh &&
+      !isJwtExpired(shared.token)
+    ) {
+      await persistSession(shared.token, shared.refresh_token);
+      return { status: "refreshed", accessToken: shared.token };
+    }
+    if (Date.now() >= deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, RENEWED_ELSEWHERE_POLL_MS));
   }
 }
 
@@ -149,19 +181,48 @@ export async function refreshAccessTokenOnce(): Promise<string | null> {
  * out neither completes nor fails, so the page being left does not flash an
  * error for a request the user never sees the end of.
  */
-function leaveForLogin(): Observable<never> {
-  logout();
-  return new Observable<never>(() => {});
+function leaveForLogin(
+  operation: Operation,
+  forward: NextLink,
+): Observable<FetchResult> | Observable<never> {
+  if (logout()) return new Observable<never>(() => {});
+  // A stage is open: the player stays where they are.
+  return replayAfterReauth(operation, forward);
+}
+
+/**
+ * The login ended while a stage is open. The player is being asked to log
+ * in again there; the request waits for that and is then sent again with
+ * the new token. If they decline, the caller hears that it failed.
+ */
+function replayAfterReauth(operation: Operation, forward: NextLink): Observable<FetchResult> {
+  return fromPromise(waitForReauth()).flatMap((accessToken) => {
+    if (!accessToken) return sessionEndedError();
+    operation.setContext({
+      headers: { ...operation.getContext().headers, Authorization: `Bearer ${accessToken}` },
+    });
+    return forward(operation);
+  });
+}
+
+function sessionEndedError(): Observable<never> {
+  return new Observable<never>((observer) => {
+    observer.error(new Error(SESSION_ENDED_MESSAGE));
+  });
 }
 
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors) {
     const needsRefresh = graphQLErrors.some((err) => REFRESHABLE_ERRORS.has(err.message));
     if (needsRefresh && !operation.getContext().skipAuthRefresh) {
+      if (sessionEndDeferred()) {
+        // Already refused once; asking for a renewal again cannot succeed.
+        return replayAfterReauth(operation, forward);
+      }
       if (getRefreshTokenForGraphql()) {
         return fromPromise(refreshSessionOnce()).flatMap((outcome) => {
           if (outcome.status === "rejected") {
-            return leaveForLogin();
+            return leaveForLogin(operation, forward);
           }
           if (outcome.status === "unavailable") {
             // Not an expiry: the user stays logged in and can retry.
@@ -181,7 +242,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
       }
       if (getAccessTokenForGraphql()) {
         // A login the server no longer accepts, and nothing to renew it with.
-        return leaveForLogin();
+        return leaveForLogin(operation, forward);
       }
       // Not logged in at all: the caller gets the error as usual.
     }

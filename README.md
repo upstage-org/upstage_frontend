@@ -15,7 +15,7 @@ receives live-stage traffic over MQTT WebSockets, and is deployed as a static
 
 ```sh
 pnpm install
-cp .env.example .env      # then edit — see the sample below
+cp .env.example .env      # then edit — see the sample below; add LOCAL_SERVE_STATIC_CONTENT
 pnpm dev                  # Vite on http://localhost:3000
 ```
 
@@ -68,13 +68,14 @@ centrally in `src/config.ts` (types in `src/env.d.ts`):
 | `VITE_MQTT_ENDPOINT`                                                                                                     | MQTT **WebSocket** URL (`ws://…:9001` in dev, `wss://…:443` in prod).                                                                                                                                                                            |
 | _(no broker credential vars)_                                                                                            | The Mosquitto `performance` login is served at runtime on the GraphQL `Stage.mqtt` field so it never reaches the public bundle. Set `MQTT_USER` / `MQTT_PASSWORD` on the **backend**.                                                            |
 | `VITE_JITSI_ENDPOINTS`                                                                                                   | Jitsi server URL(s) for camera/mic streaming: **one or more origins, comma-separated when there are several**. The first URL is the default; with 2+ URLs performers pick a server in the Streams tab.                                           |
-| `VITE_JITSI_XMPP_DOMAIN` / `VITE_JITSI_XMPP_MUC_DOMAIN` / `VITE_JITSI_XMPP_FOCUS_DOMAIN` / `VITE_JITSI_PREFER_WEBSOCKET` | Optional Jitsi XMPP overrides for non-default Jitsi installs.                                                                                                                                                                                    |
+| `VITE_JITSI_XMPP_DOMAIN` / `VITE_JITSI_XMPP_MUC_DOMAIN` / `VITE_JITSI_XMPP_FOCUS_DOMAIN` / `VITE_JITSI_PREFER_WEBSOCKET` | Optional Jitsi XMPP overrides for non-default Jitsi installs. The three domain overrides apply to the default (first) server only.                                                                                                               |
+| `VITE_JITSI_WIRE_TRACE`                                                                                                  | `true` logs the XMPP wire trace (`[diag]`) to the console. Only honoured by the dev server, never by a built bundle.                                                                                                                             |
 | `VITE_RTMP_ENDPOINTS`                                                                                                    | MediaMTX playback URL(s) for RTMP/OBS stream feeds: **one or more origins, comma-separated when there are several**. The first URL is the default; a stream feed is bound to one server when it is created. **Leave unset to hide all RTMP UI.** |
 | `VITE_CLOUDFLARE_CAPTCHA_SITEKEY`                                                                                        | Turnstile site key for the login captcha.                                                                                                                                                                                                        |
 | `VITE_STRIPE_KEY`                                                                                                        | Stripe publishable key (donations/subscriptions; optional).                                                                                                                                                                                      |
 | `VITE_RELEASE_VERSION` / `VITE_ALIAS_RELEASE_VERSION`                                                                    | Version strings shown in the UI.                                                                                                                                                                                                                 |
-| `VITE_ENV_TYPE`                                                                                                          | `Production` enables captcha + CORS restrictions; anything else relaxes them.                                                                                                                                                                    |
-| `VITE_E2E`                                                                                                               | Exposes `window.__UPSTAGE_PINIA__` for Playwright (also on in `pnpm dev`).                                                                                                                                                                       |
+| `VITE_ENV_TYPE`                                                                                                          | `Production` (exact spelling) shows the Turnstile captcha on login, registration and the donation form; anything else hides it. CORS is a backend setting (`ENV_TYPE`), not this one.                                                            |
+| `VITE_E2E`                                                                                                               | Exposes every store, including the login tokens, on `window.__UPSTAGE_PINIA__` for Playwright (also on in `pnpm dev`). `run_front_end_dev.sh` sets it; **never set it for a production build**.                                                  |
 | `LOCAL_SERVE_STATIC_CONTENT`                                                                                             | Dev/test only (not `VITE_`-prefixed): uploads dir for the dev static server.                                                                                                                                                                     |
 | `VITE_STUDIO_API_PROXY`                                                                                                  | Dev only: override the `/api` proxy target (default `http://127.0.0.1:9090`).                                                                                                                                                                    |
 | `FRONTEND_PORT`                                                                                                          | Port for `pnpm serve:dist` preview (default 4173).                                                                                                                                                                                               |
@@ -134,7 +135,15 @@ above). The run scripts copy it into place and build:
 
 `--build` runs a one-shot docker compose builder (Node 26 + pnpm, typecheck +
 `vite build`) and writes the result to **`/frontend_app_<site>/dist`** on the
-host. Nothing in this repo serves production traffic — that's nginx's job:
+host. The dev site is built with `pnpm build:dev` (Vite mode `development`),
+prod with `pnpm build`. The image is rebuilt without cache on every run.
+Nothing in this repo serves production traffic — that's nginx's job.
+
+Every build writes a stamp to `public/version.json` and bakes the same value
+into the bundle. The stamp is the UTC deploy time (`UPSTAGE_BUILD_VERSION`,
+set by the run scripts; no git access). An open page compares its own stamp
+with the served `/version.json` (fetched with `cache: "no-store"`) and
+offers a reload when they differ.
 
 ### Serving (nginx) — all SSL is stripped at nginx
 
@@ -152,8 +161,15 @@ must:
 - use HTTPS in production: browsers only allow camera/microphone (Jitsi) on
   secure origins.
 
-The vendored scripts under `public/js/` (`lib-jitsi-meet.min.js`,
-`mespeak.js`) ship inside `dist/` — deploy the whole directory.
+The vendored scripts under `public/js/` (`jitsi/lib-jitsi-meet.min.js`,
+`mespeak/`) ship inside `dist/` — deploy the whole directory.
+`lib-jitsi-meet` must stay compatible with the Jitsi server release. The
+current copy is the one Jitsi `stable-11248` ships (version `7d14f385`), with
+one local change: room metadata is passed to the STUN/TURN handler only when
+its `services` field is a list. Prosody sends `"services":{}` when no TURN
+server is configured, which the unchanged library reports as
+`findAll error: :scope>services>service` on every join. Re-apply that change
+when the file is replaced (search for `onReceiveStunAndTurnCredentials(i)`).
 
 `./run_front_end_<site>.sh --serve` runs a Vite dev server against that
 site's env instead of building (dev :3001 / prod :3002).
@@ -187,14 +203,42 @@ CI run the same `verify` gate.
   users on the stage's player/editor access lists, edited in Stage
   Management → General. An admin who is neither the owner nor listed joins
   that stage as audience. This is intentional.
-- **Stale logins on a stage.** If a viewer's login token expires while they
-  are watching a stage, they keep watching uninterrupted (as audience); the
-  app completes the logout when they navigate away from the stage.
+- **Login lifetime.** The backend issues tokens that last 30 days for admins
+  and 2 days for everyone else (`JWT_ADMIN_TOKEN_DAYS` / `JWT_USER_TOKEN_DAYS`
+  on the backend). An open page renews its tokens five minutes before they
+  expire, so an active user stays logged in.
+- **When a login ends.** If the server refuses to renew, the session is
+  cleared and the browser goes to `/login?redirect=<page>`; the login page
+  shows a "session expired" notice and returns the user to that page after
+  login. If the server cannot be reached, the user stays logged in and the
+  renewal is retried every 30 seconds.
+- **A login that ends during a performance.** Only players log in; the
+  audience watches without an account. While a stage or a popped-out chat
+  window is open, a login that ends never interrupts the player: nothing is
+  cleared, the page does not navigate, and the stage keeps running over its
+  broker connection.
+  - The player is asked to log in again in a small panel on the stage
+    (`views/live/ReauthPrompt.vue`). It has no backdrop and takes no focus.
+    Logging in puts the new tokens into the running session; only the same
+    account is accepted.
+  - A request that needs the login waits for that and is then sent again
+    with the new token (`replayAfterReauth` in `apollo.ts`).
+  - "Later" closes the panel and leaves a "Log in again" button. Waiting
+    requests then fail with "Your login has expired". The logout completes
+    when the player leaves the stage, and the login page returns them to the
+    page they were going to.
+  - A stage page that is _loaded_ with an already expired login goes to the
+    login page first and comes back to the stage: nothing is running yet.
+  - The player's own Logout is never deferred.
+- **Several windows on one login.** The stage, a popped-out chat and the
+  studio share the stored login. A window takes over tokens that another
+  window renewed or logged in with, so logging in again once restores every
+  window, and two windows renewing at the same moment do not end the login
+  (the backend rotates the refresh token, so one of them is refused).
 - More docs: [docs/REPLAY.md](docs/REPLAY.md) (recordings & replay),
+  [docs/STREAM_AUDIO.md](docs/STREAM_AUDIO.md) (who hears a stream),
   [docs/BROWSER_SUPPORT.md](docs/BROWSER_SUPPORT.md),
-  [TOUCH_CHEATSHEET.md](TOUCH_CHEATSHEET.md) (touch-screen controls),
-  [UpstageInternal.md](UpstageInternal.md) (upstage.live-specific settings +
-  data restoration).
+  [TOUCH_CHEATSHEET.md](TOUCH_CHEATSHEET.md) (touch-screen controls).
 
 ## License
 

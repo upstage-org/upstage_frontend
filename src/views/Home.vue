@@ -138,7 +138,7 @@ export default {
     }
 
     // Tailwind preflight forces img { display: block }, which defeats the
-    // text-align centering TinyMCE uses; restore the editor's inline layout.
+    // text-align centering the rich text editor uses; restore inline layout.
     :deep(img) {
       display: inline-block;
       max-width: 100%;

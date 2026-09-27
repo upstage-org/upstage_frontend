@@ -30,8 +30,13 @@ export const removeRefreshToken = (): void => Cookies.remove(REFRESH_TOKEN);
 // which keeps the utils/auth ↔ pinia/auth import cycle resolvable: the store
 // uses ES-module live bindings to call `setToken`/`removeToken` exported here.
 export const loggedIn = computed<boolean>(() => useAuthStore().loggedIn);
-export const logout = (): void => useAuthStore().logout();
+/** Returns false when the logout was deferred because a stage is open. */
+export const logout = (): boolean => useAuthStore().logout();
 export const logoutToHome = (): void => useAuthStore().logoutToHome();
+/** True while a logout is deferred because a stage is open. */
+export const sessionEndDeferred = (): boolean => useAuthStore().sessionEndDeferred;
+/** The new access token once the player logged in again on the stage, else null. */
+export const waitForReauth = (): Promise<string | null> => useAuthStore().waitForReauth();
 
 export function displayName(user: AuthUser | null | undefined): string {
   if (!user) return "";

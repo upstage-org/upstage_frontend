@@ -9,6 +9,10 @@
 
 const NOTICE_KEY = "upstage:sessionExpired";
 
+/** What a request is told when the login ended but the player is still on a stage. */
+export const SESSION_ENDED_MESSAGE =
+  "Your login has expired. Log in again after leaving the stage.";
+
 /** Longest delay a browser timer accepts; anything above fires immediately. */
 export const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 

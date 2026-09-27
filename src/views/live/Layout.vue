@@ -9,21 +9,23 @@ import AudioPlayer from "components/stage/AudioPlayer.vue";
 import Shell from "components/objects/MeetingObject/Shell.vue";
 import Preloader from "./Preloader.vue";
 import LoginPrompt from "./LoginPrompt.vue";
+import ReauthPrompt from "./ReauthPrompt.vue";
 import ConnectionStatus from "./ConnectionStatus.vue";
 import MasqueradingStatus from "./MasqueradingStatus.vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useAuthStore } from "@stores/pinia/auth";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import { storeToRefs } from "pinia";
-import { onMounted, onUnmounted, ref } from "vue";
+import { onUnmounted } from "vue";
 import { useRoute } from "vue-router";
-import { isJwtExpired, loggedIn } from "utils/auth";
+import { loggedIn } from "utils/auth";
 
 export default {
   components: {
     Logo,
     Preloader,
     LoginPrompt,
+    ReauthPrompt,
     SettingPopup,
     Chat,
     PlayerChat,
@@ -55,36 +57,18 @@ export default {
       stageStore.disconnect();
     });
 
-    // Live-route expiry guard. The Live route does NOT set requireAuth
-    // (audience members must be able to land here unauthenticated).
-    // Deliberate UX: a viewer whose JWT expires while watching keeps the
-    // stage view undisturbed (the backend already treats a stale token as
-    // audience) — no mid-performance logout. We only REMEMBER that the
-    // token went stale (checked on mount, visibilitychange, and page
-    // wake, so an overnight tab is detected) and complete the logout when
-    // they navigate away from the stage, so the rest of the app never
-    // runs half-authenticated with a dead token.
-    const staleTokenSeen = ref(false);
-    const checkExpiry = () => {
-      if (authStore.loggedIn && isJwtExpired(authStore.getToken)) {
-        staleTokenSeen.value = true;
-      }
-    };
-    onMounted(checkExpiry);
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") checkExpiry();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    onUnmounted(() => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      checkExpiry();
-      if (staleTokenSeen.value && authStore.loggedIn) {
-        authStore.logout();
-      }
-    });
+    // A performance is never interrupted by a login that ends. While this
+    // view is open the auth store defers every forced logout (refused
+    // renewal, expired token, a request the server turns down): the player
+    // keeps the stage, their tools and the broker connection, and is asked
+    // to log in again right here (ReauthPrompt). If they do not, the logout
+    // is completed when they leave the stage: by the router guard, or by
+    // releasing the hold here. The Live route does NOT set requireAuth (the
+    // audience watches without logging in).
+    const releaseSession = authStore.holdForStage();
+    onUnmounted(releaseSession);
 
     usePageWakeRecovery(() => {
-      checkExpiry();
       if (canPlay.value && stageStore.status === "OFFLINE") {
         stageStore.connect();
       } else if (canPlay.value) {
@@ -106,6 +90,7 @@ export default {
     const onPageHide = (event) => {
       if (!event.persisted) {
         onUnload();
+        authStore.dropEndedSession();
       }
     };
     window.addEventListener("beforeunload", onUnload);
@@ -138,6 +123,7 @@ export default {
       <MasqueradingStatus />
     </div>
   </div>
+  <ReauthPrompt />
   <Shell id="main-content">
     <Preloader />
     <!--

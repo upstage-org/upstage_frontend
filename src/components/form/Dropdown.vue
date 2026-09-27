@@ -1,44 +1,47 @@
-<script>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-export default {
-  props: {
-    data: Array,
-    modelValue: [String, Number],
-    renderLabel: {
-      type: Function,
-      default: (item) => item,
-    },
-    renderValue: {
-      type: Function,
-      default: (item) => item,
-    },
-    renderDescription: {
-      type: Function,
-    },
-    placeholder: String,
-    isRight: Boolean,
-    isUp: Boolean,
-    isRounded: Boolean,
-    fixed: Boolean,
+
+// Items are whatever the caller lists: plain strings/numbers or option objects.
+type Item = any;
+
+const props = withDefaults(
+  defineProps<{
+    data?: Item[];
+    modelValue?: string | number;
+    renderLabel?: (item: Item) => unknown;
+    renderValue?: (item: Item) => unknown;
+    renderDescription?: (item: Item) => string;
+    placeholder?: string;
+    isRight?: boolean;
+    isUp?: boolean;
+    isRounded?: boolean;
+    fixed?: boolean;
+  }>(),
+  {
+    renderLabel: (item: Item) => item,
+    renderValue: (item: Item) => item,
   },
-  emits: ["update:modelValue", "select", "open"],
-  setup: (props, { emit }) => {
-    const selectedItem = computed(() =>
-      props.data?.find((item) => props.renderValue(item) === props.modelValue),
-    );
-    const isActive = ref();
-    watch(isActive, (value) => emit("open", value));
-    const select = (value, item) => {
-      emit("update:modelValue", value);
-      emit("select", value, item);
-      isActive.value = false;
-    };
-    const el = ref();
-    const scrollIntoView = () => el.value.querySelector(".is-active")?.scrollIntoView();
-    onMounted(scrollIntoView);
-    return { select, selectedItem, isActive, el };
-  },
+);
+
+const emit = defineEmits<{
+  (e: "update:modelValue", value: unknown): void;
+  (e: "select", value: unknown, item: Item): void;
+  (e: "open", value: boolean | undefined): void;
+}>();
+
+const selectedItem = computed(() =>
+  props.data?.find((item) => props.renderValue(item) === props.modelValue),
+);
+const isActive = ref<boolean>();
+watch(isActive, (value) => emit("open", value));
+const select = (value: unknown, item: Item) => {
+  emit("update:modelValue", value);
+  emit("select", value, item);
+  isActive.value = false;
 };
+const el = ref<HTMLElement>();
+const scrollIntoView = () => el.value?.querySelector(".is-active")?.scrollIntoView();
+onMounted(scrollIntoView);
 </script>
 
 <template>
