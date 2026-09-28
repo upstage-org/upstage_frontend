@@ -229,6 +229,13 @@ export const useStageStore = defineStore(
     const trackServers = new WeakMap<object, string>();
     /** Jitsi tile ids waiting for CONFERENCE_JOINED before first MQTT PLACE. */
     const pendingJitsiPublish = new Set<ObjectId>();
+    /**
+     * Jitsi tile ids removed by an explicit MQTT DESTROY (cleared again by a
+     * PLACE of the same id). A MOVE_TO for an unknown jitsi tile re-creates it
+     * (see handleBoardMessage), but never one of these: a move that lands
+     * just after a delete must not bring the tile back.
+     */
+    const destroyedJitsiTiles = new Set<ObjectId>();
 
     const tools = ref<ToolsState>({
       avatars: [],
@@ -2621,6 +2628,7 @@ export const useStageStore = defineStore(
             // board.tracks and are filled by lib-jitsi-meet on each
             // browser after the publisher's room.addTrack() succeeds —
             // they are never serialized onto TOPICS.BOARD.
+            destroyedJitsiTiles.delete(message.object.id);
             PUSH_OBJECT({ ...message.object, liveAction: true, published: true });
           }
           break;
@@ -2629,12 +2637,30 @@ export const useStageStore = defineStore(
             if (isStaleOwnMove(message)) break;
             diagMqttJitsiBoard("in", BOARD_ACTIONS.MOVE_TO, message.object);
             noteLiveMove(message.object.id, message.live === true);
-            UPDATE_OBJECT(message.object);
+            const { id } = message.object;
+            if (
+              isJitsiBoardType(message.object.type) &&
+              !destroyedJitsiTiles.has(id) &&
+              !board.value.objects.some((o) => o.id === id)
+            ) {
+              // A performer's tile that this client dropped when the
+              // performer left the conference (USER_LEFT →
+              // removeJitsiParticipantLocally). On their return the heal
+              // broadcast for the already-published tile is a MOVE_TO,
+              // which UPDATE_OBJECT would ignore; re-create the tile the
+              // way a PLACE does.
+              PUSH_OBJECT({ ...message.object, liveAction: true, published: true });
+            } else {
+              UPDATE_OBJECT(message.object);
+            }
           }
           break;
         case BOARD_ACTIONS.DESTROY:
           if (message.object) {
             pendingJitsiPublish.delete(message.object.id);
+            if (isJitsiBoardType(message.object.type)) {
+              destroyedJitsiTiles.add(message.object.id);
+            }
             DELETE_OBJECT(message.object);
           }
           break;

@@ -211,6 +211,9 @@ jitsi tile re-publishes after performer navigates away/back") is skipped
 unless `E2E_EVENT_ARCHIVE=1` says an archive worker is running for the e2e
 database. Running one is not enough to enable it for the whole suite: the
 other tests rely on the empty board and do not clean up after themselves.
+`tests/e2e/env/e2e-archive-up.sh` starts such a worker
+(`upstage_event_archive_e2e`); remove it with
+`docker rm -f upstage_event_archive_e2e` after the test.
 
 The e2e SPA uses the `dev` MQTT namespace (the dev broker's ACL allows the
 stage login `dev/+/+` only), and the dev archive worker subscribes to every

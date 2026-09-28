@@ -2081,15 +2081,24 @@ test.describe("streaming: performer streams, audience views @full", () => {
         { timeout: 30_000 },
       );
 
-      await waitForPerformerJoinedAndTracks(performerPage);
+      // The Streams toolbox panel is closed after the remount, so the
+      // Yourself preview that waitForPerformerJoinedAndTracks watches does
+      // not exist; the board-state watcher re-publishes without it.
+      await waitForPerformerRepublished(performerPage);
+      console.log(
+        "[streaming] performer after navback:",
+        JSON.stringify(await performerPage.evaluate(describeJitsiTileState, streamName)),
+      );
 
       // The audience side never navigated, but the JitsiTracks it
       // held for the performer's previous JID are orphaned by the
       // performer's `leave()` on navigate-away. The fresh re-publish
       // arrives with a NEW track id under the performer's NEW
-      // myUserId; the audience tile's `participantId` is healed by
-      // the performer's syncLocalJitsiParticipantId broadcast so the
-      // tile re-binds to the new tracks and frames resume.
+      // myUserId. The audience dropped the tile when the performer left
+      // the conference (USER_LEFT); the performer's heal broadcast is a
+      // MOVE_TO, which re-creates the tile with the new participantId
+      // (stage.ts handleBoardMessage) so it binds to the new tracks and
+      // frames resume.
       //
       // We poll with a per-iteration freshness check rather than just
       // `videoWidth > 0`: the OLD <video> element may still report
@@ -2098,6 +2107,44 @@ test.describe("streaming: performer streams, audience views @full", () => {
       // <video> advances as new frames are decoded, so we sample it
       // and require it to advance over the polling window.
       await waitForAudienceVideoFreshFrames(audience.page, streamName, 90_000);
+
+      // ---- 4. Audience presses "Refresh streams" on the recovered tile ----
+      // The re-created tile must behave like any other stream tile: the
+      // button is offered, the force signal detaches and re-attaches the
+      // <video> (a fresh `loadstart`), frames keep coming, and the tile is
+      // not duplicated.
+      await audience.page.evaluate((testid) => {
+        const v = document.querySelector(`[data-testid="object-${testid}"] video`) as
+          (HTMLVideoElement & { __loadstarts?: number }) | null;
+        if (!v) throw new Error("audience video not found before refresh");
+        v.__loadstarts = 0;
+        v.addEventListener("loadstart", () => {
+          v.__loadstarts = (v.__loadstarts ?? 0) + 1;
+        });
+      }, streamName);
+      const audienceRefresh = audience.page.locator(
+        '#reload-stream button[aria-label="Refresh streams"]',
+      );
+      await audienceRefresh.waitFor({ state: "visible", timeout: 10_000 });
+      await audienceRefresh.dispatchEvent("mousedown");
+      await audience.page.waitForFunction(
+        (testid) => {
+          const v = document.querySelector(`[data-testid="object-${testid}"] video`) as
+            (HTMLVideoElement & { __loadstarts?: number }) | null;
+          return (v?.__loadstarts ?? 0) > 0;
+        },
+        streamName,
+        { timeout: 10_000 },
+      );
+      await waitForAudienceVideoFreshFrames(audience.page, streamName, 30_000);
+      const audienceTiles = await audience.page.evaluate(
+        (name) =>
+          window.__UPSTAGE_PINIA__!.stage.board.objects.filter(
+            (o: { name?: string; type?: string }) => o.type === "jitsi" && o.name === name,
+          ).length,
+        streamName,
+      );
+      expect(audienceTiles).toBe(1);
 
       await performerPage.screenshot({
         path: path.join(SCREENSHOT_DIR, "performer-after-navback.png"),
@@ -2606,6 +2653,25 @@ async function waitForPerformerJoinedAndTracks(performerPage: Page): Promise<voi
 }
 
 /**
+ * Performer has re-published without opening the Streams panel: the
+ * publisher's `room.addTrack()` succeeded and put a local video track into
+ * `board.tracks` (localStreamPublisher.ts publishLocalTracksToRoom).
+ */
+async function waitForPerformerRepublished(performerPage: Page): Promise<void> {
+  await performerPage.waitForFunction(
+    () => {
+      const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+        status: string;
+        board: { tracks: { type?: string; isLocal?: () => boolean }[] };
+      };
+      if (stage.status !== "LIVE") return false;
+      return stage.board.tracks.some((t) => t.type === "video" && t.isLocal?.() === true);
+    },
+    { timeout: 60_000 },
+  );
+}
+
+/**
  * Place a jitsi-typed tile on the performer's board. Uses the same
  * Pinia store path the real drag-from-Yourself handler triggers.
  * Returns the placed object's `id` for downstream lookups.
@@ -2698,9 +2764,49 @@ async function waitForAudienceVideoFreshFrames(
     if (advanced) return;
     await audiencePage.waitForTimeout(500);
   }
+  const state = await audiencePage.evaluate(describeJitsiTileState, streamName).catch(String);
   throw new Error(
-    `[streaming] audience <video> for "${streamName}" did not advance currentTime within ${timeoutMs}ms`,
+    `[streaming] audience <video> for "${streamName}" did not advance currentTime within ${timeoutMs}ms; audience state: ${JSON.stringify(state)}`,
   );
+}
+
+/**
+ * Snapshot of a jitsi tile as one browser sees it: the board object's
+ * binding, the DOM <video>, and every track in `board.tracks` with its
+ * participant — enough to tell "no track arrived" from "track arrived but
+ * the tile is bound to another participant".
+ */
+function describeJitsiTileState(name: string) {
+  type Track = { type?: string; isLocal?: () => boolean; getParticipantId?: () => string };
+  const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+    status: string;
+    board: {
+      objects: {
+        name?: string;
+        type?: string;
+        participantId?: string;
+        hostId?: string;
+        published?: boolean;
+      }[];
+      tracks: Track[];
+    };
+  };
+  const obj = stage.board.objects.find((o) => o.type === "jitsi" && o.name === name);
+  const v = document.querySelector(
+    `[data-testid="object-${name}"] video`,
+  ) as HTMLVideoElement | null;
+  return {
+    status: stage.status,
+    tile: obj
+      ? { participantId: obj.participantId, hostId: obj.hostId, published: obj.published }
+      : null,
+    video: v ? { width: v.videoWidth, time: v.currentTime, readyState: v.readyState } : null,
+    tracks: stage.board.tracks.map((t) => ({
+      type: t.type,
+      local: t.isLocal?.(),
+      participant: t.getParticipantId?.(),
+    })),
+  };
 }
 
 /**
