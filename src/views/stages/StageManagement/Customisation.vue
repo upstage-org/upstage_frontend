@@ -1,5 +1,6 @@
-<script>
+<script setup lang="ts">
 import { reactive, ref } from "vue";
+import type { Ref } from "vue";
 import Selectable from "components/Selectable.vue";
 import SaveButton from "components/form/SaveButton.vue";
 import { message } from "ant-design-vue";
@@ -17,127 +18,112 @@ import { TOPICS } from "utils/constants";
 import { coerceNumber } from "utils/common";
 import configs from "config";
 
-export default {
-  components: { Selectable, SaveButton, HorizontalField, Dropdown, AppSwitch, ColorPicker },
-  setup: () => {
-    const stage = inject("stage");
-    const refresh = inject("refresh");
-    const config = useAttribute(stage, "config", true).value ?? {
-      ratio: {
-        width: 16,
-        height: 9,
-      },
-      animations: {
-        bubble: "fade",
-        curtain: "drop",
-        bubbleSpeed: 1800,
-        curtainSpeed: 9100,
-      },
-      defaultcolor: "#30AC45",
-      enabledLiveStreaming: true,
-      streamingMode: "both",
-    };
-
-    const selectedRatio = reactive(config.ratio);
-    // Seed defaults first so stages whose saved config predates a key show
-    // real values instead of blank fields; saved values win via the spread.
-    // `removal`/`removalSpeed` are dead keys: exit animations are set per
-    // stage assignment (media editor Stages tab / Stage Management > Media)
-    // and the board no longer reads a stage-wide fallback. Old saved values
-    // just ride along in the spread, ignored.
-    const animations = reactive({
-      bubble: "fade",
-      curtain: "drop",
-      bubbleSpeed: 1800,
-      curtainSpeed: 9100,
-      ...(config.animations ?? {}),
-    });
-    const defaultcolor = ref(config.defaultcolor || "#30AC45");
-    const enabledLiveStreaming = ref(config.enabledLiveStreaming ?? true);
-    // Which transports "Live Streaming" enables: Jitsi rooms, RTMP feeds, or
-    // both. Legacy configs predate the field, and their enabled state always
-    // meant both, so default accordingly.
-    const streamingMode = ref(
-      ["jitsi", "rtmp", "both"].includes(config.streamingMode) ? config.streamingMode : "both",
-    );
-    // Multi-server streaming: informational only. Performers pick a server
-    // per stream on stage (one Yourself tile per server in the Streams tab);
-    // there is deliberately no stage-wide server setting.
-    const configuredServers = {
-      jitsi: configs.JITSI_SERVER_COUNT ?? 1,
-      rtmp: configs.RTMP_SERVER_COUNT ?? (configs.RTMP_ENDPOINT ? 1 : 0),
-    };
-
-    const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
-    const saveCustomisation = async () => {
-      const configData = JSON.stringify({
-        ratio: selectedRatio,
-        animations,
-        defaultcolor: defaultcolor.value,
-        enabledLiveStreaming: enabledLiveStreaming.value,
-        streamingMode: streamingMode.value,
-      });
-      await save(
-        () => {
-          message.success("Customisation saved!");
-          refresh(stage.value.id);
-        },
-        stage.value.id,
-        configData,
-      );
-      const mqtt = buildClient();
-      const client = mqtt.connect(stage.value?.mqtt);
-      if (!client) return;
-      client.publish(
-        namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
-        JSON.stringify({
-          type: "setBackdropColor",
-          color: defaultcolor.value,
-        }),
-        { qos: 1, retain: false },
-        (error) => {
-          // `resolve` / `reject` did not exist here: the success path threw a
-          // ReferenceError before disconnecting and leaked one broker
-          // connection per save.
-          if (error) {
-            message.error(`Could not broadcast the backdrop colour: ${error.message ?? error}`);
-          }
-          mqtt.disconnect();
-        },
-      );
-    };
-
-    const sendBackdropColor = (color) => {
-      defaultcolor.value = color;
-    };
-
-    // Custom-ratio number inputs need cross-browser coercion: Firefox lets
-    // the user type non-integer / negative values that Chromium rejects.
-    // Fall back to 1 (the smallest sensible ratio component) when the
-    // input is empty or unparseable so the SaveButton's disabled-guard
-    // (`!selectedRatio.width || !selectedRatio.height`) stays meaningful.
-    const setRatioWidth = (e) => {
-      selectedRatio.width = coerceNumber(e.target.value, { min: 1, step: 1 }) ?? 1;
-    };
-    const setRatioHeight = (e) => {
-      selectedRatio.height = coerceNumber(e.target.value, { min: 1, step: 1 }) ?? 1;
-    };
-
-    return {
-      selectedRatio,
-      saving,
-      saveCustomisation,
-      animations,
-      capitalize,
-      defaultcolor,
-      sendBackdropColor,
-      enabledLiveStreaming,
-      streamingMode,
-      configuredServers,
-      setRatioWidth,
-      setRatioHeight,
-    };
+// Provided by StageManagement/index.vue.
+const stage = inject("stage") as Ref<any>;
+const refresh = inject("refresh") as (id: unknown) => void;
+const config = useAttribute(stage, "config", true).value ?? {
+  ratio: {
+    width: 16,
+    height: 9,
   },
+  animations: {
+    bubble: "fade",
+    curtain: "drop",
+    bubbleSpeed: 1800,
+    curtainSpeed: 9100,
+  },
+  defaultcolor: "#30AC45",
+  enabledLiveStreaming: true,
+  streamingMode: "both",
+};
+
+const selectedRatio = reactive(config.ratio);
+// Seed defaults first so stages whose saved config predates a key show
+// real values instead of blank fields; saved values win via the spread.
+// `removal`/`removalSpeed` are dead keys: exit animations are set per
+// stage assignment (media editor Stages tab / Stage Management > Media)
+// and the board no longer reads a stage-wide fallback. Old saved values
+// just ride along in the spread, ignored.
+const animations = reactive({
+  bubble: "fade",
+  curtain: "drop",
+  bubbleSpeed: 1800,
+  curtainSpeed: 9100,
+  ...(config.animations ?? {}),
+});
+const defaultcolor = ref(config.defaultcolor || "#30AC45");
+const enabledLiveStreaming = ref(config.enabledLiveStreaming ?? true);
+// Which transports "Live Streaming" enables: Jitsi rooms, RTMP feeds, or
+// both. Legacy configs predate the field, and their enabled state always
+// meant both, so default accordingly.
+const streamingMode = ref(
+  ["jitsi", "rtmp", "both"].includes(config.streamingMode) ? config.streamingMode : "both",
+);
+// Multi-server streaming: informational only. Performers pick a server
+// per stream on stage (one Yourself tile per server in the Streams tab);
+// there is deliberately no stage-wide server setting.
+const configuredServers = {
+  jitsi: configs.JITSI_SERVER_COUNT ?? 1,
+  rtmp: configs.RTMP_SERVER_COUNT ?? (configs.RTMP_ENDPOINT ? 1 : 0),
+};
+
+const { loading: saving, save } = useMutation(stageGraph.saveStageConfig);
+const saveCustomisation = async () => {
+  const configData = JSON.stringify({
+    ratio: selectedRatio,
+    animations,
+    defaultcolor: defaultcolor.value,
+    enabledLiveStreaming: enabledLiveStreaming.value,
+    streamingMode: streamingMode.value,
+  });
+  await save(
+    () => {
+      message.success("Customisation saved!");
+      refresh(stage.value.id);
+    },
+    stage.value.id,
+    configData,
+  );
+  const mqtt = buildClient();
+  const client = mqtt.connect(stage.value?.mqtt);
+  if (!client) return;
+  client.publish(
+    namespaceTopic(TOPICS.BACKGROUND, stage.value.fileLocation),
+    JSON.stringify({
+      type: "setBackdropColor",
+      color: defaultcolor.value,
+    }),
+    { qos: 1, retain: false },
+    (error: any) => {
+      // `resolve` / `reject` did not exist here: the success path threw a
+      // ReferenceError before disconnecting and leaked one broker
+      // connection per save.
+      if (error) {
+        message.error(`Could not broadcast the backdrop colour: ${error.message ?? error}`);
+      }
+      mqtt.disconnect();
+    },
+  );
+};
+
+const sendBackdropColor = (color: string) => {
+  defaultcolor.value = color;
+};
+
+const rangeValue = (e: Event) => Number((e.target as HTMLInputElement).value);
+
+// Custom-ratio number inputs need cross-browser coercion: Firefox lets
+// the user type non-integer / negative values that Chromium rejects.
+// Fall back to 1 (the smallest sensible ratio component) when the
+// input is empty or unparseable so the SaveButton's disabled-guard
+// (`!selectedRatio.width || !selectedRatio.height`) stays meaningful.
+const setRatioWidth = (e: Event) => {
+  selectedRatio.width =
+    coerceNumber((e.target as HTMLInputElement).value, { min: 1, step: 1 }) ?? 1;
+};
+const setRatioHeight = (e: Event) => {
+  selectedRatio.height =
+    coerceNumber((e.target as HTMLInputElement).value, { min: 1, step: 1 }) ?? 1;
 };
 </script>
 
@@ -173,7 +159,7 @@ export default {
                   max="1"
                   :value="1000 / animations.bubbleSpeed"
                   type="range"
-                  @change="animations.bubbleSpeed = 1000 / $event.target.value"
+                  @change="animations.bubbleSpeed = 1000 / rangeValue($event)"
                 />
                 <span class="ml-2">{{ $t("fast") }}</span>
               </div>
@@ -203,7 +189,7 @@ export default {
                   max="1"
                   :value="5000 / animations.curtainSpeed"
                   type="range"
-                  @change="animations.curtainSpeed = 5000 / $event.target.value"
+                  @change="animations.curtainSpeed = 5000 / rangeValue($event)"
                 />
                 <span class="ml-2">{{ $t("fast") }}</span>
               </div>

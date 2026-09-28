@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import { assign, get, debounce } from "lodash-es";
@@ -7,6 +7,7 @@ import Modal from "components/Modal.vue";
 import Loading from "components/Loading.vue";
 import Asset from "components/Asset.vue";
 import { computed, provide, reactive, inject, watch, ref } from "vue";
+import type { Ref } from "vue";
 import { capitalize, compareByLabel } from "utils/common";
 import { stageGraph } from "services/graphql";
 import { useQuery } from "services/graphql/composable";
@@ -19,300 +20,278 @@ import { permissionFragment } from "models/fragment";
 
 dayjs.extend(isBetween);
 
-export default {
-  components: { Modal, Loading, Asset, VNodes, MediaForm, StageMediaTable },
-  props: { modelValue: [String, Object] },
-  emits: ["update:modelValue"],
-  setup: (props, { emit }) => {
-    const { data, loading } = useQuery(stageGraph.getSearchOption);
-    provide("whoami", null);
-    const visibleDropzone = inject("visibleDropzone");
-    const result = computed(() => data?.value);
+defineProps<{
+  modelValue?: string | Record<string, any>;
+}>();
+const emit = defineEmits<{
+  (e: "update:modelValue", value: string): void;
+}>();
 
-    const tableParams = reactive({
-      page: 1,
-      limit: 10,
-      cursor: undefined,
-      sort: "CREATED_ON_DESC",
-    });
+const { data, loading } = useQuery(stageGraph.getSearchOption);
+provide("whoami", null);
+// Provided by the Dropzone wrapper around this picker.
+const visibleDropzone = inject("visibleDropzone") as Ref<boolean>;
+const result = computed(() => data?.value);
 
-    const formData = reactive({
-      name: null,
-      owners: [],
-      types: [],
-      stages: [],
-      tags: [],
-      dates: [],
-    });
+const tableParams = reactive<Record<string, any>>({
+  page: 1,
+  limit: 10,
+  cursor: undefined,
+  sort: "CREATED_ON_DESC",
+});
 
-    const searchInput = ref("");
+const formData = reactive<Record<string, any>>({
+  name: null,
+  owners: [],
+  types: [],
+  stages: [],
+  tags: [],
+  dates: [],
+});
 
-    const debouncedSearch = debounce((value) => {
-      formData.name = value;
-    }, 2000);
+const searchInput = ref("");
 
-    watch(searchInput, (newValue) => {
-      debouncedSearch(newValue);
-    });
+const debouncedSearch = debounce((value: string) => {
+  formData.name = value;
+}, 2000);
 
-    const queryParams = computed(() => {
-      const params = {
-        ...tableParams,
-        name: formData.name || undefined,
-        owners: formData.owners.length ? formData.owners : undefined,
-        mediaTypes: formData.types.length ? formData.types : undefined,
-        stages: formData.stages.length ? formData.stages : undefined,
-        tags: formData.tags.length ? formData.tags : undefined,
-        createdBetween: formData.dates.length
-          ? [formData.dates[0].format("YYYY-MM-DD"), formData.dates[1].format("YYYY-MM-DD")]
-          : undefined,
-      };
+watch(searchInput, (newValue) => {
+  debouncedSearch(newValue);
+});
 
-      Object.keys(params).forEach((key) => {
-        if (params[key] === undefined) {
-          delete params[key];
+const queryParams = computed(() => {
+  const params: Record<string, any> = {
+    ...tableParams,
+    name: formData.name || undefined,
+    owners: formData.owners.length ? formData.owners : undefined,
+    mediaTypes: formData.types.length ? formData.types : undefined,
+    stages: formData.stages.length ? formData.stages : undefined,
+    tags: formData.tags.length ? formData.tags : undefined,
+    createdBetween: formData.dates.length
+      ? [formData.dates[0].format("YYYY-MM-DD"), formData.dates[1].format("YYYY-MM-DD")]
+      : undefined,
+  };
+
+  Object.keys(params).forEach((key) => {
+    if (params[key] === undefined) {
+      delete params[key];
+    }
+  });
+
+  return params;
+});
+
+const {
+  result: mediaResult,
+  loading: loadingMedia,
+  refetch,
+} = useApolloQuery(
+  gql`
+    query MediaTable(
+      $page: Int
+      $limit: Int
+      $name: String
+      $createdBetween: [Date]
+      $mediaTypes: [String]
+      $owners: [String]
+      $stages: [ID]
+      $tags: [String]
+      $sort: [AssetSortEnum]
+      $dormant: Boolean
+    ) {
+      media(
+        input: {
+          page: $page
+          limit: $limit
+          name: $name
+          createdBetween: $createdBetween
+          mediaTypes: $mediaTypes
+          owners: $owners
+          stages: $stages
+          tags: $tags
+          sort: $sort
+          dormant: $dormant
         }
-      });
-
-      return params;
-    });
-
-    const {
-      result: mediaResult,
-      loading: loadingMedia,
-      refetch,
-    } = useApolloQuery(
-      gql`
-        query MediaTable(
-          $page: Int
-          $limit: Int
-          $name: String
-          $createdBetween: [Date]
-          $mediaTypes: [String]
-          $owners: [String]
-          $stages: [ID]
-          $tags: [String]
-          $sort: [AssetSortEnum]
-          $dormant: Boolean
-        ) {
-          media(
-            input: {
-              page: $page
-              limit: $limit
-              name: $name
-              createdBetween: $createdBetween
-              mediaTypes: $mediaTypes
-              owners: $owners
-              stages: $stages
-              tags: $tags
-              sort: $sort
-              dormant: $dormant
-            }
-          ) {
-            totalCount
-            edges {
-              id
-              name
-              createdOn
-              size
-              description
-              fileLocation
-              dormant
-              assetType {
-                name
-              }
-              permissions {
-                ...permissionFragment
-              }
-              copyrightLevel
-              tags
-              owner {
-                username
-                displayName
-              }
-              stages {
-                name
-                fileLocation
-                id
-              }
-              privilege
-            }
+      ) {
+        totalCount
+        edges {
+          id
+          name
+          createdOn
+          size
+          description
+          fileLocation
+          dormant
+          assetType {
+            name
           }
-        }
-        ${permissionFragment}
-      `,
-      queryParams,
-      { notifyOnNetworkStatusChange: true },
-    );
-
-    watch(
-      queryParams,
-      () => {
-        refetch();
-      },
-      { deep: true },
-    );
-
-    watch(visibleDropzone, (visible) => {
-      if (visible) {
-        refetch();
-      }
-    });
-
-    const onVisibleDropzone = () => {
-      editingMediaVar(undefined);
-    };
-
-    const select = (item, closeModal) => {
-      emit("update:modelValue", item.src || item.fileLocation);
-      closeModal();
-    };
-
-    const ranges = [
-      {
-        label: "Today",
-        value: [dayjs(), dayjs()],
-      },
-      {
-        label: "Yesterday",
-        value: [dayjs().add(-1, "d"), dayjs().add(-1, "d")],
-      },
-      {
-        label: "Last 7 days",
-        value: [dayjs().add(-7, "d"), dayjs()],
-      },
-      {
-        label: "Last month",
-        value: [dayjs().add(-1, "month"), dayjs()],
-      },
-      {
-        label: "This year",
-        value: [dayjs().startOf("year"), dayjs()],
-      },
-    ];
-
-    const hasFilter = computed(() => {
-      return (
-        formData.name ||
-        formData.owners.length > 0 ||
-        formData.types.length > 0 ||
-        formData.stages.length > 0 ||
-        formData.tags.length > 0 ||
-        formData.dates.length > 0
-      );
-    });
-
-    const availableImages = computed(() => {
-      if (!mediaResult.value?.media?.edges) return [];
-
-      return mediaResult.value.media.edges
-        .filter((media) => !["audio", "video"].includes(get(media, "assetType.name")))
-        .filter((media) => ![0, 3, 4].includes(media.privilege))
-        .map((media) => ({
-          ...media,
-          src: media.fileLocation,
-        }));
-    });
-
-    const totalCount = computed(() => {
-      return mediaResult.value?.media?.totalCount || 0;
-    });
-
-    const paginationConfig = computed(() => ({
-      current: tableParams.page,
-      pageSize: tableParams.limit,
-      total: totalCount.value,
-      showQuickJumper: true,
-      showSizeChanger: true,
-    }));
-
-    const handleTableChange = ({ current = 1, pageSize = 10, sorter }) => {
-      Object.assign(tableParams, {
-        page: current,
-        limit: pageSize,
-      });
-
-      if (sorter && !Array.isArray(sorter)) {
-        sorter = [sorter];
-      }
-
-      if (sorter && sorter.length > 0) {
-        const sortOrder = sorter
-          .filter((s) => s.order)
-          .map(({ columnKey, order }) => {
-            // Keys must match the backend AssetSortEnum fields exactly
-            // (asset.py sort_field_map), otherwise the sort is silently
-            // dropped — previously this sent ASSET_TYPE / OWNER, which the
-            // backend does not recognise (it expects ASSET_TYPE_ID / OWNER_ID).
-            const fieldMap = {
-              name: "NAME",
-              asset_type_id: "ASSET_TYPE_ID",
-              owner_id: "OWNER_ID",
-              copyrightLevel: "COPYRIGHT_LEVEL",
-              size: "SIZE",
-              created_on: "CREATED_ON",
-            };
-            const field = fieldMap[columnKey] || columnKey.toUpperCase();
-            return `${field}_${order === "ascend" ? "ASC" : "DESC"}`;
-          });
-
-        if (sortOrder.length > 0) {
-          tableParams.sort = sortOrder;
+          permissions {
+            ...permissionFragment
+          }
+          copyrightLevel
+          tags
+          owner {
+            username
+            displayName
+          }
+          stages {
+            name
+            fileLocation
+            id
+          }
+          privilege
         }
       }
-    };
+    }
+    ${permissionFragment}
+  `,
+  queryParams,
+  { notifyOnNetworkStatusChange: true },
+);
 
-    provide("refresh", () => {
-      refetch();
-    });
-
-    const handleFilterOwnerName = (keyword, option) => {
-      const s = keyword.toLowerCase();
-      return option.value.toLowerCase().includes(s) || option.label.toLowerCase().includes(s);
-    };
-
-    const handleFilterStageName = (keyword, option) => {
-      return option.label.toLowerCase().includes(keyword.toLowerCase());
-    };
-
-    const clearFilters = () => {
-      assign(formData, {
-        name: null,
-        owners: [],
-        types: [],
-        stages: [],
-        tags: [],
-        dates: [],
-      });
-
-      searchInput.value = "";
-
-      tableParams.page = 1;
-    };
-
-    return {
-      loading,
-      loadingMedia,
-      dayjs,
-      ranges,
-      availableImages,
-      totalCount,
-      select,
-      hasFilter,
-      formData,
-      searchInput,
-      result,
-      capitalize,
-      compareByLabel,
-      visibleDropzone,
-      onVisibleDropzone,
-      clearFilters,
-      handleFilterOwnerName,
-      handleFilterStageName,
-      paginationConfig,
-      handleTableChange,
-    };
+watch(
+  queryParams,
+  () => {
+    refetch();
   },
+  { deep: true },
+);
+
+watch(visibleDropzone, (visible) => {
+  if (visible) {
+    refetch();
+  }
+});
+
+const onVisibleDropzone = () => {
+  editingMediaVar(undefined);
+};
+
+const select = (item: any, closeModal: () => void) => {
+  emit("update:modelValue", item.src || item.fileLocation);
+  closeModal();
+};
+
+const ranges = [
+  {
+    label: "Today",
+    value: [dayjs(), dayjs()],
+  },
+  {
+    label: "Yesterday",
+    value: [dayjs().add(-1, "d"), dayjs().add(-1, "d")],
+  },
+  {
+    label: "Last 7 days",
+    value: [dayjs().add(-7, "d"), dayjs()],
+  },
+  {
+    label: "Last month",
+    value: [dayjs().add(-1, "month"), dayjs()],
+  },
+  {
+    label: "This year",
+    value: [dayjs().startOf("year"), dayjs()],
+  },
+];
+
+const hasFilter = computed(() => {
+  return (
+    formData.name ||
+    formData.owners.length > 0 ||
+    formData.types.length > 0 ||
+    formData.stages.length > 0 ||
+    formData.tags.length > 0 ||
+    formData.dates.length > 0
+  );
+});
+
+const availableImages = computed(() => {
+  if (!mediaResult.value?.media?.edges) return [];
+
+  return mediaResult.value.media.edges
+    .filter((media: any) => !["audio", "video"].includes(get(media, "assetType.name")))
+    .filter((media: any) => ![0, 3, 4].includes(media.privilege))
+    .map((media: any) => ({
+      ...media,
+      src: media.fileLocation,
+    }));
+});
+
+const totalCount = computed(() => {
+  return mediaResult.value?.media?.totalCount || 0;
+});
+
+const paginationConfig = computed(() => ({
+  current: tableParams.page,
+  pageSize: tableParams.limit,
+  total: totalCount.value,
+  showQuickJumper: true,
+  showSizeChanger: true,
+}));
+
+const handleTableChange = ({ current = 1, pageSize = 10, sorter }: any) => {
+  Object.assign(tableParams, {
+    page: current,
+    limit: pageSize,
+  });
+
+  if (sorter && !Array.isArray(sorter)) {
+    sorter = [sorter];
+  }
+
+  if (sorter && sorter.length > 0) {
+    const sortOrder = sorter
+      .filter((s: any) => s.order)
+      .map(({ columnKey, order }: any) => {
+        // Keys must match the backend AssetSortEnum fields exactly
+        // (asset.py sort_field_map), otherwise the sort is silently
+        // dropped — previously this sent ASSET_TYPE / OWNER, which the
+        // backend does not recognise (it expects ASSET_TYPE_ID / OWNER_ID).
+        const fieldMap: Record<string, string> = {
+          name: "NAME",
+          asset_type_id: "ASSET_TYPE_ID",
+          owner_id: "OWNER_ID",
+          copyrightLevel: "COPYRIGHT_LEVEL",
+          size: "SIZE",
+          created_on: "CREATED_ON",
+        };
+        const field = fieldMap[columnKey] || columnKey.toUpperCase();
+        return `${field}_${order === "ascend" ? "ASC" : "DESC"}`;
+      });
+
+    if (sortOrder.length > 0) {
+      tableParams.sort = sortOrder;
+    }
+  }
+};
+
+provide("refresh", () => {
+  refetch();
+});
+
+const handleFilterOwnerName = (keyword: string, option: any) => {
+  const s = keyword.toLowerCase();
+  return option.value.toLowerCase().includes(s) || option.label.toLowerCase().includes(s);
+};
+
+const handleFilterStageName = (keyword: string, option: any) => {
+  return option.label.toLowerCase().includes(keyword.toLowerCase());
+};
+
+const clearFilters = () => {
+  assign(formData, {
+    name: null,
+    owners: [],
+    types: [],
+    stages: [],
+    tags: [],
+    dates: [],
+  });
+
+  searchInput.value = "";
+
+  tableParams.page = 1;
 };
 </script>
 
@@ -365,7 +344,7 @@ export default {
                   :options="
                     result
                       ? result.users
-                          .map((e) => {
+                          .map((e: any) => {
                             return {
                               value: e.username,
                               label: e.displayName || e.username,
@@ -400,9 +379,9 @@ export default {
                     result
                       ? result.mediaTypes
                           .filter(
-                            (e) => !['shape', 'media', 'image'].includes(e.name.toLowerCase()),
+                            (e: any) => !['shape', 'media', 'image'].includes(e.name.toLowerCase()),
                           )
-                          .map((e) => ({
+                          .map((e: any) => ({
                             value: e.name,
                             label: capitalize(e.name),
                           }))
@@ -423,7 +402,7 @@ export default {
                   :options="
                     result
                       ? result.getAllStages
-                          .map((e) => ({
+                          .map((e: any) => ({
                             value: e.id,
                             label: e.name,
                           }))
@@ -443,7 +422,7 @@ export default {
                   :options="
                     result
                       ? result.tags
-                          .map((e) => ({
+                          .map((e: any) => ({
                             value: e.name,
                             label: e.name,
                           }))

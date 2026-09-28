@@ -13,7 +13,7 @@ export interface GenerateReceiptInput {
   date: string;
 }
 
-// The former `oneTimePurchase` helper (raw card number / CVC interpolated
+// The former one-time donation helper (raw card number / CVC interpolated
 // into the query string) was unused and has been removed; donations go
 // through Stripe Elements via `paymentSecret`.
 export default {

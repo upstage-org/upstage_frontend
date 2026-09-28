@@ -1,17 +1,11 @@
-<script>
+<script setup lang="ts">
 import Skeleton from "../Skeleton.vue";
 import Icon from "components/Icon.vue";
 import { useStageStore } from "@stores/pinia/stage";
 
-export default {
-  components: { Skeleton, Icon },
-  setup: () => {
-    const stageStore = useStageStore();
-    const props = stageStore.tools.props;
-    const clearAll = () => stageStore.clearStageObjectsOfKind("prop");
-    return { props, clearAll };
-  },
-};
+const stageStore = useStageStore();
+const props = stageStore.tools.props as any[];
+const clearAll = () => stageStore.clearStageObjectsOfKind("prop");
 </script>
 
 <template>

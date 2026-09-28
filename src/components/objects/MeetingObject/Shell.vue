@@ -5,6 +5,9 @@ import { useLocalStreamPublisher } from "./localStreamPublisher";
 import { useExtraServerPublishers } from "./extraServerPublishers";
 
 export default {
+  // Renders only its slot (no root element), so attributes such as the `id`
+  // from live/Layout.vue have nothing to land on.
+  inheritAttrs: false,
   setup(_, { slots }) {
     const [jitsi, joined] = useJitsi();
     provide("jitsi", jitsi);

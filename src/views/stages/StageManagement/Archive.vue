@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 import Messages from "components/stage/Chat/Messages.vue";
 import DataTable from "components/DataTable/index.vue";
 import Modal from "components/Modal.vue";
@@ -8,6 +8,7 @@ import Field from "components/form/Field.vue";
 import ClearChat from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
 import { computed, inject, ref } from "vue";
+import type { Ref } from "vue";
 import dayjs from "@utils/dayjs";
 import humanizeDuration from "humanize-duration";
 import { useI18n } from "vue-i18n";
@@ -15,325 +16,287 @@ import { message } from "ant-design-vue";
 import { useMutation } from "services/graphql/composable";
 import { stageGraph } from "services/graphql";
 
-export default {
-  components: {
-    Messages,
-    DataTable,
-    ClearChat,
-    SweepStage,
-    Modal,
-    Icon,
-    CustomConfirm,
-    Field,
+// Provided by StageManagement/index.vue.
+const stage = inject("stage") as Ref<any>;
+const refresh = inject("refresh") as ((id: unknown) => void) | undefined;
+const { t } = useI18n();
+
+const trimPerformanceId = ref<string | number | null>(null);
+const trimNewName = ref("");
+const trimMinPauseSeconds = ref(30);
+
+const initTrimForm = (item: any) => {
+  trimPerformanceId.value = item.id;
+  const suffix = t("trim_replay_name_suffix");
+  trimNewName.value = item.name ? `${item.name} ${suffix}` : t("trim_replay_default_name");
+  trimMinPauseSeconds.value = 30;
+};
+
+const trimSession = computed(() =>
+  sessions.value.find((s) => String(s.id) === String(trimPerformanceId.value)),
+);
+
+const trimDurationHint = computed(() => {
+  const s = trimSession.value;
+  if (!s?.duration) return "";
+  return t("trim_replay_duration_hint", {
+    duration: humanizeDuration(s.duration, { round: true }),
+    seconds: trimMinPauseSeconds.value,
+  });
+});
+
+const date = (value: any) => {
+  return value ? dayjs(value).format("YYYY-MM-DD") : "Now";
+};
+
+const headers = [
+  {
+    title: "Name",
+    slot: "name",
   },
-  setup: () => {
-    const stage = inject("stage");
-    const refresh = inject("refresh");
-    const { t } = useI18n();
-
-    const trimPerformanceId = ref(null);
-    const trimNewName = ref("");
-    const trimMinPauseSeconds = ref(30);
-
-    const initTrimForm = (item) => {
-      trimPerformanceId.value = item.id;
-      const suffix = t("trim_replay_name_suffix");
-      trimNewName.value = item.name ? `${item.name} ${suffix}` : t("trim_replay_default_name");
-      trimMinPauseSeconds.value = 30;
-    };
-
-    const trimSession = computed(() =>
-      sessions.value.find((s) => String(s.id) === String(trimPerformanceId.value)),
-    );
-
-    const trimDurationHint = computed(() => {
-      const s = trimSession.value;
-      if (!s?.duration) return "";
-      return t("trim_replay_duration_hint", {
-        duration: humanizeDuration(s.duration, { round: true }),
-        seconds: trimMinPauseSeconds.value,
-      });
+  {
+    title: "Audience Chat",
+    slot: "public-chat",
+    align: "center",
+  },
+  {
+    title: "Player Chat",
+    slot: "private-chat",
+    align: "center",
+  },
+  {
+    title: "Replay",
+    slot: "replay",
+  },
+  {
+    title: "Messages",
+    render: (item: any) => item.messages.length,
+    align: "center",
+  },
+  {
+    title: "Length",
+    render: (item: any) => humanizeDuration(item.duration, { round: true }),
+    align: "center",
+  },
+  {
+    title: "Archived On",
+    key: "createdOn",
+    type: "date",
+  },
+  {
+    title: "",
+    slot: "actions",
+  },
+];
+const sessions = computed(() => {
+  const res: any[] = [];
+  if (stage.value) {
+    const { performances, chats } = stage.value;
+    (performances || []).forEach((p: any) => {
+      p.messages = chats.filter((c: any) => c.performanceId === p.id).map((c: any) => c.payload);
+      res.push(p);
     });
-
-    const date = (value) => {
-      return value ? dayjs(value).format("YYYY-MM-DD") : "Now";
-    };
-
-    const headers = [
-      {
-        title: "Name",
-        slot: "name",
-      },
-      {
-        title: "Audience Chat",
-        slot: "public-chat",
-        align: "center",
-      },
-      {
-        title: "Player Chat",
-        slot: "private-chat",
-        align: "center",
-      },
-      {
-        title: "Replay",
-        slot: "replay",
-      },
-      {
-        title: "Messages",
-        render: (item) => item.messages.length,
-        align: "center",
-      },
-      {
-        title: "Length",
-        render: (item) => humanizeDuration(item.duration, { round: true }),
-        align: "center",
-      },
-      {
-        title: "Archived On",
-        key: "createdOn",
-        type: "date",
-      },
-      {
-        title: "",
-        slot: "actions",
-      },
-    ];
-    const sessions = computed(() => {
-      const res = [];
-      if (stage.value) {
-        const { performances, chats } = stage.value;
-        (performances || []).forEach((p) => {
-          p.messages = chats.filter((c) => c.performanceId === p.id).map((c) => c.payload);
-          res.push(p);
-        });
-      }
-      res.sort((a, b) => b.id - a.id);
-      res.forEach((session) => {
-        const messages = session.messages.filter((m) => !m.clear);
-        if (messages.length) {
-          session.begin = null;
-          for (const m of messages) {
-            if (m.at) {
-              if (!session.begin) {
-                session.begin = m.at;
-              }
-              session.end = m.at;
-              session.duration = m.at - session.begin;
-            }
+  }
+  res.sort((a, b) => b.id - a.id);
+  res.forEach((session) => {
+    const messages = session.messages.filter((m: any) => !m.clear);
+    if (messages.length) {
+      session.begin = null;
+      for (const m of messages) {
+        if (m.at) {
+          if (!session.begin) {
+            session.begin = m.at;
           }
-        } else {
-          session.chatless = true;
-          session.duration = 0;
+          session.end = m.at;
+          session.duration = m.at - session.begin;
         }
-      });
-      res.forEach((session) => {
-        session.privateMessages = session.messages.filter((m) => m.isPrivate || m.clearPlayerChat);
-        session.publicMessages = session.messages.filter((m) => !m.isPrivate && !m.clearPlayerChat);
-      });
-      return res;
-    });
-
-    let textFile;
-
-    const makeTextFile = function (content) {
-      const data = new Blob(content, { type: "text/plain" });
-
-      // If we are replacing a previously generated file we need to
-      // manually revoke the object URL to avoid memory leaks.
-      if (textFile !== null) {
-        window.URL.revokeObjectURL(textFile);
       }
+    } else {
+      session.chatless = true;
+      session.duration = 0;
+    }
+  });
+  res.forEach((session) => {
+    session.privateMessages = session.messages.filter((m: any) => m.isPrivate || m.clearPlayerChat);
+    session.publicMessages = session.messages.filter(
+      (m: any) => !m.isPrivate && !m.clearPlayerChat,
+    );
+  });
+  return res;
+});
 
-      textFile = window.URL.createObjectURL(data);
+let textFile: string | undefined;
 
-      // returns a URL you can use as a href
-      return textFile;
-    };
-    const downloadChatLog = (option, session) => {
-      const link = document.createElement("a");
-      let content = [];
-      if (option == "public") {
-        if (session) {
-          link.setAttribute(
-            "download",
-            `${stage.value.name}-Audience-chat-${
-              session.end ? timeStamp(session.end) : timeStamp(session.createdOn)
-            }.txt`,
-          );
-          content = session.publicMessages.map((item) => {
-            let line;
+const makeTextFile = function (content: string[]) {
+  const data = new Blob(content, { type: "text/plain" });
+
+  // If we are replacing a previously generated file we need to
+  // manually revoke the object URL to avoid memory leaks.
+  if (textFile !== null) {
+    window.URL.revokeObjectURL(textFile as string);
+  }
+
+  textFile = window.URL.createObjectURL(data);
+
+  // returns a URL you can use as a href
+  return textFile;
+};
+const downloadChatLog = (option: string, session?: any) => {
+  const link = document.createElement("a");
+  let content: string[] = [];
+  if (option == "public") {
+    if (session) {
+      link.setAttribute(
+        "download",
+        `${stage.value.name}-Audience-chat-${
+          session.end ? timeStamp(session.end) : timeStamp(session.createdOn)
+        }.txt`,
+      );
+      content = session.publicMessages.map((item: any) => {
+        let line;
+        if (item.clear) {
+          line = "---------------- Clear Chat ----------------";
+        } else {
+          line = `${item.user}: ${item.message}`;
+        }
+        return `${line}\r\n`;
+      });
+    } else {
+      link.setAttribute("download", `${stage.value.name}-Audience-chat.txt`);
+      sessions.value.forEach((session) => {
+        content = content.concat(
+          session.publicMessages.map((item: any) => {
             if (item.clear) {
-              line = "---------------- Clear Chat ----------------";
+              return `---------------- Clear Chat ----------------\r\n`;
             } else {
-              line = `${item.user}: ${item.message}`;
+              return `${item.user}: ${item.message}\r\n`;
             }
-            return `${line}\r\n`;
-          });
-        } else {
-          link.setAttribute("download", `${stage.value.name}-Audience-chat.txt`);
-          sessions.value.forEach((session) => {
-            content = content.concat(
-              session.publicMessages.map((item) => {
-                if (item.clear) {
-                  return `---------------- Clear Chat ----------------\r\n`;
-                } else {
-                  return `${item.user}: ${item.message}\r\n`;
-                }
-              }),
-            );
-          });
-        }
-      } else {
-        if (session) {
-          link.setAttribute(
-            "download",
-            `${stage.value.name}-Player-chat-${
-              session.end ? timeStamp(session.end) : timeStamp(session.createdOn)
-            }.txt`,
-          );
-          content = session.privateMessages.map((item) => {
-            let line;
-            if (item.clearPlayerChat) {
-              line = "---------------- Clear Chat ----------------";
-            } else {
-              line = `${item.user}: ${item.message}`;
-            }
-            return `${line}\r\n`;
-          });
-        } else {
-          link.setAttribute("download", `${stage.value.name}-Player-chat.txt`);
-          sessions.value.forEach((session) => {
-            content = content.concat(
-              session.privateMessages.map((item) => {
-                if (item.clearPlayerChat) {
-                  return `---------------- Clear Chat ----------------\r\n`;
-                } else {
-                  return `${item.user}: ${item.message}\r\n`;
-                }
-              }),
-            );
-          });
-        }
-      }
-      link.href = makeTextFile(content);
-      document.body.appendChild(link);
-
-      // wait for the link to be added to the document
-      window.requestAnimationFrame(function () {
-        const event = new MouseEvent("click");
-        link.dispatchEvent(event);
-        document.body.removeChild(link);
+          }),
+        );
       });
-    };
-
-    const padTo2Digits = (num) => {
-      return num.toString().padStart(2, "0");
-    };
-
-    const formatDate = (date) => {
-      return (
-        [padTo2Digits(date.getHours()), padTo2Digits(date.getMinutes())].join("") +
-        "-" +
-        [padTo2Digits(date.getDate()), padTo2Digits(date.getMonth() + 1), date.getFullYear()].join(
-          "",
-        )
+    }
+  } else {
+    if (session) {
+      link.setAttribute(
+        "download",
+        `${stage.value.name}-Player-chat-${
+          session.end ? timeStamp(session.end) : timeStamp(session.createdOn)
+        }.txt`,
       );
-    };
+      content = session.privateMessages.map((item: any) => {
+        let line;
+        if (item.clearPlayerChat) {
+          line = "---------------- Clear Chat ----------------";
+        } else {
+          line = `${item.user}: ${item.message}`;
+        }
+        return `${line}\r\n`;
+      });
+    } else {
+      link.setAttribute("download", `${stage.value.name}-Player-chat.txt`);
+      sessions.value.forEach((session) => {
+        content = content.concat(
+          session.privateMessages.map((item: any) => {
+            if (item.clearPlayerChat) {
+              return `---------------- Clear Chat ----------------\r\n`;
+            } else {
+              return `${item.user}: ${item.message}\r\n`;
+            }
+          }),
+        );
+      });
+    }
+  }
+  link.href = makeTextFile(content);
+  document.body.appendChild(link);
 
-    const timeStamp = (value) => {
-      const date = new Date(value);
-      return formatDate(date);
-    };
+  // wait for the link to be added to the document
+  window.requestAnimationFrame(function () {
+    const event = new MouseEvent("click");
+    link.dispatchEvent(event);
+    document.body.removeChild(link);
+  });
+};
 
-    const { loading: updating, save: updateMutation } = useMutation(stageGraph.updatePerformance);
-    const updatePerformance = async (item, complete) => {
-      await updateMutation(
-        "Performance updated successfully!",
-        item.id,
-        item.name,
-        item.description,
-      );
-      complete();
-    };
+const padTo2Digits = (num: number) => {
+  return num.toString().padStart(2, "0");
+};
 
-    const { loading: deleting, save: deleteMutation } = useMutation(stageGraph.deletePerformance);
-    const deletePerformance = async (item, complete) => {
-      const id = Number(item.id);
-      if (!Number.isFinite(id)) {
-        message.error(t("replay_delete_invalid_id"));
-        return;
-      }
-      const response = await deleteMutation("Performance deleted successfully!", id);
-      const ok = response?.deletePerformance?.success;
-      if (ok === false) {
-        message.error(t("replay_delete_failed"));
-        return;
-      }
-      complete();
+const formatDate = (date: Date) => {
+  return (
+    [padTo2Digits(date.getHours()), padTo2Digits(date.getMinutes())].join("") +
+    "-" +
+    [padTo2Digits(date.getDate()), padTo2Digits(date.getMonth() + 1), date.getFullYear()].join("")
+  );
+};
+
+const timeStamp = (value: any) => {
+  const date = new Date(value);
+  return formatDate(date);
+};
+
+const { loading: updating, save: updateMutation } = useMutation(stageGraph.updatePerformance);
+const updatePerformance = async (item: any, complete: () => void) => {
+  await updateMutation("Performance updated successfully!", item.id, item.name, item.description);
+  complete();
+};
+
+const { loading: deleting, save: deleteMutation } = useMutation(stageGraph.deletePerformance);
+const deletePerformance = async (item: any, complete: () => void) => {
+  const id = Number(item.id);
+  if (!Number.isFinite(id)) {
+    message.error(t("replay_delete_invalid_id"));
+    return;
+  }
+  const response = await deleteMutation("Performance deleted successfully!", id);
+  const ok = response?.deletePerformance?.success;
+  if (ok === false) {
+    message.error(t("replay_delete_failed"));
+    return;
+  }
+  complete();
+  if (refresh) {
+    refresh(stage.value.id);
+  }
+};
+
+const copyReplayLink = async (item: any) => {
+  if (!stage.value?.fileLocation || item?.id == null) return;
+  const { copyReplayLink: copy } = await import("@utils/replayLink");
+  await copy(stage.value.fileLocation, item.id);
+  message.success(t("replay_link_copied"));
+};
+
+const { loading: trimming, save: trimSave } = useMutation(
+  stageGraph.duplicatePerformanceWithTrimmedPauses,
+);
+const duplicateWithTrimmedPauses = async (closeModal?: () => void) => {
+  const secs = Number(trimMinPauseSeconds.value);
+  if (!trimNewName.value?.trim()) {
+    message.error(t("trim_replay_name_required"));
+    return;
+  }
+  if (!(secs > 0)) {
+    message.error(t("trim_replay_pause_positive"));
+    return;
+  }
+  await trimSave(
+    () => {
+      message.success(t("trim_replay_success"));
       if (refresh) {
         refresh(stage.value.id);
       }
-    };
-
-    const copyReplayLink = async (item) => {
-      if (!stage.value?.fileLocation || item?.id == null) return;
-      const { copyReplayLink: copy } = await import("@utils/replayLink");
-      await copy(stage.value.fileLocation, item.id);
-      message.success(t("replay_link_copied"));
-    };
-
-    const { loading: trimming, save: trimSave } = useMutation(
-      stageGraph.duplicatePerformanceWithTrimmedPauses,
-    );
-    const duplicateWithTrimmedPauses = async (closeModal) => {
-      const secs = Number(trimMinPauseSeconds.value);
-      if (!trimNewName.value?.trim()) {
-        message.error(t("trim_replay_name_required"));
-        return;
-      }
-      if (!(secs > 0)) {
-        message.error(t("trim_replay_pause_positive"));
-        return;
-      }
-      await trimSave(
-        () => {
-          message.success(t("trim_replay_success"));
-          if (refresh) {
-            refresh(stage.value.id);
-          }
-          closeModal?.();
-        },
-        {
-          input: {
-            sourcePerformanceId: trimPerformanceId.value,
-            name: trimNewName.value.trim(),
-            description: null,
-            minPauseSeconds: secs,
-          },
-        },
-      );
-    };
-
-    return {
-      stage,
-      sessions,
-      downloadChatLog,
-      headers,
-      date,
-      updatePerformance,
-      updating,
-      deletePerformance,
-      deleting,
-      trimPerformanceId,
-      trimNewName,
-      trimMinPauseSeconds,
-      initTrimForm,
-      duplicateWithTrimmedPauses,
-      trimming,
-      copyReplayLink,
-      trimDurationHint,
-    };
-  },
+      closeModal?.();
+    },
+    {
+      input: {
+        sourcePerformanceId: trimPerformanceId.value,
+        name: trimNewName.value.trim(),
+        description: null,
+        minPauseSeconds: secs,
+      },
+    },
+  );
 };
 </script>
 

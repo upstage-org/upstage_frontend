@@ -338,6 +338,8 @@ export default {
       loadeddata,
       video,
       isStreamPlaybackBoardType,
+      // Read by the template (`:disabled="replaying"` on the context menu).
+      replaying,
     };
   },
 };

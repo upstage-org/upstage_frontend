@@ -1,7 +1,8 @@
-<script>
+<script setup lang="ts">
 import { useAttribute, useMutation, useQuery, useRequest } from "services/graphql/composable";
 import { stageGraph, userGraph } from "services/graphql";
 import { inject, reactive, ref, watch, computed, provide } from "vue";
+import type { Ref } from "vue";
 import Field from "components/form/Field.vue";
 import ImagePicker from "components/form/ImagePicker.vue";
 import MultiTransferAccessColumn from "components/MultiTransferAccessColumn.vue";
@@ -19,239 +20,202 @@ import AppSwitch from "components/form/Switch.vue";
 import { message } from "ant-design-vue";
 import { handleError } from "utils/common";
 
-export default {
-  components: {
-    Field,
-    ClearChatInStage,
-    SweepStage,
-    MultiTransferAccessColumn,
-    ImagePicker,
-    DuplicateStage,
-    DeleteStage,
-    AppSwitch,
-  },
-  setup: () => {
-    const cacheStore = useCacheStore();
-    const { whoami } = storeToRefs(useUserStore());
-    const router = useRouter();
-    const stage = inject("stage");
-    /** Refetch stage in parent layout so injected `stage` matches DB after save (clearCache alone leaves stale data). */
-    const refresh = inject("refresh");
+const cacheStore = useCacheStore();
+const { whoami } = storeToRefs(useUserStore());
+const router = useRouter();
+// Provided by StageManagement/index.vue.
+const stage = inject("stage") as Ref<any>;
+/** Refetch stage in parent layout so injected `stage` matches DB after save (clearCache alone leaves stale data). */
+const refresh = inject("refresh") as (id: unknown) => Promise<unknown>;
 
-    const form = reactive({
-      fileLocation: "",
-      ...stage.value,
-      owner: stage.value.owner?.id,
-      status: useAttribute(stage, "status").value ?? "rehearsal",
-      cover: useAttribute(stage, "cover").value,
-    });
+const form = reactive<Record<string, any>>({
+  fileLocation: "",
+  ...stage.value,
+  owner: stage.value.owner?.id,
+  status: useAttribute(stage, "status").value ?? "rehearsal",
+  cover: useAttribute(stage, "cover").value,
+});
 
-    const playerAccess = ref(useAttribute(stage, "playerAccess", true).value ?? []);
+const playerAccess = ref<any[][]>(useAttribute(stage, "playerAccess", true).value ?? []);
 
-    watch(playerAccess, (val) => {
-      form.playerAccess = JSON.stringify(val);
-    });
+watch(playerAccess, (val) => {
+  form.playerAccess = JSON.stringify(val);
+});
 
-    const { nodes, loading: loadingUsers } = useQuery(userGraph.userList);
-    const users = computed(() =>
-      nodes.value
-        ? nodes.value.filter((u) => {
-            if (stage.value && stage.value.owner) {
-              return u.username !== stage.value.owner.username;
-            }
-            return u.username !== whoami?.value.username;
-          })
-        : [],
-    );
-
-    const owner = computed(() =>
-      nodes.value
-        ? nodes.value.find((u) => {
-            if (stage.value && stage.value.owner) {
-              return u.username === stage.value.owner.username;
-            }
-            return u.username === whoami?.value.username;
-          })
-        : [],
-    );
-
-    const ownerSearchValue = ref("");
-    const allUsers = computed(() => nodes.value || []);
-
-    const filteredOwnerUsers = computed(() => {
-      if (!ownerSearchValue.value) {
-        return allUsers.value;
-      }
-
-      const search = ownerSearchValue.value.toLowerCase();
-      return allUsers.value.filter((user) => {
-        const displayName = getOwnerDisplayName(user).toLowerCase();
-        const username = user.username?.toLowerCase() || "";
-        const email = user.email?.toLowerCase() || "";
-        const firstName = user.firstName?.toLowerCase() || "";
-        const lastName = user.lastName?.toLowerCase() || "";
-
-        return (
-          displayName.includes(search) ||
-          username.includes(search) ||
-          email.includes(search) ||
-          firstName.includes(search) ||
-          lastName.includes(search)
-        );
-      });
-    });
-
-    const handleOwnerSearch = (value) => {
-      ownerSearchValue.value = value;
-    };
-
-    const handleOwnerDropdownChange = (open) => {
-      if (!open) {
-        ownerSearchValue.value = "";
-      }
-    };
-
-    const getOwnerDisplayName = (user) => {
-      if (user.displayName) {
-        return user.displayName;
-      }
-      return user.username;
-    };
-
-    watch(
-      whoami,
-      () => {
-        if (whoami.value && !stage.value.id) {
-          form.owner = whoami.value.id;
+const { nodes, loading: loadingUsers } = useQuery(userGraph.userList);
+const users = computed(() =>
+  nodes.value
+    ? nodes.value.filter((u: any) => {
+        if (stage.value && stage.value.owner) {
+          return u.username !== stage.value.owner.username;
         }
-      },
-      { immediate: true },
-    );
+        return u.username !== (whoami?.value as any).username;
+      })
+    : [],
+);
 
-    watch(
-      () => form.owner,
-      (newOwnerId, oldOwnerId) => {
-        if (oldOwnerId && newOwnerId !== oldOwnerId && whoami.value) {
-          if (newOwnerId !== whoami.value.id) {
-            const currentPlayerAccess = [...playerAccess.value];
-
-            while (currentPlayerAccess.length < 2) {
-              currentPlayerAccess.push([]);
-            }
-
-            const currentUserIdStr = String(whoami.value.id);
-
-            const userAlreadyInAccess = currentPlayerAccess.some((accessLevel) =>
-              accessLevel.some((userId) => userId === currentUserIdStr),
-            );
-
-            if (!userAlreadyInAccess) {
-              currentPlayerAccess[1].push(currentUserIdStr);
-              playerAccess.value = currentPlayerAccess;
-            }
-          }
+const owner = computed(() =>
+  nodes.value
+    ? nodes.value.find((u: any) => {
+        if (stage.value && stage.value.owner) {
+          return u.username === stage.value.owner.username;
         }
-      },
+        return u.username === (whoami?.value as any).username;
+      })
+    : [],
+);
+
+const ownerSearchValue = ref("");
+const allUsers = computed<any[]>(() => nodes.value || []);
+
+const filteredOwnerUsers = computed(() => {
+  if (!ownerSearchValue.value) {
+    return allUsers.value;
+  }
+
+  const search = ownerSearchValue.value.toLowerCase();
+  return allUsers.value.filter((user) => {
+    const displayName = getOwnerDisplayName(user).toLowerCase();
+    const username = user.username?.toLowerCase() || "";
+    const email = user.email?.toLowerCase() || "";
+    const firstName = user.firstName?.toLowerCase() || "";
+    const lastName = user.lastName?.toLowerCase() || "";
+
+    return (
+      displayName.includes(search) ||
+      username.includes(search) ||
+      email.includes(search) ||
+      firstName.includes(search) ||
+      lastName.includes(search)
     );
+  });
+});
 
-    const { loading, mutation } = useMutation(
-      stage.value.id ? stageGraph.updateStage : stageGraph.createStage,
-      form,
-    );
-    const createStage = async () => {
-      try {
-        const stage = await mutation();
-        message.success("Stage created successfully!");
-        cacheStore.fetchStages();
-        router.push(`/stages/stage-management/${stage.id}/`);
-      } catch (error) {
-        message.error(error);
-      }
-    };
-    const updateStage = async () => {
-      try {
-        await mutation();
-        message.success("Stage updated successfully!");
-        cacheStore.updateStageVisibility(form.id, form.visibility);
-        await refresh(stage.value.id);
-      } catch (error) {
-        handleError(error);
-      }
-    };
-
-    const preservedPaths = ["backstage", "login", "register", "static", "studio", "replay", "api"];
-    const urlValid = ref(!!stage.value.id);
-    const { loading: validatingURL, fetch } = useRequest(stageGraph.stageList);
-
-    const validRegex = /^[a-zA-Z0-9-_]*$/;
-    const checkURL = debounce(async () => {
-      const url = form.fileLocation.trim();
-      if (!url || !validRegex.test(url) || preservedPaths.includes(url)) {
-        urlValid.value = false;
-        return;
-      }
-      const response = await fetch({
-        fileLocation: url,
-      });
-      urlValid.value = true;
-      if (response.stages.length) {
-        const existingStage = response.stages[0];
-        if (existingStage.fileLocation !== stage.value.fileLocation) {
-          urlValid.value = false;
-        }
-      }
-    }, 500);
-
-    const urlError = computed(() => {
-      if (!validRegex.test(form.fileLocation)) {
-        return "URL cannot contain special characters or spaces!";
-      }
-      if (preservedPaths.includes(form.fileLocation.trim())) {
-        return `These URL are not allowed: ${preservedPaths.join(", ")}`;
-      }
-      if (!urlValid.value && form.fileLocation) {
-        return "This URL already existed!";
-      }
-      return null;
-    });
-
-    const afterDelete = () => {
-      cacheStore.fetchStages();
-      router.push("/stages");
-    };
-
-    const afterDuplicate = () => {
-      cacheStore.fetchStages();
-    };
-
-    provide("afterDuplicate", afterDuplicate);
-
-    return {
-      form,
-      stage,
-      createStage,
-      updateStage,
-      loading,
-      loadingUsers,
-      users,
-      owner,
-      displayName,
-      checkURL,
-      validatingURL,
-      urlValid,
-      playerAccess,
-      afterDelete,
-      urlError,
-      allUsers,
-      filteredOwnerUsers,
-      handleOwnerSearch,
-      handleOwnerDropdownChange,
-      getOwnerDisplayName,
-      ownerSearchValue,
-      compareByLabel,
-    };
-  },
+const handleOwnerSearch = (value: string) => {
+  ownerSearchValue.value = value;
 };
+
+const handleOwnerDropdownChange = (open: boolean) => {
+  if (!open) {
+    ownerSearchValue.value = "";
+  }
+};
+
+const getOwnerDisplayName = (user: any) => {
+  if (user.displayName) {
+    return user.displayName;
+  }
+  return user.username;
+};
+
+watch(
+  whoami,
+  () => {
+    if (whoami.value && !stage.value.id) {
+      form.owner = whoami.value.id;
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => form.owner,
+  (newOwnerId, oldOwnerId) => {
+    if (oldOwnerId && newOwnerId !== oldOwnerId && whoami.value) {
+      if (newOwnerId !== whoami.value.id) {
+        const currentPlayerAccess = [...playerAccess.value];
+
+        while (currentPlayerAccess.length < 2) {
+          currentPlayerAccess.push([]);
+        }
+
+        const currentUserIdStr = String(whoami.value.id);
+
+        const userAlreadyInAccess = currentPlayerAccess.some((accessLevel) =>
+          accessLevel.some((userId) => userId === currentUserIdStr),
+        );
+
+        if (!userAlreadyInAccess) {
+          currentPlayerAccess[1].push(currentUserIdStr);
+          playerAccess.value = currentPlayerAccess;
+        }
+      }
+    }
+  },
+);
+
+const { loading, mutation } = useMutation(
+  stage.value.id ? stageGraph.updateStage : stageGraph.createStage,
+  form,
+);
+const createStage = async () => {
+  try {
+    const stage = await mutation();
+    message.success("Stage created successfully!");
+    cacheStore.fetchStages();
+    router.push(`/stages/stage-management/${stage.id}/`);
+  } catch (error: any) {
+    message.error(error);
+  }
+};
+const updateStage = async () => {
+  try {
+    await mutation();
+    message.success("Stage updated successfully!");
+    cacheStore.updateStageVisibility(form.id, form.visibility);
+    await refresh(stage.value.id);
+  } catch (error) {
+    handleError(error);
+  }
+};
+
+const preservedPaths = ["backstage", "login", "register", "static", "studio", "replay", "api"];
+// `null` while the URL is being typed and has not been checked yet.
+const urlValid = ref<boolean | null>(!!stage.value.id);
+const { loading: validatingURL, fetch } = useRequest(stageGraph.stageList);
+
+const validRegex = /^[a-zA-Z0-9-_]*$/;
+const checkURL = debounce(async () => {
+  const url = form.fileLocation.trim();
+  if (!url || !validRegex.test(url) || preservedPaths.includes(url)) {
+    urlValid.value = false;
+    return;
+  }
+  const response = await fetch({
+    fileLocation: url,
+  });
+  urlValid.value = true;
+  if (response.stages.length) {
+    const existingStage = response.stages[0];
+    if (existingStage.fileLocation !== stage.value.fileLocation) {
+      urlValid.value = false;
+    }
+  }
+}, 500);
+
+const urlError = computed(() => {
+  if (!validRegex.test(form.fileLocation)) {
+    return "URL cannot contain special characters or spaces!";
+  }
+  if (preservedPaths.includes(form.fileLocation.trim())) {
+    return `These URL are not allowed: ${preservedPaths.join(", ")}`;
+  }
+  if (!urlValid.value && form.fileLocation) {
+    return "This URL already existed!";
+  }
+  return undefined;
+});
+
+const afterDelete = () => {
+  cacheStore.fetchStages();
+  router.push("/stages");
+};
+
+const afterDuplicate = () => {
+  cacheStore.fetchStages();
+};
+
+provide("afterDuplicate", afterDuplicate);
 </script>
 
 <template>
@@ -323,8 +287,9 @@ export default {
                   : 'fas'
           "
           :help="
-            !form.fileLocation &&
-            `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
+            !form.fileLocation
+              ? `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
+              : undefined
           "
           :error="urlError"
           :disabled="!!stage.id"

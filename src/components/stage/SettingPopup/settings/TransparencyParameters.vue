@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 import { reactive, computed } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import HorizontalField from "components/form/HorizontalField.vue";
@@ -11,33 +11,24 @@ import SaveButton from "components/form/SaveButton.vue";
 // keeps this hold-independent: the inline OpacitySlider only renders while a
 // holdable tile is actively held, which left audience-facing stream tiles
 // with no reachable transparency control from the right-click menu.
-export default {
-  components: {
-    HorizontalField,
-    SaveButton,
-  },
-  emits: ["close"],
-  setup: (props, { emit }) => {
-    const stageStore = useStageStore();
-    const currentObject = computed(() => stageStore.activeObject);
-    const parameters = reactive({
-      opacity: Math.round((currentObject.value?.opacity ?? 1) * 100),
-    });
 
-    // `shapeObject` is synchronous in Pinia (same as VolumeParameters).
-    const saveOpacity = () => {
-      stageStore.shapeObject({
-        ...currentObject.value,
-        opacity: parameters.opacity / 100,
-      });
-      emit("close");
-    };
+const emit = defineEmits<{
+  (e: "close"): void;
+}>();
 
-    return {
-      saveOpacity,
-      parameters,
-    };
-  },
+const stageStore = useStageStore();
+const currentObject = computed<any>(() => stageStore.activeObject);
+const parameters = reactive({
+  opacity: Math.round((currentObject.value?.opacity ?? 1) * 100),
+});
+
+// `shapeObject` is synchronous in Pinia (same as VolumeParameters).
+const saveOpacity = () => {
+  stageStore.shapeObject({
+    ...currentObject.value,
+    opacity: parameters.opacity / 100,
+  });
+  emit("close");
 };
 </script>
 
