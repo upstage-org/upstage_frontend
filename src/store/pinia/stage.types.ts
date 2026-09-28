@@ -323,7 +323,7 @@ export interface SettingPopup {
   [k: string]: unknown;
 }
 
-export interface PurchasePopup {
+export interface DonationPopup {
   isActive: boolean;
   amount?: number;
   [k: string]: unknown;

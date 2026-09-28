@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 // Import the asset through Vite's resolver so the rendered <img> uses an
 // absolute, content-hashed URL instead of the literal string "assets/…".
 // A bare-string `src` is browser-relative and resolves against the
@@ -9,16 +9,11 @@
 // `Navbar.vue` and `QRCode.vue` already use this same pattern.
 import logoSrc from "assets/upstage.png";
 
-export default {
-  props: {
-    link: String,
-    to: String,
-    target: String,
-  },
-  data() {
-    return { logoSrc };
-  },
-};
+defineProps<{
+  link?: string;
+  to?: string;
+  target?: string;
+}>();
 </script>
 
 <template>

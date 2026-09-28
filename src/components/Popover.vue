@@ -1,28 +1,23 @@
-<script>
+<script setup lang="ts">
 import { ref } from "vue";
 import { animate } from "animejs";
-export default {
-  setup: () => {
-    const position = ref();
-    const show = (e) => {
-      position.value = {
-        x: e.clientX,
-        y: e.clientY,
-      };
-    };
 
-    const hide = () => {
-      position.value = null;
-    };
+const position = ref<{ x: number; y: number } | null>();
+const show = (e: MouseEvent) => {
+  position.value = {
+    x: e.clientX,
+    y: e.clientY,
+  };
+};
 
-    const enter = (el, complete) => {
-      animate(el, {
-        onComplete: complete,
-      });
-    };
+const hide = () => {
+  position.value = null;
+};
 
-    return { show, hide, position, enter };
-  },
+const enter = (el: Element, complete: () => void) => {
+  animate(el, {
+    onComplete: complete,
+  });
 };
 </script>
 

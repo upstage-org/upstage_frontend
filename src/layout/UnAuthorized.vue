@@ -8,10 +8,8 @@ import { storeToRefs } from "pinia";
 // Async chunks: these pull in Stripe.js + vue-stripe-js, which no public
 // page needs until someone opens the donate popup. Loading them after the
 // page has rendered keeps the ~200 KB Stripe bundle off the critical path.
-const OneTimePurchase = defineAsyncComponent(
-  () => import("components/payment/OneTimePurchase.vue"),
-);
-const PurchasePopup = defineAsyncComponent(() => import("components/payment/PurchasePopup.vue"));
+const DonationBar = defineAsyncComponent(() => import("components/payment/DonationBar.vue"));
+const DonationPopup = defineAsyncComponent(() => import("components/payment/DonationPopup.vue"));
 
 const { enableDonate } = storeToRefs(useConfigStore());
 </script>
@@ -20,8 +18,8 @@ const { enableDonate } = storeToRefs(useConfigStore());
   <NavBar />
   <div id="main-layout">
     <router-view />
-    <OneTimePurchase v-if="enableDonate" />
-    <PurchasePopup v-if="enableDonate" />
+    <DonationBar v-if="enableDonate" />
+    <DonationPopup v-if="enableDonate" />
   </div>
   <Footer />
 </template>

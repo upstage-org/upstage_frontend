@@ -1,124 +1,114 @@
-<script>
+<script setup lang="ts">
 import { reactive } from "vue";
 import { watch } from "vue";
 import { includesIgnoreCase } from "utils/common";
 import { RightOutlined, LeftOutlined } from "@ant-design/icons-vue";
-export default {
-  components: { RightOutlined, LeftOutlined },
-  props: {
-    columns: Array,
-    modelValue: Array,
-    data: { type: Array, default: () => [] },
-    owner: Object,
-    renderLabel: {
-      type: Function,
-      default: (item) => item,
-    },
-    renderValue: {
-      type: Function,
-      default: (item) => item,
-    },
-    renderKeywords: Function,
+
+const props = withDefaults(
+  defineProps<{
+    columns: string[];
+    modelValue: any[][];
+    data?: any[];
+    owner?: Record<string, any>;
+    renderLabel?: (item: any) => any;
+    renderValue?: (item: any) => any;
+    renderKeywords?: (item: any) => any;
+  }>(),
+  {
+    data: () => [],
+    owner: undefined,
+    renderLabel: (item: any) => item,
+    renderValue: (item: any) => item,
+    renderKeywords: undefined,
   },
-  emits: ["update:modelValue"],
-  setup: (props, { emit }) => {
-    const positions = reactive([]);
-    const searchs = reactive([]);
+);
+const emit = defineEmits<{
+  (e: "update:modelValue", value: any[][]): void;
+}>();
 
-    const matchSearch = (item, column) => {
-      if (!searchs[column]) {
-        return true;
+const positions = reactive<number[]>([]);
+const searchs = reactive<string[]>([]);
+
+const matchSearch = (item: number, column: number) => {
+  if (!searchs[column]) {
+    return true;
+  }
+  const transform = props.renderKeywords ?? props.renderLabel;
+  return includesIgnoreCase(transform(props.data[item]), searchs[column]);
+};
+
+const shouldVisible = (item: number, column: number) => {
+  return (positions[item] ?? 0) === column && matchSearch(item, column);
+};
+
+const moveRight = (item: number) => {
+  const currentPosition = positions[item] ?? 0;
+  if (currentPosition < props.columns.length - 1) {
+    positions[item] = currentPosition + 1;
+  }
+};
+
+const moveLeft = (item: number) => {
+  const currentPosition = positions[item] ?? 0;
+  if (currentPosition > 0) {
+    positions[item] = currentPosition - 1;
+  }
+};
+
+/** Last column cannot move right; primary click moves one step left like other columns advance right. */
+const onRowClick = (itemIndex: number, columnIndex: number) => {
+  if (columnIndex === props.columns.length - 1) {
+    moveLeft(itemIndex);
+  } else {
+    moveRight(itemIndex);
+  }
+};
+
+/** Right-click moves one column left; not defined in the audience-only column. */
+const onRowContextMenu = (e: MouseEvent, itemIndex: number, columnIndex: number) => {
+  if (columnIndex <= 0) return;
+  e.preventDefault();
+  moveLeft(itemIndex);
+};
+
+watch(positions, () => {
+  const res: any[][] = [];
+  for (let i = 1; i < props.columns.length; i++) {
+    if (!res[i - 1]) {
+      res[i - 1] = [];
+    }
+    for (let j = 0; j < props.data.length; j++) {
+      if (positions[j] === i) {
+        res[i - 1].push(props.renderValue(props.data[j]));
       }
-      const transform = props.renderKeywords ?? props.renderLabel;
-      return includesIgnoreCase(transform(props.data[item]), searchs[column]);
-    };
+    }
+  }
+  emit("update:modelValue", res);
+});
 
-    const shouldVisible = (item, column) => {
-      return (positions[item] ?? 0) === column && matchSearch(item, column);
-    };
-
-    const moveRight = (item) => {
-      let currentPosition = positions[item] ?? 0;
-      if (currentPosition < props.columns.length - 1) {
-        positions[item] = currentPosition + 1;
-      }
-    };
-
-    const moveLeft = (item) => {
-      const currentPosition = positions[item] ?? 0;
-      if (currentPosition > 0) {
-        positions[item] = currentPosition - 1;
-      }
-    };
-
-    /** Last column cannot move right; primary click moves one step left like other columns advance right. */
-    const onRowClick = (itemIndex, columnIndex) => {
-      if (columnIndex === props.columns.length - 1) {
-        moveLeft(itemIndex);
-      } else {
-        moveRight(itemIndex);
-      }
-    };
-
-    /** Right-click moves one column left; not defined in the audience-only column. */
-    const onRowContextMenu = (e, itemIndex, columnIndex) => {
-      if (columnIndex <= 0) return;
-      e.preventDefault();
-      moveLeft(itemIndex);
-    };
-
-    watch(positions, () => {
-      let res = [];
-      for (let i = 1; i < props.columns.length; i++) {
-        if (!res[i - 1]) {
-          res[i - 1] = [];
-        }
-        for (let j = 0; j < props.data.length; j++) {
-          if (positions[j] === i) {
-            res[i - 1].push(props.renderValue(props.data[j]));
-          }
-        }
-      }
-      emit("update:modelValue", res);
-    });
-
-    watch(
-      [() => props.modelValue, () => props.data],
-      ([val]) => {
-        if (props.data) {
-          for (let i = 0; i < val.length; i++) {
-            for (let j = 0; j < (val[i] ?? []).length; j++) {
-              positions[props.data.findIndex((item) => props.renderValue(item) === val[i][j])] =
-                i + 1;
-            }
-          }
-        }
-      },
-      { immediate: true },
-    );
-
-    const count = (i) =>
-      props.data ? props.data.filter((item, p) => (positions[p] ?? 0) === i).length : 0;
-
-    const moveAll = (from, to) => {
-      for (let i = 0; i < props.data.length; i++) {
-        if ((positions[i] ?? 0) === from && shouldVisible(i, from)) {
-          positions[i] = to;
+watch(
+  [() => props.modelValue, () => props.data] as const,
+  ([val]) => {
+    if (props.data) {
+      for (let i = 0; i < val.length; i++) {
+        for (let j = 0; j < (val[i] ?? []).length; j++) {
+          positions[props.data.findIndex((item) => props.renderValue(item) === val[i][j])] = i + 1;
         }
       }
-    };
-
-    return {
-      shouldVisible,
-      moveRight,
-      moveLeft,
-      onRowClick,
-      onRowContextMenu,
-      count,
-      searchs,
-      moveAll,
-    };
+    }
   },
+  { immediate: true },
+);
+
+const count = (i: number) =>
+  props.data ? props.data.filter((item, p) => (positions[p] ?? 0) === i).length : 0;
+
+const moveAll = (from: number, to: number) => {
+  for (let i = 0; i < props.data.length; i++) {
+    if ((positions[i] ?? 0) === from && shouldVisible(i, from)) {
+      positions[i] = to;
+    }
+  }
 };
 </script>
 

@@ -95,6 +95,8 @@ declare module 'vue' {
     Depth: typeof import('./src/components/stage/Toolboxs/tools/Depth.vue')['default']
     Divider: typeof import('./src/components/Divider.vue')['default']
     DName: typeof import('./src/components/display/DName.vue')['default']
+    DonationBar: typeof import('./src/components/payment/DonationBar.vue')['default']
+    DonationPopup: typeof import('./src/components/payment/DonationPopup.vue')['default']
     DoubleRightOutlined: typeof import('@ant-design/icons-vue')['DoubleRightOutlined']
     DownloadButton: typeof import('./src/components/form/DownloadButton.vue')['default']
     DownloadOutlined: typeof import('@ant-design/icons-vue')['DownloadOutlined']

@@ -13,9 +13,9 @@ export default {
   components: { Icon, StripeElements, StripeElement, Turnstile },
   setup() {
     const stageStore = useStageStore();
-    const isActive = computed(() => stageStore.purchasePopup.isActive);
-    const title = computed(() => stageStore.purchasePopup.title);
-    const amount = computed(() => stageStore.purchasePopup.amount);
+    const isActive = computed(() => stageStore.donationPopup.isActive);
+    const title = computed(() => stageStore.donationPopup.title);
+    const amount = computed(() => stageStore.donationPopup.amount);
     const isReceiptPopupActive = computed(() => stageStore.receiptPopup.isActive);
     const donationDetails = computed(() => stageStore.receiptPopup.donationDetails);
     const loading = ref(false);
@@ -37,7 +37,7 @@ export default {
 
     const close = () => {
       resetPaymentState();
-      stageStore.closePurchasePopup();
+      stageStore.closeDonationPopup();
     };
 
     const closeReceiptPopup = () => {
@@ -259,7 +259,7 @@ export default {
                 />
               </StripeElements>
               <br />
-              <div class="button-purchase">
+              <div class="button-donate">
                 <button
                   class="button is-primary"
                   type="submit"
@@ -387,7 +387,7 @@ card-input:focus {
   grid-template-columns: 1fr 1fr;
 }
 
-.button-purchase {
+.button-donate {
   display: grid;
   grid-template-columns: 1fr;
 }

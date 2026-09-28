@@ -1,40 +1,32 @@
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
 import { absolutePath } from "utils/common";
 
-export default {
-  components: {},
-  props: { asset: Object },
-  emits: ["detectSize"],
-  setup: (props, { emit }) => {
-    // Normalize the polymorphic assetType (object {name} or string) into a
-    // single string for the template. Previously this was done by
-    // Object.assign(props.asset, ...) in setup, which mutated the parent's
-    // prop (vue/no-mutating-props) and silently flipped asset.assetType from
-    // an object to a string for everyone holding a reference to it.
-    const assetTypeName = computed(() =>
-      typeof props.asset.assetType === "object"
-        ? props.asset.assetType?.name
-        : props.asset.assetType,
-    );
-    const src = computed(
-      () => props.asset.base64 ?? absolutePath(props.asset.src || props.asset.fileLocation),
-    );
-    const meta = computed(() => {
-      if (props.asset.description) {
-        return JSON.parse(props.asset.description);
-      }
-      return {};
-    });
-    const handleLoad = (e) => {
-      emit("detectSize", {
-        width: e.target.width,
-        height: e.target.height,
-      });
-    };
+// Media rows reach this component in several shapes (list row, upload draft).
+type AssetLike = Record<string, any>;
 
-    return { src, meta, handleLoad, assetTypeName };
-  },
+const props = defineProps<{ asset: AssetLike }>();
+const emit = defineEmits<{
+  (e: "detectSize", size: { width: number; height: number }): void;
+}>();
+
+// Normalize the polymorphic assetType (object {name} or string) into a
+// single string for the template. Previously this was done by
+// Object.assign(props.asset, ...) in setup, which mutated the parent's
+// prop (vue/no-mutating-props) and silently flipped asset.assetType from
+// an object to a string for everyone holding a reference to it.
+const assetTypeName = computed(() =>
+  typeof props.asset.assetType === "object" ? props.asset.assetType?.name : props.asset.assetType,
+);
+const src = computed(
+  () => props.asset.base64 ?? absolutePath(props.asset.src || props.asset.fileLocation),
+);
+const handleLoad = (e: Event) => {
+  const image = e.target as HTMLImageElement;
+  emit("detectSize", {
+    width: image.width,
+    height: image.height,
+  });
 };
 </script>
 

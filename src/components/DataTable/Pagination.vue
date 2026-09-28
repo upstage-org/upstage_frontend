@@ -1,54 +1,53 @@
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
 import Dropdown from "components/form/Dropdown.vue";
-export default {
-  components: { Dropdown },
-  props: {
-    total: {
-      type: Number,
-      default: 0,
-    },
-    modelValue: Number,
-    limit: Number,
-    maxNavigationButtons: {
-      type: Number,
-      default: 7,
-    },
+
+const props = withDefaults(
+  defineProps<{
+    total?: number;
+    modelValue: number;
+    limit: number;
+    maxNavigationButtons?: number;
+  }>(),
+  {
+    total: 0,
+    maxNavigationButtons: 7,
   },
-  emits: ["update:modelValue", "update:limit", "page", "change"],
-  setup: (props, { emit }) => {
-    const goToPage = (page) => {
-      emit("update:modelValue", page);
-      emit("change");
-    };
+);
+const emit = defineEmits<{
+  (e: "update:modelValue", page: number): void;
+  (e: "update:limit", limit: number): void;
+  (e: "change"): void;
+}>();
 
-    const changeLimit = (limit) => {
-      emit("update:modelValue", 1);
-      emit("update:limit", limit);
-      emit("change");
-    };
-
-    const totalPages = computed(() => Math.ceil(props.total / props.limit));
-    const visibleNavigationButtons = computed(() => {
-      const buttons = [];
-      let begin = Math.ceil(props.modelValue - (props.maxNavigationButtons - 2) / 2);
-      if (begin < 2) {
-        begin = 2;
-      }
-      let end = begin + props.maxNavigationButtons - 3;
-      if (end > totalPages.value - 1) {
-        begin = Math.max(2, begin - (end - totalPages.value + 1));
-        end = totalPages.value - 1;
-      }
-      for (let i = begin; i <= end; i++) {
-        buttons.push(i);
-      }
-      return buttons;
-    });
-
-    return { goToPage, totalPages, visibleNavigationButtons, changeLimit };
-  },
+const goToPage = (page: number) => {
+  emit("update:modelValue", page);
+  emit("change");
 };
+
+const changeLimit = (limit: unknown) => {
+  emit("update:modelValue", 1);
+  emit("update:limit", limit as number);
+  emit("change");
+};
+
+const totalPages = computed(() => Math.ceil(props.total / props.limit));
+const visibleNavigationButtons = computed(() => {
+  const buttons: number[] = [];
+  let begin = Math.ceil(props.modelValue - (props.maxNavigationButtons - 2) / 2);
+  if (begin < 2) {
+    begin = 2;
+  }
+  let end = begin + props.maxNavigationButtons - 3;
+  if (end > totalPages.value - 1) {
+    begin = Math.max(2, begin - (end - totalPages.value + 1));
+    end = totalPages.value - 1;
+  }
+  for (let i = begin; i <= end; i++) {
+    buttons.push(i);
+  }
+  return buttons;
+});
 </script>
 
 <template>

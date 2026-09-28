@@ -1,5 +1,6 @@
-<script>
+<script setup lang="ts">
 import { inject, ref, createVNode } from "vue";
+import type { Ref } from "vue";
 import { message } from "ant-design-vue";
 import { stageGraph } from "services/graphql";
 import { useClearStage } from "components/stage/composable";
@@ -7,65 +8,59 @@ import { Modal } from "ant-design-vue";
 import { handleError } from "utils/common";
 import { useMutation } from "services/graphql/composable";
 
-export default {
-  props: {
-    archive: Boolean,
-  },
-  setup: (props) => {
-    const stage = inject("stage");
-    const refresh = inject("refresh");
-    const status = ref();
+const props = defineProps<{ archive?: boolean }>();
 
-    const { mutation } = useMutation(stageGraph.sweepStage, {
-      id: stage.value.id,
-    });
+// Provided by StageManagement/index.vue.
+const stage = inject("stage") as Ref<any>;
+const refresh = inject("refresh") as ((id: unknown) => void) | undefined;
+const status = ref<string>();
 
-    const onConfirm = () => {
-      Modal.confirm({
-        title: "Confirm",
-        content: createVNode(
-          "div",
-          { style: "color: black; white-space: pre-line;" },
-          props.archive
-            ? "Archiving will create a replay recording and chat files from the stage since it was last archived. It will also sweep the stage and start a new recording. Sweeping the stage removes all media items from the stage, including text and drawings. Media assigned to the stage will still be available in the toolbars, as will any scenes that have been saved.\n Do you want to archive now?"
-            : "Sweeping the stage removes all media items from the stage, including text and drawings. Media assigned to the stage will still be available in the toolbars, as will any scenes that have been saved.\n Do you want to sweep the stage?",
-        ),
-        onOk() {
-          sweep();
-        },
-        okButtonProps: {
-          danger: true,
-        },
-      });
-    };
+const { mutation } = useMutation(stageGraph.sweepStage, {
+  id: stage.value.id,
+});
 
-    const sweep = async () => {
-      try {
-        status.value = "Sweeping archived events...";
-        await mutation();
-        status.value = "Send live stage sweeping signal...";
+const onConfirm = () => {
+  Modal.confirm({
+    title: "Confirm",
+    content: createVNode(
+      "div",
+      { style: "color: black; white-space: pre-line;" },
+      props.archive
+        ? "Archiving will create a replay recording and chat files from the stage since it was last archived. It will also sweep the stage and start a new recording. Sweeping the stage removes all media items from the stage, including text and drawings. Media assigned to the stage will still be available in the toolbars, as will any scenes that have been saved.\n Do you want to archive now?"
+        : "Sweeping the stage removes all media items from the stage, including text and drawings. Media assigned to the stage will still be available in the toolbars, as will any scenes that have been saved.\n Do you want to sweep the stage?",
+    ),
+    onOk() {
+      sweep();
+    },
+    okButtonProps: {
+      danger: true,
+    },
+  });
+};
 
-        const config = stage.value.attributes.find((i) => i.name === "config");
+const sweep = async () => {
+  try {
+    status.value = "Sweeping archived events...";
+    await mutation();
+    status.value = "Send live stage sweeping signal...";
 
-        const clearStage = useClearStage(
-          stage.value.fileLocation,
-          config ? JSON.parse(config.description)?.defaultcolor : null,
-          stage.value.mqtt,
-        );
-        await clearStage();
-        message.success(`${stage.value.name} swept successfully!`);
-        if (refresh) {
-          refresh(stage.value.id);
-        }
-      } catch (error) {
-        handleError(error);
-      } finally {
-        status.value = "";
-      }
-    };
+    const config = stage.value.attributes.find((i: { name: string }) => i.name === "config");
 
-    return { status, sweep, onConfirm };
-  },
+    const clearStage = useClearStage(
+      stage.value.fileLocation,
+      config ? JSON.parse(config.description)?.defaultcolor : null,
+      stage.value.mqtt,
+    );
+    await clearStage();
+    message.success(`${stage.value.name} swept successfully!`);
+    if (refresh) {
+      refresh(stage.value.id);
+    }
+  } catch (error) {
+    handleError(error);
+  } finally {
+    status.value = "";
+  }
 };
 </script>
 

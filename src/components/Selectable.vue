@@ -1,12 +1,12 @@
-<script>
-export default {
-  props: {
-    selected: Boolean,
-    revert: Boolean,
-    multiple: Boolean,
-  },
-  emits: ["select"],
-};
+<script setup lang="ts">
+defineProps<{
+  selected?: boolean;
+  revert?: boolean;
+  multiple?: boolean;
+}>();
+defineEmits<{
+  (e: "select"): void;
+}>();
 </script>
 
 <template>

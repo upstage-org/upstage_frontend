@@ -1,15 +1,9 @@
-<script>
+<script setup lang="ts">
 import configs from "config";
 
-export default {
-  setup: () => {
-    return {
-      release: configs.ALIAS_RELEASE_VERSION,
-      version: configs.RELEASE_VERSION,
-      notInIframe: window.self === window.top,
-    };
-  },
-};
+const release = configs.ALIAS_RELEASE_VERSION;
+const version = configs.RELEASE_VERSION;
+const notInIframe = window.self === window.top;
 </script>
 
 <template>

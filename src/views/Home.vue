@@ -1,7 +1,6 @@
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
 import Loading from "components/Loading.vue";
-import { absolutePath } from "utils/common";
 import { sanitizeRichText } from "utils/sanitizeHtml";
 import Entry from "components/stage/Entry.vue";
 import { MasonryWall } from "@yeger/vue-masonry-wall";
@@ -10,40 +9,24 @@ import { gql } from "@apollo/client/core";
 import { useConfigStore } from "@stores/pinia/config";
 import { storeToRefs } from "pinia";
 
-export default {
-  name: "Home",
-  components: { Loading, Entry, MasonryWall },
-  setup: () => {
-    const { result, loading } = useQuery(
-      gql`
-        query ListFoyerStage {
-          foyerStageList {
-            id
-            name
-            owner {
-              displayName
-              username
-            }
-            fileLocation
-            cover
-            players
-            audiences
-          }
-        }
-      `,
-      null,
-    );
-    const { foyer } = storeToRefs(useConfigStore());
-    const visibleStages = computed(() => result?.value?.foyerStageList || []);
-    return {
-      visibleStages,
-      loading,
-      absolutePath,
-      foyer,
-      sanitizeRichText,
-    };
-  },
-};
+const { result, loading } = useQuery(gql`
+  query ListFoyerStage {
+    foyerStageList {
+      id
+      name
+      owner {
+        displayName
+        username
+      }
+      fileLocation
+      cover
+      players
+      audiences
+    }
+  }
+`);
+const { foyer } = storeToRefs(useConfigStore());
+const visibleStages = computed(() => result?.value?.foyerStageList || []);
 </script>
 
 <template>
@@ -64,7 +47,7 @@ export default {
         <div v-else class="stages my-4 pt-6">
           <MasonryWall :items="visibleStages" :ssr-columns="1" :column-width="300" :gap="32">
             <template #default="{ item }">
-              <Entry :stage="item" :fallback-cover="'greencurtain.jpg'" />
+              <Entry :stage="item as Record<string, any>" :fallback-cover="'greencurtain.jpg'" />
             </template>
           </MasonryWall>
         </div>

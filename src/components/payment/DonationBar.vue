@@ -1,40 +1,35 @@
-<script>
+<script setup lang="ts">
 import { ref } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { message } from "ant-design-vue";
 import { coerceNumber } from "utils/common";
 
-export default {
-  setup: () => {
-    const stageStore = useStageStore();
-    const amount = ref(null);
+const stageStore = useStageStore();
+const amount = ref<number | null>(null);
 
-    // Cross-browser parse: Firefox accepts looser strings than Chromium
-    // here ("1,5", trailing letters), and neither browser enforces the
-    // step="0.01" constraint on `input`. coerceNumber handles all of it.
-    const onAmountInput = (e) => {
-      amount.value = coerceNumber(e.target.value, {
-        min: 0,
-        max: 999999.99,
-        step: 0.01,
-      });
-    };
+// Cross-browser parse: Firefox accepts looser strings than Chromium
+// here ("1,5", trailing letters), and neither browser enforces the
+// step="0.01" constraint on `input`. coerceNumber handles all of it.
+const onAmountInput = (e: Event) => {
+  amount.value = coerceNumber((e.target as HTMLInputElement).value, {
+    min: 0,
+    max: 999999.99,
+    step: 0.01,
+  });
+};
 
-    const openPurchasePopup = () => {
-      if (amount.value && amount.value != 0) {
-        stageStore.openPurchasePopup({
-          type: "OneTimePurchase",
-          amount: amount.value,
-          title: "Donate to UpStage (amounts shown in US dollars)",
-        });
-        amount.value = null;
-      } else {
-        message.warning("Please select amount to donate!");
-      }
-    };
-
-    return { amount, openPurchasePopup, onAmountInput };
-  },
+const openDonationPopup = () => {
+  if (amount.value && amount.value != 0) {
+    stageStore.openDonationPopup({
+      isActive: true,
+      type: "Donation",
+      amount: amount.value,
+      title: "Donate to UpStage (amounts shown in US dollars)",
+    });
+    amount.value = null;
+  } else {
+    message.warning("Please select amount to donate!");
+  }
 };
 </script>
 
@@ -81,7 +76,7 @@ export default {
         </div>
       </div>
       <div class="column">
-        <button class="button is-primary is-fullwidth" @click="openPurchasePopup()">
+        <button class="button is-primary is-fullwidth" @click="openDonationPopup()">
           <span>Donate to UpStage (amounts shown in US dollars)</span>
         </button>
       </div>

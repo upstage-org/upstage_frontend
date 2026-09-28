@@ -1,130 +1,119 @@
-<script>
+<script setup lang="ts">
 import { useQuery } from "services/graphql/composable";
 import Loading from "components/Loading.vue";
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
+import type { Ref } from "vue";
 import dayjs from "@utils/dayjs";
 import Pagination from "./Pagination.vue";
 import { CaretUpOutlined, CaretDownOutlined } from "@ant-design/icons-vue";
 
-export default {
-  components: { Loading, Pagination, CaretUpOutlined, CaretDownOutlined },
-  props: {
-    query: {
-      type: Function,
-    },
-    headers: {
-      type: Array,
-      default: () => [],
-    },
-    numbered: {
-      type: Boolean,
-      default: true,
-    },
-    data: {
-      type: Array,
-    },
-    wrapper: {
-      type: Boolean,
-      default: true,
-    },
+const props = withDefaults(
+  defineProps<{
+    query?: (...args: any[]) => any;
+    headers?: any[];
+    numbered?: boolean;
+    data?: any[];
+    wrapper?: boolean;
+  }>(),
+  {
+    query: undefined,
+    headers: () => [],
+    numbered: true,
+    data: undefined,
+    wrapper: true,
   },
-  setup: (props) => {
-    if (props.data) {
-      return {
-        nodes: computed(() => props.data),
-        totalCount: computed(() => props.data.length),
-      };
+);
+
+// Decided once, at setup: a table that is given `data` never queries.
+const source: {
+  nodes: Ref<any>;
+  totalCount: Ref<number>;
+  loading?: Ref<boolean>;
+  refresh?: (...args: any[]) => any;
+} = props.data
+  ? {
+      nodes: computed(() => props.data),
+      totalCount: computed(() => props.data!.length),
     }
-    const { nodes, loading, totalCount, refresh } = useQuery(props.query);
+  : useQuery(props.query as any);
+const { nodes, totalCount, loading, refresh } = source;
 
-    return { loading, nodes, totalCount, refresh };
-  },
-  data: function () {
-    return {
-      current: 1,
-      limit: 10,
-      sortBy: null,
-      sortOrder: true,
-      now: new Date(),
-    };
-  },
-  computed: {
-    offset() {
-      return this.limit * (this.current - 1);
-    },
-    rows() {
-      let rows = [...this.nodes];
-      if (this.sortBy) {
-        const { sortable, type, render, key } = this.sortBy;
-        rows = rows.sort((a, b) => {
-          if (typeof sortable === "function") {
-            return sortable(a, b);
-          }
-          if (type === "date") {
-            dayjs(a[key]).diff(b[key]);
-          }
-          if (render) {
-            return render(a).localeCompare(render(b));
-          }
-          if (key) {
-            return a[key]?.localeCompare(b[key]);
-          }
-        });
+const current = ref(1);
+const limit = ref(10);
+const sortBy = ref<any>(null);
+const sortOrder = ref(true);
+const now = new Date();
+
+const offset = computed(() => limit.value * (current.value - 1));
+const rows = computed(() => {
+  let rows = [...nodes.value];
+  if (sortBy.value) {
+    const { sortable, type, render, key } = sortBy.value;
+    rows = rows.sort((a: any, b: any): any => {
+      if (typeof sortable === "function") {
+        return sortable(a, b);
       }
-      if (!this.sortOrder) {
-        rows.reverse();
+      if (type === "date") {
+        return dayjs(a[key]).diff(b[key]);
       }
-      const start = this.offset;
-      const end = start + this.limit;
-      let endR;
-      if (rows.length < end) {
-        endR = rows.length;
-      } else {
-        endR = end;
+      if (render) {
+        return render(a).localeCompare(render(b));
       }
-      rows?.forEach((row, index) => {
-        if (index == endR - 1 || index == endR - 2) {
-          row.lastItem = true;
-        } else {
-          row.lastItem = false;
-        }
-      });
-      return rows.slice(start, end);
-    },
-  },
-  mounted() {
-    const header = this.headers.find((h) => h.defaultSortOrder !== undefined);
-    if (header) {
-      this.sortBy = header;
-      this.sortOrder = header.defaultSortOrder;
+      if (key) {
+        return a[key]?.localeCompare(b[key]);
+      }
+    });
+  }
+  if (!sortOrder.value) {
+    rows.reverse();
+  }
+  const start = offset.value;
+  const end = start + limit.value;
+  let endR: number;
+  if (rows.length < end) {
+    endR = rows.length;
+  } else {
+    endR = end;
+  }
+  rows?.forEach((row, index) => {
+    if (index == endR - 1 || index == endR - 2) {
+      row.lastItem = true;
+    } else {
+      row.lastItem = false;
     }
-  },
-  methods: {
-    dayjs,
-    fromNow(date) {
-      return dayjs(date).fromNow();
-    },
-    sort(header) {
-      if (header.sortable) {
-        if (this.sortBy?.title === header.title) {
-          this.sortOrder = !this.sortOrder;
-        }
-        this.sortBy = header;
-      }
-    },
+  });
+  return rows.slice(start, end);
+});
 
-    handleFormatDate(date) {
-      if (date == null) {
-        return null;
-      }
+onMounted(() => {
+  const header = props.headers.find((h) => h.defaultSortOrder !== undefined);
+  if (header) {
+    sortBy.value = header;
+    sortOrder.value = header.defaultSortOrder;
+  }
+});
 
-      if (dayjs(this.now).diff(date, "weeks") > 1) {
-        return dayjs(date).format("DD/MM/yyyy");
-      }
+const fromNow = (date: any) => dayjs(date).fromNow();
 
-      return this.fromNow(date);
-    },
-  },
+const sort = (header: any) => {
+  if (header.sortable) {
+    if (sortBy.value?.title === header.title) {
+      sortOrder.value = !sortOrder.value;
+    }
+    sortBy.value = header;
+  }
+};
+
+const handleFormatDate = (date: any) => {
+  if (date == null) {
+    return null;
+  }
+
+  if (dayjs(now).diff(date, "weeks") > 1) {
+    return dayjs(date).format("DD/MM/yyyy");
+  }
+
+  return fromNow(date);
 };
 </script>
 
@@ -154,15 +143,13 @@ export default {
                 <CaretUpOutlined
                   class="upstage-dt-sorter-icon"
                   :class="{
-                    'upstage-dt-sorter-icon--active':
-                      sortBy?.title === header.title && sortOrder,
+                    'upstage-dt-sorter-icon--active': sortBy?.title === header.title && sortOrder,
                   }"
                 />
                 <CaretDownOutlined
                   class="upstage-dt-sorter-icon"
                   :class="{
-                    'upstage-dt-sorter-icon--active':
-                      sortBy?.title === header.title && !sortOrder,
+                    'upstage-dt-sorter-icon--active': sortBy?.title === header.title && !sortOrder,
                   }"
                 />
               </span>
@@ -172,7 +159,10 @@ export default {
       </thead>
       <tfoot v-if="!nodes.length">
         <tr>
-          <td class="has-text-centered has-text-dark" :colspan="headers.length + numbered">
+          <td
+            class="has-text-centered has-text-dark"
+            :colspan="headers.length + (numbered ? 1 : 0)"
+          >
             <i class="fas fa-frown fa-4x"></i>
             <div>No replay recordings have been saved for this stage yet.</div>
           </td>

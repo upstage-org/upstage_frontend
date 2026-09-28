@@ -101,7 +101,7 @@ import type {
   BoardState,
   ToolsState,
   SettingPopup,
-  PurchasePopup,
+  DonationPopup,
   ReceiptPopup,
   ReplayState,
   Viewport,
@@ -313,7 +313,7 @@ export const useStageStore = defineStore(
       Number(localStorage.getItem("lastSeenPrivateMessage")) || 0,
     );
     const masquerading = ref<boolean>(false);
-    const purchasePopup = ref<PurchasePopup>({ isActive: false });
+    const donationPopup = ref<DonationPopup>({ isActive: false });
     const receiptPopup = ref<ReceiptPopup>({
       isActive: false,
       donationDetails: { amount: 0, date: "" },
@@ -1573,12 +1573,12 @@ export const useStageStore = defineStore(
       }
     }
 
-    function SET_PURCHASE_POPUP(purchase: PurchasePopup) {
-      purchasePopup.value = purchase;
-      if (purchase.isActive) {
+    function SET_DONATION_POPUP(donation: DonationPopup) {
+      donationPopup.value = donation;
+      if (donation.isActive) {
         receiptPopup.value.donationDetails = {
-          ...purchase,
-          amount: purchase.amount ?? 0,
+          ...donation,
+          amount: donation.amount ?? 0,
           date: new Date().toLocaleDateString(),
         };
       }
@@ -3716,13 +3716,13 @@ export const useStageStore = defineStore(
       mqtt.sendMessage(TOPICS.DRAW, { type: DRAW_ACTIONS.CLEAR });
     }
 
-    function closePurchasePopup() {
-      SET_PURCHASE_POPUP({ isActive: false });
+    function closeDonationPopup() {
+      SET_DONATION_POPUP({ isActive: false });
     }
 
-    function openPurchasePopup(setting: PurchasePopup) {
+    function openDonationPopup(setting: DonationPopup) {
       setting.isActive = true;
-      SET_PURCHASE_POPUP(setting);
+      SET_DONATION_POPUP(setting);
     }
 
     function openReceiptPopup(setting?: unknown) {
@@ -3869,7 +3869,7 @@ export const useStageStore = defineStore(
       publicChatPosition,
       lastSeenPrivateMessage,
       masquerading,
-      purchasePopup,
+      donationPopup,
       receiptPopup,
       _reloadStreams,
       _forceReloadStreams,
@@ -3963,7 +3963,7 @@ export const useStageStore = defineStore(
       TOGGLE_MASQUERADING,
       CREATE_ROOM,
       REORDER_TOOLBOX,
-      SET_PURCHASE_POPUP,
+      SET_DONATION_POPUP,
       ADD_TRACK,
       RELOAD_STREAMS,
       REFRESH_MEETING,
@@ -4057,8 +4057,8 @@ export const useStageStore = defineStore(
       sendDrawWhiteboard,
       sendUndoWhiteboard,
       sendClearWhiteboard,
-      closePurchasePopup,
-      openPurchasePopup,
+      closeDonationPopup,
+      openDonationPopup,
       openReceiptPopup,
       closeReceiptPopup,
       addTrack,
