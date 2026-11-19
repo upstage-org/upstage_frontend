@@ -21,6 +21,14 @@ describe("linkify", () => {
     expect(linkify("mail me@example.org")).toContain('href="mailto:me@example.org"');
   });
 
+  it("links internationalised e-mail addresses", () => {
+    expect(linkify("写信 用户@例子.中国 吧")).toContain('href="mailto:用户@例子.中国"');
+    expect(linkify("müller@bücher.example")).toContain('href="mailto:müller@bücher.example"');
+    // Not an address: no domain dot, or a bare @ in chat.
+    expect(linkify("me@localhost")).not.toContain("mailto:");
+    expect(linkify("hi @everyone")).not.toContain("mailto:");
+  });
+
   it("does not let an escaped quote break out of the href", () => {
     const html = linkify('https://a.b/"onmouseover="x');
     expect(html).not.toMatch(/onmouseover=[^&]/);

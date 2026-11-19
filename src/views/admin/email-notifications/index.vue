@@ -46,7 +46,8 @@ const onToggleDirect = (checked: boolean | string | number, e: Event, key: strin
 const addCustomRecipient = () => {
   const email = prompt("Enter email: ");
   if (email) {
-    if (/^[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+    // Any script in the local part and domain (the backend accepts internationalised addresses).
+    if (/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/u.test(email)) {
       if (!receiverEmails.value.includes(email)) {
         receiverEmails.value = receiverEmails.value.concat(email);
       }

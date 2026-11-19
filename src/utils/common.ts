@@ -325,7 +325,8 @@ export function linkify(inputText: string) {
   );
 
   //Change email addresses to mailto:: links.
-  const replacePattern3 = /(([a-zA-Z0-9\-_.])+@[a-zA-Z_]+?(\.[a-zA-Z]{2,6})+)/gim;
+  // Letters and digits of any script: internationalised addresses are links too.
+  const replacePattern3 = /([\p{L}\p{N}\-_.+]+@[\p{L}\p{N}\-_]+(?:\.[\p{L}\p{N}\-_]+)+)/gimu;
   replacedText = replacedText.replace(replacePattern3, '<a href="mailto:$1">$1</a>');
 
   return replacedText;
