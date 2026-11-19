@@ -22,6 +22,7 @@ vi.mock("@stores/pinia/stage", async () => {
   const store = reactive({
     url: "stage-1",
     canPlay: false,
+    stageOpenToViewer: true,
     jitsiStreamingEnabled: false,
     jitsiServersInUse: [] as string[],
     syncLocalJitsiParticipantId: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@stores/pinia/stage", async () => {
 });
 
 import { useJitsi } from "./composable";
+import { useStageStore } from "@stores/pinia/stage";
 
 const connections: Array<{
   connect: ReturnType<typeof vi.fn>;
@@ -122,5 +124,46 @@ describe("useJitsi — unmount while config.js is still loading", () => {
 
     wrapper.unmount();
     expect(connections[0].disconnect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useJitsi — stage closed to the viewer (#1573)", () => {
+  const store = () => useStageStore() as unknown as { stageOpenToViewer: boolean; url: string };
+
+  afterEach(() => {
+    store().stageOpenToViewer = true;
+    store().url = "stage-1";
+  });
+
+  it("does not load the server config or connect while the stage is closed", async () => {
+    cfg.JITSI_ENDPOINT = "https://meet-c.test";
+    cfg.JITSI_ENDPOINTS = ["https://meet-c.test"];
+    store().stageOpenToViewer = false;
+    const wrapper = mountJitsi();
+    await flushPromises();
+    expect(pendingConfigScript("meet-c.test")).toBeNull();
+    expect(connections).toHaveLength(0);
+    // Leave before the flag is reset below: a start from this component
+    // would otherwise sit in the (never-resolving) config.js queue and block
+    // the next test's injection.
+    wrapper.unmount();
+  });
+
+  it("connects once the stage opens to the viewer", async () => {
+    cfg.JITSI_ENDPOINT = "https://meet-d.test";
+    cfg.JITSI_ENDPOINTS = ["https://meet-d.test"];
+    store().stageOpenToViewer = false;
+    mountJitsi();
+    await flushPromises();
+    expect(pendingConfigScript("meet-d.test")).toBeNull();
+
+    store().stageOpenToViewer = true;
+    await flushPromises();
+    const script = pendingConfigScript("meet-d.test");
+    expect(script).not.toBeNull();
+    script?.onerror?.(new Event("error"));
+    await flushPromises();
+    expect(connections).toHaveLength(1);
+    expect(connections[0].connect).toHaveBeenCalledTimes(1);
   });
 });

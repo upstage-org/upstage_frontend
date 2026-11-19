@@ -532,3 +532,17 @@ export function truncateText(text: string, max: number, keep: number = max): str
   if (characters.length <= max) return text ?? "";
   return `${characters.slice(0, keep).join("")}...`;
 }
+
+/**
+ * Round a CSS length so it lands on a whole device pixel (#1571). Chromium's
+ * compositor can draw a one-pixel hairline along the edge of a rounded,
+ * overflow-clipped layer — a circular stream tile — when that layer sits at
+ * a fractional device-pixel offset, which the centred stage and freely
+ * dragged objects produce all the time. Firefox is unaffected. A shift of
+ * under half a device pixel is invisible.
+ */
+export function snapToDevicePixel(length: number, ratio = globalThis.devicePixelRatio): number {
+  if (!Number.isFinite(length)) return length;
+  const scale = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  return Math.round(length * scale) / scale;
+}

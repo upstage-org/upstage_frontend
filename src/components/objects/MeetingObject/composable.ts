@@ -1055,16 +1055,23 @@ export const useJitsi = () => {
   // connect with the *resolved* URL. The watcher self-stops after the
   // first non-placeholder value so a transient model refresh can't tear
   // down and re-create the conference mid-session.
+  //
+  // The conference is also not joined while the stage is closed to this
+  // viewer (#1573: rehearsal, and they are not a player): joining would
+  // deliver the performers' audio to a tab that is still behind the curtain.
+  // `stageOpenToViewer` is undefined on stores that predate it (unit stubs),
+  // which counts as open.
+  const openToViewer = () => stageStore.stageOpenToViewer !== false;
   onMounted(() => {
     const initialUrl = stageStore.url;
-    if (!isPlaceholderStageUrl(initialUrl)) {
+    if (!isPlaceholderStageUrl(initialUrl) && openToViewer()) {
       startConnection(String(initialUrl));
       return;
     }
     const stop = watch(
-      () => stageStore.url,
-      (url) => {
-        if (isPlaceholderStageUrl(url)) return;
+      () => [stageStore.url, openToViewer()] as const,
+      ([url, open]) => {
+        if (isPlaceholderStageUrl(url) || !open) return;
         stop();
         startConnection(String(url));
       },

@@ -47,6 +47,7 @@ import {
   randomMessageColor,
   randomRange,
   resolveJitsiOrigin,
+  snapToDevicePixel,
 } from "@utils/common";
 import { BACKGROUND_ACTIONS, BOARD_ACTIONS, COLORS, DRAW_ACTIONS, TOPICS } from "@utils/constants";
 import { loadReplayMarkers } from "@utils/replayMarkers";
@@ -63,6 +64,7 @@ import { unnamespaceTopic } from "@utils/mqttTopics";
 import { audienceMayPublish } from "@utils/publishPolicy";
 import { computeFinalJitsiObjectsFromEvents } from "@utils/jitsiBoardReconcile";
 import { useAttribute } from "@services/graphql/composable";
+import { eventsForEntry } from "./stageSession";
 import { avatarSpeak, stopSpeaking } from "@services/speech";
 import { useAuthStore } from "@stores/pinia/auth";
 import { useUserStore } from "@stores/pinia/user";
@@ -485,14 +487,14 @@ export const useStageStore = defineStore(
       const ratio = config.value.ratio;
       if (width / height > ratio) {
         width = height * ratio;
-        left = (window.innerWidth - width) / 2;
+        left = snapToDevicePixel((window.innerWidth - width) / 2);
       } else {
         height = width / ratio;
         if (window.innerWidth < window.innerHeight) {
           // Portrait mobile
           top = 0;
         } else {
-          top = (window.innerHeight - height) / 2;
+          top = snapToDevicePixel((window.innerHeight - height) / 2);
         }
       }
       return { width, height, left, top };
@@ -507,6 +509,34 @@ export const useStageStore = defineStore(
         !masquerading.value &&
         !replay.value.isReplaying
       );
+    });
+
+    // `ListStage` carries `status` on the stage payload; older payloads only
+    // have it in the attributes array. No status at all means the stage has
+    // never been opened: Stage Management treats that as rehearsal.
+    const stageStatus = computed<string>(() => {
+      const m = model.value as
+        | (StageModel & { status?: string; attributes?: { name: string; description?: string }[] })
+        | null;
+      if (!m) return "";
+      const fromAttributes = m.attributes?.find((a) => a.name === "status")?.description;
+      return m.status ?? fromAttributes ?? "rehearsal";
+    });
+
+    /**
+     * Whether this session may be on the stage at all (#1573). A stage is
+     * open to everyone only while it is live; in rehearsal it is open to its
+     * players (also when they preview as audience). The Preloader keeps the
+     * curtain down for everyone else, and the live layout mounts nothing
+     * behind it — not the board, not the audio player, not the Jitsi
+     * conference — so a closed stage cannot be heard either. Recordings are
+     * not covered here: the replay layout does not consult this.
+     */
+    const stageOpenToViewer = computed<boolean>(() => {
+      if (!model.value) return false;
+      const permission = model.value.permission;
+      if (permission && permission !== "audience") return true;
+      return stageStatus.value === "live";
     });
 
     /**
@@ -3189,7 +3219,11 @@ export const useStageStore = defineStore(
             });
           } else {
             const archivedEvents = events ?? [];
-            archivedEvents.forEach((event: ReplayEvent) => replayEvent(event));
+            // Temporary on-stage settings (the background colour) only last
+            // for the session they were made in; see stageSession.ts (#1572).
+            eventsForEntry(archivedEvents, Date.now()).forEach((event: ReplayEvent) =>
+              replayEvent(event),
+            );
             reconcileJitsiBoardFromEvents(archivedEvents);
           }
           await stageGraph.updateLastAccess(stage.id);
@@ -3633,7 +3667,10 @@ export const useStageStore = defineStore(
       const id = session.value;
       // Presence-suppressed pop-outs never joined, so they publish no leave.
       if (id != null && !standaloneChatPresenceSuppressed.value) {
-        mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
+        // `unload`: the page is going away, which may be a reload that rejoins
+        // in seconds. stageSession.ts keeps the stage "occupied" briefly for
+        // such a leave; the in-app leave above ends presence at once.
+        mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true, unload: true });
       }
       session.value = null;
       CLEAN_STAGE();
@@ -3914,6 +3951,8 @@ export const useStageStore = defineStore(
       activeMovable,
       stageSize,
       canPlay,
+      stageStatus,
+      stageOpenToViewer,
       players,
       audiences,
       unreadPrivateMessageCount,

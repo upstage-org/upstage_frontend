@@ -2,7 +2,7 @@
 import { ref, inject } from "vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import Moveable from "moveable";
-import { isJitsiBoardType, throttle } from "@utils/common";
+import { isJitsiBoardType, snapToDevicePixel, throttle } from "@utils/common";
 import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 
@@ -307,10 +307,11 @@ export default {
         // move and every other move, not to the drag itself.
         const liveMove = stageStore.isLiveMoving(x.id);
         animation = animate(el.value, {
-          left,
-          top,
-          width,
-          height,
+          // Rest on whole device pixels (#1571); the glide itself is free.
+          left: snapToDevicePixel(left),
+          top: snapToDevicePixel(top),
+          width: snapToDevicePixel(width),
+          height: snapToDevicePixel(height),
           rotate,
           opacity,
           scaleX,
@@ -346,10 +347,11 @@ export default {
 
     onMounted(() => {
       const { x, y, w, h, rotate } = props.object;
-      el.value.style.width = `${w}px`;
-      el.value.style.height = `${h}px`;
-      el.value.style.left = `${x}px`;
-      el.value.style.top = `${y}px`;
+      // Whole device pixels: see snapToDevicePixel (#1571).
+      el.value.style.width = `${snapToDevicePixel(w)}px`;
+      el.value.style.height = `${snapToDevicePixel(h)}px`;
+      el.value.style.left = `${snapToDevicePixel(x)}px`;
+      el.value.style.top = `${snapToDevicePixel(y)}px`;
       el.value.style.transform = `rotate(${rotate}deg)`;
       // If this object mounted already-selected (e.g. auto-focused right after
       // being dropped on the stage), show its resize frame now that `el` exists.
@@ -385,7 +387,11 @@ export default {
     :style="{
       position: 'absolute',
       opacity: object.opacity * (ghosting ? 0.5 : 1),
-      filter: `grayscale(${object.liveAction === false ? 1 : 0})`,
+      /* Only an unpublished object is greyed out. A `grayscale(0)` here is an
+         identity, but still a filter: Chromium rendered every object through
+         an offscreen surface, and a rounded stream tile at a fractional
+         offset then showed a hairline along its left edge (#1571). */
+      filter: object.liveAction === false ? 'grayscale(1)' : 'none',
       'transform-origin': transformOrigin,
       /* Players drag objects with a finger: without this the browser claims
          the gesture and pans the page instead. Audience (not controlable)
@@ -418,7 +424,7 @@ export default {
       height: object.h + 'px',
       transform: `rotate(${object.rotate}deg)`,
       opacity: object.opacity,
-      filter: `grayscale(${object.liveAction === false ? 1 : 0})`,
+      filter: object.liveAction === false ? 'grayscale(1)' : 'none',
     }"
   >
     <slot />
