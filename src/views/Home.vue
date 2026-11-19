@@ -22,6 +22,7 @@ const { result, loading } = useQuery(gql`
       cover
       players
       audiences
+      pinned
     }
   }
 `);

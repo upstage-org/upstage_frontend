@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import Entry from "./entry.vue";
+import PinnedStages from "./PinnedStages.vue";
 import { h } from "vue";
 import { Skeleton, Space } from "ant-design-vue";
 import Header from "components/Header.vue";
@@ -49,6 +50,11 @@ About
 > FAQ (https://upstage.org.nz/?page_id=115)
 > Contact (/contact)`,
           ]),
+        }),
+        h(PinnedStages, {
+          key: "FOYER_PINNED_STAGES",
+          defaultValue: foyer.value.pinnedStages?.value ?? "",
+          refresh: refreshConfig,
         }),
         h(Entry, {
           key: "SHOW_REGISTRATION",

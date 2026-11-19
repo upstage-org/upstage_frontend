@@ -71,6 +71,12 @@ export default {
             value
             createdOn
           }
+          pinnedStages {
+            id
+            name
+            value
+            createdOn
+          }
         }
       }
     `),
