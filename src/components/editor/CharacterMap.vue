@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { claimFocus } from "./richText";
 /**
  * "Special character" picker for `RichTextEditor`: TinyMCE's groups, a search
  * box that matches the character or its name, and a grid of buttons.
@@ -30,18 +31,23 @@ const toEntry = ([codePoint, name]: [number, string]): Entry => ({
 const shown = computed<Entry[]>(() => {
   const needle = query.value.trim().toLocaleLowerCase();
   if (needle) {
-    return SPECIAL_CHARACTERS.flatMap((g) => g.characters.map(toEntry)).filter(
-      (entry) =>
-        entry.character === needle ||
+    // A character listed in two groups (¤ is in Currency and Text) appears once.
+    const seen = new Set<number>();
+    return SPECIAL_CHARACTERS.flatMap((g) => g.characters.map(toEntry)).filter((entry) => {
+      if (seen.has(entry.codePoint)) return false;
+      const hit =
+        entry.character.toLocaleLowerCase() === needle ||
         entry.name.toLocaleLowerCase().includes(needle) ||
-        `u+${entry.codePoint.toString(16)}` === needle,
-    );
+        `u+${entry.codePoint.toString(16)}` === needle;
+      if (hit) seen.add(entry.codePoint);
+      return hit;
+    });
   }
   const current = SPECIAL_CHARACTERS.find((g) => g.name === group.value);
   return (current?.characters ?? []).map(toEntry);
 });
 
-onMounted(() => searchInput.value?.focus());
+onMounted(() => claimFocus(searchInput.value));
 </script>
 
 <template>

@@ -84,6 +84,16 @@ export const Indent = Extension.create({
 
 /** Smallest width a handle drag or the dialog can give an image, in pixels. */
 export const MIN_IMAGE_SIZE = 16;
+/**
+ * Largest picture file embedded as a data URL. The HTML is stored in the
+ * database and sent in e-mails; a photo straight from a phone would become
+ * tens of megabytes of base64 in a signature.
+ */
+export const MAX_IMAGE_FILE_BYTES = 2 * 1024 * 1024;
+export const imageFileTooLarge = (file: { size: number }) => file.size > MAX_IMAGE_FILE_BYTES;
+export const IMAGE_TOO_LARGE_MESSAGE = `Pictures embedded in the text must be ${
+  MAX_IMAGE_FILE_BYTES / 1024 / 1024
+} MB or smaller.`;
 
 /** What the image dialog edits; `width`/`height` are pixels, `null` for "natural". */
 export interface ImageAttributes {
@@ -339,3 +349,20 @@ export const FONT_FAMILIES: Array<{ label: string; value: string }> = [
 ];
 
 export const FONT_SIZES = ["8pt", "10pt", "12pt", "14pt", "18pt", "24pt", "36pt"];
+
+/**
+ * Focus a dialog so it owns the keyboard (Esc closes it, typing cannot reach
+ * the text behind it). tiptap's own `focus` command re-focuses the editor in
+ * a requestAnimationFrame whenever the view lost focus — closing one dialog
+ * (which refocuses the editor) and opening another in the same frame would
+ * hand the keyboard straight back to the text. Claim it again after that
+ * frame; a no-op once the element is gone.
+ */
+export function claimFocus(element: HTMLElement | null | undefined): void {
+  if (!element) return;
+  element.focus();
+  if (typeof requestAnimationFrame !== "function") return;
+  requestAnimationFrame(() => {
+    if (element.isConnected && document.activeElement !== element) element.focus();
+  });
+}

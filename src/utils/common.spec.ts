@@ -10,6 +10,14 @@ describe("truncateText", () => {
     expect(truncateText(`${emoji}😀😀😀😀`, 15, 10)).toBe(`${"😀".repeat(10)}...`);
     expect(truncateText("", 15, 10)).toBe("");
   });
+
+  it("keeps multi-code-point emoji (ZWJ families, flags) whole", async () => {
+    const { truncateText } = await import("./common");
+    const family = "👨‍👩‍👧‍👦";
+    expect(truncateText(family.repeat(16), 15, 10)).toBe(`${family.repeat(10)}...`);
+    const flags = "🇳🇿".repeat(16);
+    expect(truncateText(flags, 15, 3)).toBe("🇳🇿🇳🇿🇳🇿...");
+  });
 });
 
 describe("snapToDevicePixel", () => {

@@ -31,6 +31,15 @@ import type { ReplayEvent } from "./stage.types";
  */
 export const PRESENCE_TTL_MS = 60 * 60 * 1000;
 export const UNLOAD_GRACE_MS = 30 * 1000;
+/**
+ * A stage event of any other kind (a move, a colour, a chat line) proves a
+ * publisher was present when it was sent. It keeps the run alive for one
+ * heartbeat period, until any tab leaves. This covers the minutes after a
+ * sweep, which moves the presence rows into the performance along with
+ * everything else while the tabs that sent them are still connected: their
+ * next heartbeat restores the roster, their activity bridges the gap.
+ */
+export const ACTIVITY_PRESENCE_MS = 5 * 60 * 1000;
 
 interface CounterPayload {
   id?: unknown;
@@ -72,15 +81,28 @@ export function isSessionScopedEvent(event: ReplayEvent): boolean {
 export function sessionScopeStart(events: ReplayEvent[], now: number): number {
   const open = new Map<string, Interval>();
   const intervals: Interval[] = [];
+  let activity: Interval | null = null;
   for (const event of events) {
-    if (topicKind(event.topic) !== TOPICS.COUNTER) continue;
     const t = eventTimeMs(event);
     if (!Number.isFinite(t)) continue;
+    const kind = topicKind(event.topic);
+    if (kind !== TOPICS.COUNTER) {
+      if (kind === TOPICS.STATISTICS) continue;
+      if (activity && activity.end >= t) {
+        activity.end = t + ACTIVITY_PRESENCE_MS;
+      } else {
+        activity = { start: t, end: t + ACTIVITY_PRESENCE_MS };
+        intervals.push(activity);
+      }
+      continue;
+    }
     const payload = (event.payload ?? {}) as CounterPayload;
     const id = payload.id != null ? String(payload.id) : "";
     if (!id) continue;
     const current = open.get(id);
     if (payload.leaving) {
+      // Whoever left may have been the one whose activity was counted.
+      if (activity && activity.end > t) activity.end = Math.max(activity.start, t);
       if (!current) continue;
       const end = t + (payload.unload ? UNLOAD_GRACE_MS : 0);
       if (end < current.end) current.end = Math.max(current.start, end);
@@ -104,7 +126,9 @@ export function sessionScopeStart(events: ReplayEvent[], now: number): number {
     }
   }
   if (!run || run.end < now) return now;
-  return Math.min(run.start, now);
+  // The run's start, even when the client's clock is behind the server's
+  // (`now < run.start`): every client must land on the same boundary.
+  return run.start;
 }
 
 /**

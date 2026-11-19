@@ -130,6 +130,24 @@ describe("live Layout on a stage closed to the viewer", () => {
   });
 });
 
+describe("live Layout connects once per visit", () => {
+  it("does not reconnect when a mid-session loadStage flips the stage closed and open again", async () => {
+    s().stageOpenToViewer = true;
+    mountLayout();
+    await flushPromises();
+    expect(s().connect).toHaveBeenCalledTimes(1);
+
+    // RecordingControl → loadStage → CLEAN_STAGE: model gone, status OFFLINE,
+    // then SET_MODEL brings the stage back. The socket never dropped.
+    s().stageOpenToViewer = false;
+    s().status = "OFFLINE";
+    await nextTick();
+    s().stageOpenToViewer = true;
+    await nextTick();
+    expect(s().connect).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("live Layout on an open stage", () => {
   it("connects after the load and mounts the stage", async () => {
     s().stageOpenToViewer = true;

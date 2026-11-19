@@ -406,6 +406,16 @@ describe("RichTextEditor", () => {
       expect(found).toContain("–");
       expect(dialog.find('[role="tab"]').exists()).toBe(false);
 
+      // ¤ is listed under Currency and Text: one result, and no duplicate key.
+      await dialog.find('input[name="search"]').setValue("currency sign");
+      const signs = dialog.findAll('[role="option"]').map((o) => o.attributes("data-character"));
+      expect(signs.filter((c) => c === "¤")).toHaveLength(1);
+      // A character typed in the box is found regardless of case.
+      await dialog.find('input[name="search"]').setValue("Ω");
+      expect(
+        dialog.findAll('[role="option"]').map((o) => o.attributes("data-character")),
+      ).toContain("Ω");
+
       await dialog.find('input[name="search"]').setValue("");
       await dialog
         .findAll('[role="tab"]')
@@ -428,6 +438,44 @@ describe("RichTextEditor", () => {
     await wrapper.find(".rich-text-content").trigger("keydown", { key: "Escape" });
     expect(wrapper.classes()).not.toContain("is-fullscreen");
     expect(document.body.classList.contains("rich-text-fullscreen-open")).toBe(false);
+  });
+
+  it("Esc inside a dialog closes only the dialog, not fullscreen", async () => {
+    const wrapper = await mountEditor({ modelValue: "<p>one</p>" });
+    await wrapper.find('button[title="Fullscreen"]').trigger("click");
+    await wrapper.find('button[title="Special character"]').trigger("click");
+    await wrapper.find('[role="dialog"]').trigger("keydown", { key: "Escape" });
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+    expect(wrapper.classes()).toContain("is-fullscreen");
+  });
+
+  it("the help dialog and the preview take the keyboard and close on Esc", async () => {
+    const wrapper = await mountEditor({ modelValue: "<p>one</p>" });
+    await wrapper.find('button[title="Help"]').trigger("click");
+    await flushPromises();
+    const help = wrapper.find('[role="dialog"]');
+    expect(document.activeElement).toBe(help.element);
+    await help.trigger("keydown", { key: "Escape" });
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+
+    await wrapper.find('button[title="Preview"]').trigger("click");
+    await flushPromises();
+    const preview = wrapper.find(".rich-text-preview");
+    expect(document.activeElement).toBe(preview.element);
+    await preview.trigger("keydown", { key: "Escape" });
+    expect(wrapper.find(".rich-text-preview").exists()).toBe(false);
+  });
+
+  it("refuses a picture file over the embed limit", async () => {
+    const wrapper = await mountEditor({ modelValue: "<p>one</p>" });
+    await wrapper.find('button[title="Image"]').trigger("click");
+    const dialog = wrapper.find('[role="dialog"]');
+    const input = dialog.find('input[type="file"]').element as HTMLInputElement;
+    const big = new File([new Uint8Array(3 * 1024 * 1024)], "big.png", { type: "image/png" });
+    Object.defineProperty(input, "files", { value: [big], configurable: true });
+    await dialog.find('input[type="file"]').trigger("change");
+    expect(dialog.find('[data-testid="file-error"]').text()).toContain("2 MB");
+    expect((dialog.find('input[name="src"]').element as HTMLInputElement).value).toBe("");
   });
 
   it("shows the keyboard shortcuts help", async () => {

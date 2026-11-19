@@ -52,16 +52,24 @@ export default {
     // nothing mounted behind the curtain, so nothing of the rehearsal can be
     // heard. Logging in from the curtain can turn the viewer into a player
     // (LoginPrompt reloads the permission), which opens the stage: join then.
+    // Exactly ONE connect per visit. `loadStage` is also called mid-session
+    // (RecordingControl re-reads the model after a recording mutation) and
+    // begins with CLEAN_STAGE, which flips the stage closed/open and the
+    // status to OFFLINE while the socket is still up; reacting to that would
+    // tear the live client down (mqtt.connect ends the previous one) and
+    // drop whatever it had buffered. So the watcher stops once connected.
+    let connected = false;
     const joinIfOpen = () => {
-      if (alive && loaded && stageOpenToViewer.value && stageStore.status === "OFFLINE") {
-        stageStore.connect();
-      }
+      if (connected || !alive || !loaded || !stageOpenToViewer.value) return;
+      connected = true;
+      stopWaitingForOpen();
+      stageStore.connect();
     };
+    const stopWaitingForOpen = watch(stageOpenToViewer, joinIfOpen);
     stageStore.loadStage({ url: route.params.url }).then((result) => {
       loaded = result !== false;
       joinIfOpen();
     });
-    watch(stageOpenToViewer, joinIfOpen);
 
     onUnmounted(() => {
       alive = false;

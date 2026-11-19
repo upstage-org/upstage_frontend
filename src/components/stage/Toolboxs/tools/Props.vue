@@ -49,6 +49,7 @@ const pick = (prop: any) => {
     :class="{ 'attach-pick': attachingTo != null }"
     :data-testid="attachingTo != null ? 'attach-prop-choice' : undefined"
     @click.capture="attachingTo != null && pick(prop)"
+    @dragstart.capture="attachingTo != null && stageStore.cancelAttachingProp()"
   >
     <Skeleton :data="prop" />
   </div>

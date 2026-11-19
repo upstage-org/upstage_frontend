@@ -294,12 +294,20 @@ const stageOps = {
           query ListStage($fileLocation: String) {
             stageList(input: { fileLocation: $fileLocation }) {
               permission
+              # Withheld from the audience of a closed stage (#1573); a login
+              # from the curtain that opens the stage needs it now.
+              mqtt {
+                username
+                password
+              }
             }
           }
         `,
         { fileLocation },
       )
-      .then((response) => response.stageList[0]?.permission),
+      .then(
+        (response) => response.stageList[0] as { permission?: string; mqtt?: unknown } | undefined,
+      ),
   loadScenes: (fileLocation: string) =>
     studioClient
       .request<any, Record<string, any>>(

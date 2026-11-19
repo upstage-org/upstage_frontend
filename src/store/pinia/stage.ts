@@ -818,6 +818,8 @@ export const useStageStore = defineStore(
       background.value = null;
       curtain.value = null;
       backdropColor.value = "gray";
+      attachingPropTo.value = null;
+      requestedTool.value = null;
       tools.value.avatars = [];
       tools.value.props = [];
       tools.value.backdrops = [];
@@ -2118,8 +2120,10 @@ export const useStageStore = defineStore(
       if (targetId == null) return null;
       const target = board.value.objects.find((o) => o.id === targetId);
       if (!target) return null;
+      // The palette item is live reactive state shared with the toolbox;
+      // the Board drop path clones it through dataTransfer, so do the same.
       const placed = placeObjectOnStage({
-        ...prop,
+        ...(JSON.parse(JSON.stringify(prop)) as typeof prop),
         x: target.x,
         y: target.y,
         w: target.w,
@@ -3316,9 +3320,10 @@ export const useStageStore = defineStore(
       if (!model.value?.fileLocation) return;
       // Only the caller's permission is wanted; loadStage would refetch the
       // whole model (assets, scenes, events) for that one field.
-      const permission = await stageGraph.loadPermission(model.value.fileLocation);
-      if (permission !== undefined && model.value) {
-        model.value.permission = permission;
+      const reloaded = await stageGraph.loadPermission(model.value.fileLocation);
+      if (reloaded?.permission !== undefined && model.value) {
+        model.value.permission = reloaded.permission;
+        if (reloaded.mqtt) (model.value as { mqtt?: unknown }).mqtt = reloaded.mqtt;
       }
     }
 

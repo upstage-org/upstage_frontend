@@ -4,8 +4,14 @@
  * and size in pixels with proportions kept, the way TinyMCE's image dialog
  * worked. Used both to insert a new image and to change a selected one.
  */
-import { computed, onMounted, ref, watch } from "vue";
-import { MIN_IMAGE_SIZE, type ImageAttributes } from "./richText";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  IMAGE_TOO_LARGE_MESSAGE,
+  MIN_IMAGE_SIZE,
+  imageFileTooLarge,
+  type ImageAttributes,
+  claimFocus,
+} from "./richText";
 
 const props = defineProps<{
   /** The selected image's attributes, or `null` to insert a new one. */
@@ -25,6 +31,7 @@ const constrain = ref(true);
 /** Natural size of the picture at `src`, once it has loaded. */
 const natural = ref<{ width: number; height: number } | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+const fileError = ref("");
 const srcInput = ref<HTMLInputElement | null>(null);
 
 const editing = computed(() => props.image !== null);
@@ -48,11 +55,22 @@ const lockRatio = () => {
 watch(constrain, (on) => on && lockRatio());
 
 let probe: HTMLImageElement | null = null;
+let probeTimer: ReturnType<typeof setTimeout> | null = null;
+/** The address did not load as a picture (shown under the field). */
+const loadFailed = ref(false);
+const dropProbe = () => {
+  if (probe) {
+    probe.onload = null;
+    probe.onerror = null;
+    probe = null;
+  }
+};
 /** Read the picture's own size; fills in empty width/height once it is known. */
 const probeSize = () => {
   const address = src.value.trim();
   natural.value = null;
-  if (probe) probe.onload = null;
+  loadFailed.value = false;
+  dropProbe();
   if (!address) return;
   probe = new Image();
   probe.onload = () => {
@@ -64,14 +82,25 @@ const probeSize = () => {
     }
     if (!lockedRatio.value) lockRatio();
   };
+  probe.onerror = () => {
+    if (src.value.trim() === address) loadFailed.value = true;
+  };
   probe.src = address;
 };
-
-watch(src, probeSize);
+/** Typing an address probes it once the typing pauses, not on every key. */
+const PROBE_DELAY_MS = 300;
+watch(src, () => {
+  if (probeTimer) clearTimeout(probeTimer);
+  probeTimer = setTimeout(probeSize, PROBE_DELAY_MS);
+});
 onMounted(() => {
   lockRatio();
   probeSize();
-  srcInput.value?.focus();
+  claimFocus(srcInput.value);
+});
+onBeforeUnmount(() => {
+  if (probeTimer) clearTimeout(probeTimer);
+  dropProbe();
 });
 
 const onWidthInput = () => {
@@ -91,6 +120,11 @@ const onFilePicked = (event: Event) => {
   const file = input.files?.[0];
   input.value = "";
   if (!file || !file.type.startsWith("image/")) return;
+  if (imageFileTooLarge(file)) {
+    fileError.value = IMAGE_TOO_LARGE_MESSAGE;
+    return;
+  }
+  fileError.value = "";
   const reader = new FileReader();
   reader.onload = () => {
     if (typeof reader.result !== "string") return;
@@ -189,11 +223,15 @@ const save = () => {
           <span>Keep proportions</span>
         </label>
       </div>
+      <p v-if="fileError" class="hint error" data-testid="file-error">{{ fileError }}</p>
+      <p v-else-if="loadFailed" class="hint error" data-testid="load-error">
+        This address did not load as a picture.
+      </p>
       <p v-if="natural" class="hint">
         Original size {{ natural.width }} × {{ natural.height }} px. Leave width and height empty to
         use it.
       </p>
-      <p v-if="src.trim()" class="preview">
+      <p v-if="natural" class="preview">
         <img :src="src.trim()" :alt="alt || 'Preview'" />
       </p>
       <div class="actions">
@@ -280,6 +318,10 @@ const save = () => {
     margin: 0 0 8px;
     font-size: 12px;
     color: #555;
+
+    &.error {
+      color: #b00020;
+    }
   }
 
   .preview {

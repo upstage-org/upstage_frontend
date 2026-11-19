@@ -20,7 +20,12 @@ vi.mock("@vue/apollo-composable", async () => {
     useQuery: () => ({
       result: ref({
         whoami: { username: "p" },
-        stages: { edges: [{ id: "7", name: "Mine", permission: "owner" }] },
+        stages: {
+          edges: [
+            { id: "7", name: "Mine", permission: "owner" },
+            { id: "8", name: "Theirs (player access)", permission: "player" },
+          ],
+        },
       }),
       loading: ref(false),
     }),
@@ -45,7 +50,7 @@ const media = (copyrightLevel: number, note?: string) => ({
   copyrightLevel,
   description: JSON.stringify(note === undefined ? {} : { note }),
   owner: { username: "gloria", displayName: "Gloria" },
-  stages: [],
+  stages: [] as { id: string; name: string }[],
   assetType: null,
 });
 
@@ -77,6 +82,8 @@ describe("QuickStageAssignment saving (#1569)", () => {
     const wrapper = await open(media(0));
     await wrapper.find("[data-testid=save]").trigger("click");
     await flushPromises();
+    // Only the item's CURRENT assignments on unmanageable stages are kept;
+    // stage 8 (player access, item not there) must not be sent (#1569).
     expect(mutate).toHaveBeenCalledWith({ assetId: "1", stageIds: [] });
     expect(toast.success).toHaveBeenCalled();
     expect(wrapper.find(".modal").exists()).toBe(false);
@@ -90,6 +97,25 @@ describe("QuickStageAssignment saving (#1569)", () => {
     expect(toast.error).toHaveBeenCalledWith("You are not allowed to assign this media");
     expect(toast.success).not.toHaveBeenCalled();
     expect(wrapper.find(".modal").exists()).toBe(true);
+  });
+});
+
+describe("QuickStageAssignment keeps unmanageable assignments (#1569)", () => {
+  it("sends the item's current assignment on a stage the user cannot manage, not every such stage", async () => {
+    mutate.mockResolvedValue({ data: { quickAssignMutation: { success: true } } });
+    const m = {
+      ...media(0),
+      stages: [
+        { id: "9", name: "Owner's stage" },
+        { id: "7", name: "Mine" },
+      ],
+    };
+    const wrapper = await open(m);
+    await wrapper.find("[data-testid=save]").trigger("click");
+    await flushPromises();
+    const sent = mutate.mock.calls[0][0].stageIds;
+    expect(sent).toContain("9");
+    expect(sent).not.toContain("8");
   });
 });
 

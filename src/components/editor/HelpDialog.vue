@@ -1,6 +1,12 @@
 <script setup lang="ts">
 /** Keyboard shortcuts of `RichTextEditor`, in place of TinyMCE's Help dialog. */
+import { onMounted, ref } from "vue";
+import { claimFocus } from "./richText";
+
 const emit = defineEmits<{ (e: "cancel"): void }>();
+// Take the keyboard so Esc closes the dialog and typing cannot reach the text behind it.
+const dialog = ref<HTMLElement | null>(null);
+onMounted(() => claimFocus(dialog.value));
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const mod = isMac ? "⌘" : "Ctrl";
@@ -28,6 +34,7 @@ const SHORTCUTS: Array<[string, string]> = [
 <template>
   <div class="rich-text-dialog-backdrop" @mousedown.self="emit('cancel')">
     <div
+      ref="dialog"
       class="rich-text-dialog rich-text-help"
       role="dialog"
       aria-modal="true"

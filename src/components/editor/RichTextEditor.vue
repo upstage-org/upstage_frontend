@@ -34,7 +34,7 @@ import {
 } from "@ant-design/icons-vue";
 import { EditorContent, useEditor } from "@tiptap/vue-3";
 import Placeholder from "@tiptap/extension-placeholder";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   FONT_FAMILIES,
   FONT_SIZES,
@@ -43,12 +43,16 @@ import {
   prepareHtml,
   sizeFromStyle,
   withoutSize,
+  IMAGE_TOO_LARGE_MESSAGE,
+  imageFileTooLarge,
   type ImageAttributes,
   type ImageEditRequest,
+  claimFocus,
 } from "./richText";
 import ImageDialog from "./ImageDialog.vue";
 import CharacterMap from "./CharacterMap.vue";
 import HelpDialog from "./HelpDialog.vue";
+import { message } from "ant-design-vue";
 
 const props = withDefaults(
   defineProps<{
@@ -76,7 +80,7 @@ const lostMarkup = ref<string[]>([]);
 const sourceMode = ref(false);
 const source = ref("");
 /** Open image dialog: the selected image's attributes, or `null` when inserting. */
-const imageDialog = ref<{ image: ImageAttributes | null } | null>(null);
+const imageDialog = ref<{ image: ImageAttributes | null; pos?: number } | null>(null);
 const previewOpen = ref(false);
 const charMapOpen = ref(false);
 const helpOpen = ref(false);
@@ -92,6 +96,10 @@ const insertImageFiles = (files: File[]): boolean => {
   const images = files.filter((file) => file.type.startsWith("image/"));
   if (!images.length) return false;
   for (const file of images) {
+    if (imageFileTooLarge(file)) {
+      message.warning(IMAGE_TOO_LARGE_MESSAGE);
+      continue;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== "string") return;
@@ -178,6 +186,8 @@ const anyDialogOpen = () =>
 
 /** Esc leaves fullscreen when no dialog is open (dialogs close themselves on Esc). */
 function onRootKeydown(event: KeyboardEvent) {
+  // A dialog that just closed itself on this very Esc has already handled it.
+  if (event.defaultPrevented) return;
   if (event.key === "Escape" && fullscreen.value && !anyDialogOpen()) {
     event.preventDefault();
     fullscreen.value = false;
@@ -312,20 +322,35 @@ const selectedImage = (): ImageAttributes | null => {
 
 function openImageDialog() {
   if (disabled.value) return;
-  imageDialog.value = { image: selectedImage() };
+  const image = selectedImage();
+  // Remember WHICH image: the dialog is not a focus trap, so the selection
+  // may move before Save, and Save must then still update this node rather
+  // than insert a second copy.
+  const pos = image ? editor.value?.state.selection.from : undefined;
+  imageDialog.value = { image, pos };
 }
 
 const saveImage = (image: ImageAttributes) => {
   const editing = imageDialog.value?.image !== null;
+  const pos = imageDialog.value?.pos;
   imageDialog.value = null;
   const instance = editor.value;
   if (!instance) return;
-  if (editing && instance.isActive("image")) {
+  if (editing) {
+    const node = typeof pos === "number" ? instance.state.doc.nodeAt(pos) : null;
+    if (!node || node.type.name !== "image") {
+      message.warning("The picture is no longer in the text.");
+      instance.commands.focus();
+      return;
+    }
     // The size is now in the attributes; a size left in `style` would win over it.
-    run()
+    instance
+      .chain()
+      .focus()
+      .setNodeSelection(pos as number)
       .updateAttributes("image", {
         ...image,
-        style: withoutSize(instance.getAttributes("image").style as string | null),
+        style: withoutSize(node.attrs.style as string | null),
       })
       .run();
     return;
@@ -349,6 +374,19 @@ const closeImageDialog = () => {
 const insertCharacter = (character: string) => {
   charMapOpen.value = false;
   run().insertContent(character).run();
+};
+
+const previewEl = ref<HTMLElement | null>(null);
+// The preview takes the keyboard (Esc closes it, typing cannot reach the
+// text behind it) and hands it back to the editor when it closes.
+watch(previewOpen, async (open) => {
+  if (!open) return;
+  await nextTick();
+  claimFocus(previewEl.value);
+});
+const closePreview = () => {
+  previewOpen.value = false;
+  editor.value?.commands.focus();
 };
 
 const closeDialogs = () => {
@@ -701,21 +739,19 @@ const previewDocument = computed(() => {
     />
     <CharacterMap v-if="charMapOpen" @insert="insertCharacter" @cancel="closeDialogs" />
     <HelpDialog v-if="helpOpen" @cancel="closeDialogs" />
-    <div
-      v-if="previewOpen"
-      class="rich-text-preview-backdrop"
-      @mousedown.self="previewOpen = false"
-    >
+    <div v-if="previewOpen" class="rich-text-preview-backdrop" @mousedown.self="closePreview">
       <div
+        ref="previewEl"
         class="rich-text-preview"
         role="dialog"
         aria-modal="true"
         aria-label="Preview"
-        @keydown.esc="previewOpen = false"
+        tabindex="-1"
+        @keydown.esc.prevent="closePreview"
       >
         <div class="rich-text-preview-bar">
           <strong>Preview</strong>
-          <button type="button" title="Close preview" @click="previewOpen = false">Close</button>
+          <button type="button" title="Close preview" @click="closePreview">Close</button>
         </div>
         <iframe
           class="rich-text-preview-frame"

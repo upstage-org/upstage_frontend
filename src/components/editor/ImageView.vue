@@ -50,10 +50,22 @@ const startResize = (corner: Corner, event: MouseEvent) => {
   event.preventDefault();
   event.stopPropagation();
   const element = img.value;
-  const startWidth = size.value.width || element.offsetWidth || element.naturalWidth;
-  const startHeight = size.value.height || element.offsetHeight || element.naturalHeight;
+  // Start from the size on screen, and keep the proportions the picture
+  // really has: both attributes when both are set, else its natural size.
+  // Mixing an attribute width with a rendered height (a width-only image
+  // squeezed by max-width) produced a wrong ratio and a squashed save.
+  const rect = element.getBoundingClientRect();
+  const startWidth =
+    Math.round(rect.width) || size.value.width || element.offsetWidth || element.naturalWidth;
+  const startHeight =
+    Math.round(rect.height) || size.value.height || element.offsetHeight || element.naturalHeight;
   if (!startWidth || !startHeight) return;
-  const ratio = startHeight / startWidth;
+  const ratio =
+    size.value.width && size.value.height
+      ? size.value.height / size.value.width
+      : element.naturalWidth && element.naturalHeight
+        ? element.naturalHeight / element.naturalWidth
+        : startHeight / startWidth;
   const direction = corner.endsWith("w") ? -1 : 1;
   const startX = event.clientX;
 

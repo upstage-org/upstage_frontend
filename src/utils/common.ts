@@ -326,7 +326,8 @@ export function linkify(inputText: string) {
 
   //Change email addresses to mailto:: links.
   // Letters and digits of any script: internationalised addresses are links too.
-  const replacePattern3 = /([\p{L}\p{N}\-_.+]+@[\p{L}\p{N}\-_]+(?:\.[\p{L}\p{N}\-_]+)+)/gimu;
+  const replacePattern3 =
+    /([\p{L}\p{N}\-_.+]+@[\p{L}\p{N}\-_]+(?:\.[\p{L}\p{N}\-_]+)*\.\p{L}{2,})/gimu;
   replacedText = replacedText.replace(replacePattern3, '<a href="mailto:$1">$1</a>');
 
   return replacedText;
@@ -527,10 +528,31 @@ export function shortServerLabel(origin: unknown, origins: readonly unknown[]): 
  * is longer than `max`. Counts code points, not UTF-16 units, so an emoji or
  * a character outside the BMP is never cut in half.
  */
+/**
+ * The user-perceived characters of `text`: grapheme clusters where the
+ * platform can segment them (flags, skin tones and family emoji stay whole),
+ * code points otherwise.
+ */
+function graphemes(text: string): string[] {
+  const Segmenter = (
+    Intl as {
+      Segmenter?: new (
+        locale?: string,
+        options?: object,
+      ) => { segment(input: string): Iterable<{ segment: string }> };
+    }
+  ).Segmenter;
+  if (Segmenter) {
+    const segmenter = new Segmenter(undefined, { granularity: "grapheme" });
+    return Array.from(segmenter.segment(text), (g) => g.segment);
+  }
+  return Array.from(text);
+}
+
 export function truncateText(text: string, max: number, keep: number = max): string {
-  const characters = Array.from(text ?? "");
-  if (characters.length <= max) return text ?? "";
-  return `${characters.slice(0, keep).join("")}...`;
+  const units = graphemes(text);
+  if (units.length <= max) return text;
+  return `${units.slice(0, keep).join("")}...`;
 }
 
 /**

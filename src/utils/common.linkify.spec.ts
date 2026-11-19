@@ -74,3 +74,12 @@ describe("safeLinkUrl", () => {
     expect(safeLinkUrl(undefined)).toBeNull();
   });
 });
+
+describe("linkify e-mail edges", () => {
+  it("needs a letters-only top-level label and leaves trailing punctuation outside", async () => {
+    const { linkify } = await import("./common");
+    expect(linkify("v 1.2@3.4 ok")).not.toContain("mailto:");
+    expect(linkify("me@example.org-")).toContain('href="mailto:me@example.org"');
+    expect(linkify("用户@例子.测试")).toContain("mailto:用户@例子.测试");
+  });
+});

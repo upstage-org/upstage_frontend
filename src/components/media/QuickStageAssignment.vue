@@ -85,10 +85,20 @@ const { mutate } = useMutation<
 const refresh = inject("refresh", () => {});
 
 const handleOk = async () => {
-  const remainIds = result.value.stages.edges
-    .filter((el: any) => {
-      return !(isAdmin.value ? true : el.permission == "editor" || el.permission == "owner");
-    })
+  // Keep the item's CURRENT assignments on stages this user cannot manage.
+  // This used to send every stage the user merely had player access to,
+  // whether or not the item was there, so a quick-assign quietly attached
+  // the item to other people's stages (#1569). The backend keeps those
+  // assignments for a non-owner anyway; this list is for the owner's save.
+  const manageable = new Set(
+    (result.value?.stages.edges ?? [])
+      .filter((el: any) =>
+        isAdmin.value ? true : el.permission == "editor" || el.permission == "owner",
+      )
+      .map((el: AssignedStage) => String(el.id)),
+  );
+  const remainIds = props.media.stages
+    .filter((el: AssignedStage) => !manageable.has(String(el.id)))
     .map((el: AssignedStage) => el.id);
   const stageIds: any = stages.value;
   try {

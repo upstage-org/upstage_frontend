@@ -79,7 +79,9 @@ export default {
       // ones. Flipping `preloading` off right after the GraphQL load makes
       // `ready` (model && !preloading) truthy immediately.
       stageStore.SET_PRELOADING_STATUS(false);
-      stageStore.connect();
+      // A stage closed to this viewer (#1573) is not joined from the chat
+      // window either: a rehearsal's chat must not reach a direct link.
+      if (stageStore.stageOpenToViewer) stageStore.connect();
     });
 
     onUnmounted(() => {

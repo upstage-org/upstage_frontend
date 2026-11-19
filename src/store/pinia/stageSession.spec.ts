@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACTIVITY_PRESENCE_MS,
   PRESENCE_TTL_MS,
   UNLOAD_GRACE_MS,
   eventsForEntry,
@@ -43,7 +44,31 @@ const ms = (seconds: number) => seconds * 1000;
 describe("sessionScopeStart", () => {
   it("is now when nobody has ever been on the stage", () => {
     expect(sessionScopeStart([], ms(T0))).toBe(ms(T0));
-    expect(sessionScopeStart([move(T0 - 10), colour(T0 - 5)], ms(T0))).toBe(ms(T0));
+    // Activity without any presence row is still evidence of a publisher,
+    // but only for one heartbeat period.
+    const stale = T0 - ACTIVITY_PRESENCE_MS / 1000 - 1;
+    expect(sessionScopeStart([move(stale), colour(stale)], ms(T0))).toBe(ms(T0));
+  });
+
+  it("recent activity keeps the run alive when the presence rows were swept away", () => {
+    // Sweep moved every row at T0+100 into the performance (nothing left),
+    // the performer who is still connected sets a colour at T0+110 and the
+    // audience enters at T0+120: the colour must apply.
+    const events = [colour(T0 + 110)];
+    expect(sessionScopeStart(events, ms(T0 + 120))).toBe(ms(T0 + 110));
+    // …and the heartbeat that follows joins up with it.
+    const later = [colour(T0 + 110), counter(T0 + 300, "a")];
+    expect(sessionScopeStart(later, ms(T0 + 400))).toBe(ms(T0 + 110));
+  });
+
+  it("a leave ends the presence that activity implied", () => {
+    const events = [colour(T0), counter(T0 + 5, "a", { leaving: true })];
+    expect(sessionScopeStart(events, ms(T0 + 10))).toBe(ms(T0 + 10));
+  });
+
+  it("uses the run's start even when the client's clock is behind the server", () => {
+    const events = [counter(T0, "a"), counter(T0 + 300, "a")];
+    expect(sessionScopeStart(events, ms(T0 - 120))).toBe(ms(T0));
   });
 
   it("starts at the first join of a run that is still alive", () => {

@@ -35,7 +35,11 @@ const close = () => (showing.value = false);
 
 watch(loggedIn, () => {
   if (loggedIn.value) {
-    userStore.fetchCurrent().then(() => stageStore.joinStage());
+    userStore.fetchCurrent().then(() => {
+      // On a stage closed to the viewer the broker was never joined; the
+      // join happens when the reloaded permission opens the stage (Layout).
+      if (stageStore.status !== "OFFLINE") return stageStore.joinStage();
+    });
     close();
   }
 });
