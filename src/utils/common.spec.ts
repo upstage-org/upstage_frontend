@@ -30,3 +30,30 @@ describe("snapToDevicePixel", () => {
     expect(snapToDevicePixel(10.4, NaN)).toBe(10);
   });
 });
+
+describe("stream tile wearers (#1566)", () => {
+  it("recognises jitsi, RTMP and video tiles and nothing else", async () => {
+    const { isStreamTileObject } = await import("./common");
+    expect(isStreamTileObject({ type: "jitsi" })).toBe(true);
+    expect(isStreamTileObject({ type: "video", isRTMP: true })).toBe(true);
+    expect(isStreamTileObject({ type: "video" })).toBe(true);
+    expect(isStreamTileObject({ type: "avatar" })).toBe(false);
+    expect(isStreamTileObject({ type: "prop" })).toBe(false);
+    expect(isStreamTileObject(null)).toBe(false);
+  });
+
+  it("finds the stream a prop is worn by, but not an avatar", async () => {
+    const { streamWearerOf } = await import("./common");
+    const objects = [
+      { id: "s", type: "jitsi" },
+      { id: "a", type: "avatar" },
+      { id: "p1", type: "prop", wornBy: "s" },
+      { id: "p2", type: "prop", wornBy: "a" },
+      { id: "p3", type: "prop", wornBy: "gone" },
+    ];
+    expect(streamWearerOf(objects[2], objects)?.id).toBe("s");
+    expect(streamWearerOf(objects[3], objects)).toBeNull();
+    expect(streamWearerOf(objects[4], objects)).toBeNull();
+    expect(streamWearerOf({ wornBy: null }, objects)).toBeNull();
+  });
+});

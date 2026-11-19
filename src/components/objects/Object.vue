@@ -8,6 +8,7 @@ import {
   isJitsiBoardType,
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
+  streamWearerOf,
 } from "@utils/common";
 import { autoplayStartFrame } from "@utils/frameAnimation";
 import { openSafeLink } from "@utils/sanitizeHtml";
@@ -57,7 +58,14 @@ export default {
     const canPlay = computed(() => storeCanPlay.value && !replaying);
     const controlable = computed(() => {
       if (replaying) return false;
-      return holdable.value ? isHolding.value : canPlay.value && !props.object.wornBy;
+      if (holdable.value) return isHolding.value;
+      // A worn prop is moved by its wearer's holder — except a frame worn by
+      // a stream tile (#1566), which nobody holds: any player adjusts it.
+      return (
+        canPlay.value &&
+        (!props.object.wornBy ||
+          streamWearerOf(props.object, stageStore.board?.objects ?? []) !== null)
+      );
     });
     provide("holdable", holdable);
 

@@ -106,6 +106,10 @@ export default {
   hold_this_avatar: "Mantenha este avatar",
   remove_from_avatar: "Remover o avatar",
   add_to_avatar: "Adicionar o avatar",
+  add_prop_to_stream: "Adicionar objeto ao stream",
+  add_prop_to_avatar: "Adicionar objeto ao avatar",
+  remove_from_stream: "Remover do stream",
+  choose_prop_for: "Escolha um objeto para adicionar a {name}",
   multiframe_loop_tooltip:
     "Repetir: ligado, os quadros repetem sem parar; desligado (ícone esmaecido), percorre todos os quadros uma vez e para.",
   animation_speed_tooltip:

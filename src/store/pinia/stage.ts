@@ -181,6 +181,12 @@ export const useStageStore = defineStore(
     // is the mutation target.
     const _activeMovable = ref<ObjectId | null>(null);
 
+    // "Add prop to stream / avatar" (#1566): the object a prop is being
+    // chosen for, and the toolbox panel that choice is made in. Local UI
+    // state; the attachment itself travels as the prop's `wornBy`.
+    const attachingPropTo = ref<ObjectId | null>(null);
+    const requestedTool = ref<string | null>(null);
+
     const CHAT_TIMESTAMPS_KEY = "upstage-chat-timestamps";
     const readStoredFlag = (key: string): boolean => {
       try {
@@ -2083,6 +2089,47 @@ export const useStageStore = defineStore(
       } else {
         PUSH_CHAT_MESSAGE(m);
       }
+    }
+
+    /** Open the Props panel so the next prop picked is worn by `targetId`. */
+    function startAttachingProp(targetId: ObjectId) {
+      attachingPropTo.value = targetId;
+      requestedTool.value = "Props";
+    }
+
+    function cancelAttachingProp() {
+      attachingPropTo.value = null;
+    }
+
+    /** The toolbox opened the panel it was asked for. */
+    function consumeRequestedTool() {
+      requestedTool.value = null;
+    }
+
+    /**
+     * Put `prop` on the stage worn by the object chosen in
+     * startAttachingProp, sized and placed over it, unpublished (white bulb)
+     * so the player can adjust it first. Returns the placed object, or null
+     * when nothing was being attached or the target has left the stage.
+     */
+    function attachPropTo(prop: Partial<BoardObject> & { type?: string }): BoardObject | null {
+      const targetId = attachingPropTo.value;
+      attachingPropTo.value = null;
+      if (targetId == null) return null;
+      const target = board.value.objects.find((o) => o.id === targetId);
+      if (!target) return null;
+      const placed = placeObjectOnStage({
+        ...prop,
+        x: target.x,
+        y: target.y,
+        w: target.w,
+        h: target.h,
+        rotate: 0,
+        wornBy: target.id,
+        liveAction: false,
+      });
+      autoFocusMoveable(placed.id);
+      return placed;
     }
 
     function placeObjectOnStage(
@@ -4072,6 +4119,12 @@ export const useStageStore = defineStore(
       speakAsAvatar,
       handleChatMessage,
       placeObjectOnStage,
+      attachingPropTo,
+      requestedTool,
+      startAttachingProp,
+      cancelAttachingProp,
+      consumeRequestedTool,
+      attachPropTo,
       syncLocalJitsiParticipantId,
       ensureJitsiTileParticipantBroadcast,
       reconcileJitsiBoardFromEvents,
