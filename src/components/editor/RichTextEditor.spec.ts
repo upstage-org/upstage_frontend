@@ -359,6 +359,87 @@ describe("RichTextEditor", () => {
     });
   });
 
+  it("stores Unicode text as the characters themselves", async () => {
+    const text = "Kia ora — café 日本語 😀 עברית ‘quoted’ €";
+    expect(roundTrip(`<p>${text}</p>`)).toBe(`<p>${text}</p>`);
+    const wrapper = await mountEditor({ modelValue: "<p></p>" });
+    const content = wrapper.find(".rich-text-content").element as HTMLElement & {
+      editor?: Editor;
+    };
+    content.editor?.chain().focus().insertContent(text).run();
+    await flushPromises();
+    const html = (wrapper.emitted("update:modelValue") as string[][]).at(-1)?.[0] ?? "";
+    expect(html).toContain(text);
+    expect(html).not.toMatch(/&(?!nbsp;|amp;|lt;|gt;)[a-z]+;/);
+  });
+
+  describe("special characters", () => {
+    it("offers TinyMCE's groups and inserts the chosen character", async () => {
+      const wrapper = await mountEditor({ modelValue: "<p>Price: </p>" });
+      await wrapper.find('button[title="Special character"]').trigger("click");
+      const dialog = wrapper.find('[role="dialog"]');
+      expect(dialog.text()).toContain("Special character");
+      const groups = dialog.findAll('[role="tab"]').map((tab) => tab.text());
+      expect(groups).toEqual([
+        "Currency",
+        "Text",
+        "Quotations",
+        "Mathematical",
+        "Extended Latin",
+        "Symbols",
+        "Arrows",
+      ]);
+      await dialog.find('[data-character="€"]').trigger("click");
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+      const html = (wrapper.emitted("update:modelValue") as string[][]).at(-1)?.[0] ?? "";
+      expect(html).toContain("€");
+      expect(html).not.toContain("&euro;");
+    });
+
+    it("searches by name and shows every group's characters", async () => {
+      const wrapper = await mountEditor({ modelValue: "<p>x</p>" });
+      await wrapper.find('button[title="Special character"]').trigger("click");
+      const dialog = wrapper.find('[role="dialog"]');
+      await dialog.find('input[name="search"]').setValue("dash");
+      const found = dialog.findAll('[role="option"]').map((o) => o.attributes("data-character"));
+      expect(found).toContain("—");
+      expect(found).toContain("–");
+      expect(dialog.find('[role="tab"]').exists()).toBe(false);
+
+      await dialog.find('input[name="search"]').setValue("");
+      await dialog
+        .findAll('[role="tab"]')
+        .find((t) => t.text() === "Arrows")!
+        .trigger("click");
+      expect(
+        dialog.findAll('[role="option"]').map((o) => o.attributes("data-character")),
+      ).toContain("→");
+    });
+  });
+
+  it("toggles fullscreen and leaves it with Esc", async () => {
+    const wrapper = await mountEditor({ modelValue: "<p>one</p>" });
+    expect(wrapper.classes()).not.toContain("is-fullscreen");
+    await wrapper.find('button[title="Fullscreen"]').trigger("click");
+    expect(wrapper.classes()).toContain("is-fullscreen");
+    expect(document.body.classList.contains("rich-text-fullscreen-open")).toBe(true);
+    expect(wrapper.find('button[title="Exit fullscreen"]').exists()).toBe(true);
+
+    await wrapper.find(".rich-text-content").trigger("keydown", { key: "Escape" });
+    expect(wrapper.classes()).not.toContain("is-fullscreen");
+    expect(document.body.classList.contains("rich-text-fullscreen-open")).toBe(false);
+  });
+
+  it("shows the keyboard shortcuts help", async () => {
+    const wrapper = await mountEditor({ modelValue: "<p>one</p>" });
+    await wrapper.find('button[title="Help"]').trigger("click");
+    const dialog = wrapper.find('[role="dialog"]');
+    expect(dialog.text()).toContain("Editor help");
+    expect(dialog.text()).toMatch(/Bold/);
+    await dialog.find("button.cancel").trigger("click");
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+  });
+
   it("previews the text in a sandboxed frame, including unsaved HTML-mode edits", async () => {
     const wrapper = await mountEditor({ modelValue: "<p>one</p>" });
     await wrapper.find('button[title="Preview"]').trigger("click");

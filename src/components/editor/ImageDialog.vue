@@ -205,36 +205,8 @@ const save = () => {
 </template>
 
 <style scoped lang="less">
-.rich-text-dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.45);
-}
-
+// Backdrop and dialog chrome come from the shared styles in CharacterMap.vue.
 .rich-text-dialog {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 460px;
-  max-height: 100%;
-  overflow-y: auto;
-  padding: 16px 20px;
-  border-radius: 8px;
-  background: #fff;
-  color: #000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  text-align: left;
-
-  h3 {
-    margin: 0 0 12px;
-    font-size: 16px;
-    font-weight: 600;
-  }
-
   label {
     display: block;
     margin-bottom: 10px;
@@ -265,6 +237,17 @@ const save = () => {
     input {
       flex: 1;
       min-width: 0;
+    }
+
+    button {
+      height: 30px;
+      padding: 0 12px;
+      border: 1px solid #007011;
+      border-radius: 4px;
+      background: #fff;
+      color: #007011;
+      cursor: pointer;
+      white-space: nowrap;
     }
   }
 
@@ -309,32 +292,6 @@ const save = () => {
     img {
       max-width: 100%;
       max-height: 160px;
-    }
-  }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-  }
-
-  button {
-    height: 30px;
-    padding: 0 14px;
-    border: 1px solid #007011;
-    border-radius: 4px;
-    background: #007011;
-    color: #fff;
-    cursor: pointer;
-
-    &.secondary {
-      background: #fff;
-      color: #007011;
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: default;
     }
   }
 }

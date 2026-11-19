@@ -12,6 +12,8 @@ import {
   DeleteRowOutlined,
   EyeOutlined,
   FontColorsOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
   InsertRowBelowOutlined,
   InsertRowRightOutlined,
   ItalicOutlined,
@@ -22,6 +24,7 @@ import {
   MenuUnfoldOutlined,
   OrderedListOutlined,
   PictureOutlined,
+  QuestionCircleOutlined,
   RedoOutlined,
   StrikethroughOutlined,
   TableOutlined,
@@ -31,7 +34,7 @@ import {
 } from "@ant-design/icons-vue";
 import { EditorContent, useEditor } from "@tiptap/vue-3";
 import Placeholder from "@tiptap/extension-placeholder";
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   FONT_FAMILIES,
   FONT_SIZES,
@@ -44,6 +47,8 @@ import {
   type ImageEditRequest,
 } from "./richText";
 import ImageDialog from "./ImageDialog.vue";
+import CharacterMap from "./CharacterMap.vue";
+import HelpDialog from "./HelpDialog.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -73,6 +78,10 @@ const source = ref("");
 /** Open image dialog: the selected image's attributes, or `null` when inserting. */
 const imageDialog = ref<{ image: ImageAttributes | null } | null>(null);
 const previewOpen = ref(false);
+const charMapOpen = ref(false);
+const helpOpen = ref(false);
+const fullscreen = ref(false);
+const root = ref<HTMLElement | null>(null);
 
 const publish = (html: string) => {
   lastEmitted = html;
@@ -154,9 +163,31 @@ watch(
   },
 );
 
+const FULLSCREEN_BODY_CLASS = "rich-text-fullscreen-open";
+watch(fullscreen, (on) => document.body.classList.toggle(FULLSCREEN_BODY_CLASS, on));
+onMounted(() => root.value?.addEventListener("keydown", onRootKeydown));
+
 onBeforeUnmount(() => {
+  root.value?.removeEventListener("keydown", onRootKeydown);
+  document.body.classList.remove(FULLSCREEN_BODY_CLASS);
   editor.value?.destroy();
 });
+
+const anyDialogOpen = () =>
+  !!imageDialog.value || previewOpen.value || charMapOpen.value || helpOpen.value;
+
+/** Esc leaves fullscreen when no dialog is open (dialogs close themselves on Esc). */
+function onRootKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && fullscreen.value && !anyDialogOpen()) {
+    event.preventDefault();
+    fullscreen.value = false;
+  }
+}
+
+const toggleFullscreen = () => {
+  fullscreen.value = !fullscreen.value;
+  editor.value?.commands.focus();
+};
 
 const toggleSource = () => {
   if (sourceMode.value) {
@@ -314,6 +345,18 @@ const closeImageDialog = () => {
   editor.value?.commands.focus();
 };
 
+/** Inserted as the character itself; the stored HTML is UTF-8, not entities. */
+const insertCharacter = (character: string) => {
+  charMapOpen.value = false;
+  run().insertContent(character).run();
+};
+
+const closeDialogs = () => {
+  charMapOpen.value = false;
+  helpOpen.value = false;
+  editor.value?.commands.focus();
+};
+
 /** The text as an e-mail client or the foyer would show it, scripts disabled. */
 const previewDocument = computed(() => {
   void revision.value;
@@ -323,7 +366,11 @@ const previewDocument = computed(() => {
 </script>
 
 <template>
-  <div class="rich-text-editor min-w-0 w-full flex-1" :class="{ 'is-readonly': readonly }">
+  <div
+    ref="root"
+    class="rich-text-editor min-w-0 w-full flex-1"
+    :class="{ 'is-readonly': readonly, 'is-fullscreen': fullscreen }"
+  >
     <div
       class="rich-text-toolbar"
       role="toolbar"
@@ -546,6 +593,15 @@ const previewDocument = computed(() => {
         </button>
         <button
           type="button"
+          title="Special character"
+          class="charmap"
+          :disabled="disabled"
+          @click="charMapOpen = true"
+        >
+          Ω
+        </button>
+        <button
+          type="button"
           title="Horizontal line"
           :disabled="disabled"
           @click="run().setHorizontalRule().run()"
@@ -608,6 +664,19 @@ const previewDocument = computed(() => {
         <button type="button" title="Preview" :disabled="!editor" @click="previewOpen = true">
           <EyeOutlined />
         </button>
+        <button
+          type="button"
+          :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+          :class="{ active: fullscreen }"
+          :disabled="!editor"
+          @click="toggleFullscreen"
+        >
+          <FullscreenExitOutlined v-if="fullscreen" />
+          <FullscreenOutlined v-else />
+        </button>
+        <button type="button" title="Help" @click="helpOpen = true">
+          <QuestionCircleOutlined />
+        </button>
       </span>
     </div>
     <p v-if="lostMarkup.length && !readonly && !sourceMode" class="rich-text-warning" role="status">
@@ -630,6 +699,8 @@ const previewDocument = computed(() => {
       @save="saveImage"
       @cancel="closeImageDialog"
     />
+    <CharacterMap v-if="charMapOpen" @insert="insertCharacter" @cancel="closeDialogs" />
+    <HelpDialog v-if="helpOpen" @cancel="closeDialogs" />
     <div
       v-if="previewOpen"
       class="rich-text-preview-backdrop"
@@ -664,6 +735,23 @@ const previewDocument = computed(() => {
   background: #fff;
   color: #000;
   text-align: left;
+
+  &.is-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    border-radius: 0;
+
+    .rich-text-body,
+    .rich-text-source {
+      flex: 1;
+      max-height: none;
+      min-height: 0;
+    }
+  }
 }
 
 .rich-text-toolbar {
@@ -724,6 +812,12 @@ const previewDocument = computed(() => {
       opacity: 0;
       cursor: inherit;
     }
+  }
+
+  button.charmap {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1;
   }
 
   select {
@@ -959,5 +1053,11 @@ const previewDocument = computed(() => {
     color: #bfbfbf;
     pointer-events: none;
   }
+}
+</style>
+
+<style lang="less">
+body.rich-text-fullscreen-open {
+  overflow: hidden;
 }
 </style>

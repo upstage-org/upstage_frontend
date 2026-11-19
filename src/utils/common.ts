@@ -520,3 +520,14 @@ export function shortServerLabel(origin: unknown, origins: readonly unknown[]): 
   const own = host.split(".");
   return own.slice(0, own.length - common).join(".");
 }
+
+/**
+ * Shorten `text` to at most `keep` characters followed by an ellipsis when it
+ * is longer than `max`. Counts code points, not UTF-16 units, so an emoji or
+ * a character outside the BMP is never cut in half.
+ */
+export function truncateText(text: string, max: number, keep: number = max): string {
+  const characters = Array.from(text ?? "");
+  if (characters.length <= max) return text ?? "";
+  return `${characters.slice(0, keep).join("")}...`;
+}
