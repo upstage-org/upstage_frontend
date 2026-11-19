@@ -10,6 +10,7 @@ import {
   DeleteColumnOutlined,
   DeleteOutlined,
   DeleteRowOutlined,
+  EyeOutlined,
   FontColorsOutlined,
   InsertRowBelowOutlined,
   InsertRowRightOutlined,
@@ -27,7 +28,6 @@ import {
   UnderlineOutlined,
   UndoOutlined,
   UnorderedListOutlined,
-  UploadOutlined,
 } from "@ant-design/icons-vue";
 import { EditorContent, useEditor } from "@tiptap/vue-3";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -38,7 +38,12 @@ import {
   createExtensions,
   findLostMarkup,
   prepareHtml,
+  sizeFromStyle,
+  withoutSize,
+  type ImageAttributes,
+  type ImageEditRequest,
 } from "./richText";
+import ImageDialog from "./ImageDialog.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -65,7 +70,9 @@ const revision = ref(0);
 const lostMarkup = ref<string[]>([]);
 const sourceMode = ref(false);
 const source = ref("");
-const fileInput = ref<HTMLInputElement | null>(null);
+/** Open image dialog: the selected image's attributes, or `null` when inserting. */
+const imageDialog = ref<{ image: ImageAttributes | null } | null>(null);
+const previewOpen = ref(false);
 
 const publish = (html: string) => {
   lastEmitted = html;
@@ -86,8 +93,18 @@ const insertImageFiles = (files: File[]): boolean => {
   return true;
 };
 
+const editImageAt = ({ pos }: ImageEditRequest) => {
+  const instance = editor.value;
+  if (!instance || instance.isEditable === false) return;
+  instance.chain().focus().setNodeSelection(pos).run();
+  openImageDialog();
+};
+
 const editor = useEditor({
-  extensions: [...createExtensions(), Placeholder.configure({ placeholder: props.placeholder })],
+  extensions: [
+    ...createExtensions({ onEditImage: editImageAt }),
+    Placeholder.configure({ placeholder: props.placeholder }),
+  ],
   content: prepareHtml(props.modelValue ?? ""),
   editable: !props.readonly,
   editorProps: {
@@ -248,16 +265,61 @@ const editLink = () => {
   run().extendMarkRange("link").setLink({ href: href.trim() }).run();
 };
 
-const insertImageFromUrl = () => {
-  const src = window.prompt("Image address");
-  if (src?.trim()) run().setImage({ src: src.trim() }).run();
+/** The selected image as the dialog shows it, or `null` when no image is selected. */
+const selectedImage = (): ImageAttributes | null => {
+  const instance = editor.value;
+  if (!instance?.isActive("image")) return null;
+  const attrs = instance.getAttributes("image");
+  const styled = sizeFromStyle(attrs.style as string | null);
+  return {
+    src: (attrs.src as string) ?? "",
+    alt: (attrs.alt as string | null) ?? null,
+    width: Number(attrs.width) || styled.width || null,
+    height: Number(attrs.height) || styled.height || null,
+  };
 };
 
-const onFilesPicked = (event: Event) => {
-  const input = event.target as HTMLInputElement;
-  insertImageFiles(Array.from(input.files ?? []));
-  input.value = "";
+function openImageDialog() {
+  if (disabled.value) return;
+  imageDialog.value = { image: selectedImage() };
+}
+
+const saveImage = (image: ImageAttributes) => {
+  const editing = imageDialog.value?.image !== null;
+  imageDialog.value = null;
+  const instance = editor.value;
+  if (!instance) return;
+  if (editing && instance.isActive("image")) {
+    // The size is now in the attributes; a size left in `style` would win over it.
+    run()
+      .updateAttributes("image", {
+        ...image,
+        style: withoutSize(instance.getAttributes("image").style as string | null),
+      })
+      .run();
+    return;
+  }
+  run()
+    .setImage({
+      src: image.src,
+      alt: image.alt ?? undefined,
+      width: image.width ?? undefined,
+      height: image.height ?? undefined,
+    })
+    .run();
 };
+
+const closeImageDialog = () => {
+  imageDialog.value = null;
+  editor.value?.commands.focus();
+};
+
+/** The text as an e-mail client or the foyer would show it, scripts disabled. */
+const previewDocument = computed(() => {
+  void revision.value;
+  const html = sourceMode.value ? source.value : (editor.value?.getHTML() ?? "");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:16px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;color:#000;background:#fff}img{max-width:100%}table{border-collapse:collapse}</style></head><body>${html}</body></html>`;
+});
 </script>
 
 <template>
@@ -475,19 +537,12 @@ const onFilesPicked = (event: Event) => {
         </button>
         <button
           type="button"
-          title="Insert image from address"
+          title="Image"
+          :class="{ active: active('image') }"
           :disabled="disabled"
-          @click="insertImageFromUrl"
+          @click="openImageDialog"
         >
           <PictureOutlined />
-        </button>
-        <button
-          type="button"
-          title="Insert image from file"
-          :disabled="disabled"
-          @click="fileInput?.click()"
-        >
-          <UploadOutlined />
         </button>
         <button
           type="button"
@@ -550,15 +605,10 @@ const onFilesPicked = (event: Event) => {
         >
           <CodeOutlined />
         </button>
+        <button type="button" title="Preview" :disabled="!editor" @click="previewOpen = true">
+          <EyeOutlined />
+        </button>
       </span>
-      <input
-        ref="fileInput"
-        type="file"
-        accept="image/*"
-        multiple
-        class="hidden"
-        @change="onFilesPicked"
-      />
     </div>
     <p v-if="lostMarkup.length && !readonly && !sourceMode" class="rich-text-warning" role="status">
       This text has formatting the editor cannot keep ({{ lostMarkup.join(", ") }}). It stays as
@@ -574,6 +624,36 @@ const onFilesPicked = (event: Event) => {
       @input="onSourceInput"
     />
     <EditorContent v-else :editor="editor" class="rich-text-body" />
+    <ImageDialog
+      v-if="imageDialog"
+      :image="imageDialog.image"
+      @save="saveImage"
+      @cancel="closeImageDialog"
+    />
+    <div
+      v-if="previewOpen"
+      class="rich-text-preview-backdrop"
+      @mousedown.self="previewOpen = false"
+    >
+      <div
+        class="rich-text-preview"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Preview"
+        @keydown.esc="previewOpen = false"
+      >
+        <div class="rich-text-preview-bar">
+          <strong>Preview</strong>
+          <button type="button" title="Close preview" @click="previewOpen = false">Close</button>
+        </div>
+        <iframe
+          class="rich-text-preview-frame"
+          title="Preview"
+          sandbox=""
+          :srcdoc="previewDocument"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -686,6 +766,56 @@ const onFilesPicked = (event: Event) => {
   overflow-y: auto;
 }
 
+.rich-text-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.rich-text-preview {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 760px;
+  height: min(80vh, 640px);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.rich-text-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #d9d9d9;
+  background: #fafafa;
+
+  button {
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid #007011;
+    border-radius: 4px;
+    background: #fff;
+    color: #007011;
+    cursor: pointer;
+  }
+}
+
+.rich-text-preview-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
 // Tailwind preflight resets headings, lists and tables; give the text the
 // look it has where it is shown (foyer, e-mail clients).
 .rich-text-body :deep(.rich-text-content) {
@@ -793,10 +923,6 @@ const onFilesPicked = (event: Event) => {
     display: inline-block;
     max-width: 100%;
     height: auto;
-
-    &.ProseMirror-selectednode {
-      outline: 2px solid #007011;
-    }
   }
 
   table {

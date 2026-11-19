@@ -3,7 +3,13 @@ import { Editor } from "@tiptap/vue-3";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import RichTextEditor from "./RichTextEditor.vue";
-import { createExtensions, findLostMarkup, prepareHtml } from "./richText";
+import {
+  createExtensions,
+  findLostMarkup,
+  prepareHtml,
+  sizeFromStyle,
+  withoutSize,
+} from "./richText";
 
 /** What the editor would store for `html` once somebody edits it. */
 const roundTrip = (html: string) => {
@@ -89,6 +95,17 @@ describe("stored text survives the editor", () => {
 
   it("reports changed wording", () => {
     expect(findLostMarkup("<p>one two</p>", "<p>one</p>")).toContain("text");
+  });
+
+  it("reads and strips a size kept in style", () => {
+    expect(sizeFromStyle("float: right; width: 120px; height: 60.4px")).toEqual({
+      width: 120,
+      height: 60,
+    });
+    expect(sizeFromStyle("float: right")).toEqual({ width: 0, height: 0 });
+    expect(withoutSize("float: right; width: 120px; height: 60px")).toBe("float: right");
+    expect(withoutSize("width: 120px")).toBeNull();
+    expect(withoutSize(null)).toBeNull();
   });
 
   it("does not execute or keep script", () => {
@@ -202,5 +219,159 @@ describe("RichTextEditor", () => {
     await wrapper.find('button[title="Link"]').trigger("click");
     emitted = wrapper.emitted("update:modelValue") as string[][];
     expect(emitted.at(-1)?.[0]).toBe("<p>upstage</p>");
+  });
+
+  /** Issue #1575: the image dialog, handles and preview TinyMCE had. */
+  describe("images", () => {
+    const IMAGE = '<p><img src="https://x/logo.png" alt="Logo" width="200" height="100"></p>';
+    const editorOf = (wrapper: ReturnType<typeof mount>) =>
+      (wrapper.find(".rich-text-content").element as HTMLElement & { editor?: Editor }).editor!;
+    const selectImage = async (wrapper: ReturnType<typeof mount>) => {
+      // The image is the first inline node of the first paragraph: position 1.
+      editorOf(wrapper).commands.setNodeSelection(1);
+      await flushPromises();
+    };
+    const lastEmitted = (wrapper: ReturnType<typeof mount>) =>
+      (wrapper.emitted("update:modelValue") as string[][]).at(-1)?.[0] ?? "";
+
+    it("inserts an image with address, alternative text and size from the dialog", async () => {
+      const wrapper = await mountEditor({ modelValue: "<p>sig</p>" });
+      expect(wrapper.find('button[title="Insert image from address"]').exists()).toBe(false);
+      await wrapper.find('button[title="Image"]').trigger("click");
+      const dialog = wrapper.find('[role="dialog"]');
+      expect(dialog.text()).toContain("Insert image");
+      await dialog.find('input[name="src"]').setValue("https://x/logo.png");
+      await dialog.find('input[name="alt"]').setValue("Our logo");
+      await dialog.find('input[name="width"]').setValue("120");
+      await dialog.find('input[name="height"]').setValue("60");
+      await dialog.trigger("submit");
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+      const html = lastEmitted(wrapper);
+      expect(html).toContain('src="https://x/logo.png"');
+      expect(html).toContain('alt="Our logo"');
+      expect(html).toContain('width="120"');
+      expect(html).toContain('height="60"');
+    });
+
+    it("keeps proportions while a size is typed", async () => {
+      const wrapper = await mountEditor({ modelValue: IMAGE });
+      await selectImage(wrapper);
+      await wrapper.find('button[title="Image"]').trigger("click");
+      const dialog = wrapper.find('[role="dialog"]');
+      expect(dialog.text()).toContain("Image properties");
+      const width = dialog.find('input[name="width"]');
+      const height = dialog.find('input[name="height"]');
+      expect((width.element as HTMLInputElement).value).toBe("200");
+      await width.setValue("100");
+      expect((height.element as HTMLInputElement).value).toBe("50");
+      await dialog.find('input[name="constrain"]').setValue(false);
+      await width.setValue("300");
+      expect((height.element as HTMLInputElement).value).toBe("50");
+    });
+
+    it("edits the selected image's properties and drops the size kept in style", async () => {
+      const wrapper = await mountEditor({
+        modelValue: '<p><img src="https://x/a.png" style="float: right; width: 80px"></p>',
+      });
+      await selectImage(wrapper);
+      await wrapper.find('button[title="Image"]').trigger("click");
+      const dialog = wrapper.find('[role="dialog"]');
+      expect((dialog.find('input[name="src"]').element as HTMLInputElement).value).toBe(
+        "https://x/a.png",
+      );
+      expect((dialog.find('input[name="width"]').element as HTMLInputElement).value).toBe("80");
+      await dialog.find('input[name="alt"]').setValue("Portrait");
+      await dialog.find('input[name="width"]').setValue("160");
+      await dialog.trigger("submit");
+      const html = lastEmitted(wrapper);
+      expect(html).toContain('alt="Portrait"');
+      expect(html).toContain('width="160"');
+      expect(html).toMatch(/style="float: right;?"/);
+      expect(html).not.toContain("width: 80px");
+      expect(html.match(/<img/g)).toHaveLength(1);
+    });
+
+    it("cancels without changing anything", async () => {
+      const wrapper = await mountEditor({ modelValue: IMAGE });
+      await selectImage(wrapper);
+      await wrapper.find('button[title="Image"]').trigger("click");
+      await wrapper.find('[role="dialog"] input[name="alt"]').setValue("changed");
+      await wrapper.find('[role="dialog"]').trigger("keydown", { key: "Escape" });
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    });
+
+    it("opens the properties on double-click and right-click", async () => {
+      const wrapper = await mountEditor({ modelValue: IMAGE });
+      await wrapper.find(".rich-text-image img").trigger("dblclick");
+      expect(wrapper.find('[role="dialog"]').text()).toContain("Image properties");
+      await wrapper.find('[role="dialog"] button.cancel').trigger("click");
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+
+      const contextmenu = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+      wrapper.find(".rich-text-image img").element.dispatchEvent(contextmenu);
+      await flushPromises();
+      expect(contextmenu.defaultPrevented).toBe(true);
+      expect(wrapper.find('[role="dialog"]').text()).toContain("Image properties");
+    });
+
+    it("shows handles on the selected image and resizes it by dragging one", async () => {
+      const wrapper = await mountEditor({ modelValue: IMAGE });
+      expect(wrapper.findAll(".rich-text-image-handle")).toHaveLength(0);
+      await selectImage(wrapper);
+      const handles = wrapper.findAll(".rich-text-image-handle");
+      expect(handles).toHaveLength(4);
+
+      const handle = wrapper.find('.rich-text-image-handle[data-corner="se"]');
+      await handle.trigger("mousedown", { clientX: 200, clientY: 100 });
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 300, clientY: 100 }));
+      await flushPromises();
+      expect(wrapper.find(".rich-text-image-size").text()).toBe("300 × 150");
+      // Nothing is stored while the mouse is down.
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+      window.dispatchEvent(new MouseEvent("mouseup", { clientX: 300, clientY: 100 }));
+      await flushPromises();
+      const html = lastEmitted(wrapper);
+      expect(html).toContain('width="300"');
+      expect(html).toContain('height="150"');
+      expect(wrapper.find(".rich-text-image-size").exists()).toBe(false);
+    });
+
+    it("shrinks from a left handle and never below the minimum size", async () => {
+      const wrapper = await mountEditor({ modelValue: IMAGE });
+      await selectImage(wrapper);
+      await wrapper
+        .find('.rich-text-image-handle[data-corner="nw"]')
+        .trigger("mousedown", { clientX: 0, clientY: 0 });
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 1000, clientY: 0 }));
+      window.dispatchEvent(new MouseEvent("mouseup", { clientX: 1000, clientY: 0 }));
+      await flushPromises();
+      expect(lastEmitted(wrapper)).toContain('width="16"');
+    });
+
+    it("has no handles and no dialog while read-only", async () => {
+      const wrapper = await mountEditor({ modelValue: IMAGE, readonly: true });
+      editorOf(wrapper).commands.setNodeSelection(1);
+      await flushPromises();
+      expect(wrapper.findAll(".rich-text-image-handle")).toHaveLength(0);
+      await wrapper.find(".rich-text-image img").trigger("dblclick");
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+    });
+  });
+
+  it("previews the text in a sandboxed frame, including unsaved HTML-mode edits", async () => {
+    const wrapper = await mountEditor({ modelValue: "<p>one</p>" });
+    await wrapper.find('button[title="Preview"]').trigger("click");
+    let frame = wrapper.find("iframe.rich-text-preview-frame");
+    expect(frame.attributes("sandbox")).toBe("");
+    expect(frame.attributes("srcdoc")).toContain("<p>one</p>");
+    await wrapper.find('button[title="Close preview"]').trigger("click");
+    expect(wrapper.find("iframe.rich-text-preview-frame").exists()).toBe(false);
+
+    await wrapper.find('button[title="Edit as HTML"]').trigger("click");
+    await wrapper.find("textarea.rich-text-source").setValue("<p>H<sub>2</sub>O</p>");
+    await wrapper.find('button[title="Preview"]').trigger("click");
+    frame = wrapper.find("iframe.rich-text-preview-frame");
+    expect(frame.attributes("srcdoc")).toContain("<p>H<sub>2</sub>O</p>");
   });
 });

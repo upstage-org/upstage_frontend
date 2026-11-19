@@ -12,8 +12,9 @@
  *  - `findLostMarkup` names whatever would still be dropped, so the editor can
  *    warn before the first keystroke instead of losing it silently.
  */
-import { Extension, type CommandProps, type Extensions } from "@tiptap/vue-3";
+import { Extension, VueNodeViewRenderer, type CommandProps, type Extensions } from "@tiptap/vue-3";
 import Image from "@tiptap/extension-image";
+import ImageView from "./ImageView.vue";
 import { TableKit } from "@tiptap/extension-table";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyleKit } from "@tiptap/extension-text-style";
@@ -81,8 +82,54 @@ export const Indent = Extension.create({
   },
 });
 
-/** Inline image that keeps the size and float TinyMCE's image dialog set. */
-const StyledImage = Image.extend({
+/** Smallest width a handle drag or the dialog can give an image, in pixels. */
+export const MIN_IMAGE_SIZE = 16;
+
+/** What the image dialog edits; `width`/`height` are pixels, `null` for "natural". */
+export interface ImageAttributes {
+  src: string;
+  alt: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+/** Sent by an image on double-click/right-click: the position of the node to edit. */
+export interface ImageEditRequest {
+  pos: number;
+}
+
+interface StyledImageOptions {
+  onEditImage?: (request: ImageEditRequest) => void;
+}
+
+/** Width/height a `style="…"` attribute sets in pixels (0 when it does not). */
+export function sizeFromStyle(style: string | null | undefined): { width: number; height: number } {
+  const read = (name: string) => {
+    const match = new RegExp(`(?:^|;)\\s*${name}\\s*:\\s*([0-9.]+)px`, "i").exec(style ?? "");
+    return match ? Math.round(parseFloat(match[1])) : 0;
+  };
+  return { width: read("width"), height: read("height") };
+}
+
+/** The same `style="…"` without its width/height, so the attributes decide the size. */
+export function withoutSize(style: string | null | undefined): string | null {
+  if (!style) return null;
+  const kept = style
+    .split(";")
+    .map((declaration) => declaration.trim())
+    .filter((declaration) => declaration && !/^(width|height)\s*:/i.test(declaration));
+  return kept.length ? kept.join("; ") : null;
+}
+
+/**
+ * Inline image that keeps the size and float TinyMCE's image dialog set, shown
+ * through `ImageView.vue` (resize handles, properties dialog).
+ */
+const StyledImage = Image.extend<StyledImageOptions & Record<string, unknown>>({
+  addOptions() {
+    return { ...this.parent?.(), onEditImage: undefined };
+  },
+
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -93,14 +140,18 @@ const StyledImage = Image.extend({
       },
     };
   },
+
+  addNodeView() {
+    return VueNodeViewRenderer(ImageView);
+  },
 });
 
-export function createExtensions(): Extensions {
+export function createExtensions(options: StyledImageOptions = {}): Extensions {
   return [
     StarterKit.configure({
       link: { openOnClick: false, autolink: true, defaultProtocol: "https" },
     }),
-    StyledImage.configure({ inline: true, allowBase64: true }),
+    StyledImage.configure({ inline: true, allowBase64: true, onEditImage: options.onEditImage }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     TextStyleKit,
     // The look travels with the text: the foyer and e-mail clients have no table styles.

@@ -57,7 +57,11 @@ onUnmounted(() => {
   if (timer.value) clearTimeout(timer.value);
 });
 
-const replaying = inject<boolean>("replaying");
+// A recording is watched, not performed: `canPlay` is deliberately false while
+// it plays (the store's publish gate), so the "stage not open" curtain below
+// must never be drawn from it here — it came back the moment Play was pressed
+// and could not be dismissed, as `clicked` was already true.
+const replaying = inject<boolean>("replaying", false);
 // `stageStore.ready` is `StageModel | null && !preloading`, i.e.
 // `StageModel | false | null` — coerce to a plain boolean for the
 // `v-if` check below.
@@ -81,7 +85,7 @@ const masquerading = computed<boolean>(() => stageStore.masquerading);
 <template>
   <transition @leave="leave">
     <section
-      v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading)"
+      v-if="!ready || !clicked || (status !== 'live' && !canPlay && !masquerading && !replaying)"
       class="hero is-fullheight is-fullwidth cover-image"
       :class="{ replaying }"
       :style="{
