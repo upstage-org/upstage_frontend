@@ -181,6 +181,14 @@ export const useStageStore = defineStore(
     // is the mutation target.
     const _activeMovable = ref<ObjectId | null>(null);
 
+    const CHAT_TIMESTAMPS_KEY = "upstage-chat-timestamps";
+    const readStoredFlag = (key: string): boolean => {
+      try {
+        return typeof localStorage !== "undefined" && localStorage.getItem(key) === "true";
+      } catch {
+        return false;
+      }
+    };
     const chat = ref<ChatState>({
       messages: [],
       privateMessages: [],
@@ -189,6 +197,9 @@ export const useStageStore = defineStore(
       opacity: 0.9,
       fontSize: "14px",
       playerFontSize: "14px",
+      // Per-viewer: a time next to every line (#1567). Remembered in this
+      // browser; never broadcast, unlike chat visibility / dark mode.
+      showTimestamps: readStoredFlag(CHAT_TIMESTAMPS_KEY),
     });
 
     const board = ref<BoardState>({
@@ -1148,9 +1159,25 @@ export const useStageStore = defineStore(
       });
     }
 
-    function SET_CHAT_PARAMETERS({ opacity, fontSize }: { opacity: number; fontSize: string }) {
+    function SET_CHAT_PARAMETERS({
+      opacity,
+      fontSize,
+      showTimestamps,
+    }: {
+      opacity: number;
+      fontSize: string;
+      showTimestamps?: boolean;
+    }) {
       chat.value.opacity = opacity;
       chat.value.fontSize = fontSize;
+      if (typeof showTimestamps === "boolean") {
+        chat.value.showTimestamps = showTimestamps;
+        try {
+          localStorage.setItem(CHAT_TIMESTAMPS_KEY, showTimestamps ? "true" : "false");
+        } catch {
+          /* ignore */
+        }
+      }
     }
 
     function SET_PLAYER_CHAT_PARAMETERS({ playerFontSize }: { playerFontSize: string }) {

@@ -6,6 +6,7 @@ import ContextMenu from "components/ContextMenu.vue";
 import Icon from "components/Icon.vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { computed, inject } from "vue";
+import { chatClockTime } from "./chatLog";
 
 export default {
   components: { Linkify, Divider, ContextMenu, Icon },
@@ -31,6 +32,9 @@ export default {
     const time = (value) => {
       return dayjs(value).fromNow();
     };
+    // Per-viewer switch in the chat settings (Parameters tab), #1567.
+    const showTimestamps = computed(() => Boolean(stageStore.chat.showTimestamps));
+    const clock = (value) => chatClockTime(value);
 
     // `removeChat` / `highlightChat` are synchronous in Pinia (the
     // mqtt.sendMessage call is not awaited inside the action). The
@@ -58,6 +62,8 @@ export default {
       session,
       isChatStandalone,
       replaying,
+      showTimestamps,
+      clock,
     };
   },
 };
@@ -86,6 +92,13 @@ export default {
         <ContextMenu>
           <template #trigger>
             <div class="chat-line">
+              <small
+                v-if="showTimestamps && clock(item.at)"
+                class="chat-line-time"
+                data-testid="chat-time"
+                :title="time(item.at)"
+                >{{ clock(item.at) }}</small
+              >
               <small class="chat-line-author">
                 <b v-if="item.isPlayer">{{ item.user }}:</b>
                 <span v-else>{{ item.user }}:</span>
@@ -186,6 +199,13 @@ export default {
 .chat-line-author {
   font-size: 1em;
   line-height: 1;
+}
+
+.chat-line-time {
+  font-size: 0.8em;
+  line-height: 1;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
 }
 
 .tag.message {

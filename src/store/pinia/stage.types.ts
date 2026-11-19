@@ -296,6 +296,8 @@ export interface ChatState {
   opacity: number;
   fontSize: string;
   playerFontSize: string;
+  /** Show a time next to every chat line (per viewer, #1567). */
+  showTimestamps?: boolean;
   [k: string]: unknown;
 }
 
