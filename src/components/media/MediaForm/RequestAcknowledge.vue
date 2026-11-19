@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import { message } from "ant-design-vue";
-import { PropType, inject } from "vue";
+import { PropType, computed, inject } from "vue";
 import { Media } from "models/studio";
 import { useRequestPermission } from "./composable";
+import { ownerNote } from "../ownerNote";
 
 const props = defineProps({
   media: {
@@ -12,6 +13,8 @@ const props = defineProps({
 });
 
 const refresh = inject("refresh", () => {});
+// The owner's credit / usage note (#1570), part of what is acknowledged.
+const conditions = computed(() => ownerNote(props.media));
 const { mutate } = useRequestPermission();
 const sendAcknowledge = async () => {
   const response = await mutate({
@@ -29,6 +32,9 @@ const sendAcknowledge = async () => {
     <template #title>
       By clicking the button, you acknowledge that you are using the media created by
       <DName :user="media.owner" />
+      <template v-if="conditions">
+        <br /><b>Their note:</b> <span data-testid="owner-note">{{ conditions }}</span>
+      </template>
     </template>
     <smart-button type="dashed" :action="sendAcknowledge">
       <CheckSquareOutlined />Acknowledge

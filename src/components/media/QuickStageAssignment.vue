@@ -9,6 +9,7 @@ import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 import MediaPreview from "./MediaPreview.vue";
 import { uniq } from "lodash-es";
+import { ownerNote } from "./ownerNote";
 
 const props = defineProps({
   media: {
@@ -19,14 +20,10 @@ const props = defineProps({
 const stages = ref<string[]>([]);
 const visible = ref(false);
 const { isAdmin } = storeToRefs(useUserStore());
-const note = computed(() => {
-  try {
-    const description = JSON.parse(props.media.description);
-    return description?.note || "";
-  } catch {
-    return "";
-  }
-});
+// Shown whatever the copyright level (#1570): the owner wrote it for the
+// players who use the item, and they reach this pop-up for free, acknowledged
+// and granted items alike.
+const note = computed(() => ownerNote(props.media));
 const { result, loading } = useQuery(
   gql`
     {
@@ -124,7 +121,10 @@ const handleOk = async () => {
       &nbsp;&nbsp;&nbsp;
       <h4 style="color: black">{{ media.name }}</h4>
     </div>
-    <h3 style="color: black; margin-top: 20px">{{ media.copyrightLevel == 1 ? note : "" }}</h3>
+    <div v-if="note" class="owner-note" data-testid="owner-note">
+      <b>Note from <DName :user="media.owner" />:</b>
+      <p>{{ note }}</p>
+    </div>
     <div class="flex">
       <a-select
         v-model:value="stages"
@@ -153,3 +153,17 @@ const handleOk = async () => {
     <br />
   </a-modal>
 </template>
+
+<style scoped>
+.owner-note {
+  margin: 20px 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid #007011;
+  background: #f6fbf6;
+  color: #000;
+}
+.owner-note p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+</style>
