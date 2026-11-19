@@ -91,10 +91,17 @@ const handleOk = async () => {
     })
     .map((el: AssignedStage) => el.id);
   const stageIds: any = stages.value;
-  await mutate({
-    assetId: props.media.id,
-    stageIds: uniq([...remainIds, ...stageIds]) as [string],
-  });
+  try {
+    await mutate({
+      assetId: props.media.id,
+      stageIds: uniq([...remainIds, ...stageIds]) as [string],
+    });
+  } catch (error) {
+    // A refused assignment used to reject here unreported: the window just
+    // stayed open with nothing assigned (#1569). Say why, keep the choices.
+    message.error((error as Error)?.message || "The media could not be assigned");
+    return;
+  }
   message.success(`${props.media.name} had been assigned successfully!`);
   refresh();
   stages.value = [];
@@ -148,7 +155,7 @@ const handleOk = async () => {
       >
       </a-select>
       &nbsp;
-      <a-button type="primary" @click="handleOk"> Save </a-button>
+      <a-button type="primary" data-testid="save" @click="handleOk"> Save </a-button>
     </div>
     <br />
   </a-modal>

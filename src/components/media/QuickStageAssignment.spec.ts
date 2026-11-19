@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 
 /**
@@ -10,16 +10,24 @@ import { nextTick } from "vue";
  * "Copyright free" credit line — were shown without it.
  */
 
+const { mutate, toast } = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
 vi.mock("@vue/apollo-composable", async () => {
   const { ref } = await import("vue");
   return {
     useQuery: () => ({
-      result: ref({ whoami: { username: "p" }, stages: { edges: [] } }),
+      result: ref({
+        whoami: { username: "p" },
+        stages: { edges: [{ id: "7", name: "Mine", permission: "owner" }] },
+      }),
       loading: ref(false),
     }),
-    useMutation: () => ({ mutate: vi.fn() }),
+    useMutation: () => ({ mutate }),
   };
 });
+vi.mock("ant-design-vue", () => ({ message: toast }));
 vi.mock("@stores/pinia/user", async () => {
   const { ref } = await import("vue");
   return { useUserStore: () => ({ isAdmin: ref(false) }) };
@@ -43,7 +51,7 @@ const media = (copyrightLevel: number, note?: string) => ({
 
 const stubs = {
   "a-button": { template: "<button @click=\"$emit('click')\"><slot /></button>" },
-  "a-modal": { template: "<div class='modal'><slot /></div>" },
+  "a-modal": { props: ["visible"], template: "<div v-if='visible' class='modal'><slot /></div>" },
   "a-select": { template: "<select />" },
   "plus-circle-outlined": true,
   DName: { props: ["user"], template: "<span>{{ user.displayName }}</span>" },
@@ -56,6 +64,34 @@ const open = async (m: ReturnType<typeof media>) => {
   await nextTick();
   return wrapper;
 };
+
+beforeEach(() => {
+  mutate.mockReset();
+  toast.success.mockReset();
+  toast.error.mockReset();
+});
+
+describe("QuickStageAssignment saving (#1569)", () => {
+  it("closes and reports success when the assignment is accepted", async () => {
+    mutate.mockResolvedValue({ data: { quickAssignMutation: { success: true } } });
+    const wrapper = await open(media(0));
+    await wrapper.find("[data-testid=save]").trigger("click");
+    await flushPromises();
+    expect(mutate).toHaveBeenCalledWith({ assetId: "1", stageIds: [] });
+    expect(toast.success).toHaveBeenCalled();
+    expect(wrapper.find(".modal").exists()).toBe(false);
+  });
+
+  it("stays open and shows the server's reason when the assignment is refused", async () => {
+    mutate.mockRejectedValue(new Error("You are not allowed to assign this media"));
+    const wrapper = await open(media(2));
+    await wrapper.find("[data-testid=save]").trigger("click");
+    await flushPromises();
+    expect(toast.error).toHaveBeenCalledWith("You are not allowed to assign this media");
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(wrapper.find(".modal").exists()).toBe(true);
+  });
+});
 
 describe("QuickStageAssignment owner note", () => {
   it.each([0, 1, 2])("shows the owner's note on a level %i item", async (level) => {
