@@ -157,6 +157,17 @@ export default {
   player_management: "Manejar jugadores",
   batch_user_creation: "Agregar nuevos jugadores",
   foyer_customisation: "Personalizar el hogar",
+  pinned_stages: "Escenarios fijados",
+  pinned_stages_help:
+    "Estos escenarios aparecen primero en el hogar, en este orden, antes de los más recientes.",
+  no_pinned_stages:
+    "Ningún escenario fijado: el hogar muestra primero el escenario activo más reciente.",
+  pin_a_stage: "Elige un escenario para fijar",
+  pin: "Fijar",
+  move_up: "Subir",
+  move_down: "Bajar",
+  not_on_foyer: "no visible en el hogar",
+  pinned_stage: "Fijado en el hogar",
   email_notification: "Notificación de correo electrónico",
   system_configuration: "Configuración del sistema",
   stop_streaming: "Dehar de transmitir",

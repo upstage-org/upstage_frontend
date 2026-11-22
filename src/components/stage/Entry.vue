@@ -19,6 +19,9 @@ const coverImage = (src) => (src ? absolutePath(src) : `/img/${props.fallbackCov
 <template>
   <router-link :to="`/${stage.fileLocation}`" class="stage">
     <div class="name">
+      <span v-if="stage.pinned" class="pin" :title="$t('pinned_stage')" data-testid="pinned-marker"
+        >📌</span
+      >
       {{ stage.name }}
     </div>
     <img class="cover" :src="coverImage(stage.cover)" lazy />
@@ -55,6 +58,12 @@ const coverImage = (src) => (src ? absolutePath(src) : `/img/${props.fallbackCov
   .name {
     background-color: #007011;
     width: 100%;
+
+    .pin {
+      font-size: 0.7em;
+      margin-right: 0.3em;
+      vertical-align: middle;
+    }
   }
 
   .counter {

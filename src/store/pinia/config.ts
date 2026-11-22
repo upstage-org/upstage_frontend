@@ -21,6 +21,8 @@ interface ConfigState {
     description?: ConfigValue;
     menu?: ConfigValue;
     showRegistration?: ConfigValue;
+    /** JSON list of stage ids pinned to the front of the foyer (#1568). */
+    pinnedStages?: ConfigValue;
   } | null;
 }
 

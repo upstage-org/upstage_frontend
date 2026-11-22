@@ -159,6 +159,17 @@ export default {
   player_management: "Gerer les joueurs",
   batch_user_creation: "Ajouter de nouveaux joueurs",
   foyer_customisation: "Personnaliser le foyer",
+  pinned_stages: "Scènes épinglées",
+  pinned_stages_help:
+    "Ces scènes apparaissent en premier dans le foyer, dans cet ordre, avant les plus récemment actives.",
+  no_pinned_stages:
+    "Aucune scène épinglée : le foyer montre d'abord la scène la plus récemment active.",
+  pin_a_stage: "Choisir une scène à épingler",
+  pin: "Épingler",
+  move_up: "Monter",
+  move_down: "Descendre",
+  not_on_foyer: "non visible dans le foyer",
+  pinned_stage: "Épinglée au foyer",
   email_notification: "Notification par mail",
   system_configuration: "Configurer le système",
   stop_streaming: "Stop Streaming",
