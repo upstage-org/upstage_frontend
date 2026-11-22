@@ -981,14 +981,19 @@ export const useStageStore = defineStore(
       }
     }
 
-    function DELETE_OBJECT(object: BoardObject) {
+    function DELETE_OBJECT(object: BoardObject, options: { keepCostumes?: boolean } = {}) {
       const { id } = object;
       board.value.objects = board.value.objects.filter((o) => o.id !== id);
-      board.value.objects
-        .filter((o) => o.wornBy === id)
-        .forEach((costume) => {
-          costume.wornBy = null;
-        });
+      // `keepCostumes`: the object is only gone from THIS client for now (a
+      // performer's stream tile while she reloads) and is expected back under
+      // the same id — props worn by it must still be attached when it returns.
+      if (!options.keepCostumes) {
+        board.value.objects
+          .filter((o) => o.wornBy === id)
+          .forEach((costume) => {
+            costume.wornBy = null;
+          });
+      }
       if (isJitsiBoardType(object.type) && object.participantId) {
         pruneJitsiTracksForParticipant(String(object.participantId));
       }
@@ -2418,7 +2423,9 @@ export const useStageStore = defineStore(
         if (!isOwnTile) continue;
         if (o.participantId === myUserId && o.published) continue;
         const healed = { ...o, participantId: myUserId } as BoardObject;
-        UPDATE_OBJECT(healed);
+        // Wire object for the store, pixels kept for the broadcast — see
+        // syncLocalJitsiParticipantId.
+        UPDATE_OBJECT(serializeObject(healed));
         if (healed.liveAction || healed.published) {
           mqttBroadcastJitsiTile(healed, "post-publish participantId safety net");
         }
@@ -2464,7 +2471,16 @@ export const useStageStore = defineStore(
             ...o,
             participantId: id,
           } as BoardObject;
-          UPDATE_OBJECT(healed);
+          // UPDATE_OBJECT takes a WIRE object (stage-relative geometry) and
+          // converts it to pixels in place. `healed` is a copy of a store
+          // object, i.e. already in pixels: handing it over as it was
+          // multiplied x/y/w/h by the stage width here, and the broadcast
+          // below then put those pixel values on the wire, so every client
+          // multiplied them again — the tile flew off the stage for everyone
+          // each time its performer reloaded or rejoined (compounding with
+          // every reload). Serialise a copy for the store, keep `healed` in
+          // pixels for the broadcast.
+          UPDATE_OBJECT(serializeObject(healed));
           if ((healed.published || healed.liveAction) && canPlay.value) {
             mqttBroadcastJitsiTile(healed, "participantId heal after CONFERENCE_JOINED");
           }
@@ -2624,6 +2640,13 @@ export const useStageStore = defineStore(
     // `MOVE_TO` also carries `zIndex` so a drag after reorder cannot leave
     // audience paint order stale if a depth message was missed.
     function deleteObject(object: BoardObject) {
+      // Props worn by the object leave the stage with it (#1566): removing a
+      // stream (or an avatar) that has a frame attached should not leave the
+      // frame behind. To keep the prop, take it off first ("Remove from
+      // stream" / "Remove from avatar"). Removed before the wearer, so no
+      // client ever shows them detached in between.
+      const worn = board.value.objects.filter((o) => o.wornBy === object.id);
+      for (const costume of worn) deleteObject(costume);
       const userStore = useUserStore();
       if (userStore.avatarId === object.id) {
         userStore.setAvatarId(null);
@@ -4015,7 +4038,7 @@ export const useStageStore = defineStore(
           (server == null || resolveJitsiOrigin(o.jitsiServer) === server),
       );
       for (const o of targets) {
-        DELETE_OBJECT(serializeObject(o));
+        DELETE_OBJECT(serializeObject(o), { keepCostumes: true });
       }
       pruneJitsiTracksForParticipant(participantId);
     }

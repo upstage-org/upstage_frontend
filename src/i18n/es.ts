@@ -110,6 +110,8 @@ export default {
   add_prop_to_stream: "Añadir objeto al stream",
   add_prop_to_avatar: "Añadir objeto al avatar",
   remove_from_stream: "Quitar del stream",
+  add_prop_to_meeting: "Añadir objeto a la reunión",
+  remove_from_meeting: "Quitar de la reunión",
   choose_prop_for: "Elige un objeto para añadir a {name}",
   multiframe_loop_tooltip:
     "Bucle: activado, los fotogramas se repiten sin fin; desactivado (icono atenuado), se recorren todos los fotogramas una vez y se detiene.",

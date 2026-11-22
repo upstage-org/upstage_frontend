@@ -100,3 +100,77 @@ describe("add prop to stream", () => {
     expect(s.attachingPropTo).toBeNull();
   });
 });
+
+describe("removing the wearer removes its props (#1566 follow-up)", () => {
+  const lit = (s: ReturnType<typeof useStageStore>, wearer: Record<string, unknown>) => {
+    s.board.objects.push({ ...wearer } as never);
+    s.startAttachingProp(wearer.id as string);
+    const frame = s.attachPropTo({ id: 9, name: "Window", type: "prop" })!;
+    return frame;
+  };
+
+  it("deleting a stream takes the attached frame off the stage with it", () => {
+    const s = useStageStore();
+    const frame = lit(s, stream);
+    s.board.objects.push({ id: "other", type: "prop", x: 0, y: 0, w: 10, h: 10 } as never);
+    s.deleteObject(s.board.objects.find((o) => o.id === "cam")!);
+    expect(s.board.objects.map((o) => o.id)).toEqual(["other"]);
+    expect(s.board.objects.some((o) => o.id === frame.id)).toBe(false);
+  });
+
+  it("deleting an avatar takes its costume with it", () => {
+    const s = useStageStore();
+    s.board.objects.push({ id: "ava", type: "avatar", x: 0, y: 0, w: 50, h: 50 } as never);
+    s.board.objects.push({
+      id: "hat",
+      type: "prop",
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 10,
+      wornBy: "ava",
+    } as never);
+    s.deleteObject(s.board.objects.find((o) => o.id === "ava")!);
+    expect(s.board.objects).toEqual([]);
+  });
+
+  it("a prop taken off first stays on the stage", () => {
+    const s = useStageStore();
+    const frame = lit(s, stream);
+    s.board.objects.find((o) => o.id === frame.id)!.wornBy = null;
+    s.deleteObject(s.board.objects.find((o) => o.id === "cam")!);
+    expect(s.board.objects.map((o) => o.id)).toEqual([frame.id]);
+  });
+
+  it("a remote DESTROY of the wearer alone only detaches (the sender removes its props itself)", () => {
+    const s = useStageStore();
+    const frame = lit(s, stream);
+    s.DELETE_OBJECT(serializeObject({ ...stream } as never));
+    const left = s.board.objects.find((o) => o.id === frame.id)!;
+    expect(left.wornBy).toBeNull();
+  });
+
+  it("a stream tile that is only away (its performer reloads) keeps its frame attached", () => {
+    const s = useStageStore();
+    const frame = lit(s, { ...stream, participantId: "abcd1234" });
+    s.removeJitsiParticipantLocally("abcd1234");
+    expect(s.board.objects.map((o) => o.id)).toEqual([frame.id]);
+    expect(s.board.objects[0].wornBy).toBe("cam");
+  });
+});
+
+describe("add prop to meeting (#1566 follow-up)", () => {
+  const meeting = { id: "room", type: "meeting", x: 10, y: 20, w: 600, h: 400, rotate: 0 };
+
+  it("places the picked prop over the meeting, worn by it, and it follows the meeting", () => {
+    const s = useStageStore();
+    s.board.objects.push({ ...meeting } as never);
+    s.startAttachingProp("room");
+    const cover = s.attachPropTo({ id: 9, name: "Bar", type: "prop" })!;
+    expect(cover).toMatchObject({ x: 10, y: 20, w: 600, h: 400, wornBy: "room" });
+    s.UPDATE_OBJECT(serializeObject({ ...meeting, x: 200, y: 100 } as never));
+    expect(s.board.objects.find((o) => o.id === cover.id)).toMatchObject({ x: 200, y: 100 });
+    s.deleteObject(s.board.objects.find((o) => o.id === "room")!);
+    expect(s.board.objects).toEqual([]);
+  });
+});

@@ -102,6 +102,8 @@ export default {
   add_prop_to_stream: "Add prop to stream",
   add_prop_to_avatar: "Add prop to avatar",
   remove_from_stream: "Remove from stream",
+  add_prop_to_meeting: "Add prop to meeting",
+  remove_from_meeting: "Remove from meeting",
   choose_prop_for: "Choose a prop to add to {name}",
   multiframe_loop_tooltip:
     "Loop: when on, frames repeat continuously. When off (dimmed), play runs through all frames once then stops.",

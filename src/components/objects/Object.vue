@@ -60,11 +60,15 @@ export default {
       if (replaying) return false;
       if (holdable.value) return isHolding.value;
       // A worn prop is moved by its wearer's holder — except a frame worn by
-      // a stream tile (#1566), which nobody holds: any player adjusts it.
+      // a stream tile or a meeting (#1566), which nobody holds: any player
+      // adjusts it. A prop whose wearer is not on the stage (a stream tile
+      // that is away while its performer reloads) is not locked either.
+      const objects = stageStore.board?.objects ?? [];
       return (
         canPlay.value &&
         (!props.object.wornBy ||
-          streamWearerOf(props.object, stageStore.board?.objects ?? []) !== null)
+          !objects.some((o) => o.id === props.object.wornBy) ||
+          streamWearerOf(props.object, objects) !== null)
       );
     });
     provide("holdable", holdable);

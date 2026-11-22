@@ -8,6 +8,7 @@ import {
   isIOS,
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
+  isMeetingObject,
   streamWearerOf,
 } from "utils/common";
 import { openSafeLink } from "utils/sanitizeHtml";
@@ -173,9 +174,11 @@ export default {
 
     // A prop worn by a stream tile (#1566): nobody holds a stream, so any
     // player may take the frame off again.
-    const wornByStream = computed(
-      () => streamWearerOf(props.object, stageStore.board?.objects ?? []) !== null,
+    const unheldWearer = computed(() =>
+      streamWearerOf(props.object, stageStore.board?.objects ?? []),
     );
+    const wornByStream = computed(() => unheldWearer.value !== null);
+    const wornByMeeting = computed(() => isMeetingObject(unheldWearer.value));
 
     const takeOffCostume = () => {
       if (isWearing.value || wornByStream.value) {
@@ -358,6 +361,7 @@ export default {
       openExitSetting,
       wearCostume,
       wornByStream,
+      wornByMeeting,
       addPropToAvatar,
       takeOffCostume,
       currentAvatar,
@@ -433,7 +437,7 @@ export default {
         <span class="panel-icon">
           <Icon src="clear.svg" />
         </span>
-        <span>{{ $t("remove_from_stream") }}</span>
+        <span>{{ $t(wornByMeeting ? "remove_from_meeting" : "remove_from_stream") }}</span>
       </a>
       <a v-else-if="currentAvatar && !isStreamBoardObject" class="panel-block" @click="wearCostume">
         <span class="panel-icon">

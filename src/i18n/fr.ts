@@ -112,6 +112,8 @@ export default {
   add_prop_to_stream: "Ajouter un accessoire au flux",
   add_prop_to_avatar: "Ajouter un accessoire à l'avatar",
   remove_from_stream: "Retirer du flux",
+  add_prop_to_meeting: "Ajouter un accessoire à la réunion",
+  remove_from_meeting: "Retirer de la réunion",
   choose_prop_for: "Choisir un accessoire à ajouter à {name}",
   multiframe_loop_tooltip:
     "Boucle : activée, les images défilent en continu ; désactivée (icône grisée), la lecture parcourt toutes les images une fois puis s’arrête.",

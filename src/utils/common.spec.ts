@@ -39,6 +39,27 @@ describe("snapToDevicePixel", () => {
   });
 });
 
+describe("meeting wearers (#1566 follow-up)", () => {
+  it("a prop worn by a meeting has an unheld wearer, like one on a stream", async () => {
+    const { streamWearerOf, isMeetingObject, isUnheldWearerObject, isStreamTileObject } =
+      await import("./common");
+    const objects = [
+      { id: "m", type: "meeting" },
+      { id: "a", type: "avatar" },
+      { id: "p1", type: "prop", wornBy: "m" },
+    ];
+    expect(streamWearerOf(objects[2], objects)?.id).toBe("m");
+    expect(isMeetingObject(objects[0])).toBe(true);
+    expect(isMeetingObject(objects[1])).toBe(false);
+    expect(isMeetingObject(null)).toBe(false);
+    expect(isUnheldWearerObject(objects[0])).toBe(true);
+    expect(isUnheldWearerObject({ type: "jitsi" })).toBe(true);
+    expect(isUnheldWearerObject(objects[1])).toBe(false);
+    // a meeting is not a stream tile: it keeps its own menu and rendering
+    expect(isStreamTileObject(objects[0])).toBe(false);
+  });
+});
+
 describe("stream tile wearers (#1566)", () => {
   it("recognises jitsi, RTMP and video tiles and nothing else", async () => {
     const { isStreamTileObject } = await import("./common");

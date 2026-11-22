@@ -1,6 +1,7 @@
 <script>
 // Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppObject from "../Object.vue";
+import MeetingContextMenu from "./ContextMenuMeeting.vue";
 import { computed, createVNode, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
@@ -90,7 +91,7 @@ const AUDIENCE_JITSI_INTERFACE_CONFIG = {
 };
 
 export default {
-  components: { AppObject },
+  components: { AppObject, MeetingContextMenu },
   props: { object: Object },
   setup: (props) => {
     const stageStore = useStageStore();
@@ -317,6 +318,9 @@ export default {
             @error="onError"
           />
         </div>
+      </template>
+      <template #menu="slotProps">
+        <MeetingContextMenu :object="meeting" v-bind="slotProps" />
       </template>
     </AppObject>
   </div>

@@ -109,6 +109,8 @@ export default {
   add_prop_to_stream: "Adicionar objeto ao stream",
   add_prop_to_avatar: "Adicionar objeto ao avatar",
   remove_from_stream: "Remover do stream",
+  add_prop_to_meeting: "Adicionar adereço à reunião",
+  remove_from_meeting: "Remover da reunião",
   choose_prop_for: "Escolha um objeto para adicionar a {name}",
   multiframe_loop_tooltip:
     "Repetir: ligado, os quadros repetem sem parar; desligado (ícone esmaecido), percorre todos os quadros uma vez e para.",

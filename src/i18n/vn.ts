@@ -84,6 +84,8 @@ export default {
   add_prop_to_stream: "Thêm đạo cụ vào luồng",
   add_prop_to_avatar: "Thêm đạo cụ vào nhân vật",
   remove_from_stream: "Gỡ khỏi luồng",
+  add_prop_to_meeting: "Thêm đạo cụ vào cuộc họp",
+  remove_from_meeting: "Gỡ khỏi cuộc họp",
   choose_prop_for: "Chọn đạo cụ để thêm vào {name}",
   multiframe_loop_tooltip:
     "Lặp: bật thì các khung chạy lại liên tục; tắt (biểu tượng mờ) thì chỉ phát một lần qua hết các khung rồi dừng.",

@@ -587,7 +587,23 @@ export function isStreamTileObject(
   );
 }
 
-/** The board object `object` is worn by, when that is a stream tile. */
+/** An embedded Jitsi meeting on the stage. */
+export function isMeetingObject(object: { type?: unknown } | null | undefined): boolean {
+  return `${object?.type ?? ""}`.trim().toLowerCase() === "meeting";
+}
+
+/**
+ * Objects a prop can be worn by that nobody "holds": stream tiles and
+ * meetings (#1566). A prop worn by one of these is adjusted and taken off by
+ * any player on the stage, unlike a costume on a held avatar.
+ */
+export function isUnheldWearerObject(
+  object: Parameters<typeof isStreamTileObject>[0] | { type?: unknown },
+): boolean {
+  return isStreamTileObject(object as never) || isMeetingObject(object);
+}
+
+/** The board object `object` is worn by, when that is a stream tile or a meeting. */
 export function streamWearerOf<T extends { id?: unknown; wornBy?: unknown }>(
   object: { wornBy?: unknown } | null | undefined,
   objects: T[],
@@ -595,5 +611,5 @@ export function streamWearerOf<T extends { id?: unknown; wornBy?: unknown }>(
   const wornBy = object?.wornBy;
   if (wornBy == null) return null;
   const wearer = objects.find((o) => o.id === wornBy);
-  return wearer && isStreamTileObject(wearer as never) ? wearer : null;
+  return wearer && isUnheldWearerObject(wearer as never) ? wearer : null;
 }
