@@ -1479,6 +1479,25 @@ export const useStageStore = defineStore(
       settings?: StageSettings;
       audioPlayers?: AudioPlayer[];
       audios?: ToolboxItem[];
+      /** Absent on scenes saved before #1578; `null` = saved without a curtain. */
+      curtain?: Curtain | null;
+    }
+
+    /** Current saved tools first (order kept), then the scene's that are new. */
+    function mergeSavedTools<T>(
+      current: T[] | undefined,
+      incoming: T[] | undefined,
+      idOf: (item: T) => unknown,
+    ): T[] {
+      const merged = [...(current ?? [])];
+      const known = new Set(merged.map(idOf));
+      for (const item of incoming ?? []) {
+        const id = idOf(item);
+        if (id != null && known.has(id)) continue;
+        known.add(id);
+        merged.push(item);
+      }
+      return merged;
     }
 
     function REPLACE_SCENE({ payload }: { payload?: string | null }) {
@@ -1493,11 +1512,44 @@ export const useStageStore = defineStore(
         if (snapshot.board) {
           snapshot.board.objects.forEach(deserializeObject);
           snapshot.board.tracks = board.value.tracks;
+          // Saved text objects and object drawings (the strips in the Text
+          // and Draw tools) live in `board.texts` / `board.drawings`, and
+          // the whole board is swapped for the scene's below. They are this
+          // player's working set for the visit and must stay available
+          // until they leave the stage (#648) — so carry the current ones
+          // over and add any the scene brings that are not there yet.
+          snapshot.board.texts = mergeSavedTools(
+            board.value.texts,
+            snapshot.board.texts,
+            (t) => t.textId,
+          );
+          snapshot.board.drawings = mergeSavedTools(
+            board.value.drawings,
+            snapshot.board.drawings,
+            (d) => d.drawingId,
+          );
         }
         if (snapshot.background !== undefined) background.value = snapshot.background;
         if (snapshot.backdropColor !== undefined) backdropColor.value = snapshot.backdropColor;
         if (snapshot.board !== undefined) board.value = snapshot.board;
         if (snapshot.settings !== undefined) settings.value = snapshot.settings;
+        // Curtain (#1578). Scene snapshots used not to record it, so the
+        // curtain on stage simply stayed whatever it was across a scene
+        // switch — saving a scene with a curtain made every other scene
+        // appear to "have" it too, and vice versa. Scenes saved since carry
+        // their own curtain state; older ones (no `curtain` key) keep the
+        // old behaviour and leave the current curtain alone.
+        if (snapshot.curtain !== undefined) {
+          if (snapshot.curtain == null) {
+            curtain.value = null;
+          } else {
+            // Drop the saved `at`: it is the time the curtain was drawn
+            // before the scene was saved, and SET_CURTAIN's stale-message
+            // guard would compare later curtain changes against it.
+            const { at: _savedAt, ...sceneCurtain } = snapshot.curtain;
+            curtain.value = sceneCurtain;
+          }
+        }
         if (snapshot.audioPlayers !== undefined) {
           if (snapshot.audioPlayers.length === 0 && audioPlayers.value.length > 0) {
             audioPlayers.value.forEach((p) => {
