@@ -3223,13 +3223,30 @@ export const useStageStore = defineStore(
     }
 
     /** Replace jitsi tiles on the board with the event-log final state. */
+    /**
+     * The jitsi tiles a saved scene puts on the stage (wire form), mirroring
+     * what REPLACE_SCENE does with that scene: `null` when the scene is
+     * unknown or carries no board, because then loading it changes nothing.
+     */
+    function jitsiTilesOfScene(sceneId: ObjectId): BoardObject[] | null {
+      const scene = model.value?.scenes?.find((s) => s.id == sceneId);
+      if (!scene?.payload) return null;
+      try {
+        const snapshot = JSON.parse(scene.payload) as { board?: { objects?: BoardObject[] } };
+        if (!snapshot.board) return null;
+        return (snapshot.board.objects ?? []).filter((o) => isJitsiBoardType(o.type));
+      } catch {
+        return null;
+      }
+    }
+
     function reconcileJitsiBoardFromEvents(events: ReplayEvent[]) {
       if (replay.value.isReplaying) return;
       const {
         tiles: finalTiles,
         destroyedIds,
         seenIds,
-      } = computeFinalJitsiObjectsFromEvents(events);
+      } = computeFinalJitsiObjectsFromEvents(events, { sceneJitsiTiles: jitsiTilesOfScene });
       for (const id of destroyedIds) pendingJitsiPublish.delete(id);
       const keepIds = new Set(finalTiles.map((o) => o.id));
       // The archive is authoritative only for tiles it has heard of. A tile

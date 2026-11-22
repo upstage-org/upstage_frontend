@@ -1,4 +1,4 @@
-import { BOARD_ACTIONS, TOPICS } from "@utils/constants";
+import { BACKGROUND_ACTIONS, BOARD_ACTIONS, TOPICS } from "@utils/constants";
 import { isJitsiBoardType } from "@utils/common";
 import { unnamespaceTopic } from "@utils/mqttTopics";
 import type { BoardObject, ObjectId, ReplayEvent } from "@stores/pinia/stage";
@@ -7,6 +7,36 @@ import type { BoardObject, ObjectId, ReplayEvent } from "@stores/pinia/stage";
 interface BoardMessage {
   type: string;
   object?: BoardObject;
+}
+
+/** A scene change in the archive, as far as the jitsi reconcile cares. */
+type SceneChange = { kind: "blank" } | { kind: "switch"; scene: ObjectId };
+
+/** Parse an archive event into a scene change (null if it is not one). */
+export function sceneChangeFromEvent(event: ReplayEvent): SceneChange | null {
+  if (unnamespaceTopic(event.topic ?? "") !== TOPICS.BACKGROUND) return null;
+  const raw = event.payload;
+  if (raw == null) return null;
+  let msg: { type?: string; scene?: ObjectId };
+  try {
+    msg = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (msg?.type === BACKGROUND_ACTIONS.BLANK_SCENE) return { kind: "blank" };
+  if (msg?.type === BACKGROUND_ACTIONS.SWITCH_SCENE && msg.scene !== undefined) {
+    return { kind: "switch", scene: msg.scene };
+  }
+  return null;
+}
+
+export interface JitsiReconcileOptions {
+  /**
+   * The jitsi tiles (wire form, as in a PLACE payload) that a saved scene
+   * puts on the stage, or `null` when the scene is unknown / has no board —
+   * in which case switching to it changed nothing on the live clients either.
+   */
+  sceneJitsiTiles?: (sceneId: ObjectId) => BoardObject[] | null;
 }
 
 /** Parse a replay/archive event into a board message (null if not a board topic). */
@@ -44,8 +74,20 @@ export interface JitsiReconcileResult {
  * drop it. Tiles sharing the CURRENT participantId are concurrent live streams
  * (a performer may publish several stream tiles from one tab at once) and must
  * ALL survive — keying the de-dup on `hostId` alone collapsed those down to one.
+ *
+ * Scene changes count too. Switching scene (or the blank scene) replaces the
+ * whole board on every live client, so a stream tile that was on stage before
+ * the switch is gone afterwards — without any DESTROY event. Ignoring that,
+ * the archive kept saying "PLACE, never destroyed", and every later reconcile
+ * (stage load, MQTT reconnect) put the tile back as a ghost: on stage for the
+ * clients that reconciled, not for the others, bound to a stream that was no
+ * longer published. After a switch the stage holds exactly the jitsi tiles the
+ * scene carries (`options.sceneJitsiTiles`); after the blank scene, none.
  */
-export function computeFinalJitsiObjectsFromEvents(events: ReplayEvent[]): JitsiReconcileResult {
+export function computeFinalJitsiObjectsFromEvents(
+  events: ReplayEvent[],
+  options: JitsiReconcileOptions = {},
+): JitsiReconcileResult {
   const byId = new Map<ObjectId, BoardObject>();
   const destroyedIds: ObjectId[] = [];
   const seenIds = new Set<ObjectId>();
@@ -58,6 +100,26 @@ export function computeFinalJitsiObjectsFromEvents(events: ReplayEvent[]): Jitsi
     if (host && pid) hostLatestPid.set(host, pid);
   };
   for (const event of sorted) {
+    const sceneChange = sceneChangeFromEvent(event);
+    if (sceneChange) {
+      if (sceneChange.kind === "blank") {
+        byId.clear();
+      } else {
+        const sceneTiles = options.sceneJitsiTiles?.(sceneChange.scene) ?? null;
+        // Unknown scene: the live clients applied nothing, so neither do we.
+        if (sceneTiles) {
+          byId.clear();
+          for (const tile of sceneTiles) {
+            if (tile?.id == null || !isJitsiBoardType(tile.type)) continue;
+            const placed = { ...tile, liveAction: true, published: true };
+            byId.set(tile.id, placed);
+            seenIds.add(tile.id);
+            noteGeneration(placed);
+          }
+        }
+      }
+      continue;
+    }
     const msg = boardMessageFromEvent(event);
     if (!msg?.object?.id || !isJitsiBoardType(msg.object.type)) continue;
     const { id } = msg.object;
