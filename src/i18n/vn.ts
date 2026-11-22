@@ -217,4 +217,7 @@ export default {
     "Cuộc họp có vẻ đã được tải. Bạn có chắc muốn tải lại cuộc họp này? Bạn sẽ rời cuộc họp và tham gia lại với camera và micrô bị tắt, và những người tham gia khác sẽ thấy bạn rời đi trong giây lát.",
   refresh_streams: "Làm mới luồng",
   refresh_streams_tooltip: "Thử kết nối lại các luồng video cá nhân trên sân khấu",
+  streams_reconnecting: "Đang kết nối lại luồng…",
+  streams_reconnecting_tooltip:
+    "Trình duyệt này đã mất kết nối với máy chủ phát trực tuyến nên các luồng trực tiếp không được gửi hay nhận. Hệ thống đang tự động kết nối lại — nếu thông báo này vẫn còn, hãy kiểm tra kết nối internet hoặc tải lại trang.",
 };

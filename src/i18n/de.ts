@@ -85,4 +85,7 @@ export default {
     "Wiederholung: eingeschaltet laufen die Bilder endlos. Aus (ausgegraut): alle Bilder einmal abspielen, dann Stopp.",
   animation_speed_tooltip:
     "Animationstempo: Sekunden pro Bild. Zahl eingeben und mit Enter die Animation starten (schließt das Menü).",
+  streams_reconnecting: "Streams werden neu verbunden…",
+  streams_reconnecting_tooltip:
+    "Dieser Browser hat die Verbindung zum Streaming-Server verloren; Live-Streams werden weder gesendet noch empfangen. Die Verbindung wird automatisch wiederhergestellt – bleibt diese Meldung stehen, prüfe deine Internetverbindung oder lade die Seite neu.",
 };

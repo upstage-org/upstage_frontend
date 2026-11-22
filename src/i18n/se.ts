@@ -257,4 +257,7 @@ export default {
     "Mötet verkar vara laddat. Är du säker på att du vill ladda om mötet? Du lämnar mötet och går med igen med kamera och mikrofon avstängda, och andra deltagare ser dig försvinna en kort stund.",
   refresh_streams: "Uppdatera strömmar",
   refresh_streams_tooltip: "Försök koppla individuella videoströmmar på scenen igen",
+  streams_reconnecting: "Strömmar återansluter…",
+  streams_reconnecting_tooltip:
+    "Den här webbläsaren har tappat anslutningen till strömningsservern, så liveströmmar varken skickas eller tas emot. Återanslutning sker automatiskt – om meddelandet finns kvar, kontrollera din internetanslutning eller ladda om sidan.",
 };

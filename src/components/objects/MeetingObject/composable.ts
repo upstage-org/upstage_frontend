@@ -288,6 +288,17 @@ export const useJitsi = () => {
     connection: null,
     localTracks,
     sessions,
+    /**
+     * Leave the default server's conference and join it again with a fresh
+     * connection. For callers that need clean signalling state (see
+     * localStreamPublisher: re-publishing in Firefox after an unpublish).
+     * Everything that follows a rejoin — new participant id, own-tile heal,
+     * re-publish of the local tracks — is the same path as after a lost
+     * connection.
+     */
+    rejoin: (reason: string) => {
+      sessions.get(configs.JITSI_ENDPOINT)?.requestRejoin?.(reason);
+    },
   };
   const stageStore = useStageStore();
 
@@ -384,6 +395,8 @@ export const useJitsi = () => {
       interruptedTimer: null,
       // Runs the pending rejoin now (browser `online` / page wake).
       retryNow: () => {},
+      // Set per attempt by startSession; tears the session down and joins anew.
+      requestRejoin: (_reason: string) => {},
       // Session-local join state, mirrored into the shared `joined` only
       // for the default server's session.
       markJoined: (value: boolean) => {
@@ -480,6 +493,14 @@ export const useJitsi = () => {
       };
       session.retryNow = run;
       session.retryTimer = setTimeout(run, delay);
+    };
+    // Deliberate rejoin on request (see `jitsi.rejoin` below): the same
+    // teardown + fresh connection as after a lost connection, without the
+    // backoff wait.
+    session.requestRejoin = (reason: string) => {
+      if (!live()) return;
+      scheduleRejoin(reason);
+      session.retryNow?.();
     };
     // No CONFERENCE_JOINED within this long after an attempt starts counts
     // as a failed attempt (a connect that neither succeeds nor errors).

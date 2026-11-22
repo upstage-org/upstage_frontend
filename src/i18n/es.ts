@@ -259,4 +259,7 @@ export default {
   refresh_streams: "Actualizar transmisiones",
   refresh_streams_tooltip:
     "Reintentar conectar las transmisiones de video individuales en el escenario",
+  streams_reconnecting: "Reconectando transmisiones…",
+  streams_reconnecting_tooltip:
+    "Este navegador perdió la conexión con el servidor de streaming, por lo que no se envían ni se reciben transmisiones en vivo. Se está reconectando automáticamente; si este mensaje no desaparece, revisa tu conexión a internet o recarga la página.",
 };

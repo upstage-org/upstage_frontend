@@ -23,7 +23,9 @@ import { defineComponent, h, ref, shallowRef } from "vue";
 const mocks = vi.hoisted(() => {
   const createLocalTracks = vi.fn();
   const deviceListeners: Array<() => void> = [];
+  const browser = { firefox: false };
   const JitsiMeetJS = {
+    util: { browser: { isFirefox: () => browser.firefox } },
     createLocalTracks,
     events: { mediaDevices: { DEVICE_LIST_CHANGED: "devicelistchanged" } },
     mediaDevices: {
@@ -33,7 +35,7 @@ const mocks = vi.hoisted(() => {
       removeEventListener: () => {},
     },
   };
-  return { JitsiMeetJS, createLocalTracks, deviceListeners };
+  return { JitsiMeetJS, createLocalTracks, deviceListeners, browser };
 });
 
 const storeMocks = vi.hoisted(() => ({ store: null as unknown as Record<string, unknown> }));
@@ -123,6 +125,7 @@ const store = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.browser.firefox = false;
   mocks.deviceListeners.length = 0;
   // jsdom does not reliably report a secure context; the acquire path
   // hard-blocks without it.
@@ -267,5 +270,90 @@ describe("useLocalStreamPublisher — rejoin after the conference was lost", () 
     expect(newRoom.addTrack).toHaveBeenCalledWith(second[0]);
     expect(newRoom.addTrack).toHaveBeenCalledWith(second[1]);
     expect(newRoom.addTrack).not.toHaveBeenCalledWith(first[1]);
+  });
+});
+
+/**
+ * Firefox: re-adding the local tracks to the same conference after an
+ * unpublish is unreliable — a renegotiation while they are detached makes
+ * Firefox signal `source-remove`, and the later addTrack does not always
+ * signal `source-add`, so the bridge discards the performer's media
+ * (prod rehearsal 2026-11-21; reproduced 2026-11-23). A re-publish after an
+ * unpublish therefore goes through a fresh conference session in Firefox.
+ */
+describe("useLocalStreamPublisher — Firefox re-publish after taking the stream off stage", () => {
+  const ownTile = [{ type: "jitsi", participantId: "me", hostId: "sess-1", id: 1 }];
+
+  async function publishThenUnpublish(firefox: boolean) {
+    mocks.browser.firefox = firefox;
+    const pair = [fakeTrack("audio"), fakeTrack("video")];
+    mocks.createLocalTracks.mockResolvedValue(pair);
+    const ctx = mountPublisher();
+    const rejoin = vi.fn();
+    (ctx.jitsi as unknown as { rejoin: typeof rejoin }).rejoin = rejoin;
+    await flushPromises();
+    store().board.objects = ownTile;
+    await flushPromises();
+    expect(ctx.room.addTrack).toHaveBeenCalledTimes(2);
+    store().board.objects = [];
+    await flushPromises();
+    expect(ctx.room.removeTrack).toHaveBeenCalledTimes(2);
+    return { ...ctx, rejoin, pair };
+  }
+
+  it("Firefox: asks for a fresh session instead of re-adding to the same conference", async () => {
+    const { room, rejoin, jitsi, joined, pair } = await publishThenUnpublish(true);
+    store().board.objects = ownTile;
+    await flushPromises();
+    expect(rejoin).toHaveBeenCalledTimes(1);
+    expect(room.addTrack).toHaveBeenCalledTimes(2); // nothing re-added to the old conference
+
+    // useJitsi rejoins: new room, joined false -> true; the same tracks are published there.
+    joined.value = false;
+    await flushPromises();
+    const newRoom = makeRoom();
+    (jitsi as { room: unknown }).room = newRoom;
+    joined.value = true;
+    await flushPromises();
+    expect(newRoom.addTrack).toHaveBeenCalledTimes(2);
+    expect(newRoom.addTrack).toHaveBeenCalledWith(pair[1]);
+    expect(mocks.createLocalTracks).toHaveBeenCalledTimes(1);
+    expect(rejoin).toHaveBeenCalledTimes(1); // the fresh session publishes directly, no second rejoin
+  });
+
+  it("Firefox: a first publish (nothing unpublished yet) does not rejoin", async () => {
+    mocks.browser.firefox = true;
+    mocks.createLocalTracks.mockResolvedValue([fakeTrack("audio"), fakeTrack("video")]);
+    const { jitsi, room } = mountPublisher();
+    const rejoin = vi.fn();
+    (jitsi as unknown as { rejoin: typeof rejoin }).rejoin = rejoin;
+    await flushPromises();
+    store().board.objects = ownTile;
+    await flushPromises();
+    expect(rejoin).not.toHaveBeenCalled();
+    expect(room.addTrack).toHaveBeenCalledTimes(2);
+  });
+
+  it("Chromium: re-adds to the same conference as before, no rejoin", async () => {
+    const { room, rejoin } = await publishThenUnpublish(false);
+    store().board.objects = ownTile;
+    await flushPromises();
+    expect(rejoin).not.toHaveBeenCalled();
+    expect(room.addTrack).toHaveBeenCalledTimes(4);
+  });
+
+  it("Firefox: Refresh streams on a published stream also goes through a fresh session", async () => {
+    mocks.browser.firefox = true;
+    mocks.createLocalTracks.mockResolvedValue([fakeTrack("audio"), fakeTrack("video")]);
+    const { jitsi, room } = mountPublisher();
+    const rejoin = vi.fn();
+    (jitsi as unknown as { rejoin: typeof rejoin }).rejoin = rejoin;
+    await flushPromises();
+    store().board.objects = ownTile;
+    await flushPromises();
+    (store() as unknown as { forceReloadStreams: Date }).forceReloadStreams = new Date();
+    await flushPromises();
+    expect(rejoin).toHaveBeenCalledTimes(1);
+    expect(room.removeTrack).not.toHaveBeenCalled();
   });
 });

@@ -18,6 +18,13 @@ vi.mock("@stores/pinia/stage", async () => {
     canPlay: false,
     streamLocalMuted: () => false,
     streamLocalVolume: () => 100,
+    addTrack(track: { getId: () => string }) {
+      if (
+        !store.jitsiTracks.some((t) => (t as { getId: () => string }).getId() === track.getId())
+      ) {
+        store.jitsiTracks = [...store.jitsiTracks, track];
+      }
+    },
   });
   return { useStageStore: () => store };
 });
@@ -76,12 +83,12 @@ function fakeTrack(type: "video" | "audio", participantId: string) {
 }
 
 const mounted: Array<{ unmount: () => void }> = [];
-function mountTile(participantId = "p1") {
+function mountTile(participantId = "p1", room: unknown = null) {
   const w = mount(Jitsi, {
     props: { object: { id: "o1", type: "jitsi", participantId }, closeMenu: () => {} },
     global: {
       mocks: { $t: (k: string) => k },
-      provide: { jitsi: { room: null, localTracks: { value: [] } } },
+      provide: { jitsi: { room, localTracks: { value: [] } } },
       stubs: {
         AppObject: { template: "<div><slot name='render' /></div>" },
         Loading: true,
@@ -200,5 +207,65 @@ describe("Jitsi tile force reload (Refresh streams button)", () => {
     await nextTick();
     expect(warn).toHaveBeenCalled();
     expect(v.attach).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * A performer takes her stream off the stage and puts it back (prod,
+ * 2026-11-21 rehearsal and reproduced 2026-11-23): lib-jitsi-meet keeps her
+ * remote track objects and never fires a second TRACK_ADDED, while the store
+ * dropped them with the old tile — so the new tile had nothing to attach.
+ * The tile now asks the conference for the participant's live tracks.
+ */
+describe("Jitsi tile recovers tracks the store dropped but the conference still has", () => {
+  const roomWith = (tracksByParticipant: Record<string, unknown[]>) => ({
+    myUserId: () => "me",
+    getLocalTracks: () => [],
+    getParticipantById: (id: string) =>
+      tracksByParticipant[id] ? { getTracks: () => tracksByParticipant[id] } : undefined,
+  });
+
+  it("attaches the conference's tracks when the store has none for the participant", async () => {
+    const video = fakeTrack("video", "p1");
+    const audio = fakeTrack("audio", "p1");
+    const w = mountTile("p1", roomWith({ p1: [audio, video] }));
+    await flushPromises();
+    await nextTick();
+    expect(store().jitsiTracks).toHaveLength(2);
+    expect(w.find(".loading").exists()).toBe(false);
+    expect(video.attach).toHaveBeenCalledTimes(1);
+  });
+
+  it("picks the tracks up on a later poll once the performer has re-published", async () => {
+    const live: Record<string, unknown[]> = {};
+    const w = mountTile("p1", roomWith(live));
+    await flushPromises();
+    expect(w.find(".loading").exists()).toBe(true);
+    const video = fakeTrack("video", "p1");
+    live.p1 = [video];
+    await vi.advanceTimersByTimeAsync(3000);
+    await nextTick();
+    expect(store().jitsiTracks).toHaveLength(1);
+    expect(video.attach).toHaveBeenCalledTimes(1);
+  });
+
+  it("never adds another participant's tracks, disposed tracks, or duplicates", async () => {
+    const mine = fakeTrack("video", "p1");
+    const dead = { ...fakeTrack("audio", "p1"), disposed: true };
+    const other = fakeTrack("video", "p2");
+    store().jitsiTracks = [mine];
+    mountTile("p1", roomWith({ p1: [mine, dead], p2: [other] }));
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(store().jitsiTracks).toEqual([mine]);
+  });
+
+  it("does nothing for the performer's own tile or before the conference exists", async () => {
+    const room = { ...roomWith({ me: [fakeTrack("video", "me")] }), myUserId: () => "me" };
+    mountTile("me", room);
+    mountTile("p1", null);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(store().jitsiTracks).toHaveLength(0);
   });
 });
