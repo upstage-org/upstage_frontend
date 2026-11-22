@@ -22,6 +22,12 @@ export interface JitsiReconcileResult {
   tiles: BoardObject[];
   /** Ids seen in a DESTROY event — caller drops these from any pending state. */
   destroyedIds: ObjectId[];
+  /**
+   * Every jitsi tile id the archive has ever heard of (PLACE, MOVE_TO or
+   * DESTROY). A tile on a board that is NOT in here was never announced, so
+   * the archive has no say over it — see reconcileJitsiBoardFromEvents.
+   */
+  seenIds: ObjectId[];
 }
 
 /**
@@ -42,6 +48,7 @@ export interface JitsiReconcileResult {
 export function computeFinalJitsiObjectsFromEvents(events: ReplayEvent[]): JitsiReconcileResult {
   const byId = new Map<ObjectId, BoardObject>();
   const destroyedIds: ObjectId[] = [];
+  const seenIds = new Set<ObjectId>();
   const hostLatestPid = new Map<string, string>();
   const sorted = [...events].sort((a, b) => (a.mqttTimestamp ?? 0) - (b.mqttTimestamp ?? 0));
   const noteGeneration = (object: BoardObject) => {
@@ -54,6 +61,7 @@ export function computeFinalJitsiObjectsFromEvents(events: ReplayEvent[]): Jitsi
     const msg = boardMessageFromEvent(event);
     if (!msg?.object?.id || !isJitsiBoardType(msg.object.type)) continue;
     const { id } = msg.object;
+    seenIds.add(id);
     switch (msg.type) {
       case BOARD_ACTIONS.DESTROY:
         byId.delete(id);
@@ -87,5 +95,5 @@ export function computeFinalJitsiObjectsFromEvents(events: ReplayEvent[]): Jitsi
     const latest = hostLatestPid.get(host);
     return latest == null || latest === pid;
   });
-  return { tiles, destroyedIds };
+  return { tiles, destroyedIds, seenIds: [...seenIds] };
 }

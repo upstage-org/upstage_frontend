@@ -6,6 +6,7 @@ import Popover from "components/Popover.vue";
 import Session from "./Session.vue";
 import ReloadStream from "./ReloadStream.vue";
 import FrozenViewersBadge from "./FrozenViewersBadge.vue";
+import StreamConnectionBadge from "./StreamConnectionBadge.vue";
 import RecordingControl from "components/stage/RecordingControl.vue";
 
 defineProps<{
@@ -52,6 +53,7 @@ onMounted(() => {
     <RecordingControl v-if="!replaying && canPlay" />
     <ReloadStream v-if="!replaying" />
     <FrozenViewersBadge v-if="!replaying" />
+    <StreamConnectionBadge v-if="!replaying" />
     <span
       class="tag is-light is-small"
       :class="{

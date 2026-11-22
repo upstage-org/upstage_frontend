@@ -440,7 +440,24 @@ export function useLocalStreamPublisher(
   );
 
   watch(joined, async (isJoined) => {
+    if (!isJoined) {
+      // The conference is gone (connection lost — useJitsi is rejoining —
+      // or route teardown). Whatever we had published went with it: the
+      // next room is a NEW conference that has none of our tracks, so the
+      // `!published` test below must let the rejoin re-add them. Leaving
+      // this latched at true is how a performer kept "publishing" to a
+      // conference they were no longer in.
+      published.value = false;
+      return;
+    }
     if (isJoined) {
+      // A camera/mic that ended while we were away (device unplugged, OS
+      // revoked it during sleep) cannot be re-added; get fresh tracks.
+      // acquireLocalTracks re-arms the publish itself when an own tile is
+      // on the board, and is a no-op while the current tracks are healthy.
+      if (tracks.length > 0 && !tracksAreHealthy()) {
+        await acquireLocalTracks();
+      }
       // Conference is back online — if a persisted own-tile is already
       // on the board, kick the canonical board-driven publish.
       if (publishingAllowed() && countOwnJitsiOnBoard() > 0 && !published.value) {
