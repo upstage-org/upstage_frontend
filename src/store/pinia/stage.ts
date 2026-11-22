@@ -573,6 +573,17 @@ export const useStageStore = defineStore(
     // our streams as frozen (drives the "Frozen for N viewers" badge). Reads
     // the map reactively; stale entries are removed by the pruner, but we also
     // apply the TTL here so a paused pruner can never over-count.
+    /**
+     * True while this tab is out of the default Jitsi server's conference
+     * after a connection loss and useJitsi is trying to rejoin (see
+     * `scheduleRejoin` in MeetingObject/composable.ts). Local UI state only —
+     * drives the "Streams reconnecting" badge; never sent over MQTT.
+     */
+    const jitsiConnectionLost = ref(false);
+    function setJitsiConnectionLost(lost: boolean) {
+      jitsiConnectionLost.value = lost;
+    }
+
     const frozenViewerCount = computed(() => {
       const now = +new Date();
       const viewers = new Set<string>();
@@ -3162,11 +3173,25 @@ export const useStageStore = defineStore(
     /** Replace jitsi tiles on the board with the event-log final state. */
     function reconcileJitsiBoardFromEvents(events: ReplayEvent[]) {
       if (replay.value.isReplaying) return;
-      const { tiles: finalTiles, destroyedIds } = computeFinalJitsiObjectsFromEvents(events);
+      const {
+        tiles: finalTiles,
+        destroyedIds,
+        seenIds,
+      } = computeFinalJitsiObjectsFromEvents(events);
       for (const id of destroyedIds) pendingJitsiPublish.delete(id);
       const keepIds = new Set(finalTiles.map((o) => o.id));
+      // The archive is authoritative only for tiles it has heard of. A tile
+      // this tab placed but has not announced yet (bulb still off, or waiting
+      // for the conference to hand out a participant id) exists nowhere but
+      // here, so "not in the archive" does not mean "removed" — without this
+      // exception every reconcile (stage load finishing, any MQTT reconnect)
+      // silently deleted the performer's freshly dropped stream tile.
+      const archived = new Set(seenIds);
+      const mySession = session.value;
+      const isOwnUnannounced = (o: BoardObject) =>
+        mySession != null && o.hostId === mySession && !o.published && !archived.has(o.id);
       board.value.objects = board.value.objects.filter(
-        (o) => !isJitsiBoardType(o.type) || keepIds.has(o.id),
+        (o) => !isJitsiBoardType(o.type) || keepIds.has(o.id) || isOwnUnannounced(o),
       );
       for (const obj of finalTiles) {
         const payload = { ...obj, liveAction: true, published: true };
@@ -3892,6 +3917,23 @@ export const useStageStore = defineStore(
      * When a lib-jitsi-meet peer leaves, drop their on-stage tiles and any
      * lingering tracks on this client (MQTT DESTROY may never arrive).
      */
+    /**
+     * Drop every REMOTE track (optionally only those delivered by `server`)
+     * from the board. Called when a Jitsi session is torn down for a rejoin:
+     * its remote JitsiTrack objects are dead, and the new conference will
+     * deliver fresh ones for the same participant ids. Local tracks (the
+     * performer's own camera/mic) are kept — they are re-added to the new
+     * conference as they are. Tiles are not touched.
+     */
+    function clearRemoteJitsiTracks(server?: string) {
+      const next = board.value.tracks.filter((t) => {
+        if (t.isLocal?.()) return true;
+        if (server == null) return false;
+        return trackServers.get(toRaw(t) as object) !== server;
+      });
+      if (next.length !== board.value.tracks.length) board.value.tracks = next;
+    }
+
     function removeJitsiParticipantLocally(participantId: string, server?: string) {
       // Multi-server: participant ids are per-conference (8 random hex), so a
       // USER_LEFT on server A must not delete a tile whose media is on
@@ -4044,6 +4086,8 @@ export const useStageStore = defineStore(
       reloadStreams,
       forceReloadStreams,
       frozenViewerCount,
+      jitsiConnectionLost,
+      setJitsiConnectionLost,
       meetingRefreshKey,
       activeObject,
       enabledLiveStreaming,
@@ -4215,6 +4259,7 @@ export const useStageStore = defineStore(
       removeTrack,
       removeObjectLocally,
       removeJitsiParticipantLocally,
+      clearRemoteJitsiTracks,
       triggerReloadStreams,
       triggerForceReloadStreams,
       reportStreamHealth,

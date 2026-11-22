@@ -138,6 +138,7 @@ export function useLocalStreamPublisher(
     pendingPublish.value = false;
     published.value = false;
     if (!jitsi?.room) return;
+    if (joined.value && tracks.length > 0) unpublishedInThisSession = true;
     for (const t of tracks) {
       try {
         await jitsi.room.removeTrack(t);
@@ -184,6 +185,41 @@ export function useLocalStreamPublisher(
     }
   };
 
+  /**
+   * Firefox only: once the local tracks have been taken out of a conference
+   * (own tile closed), re-adding them to the SAME conference is unreliable.
+   * While they are detached, any renegotiation — typically another
+   * participant leaving or reloading — makes Firefox send `source-remove`
+   * for our audio/video, and the later `addTrack` then does not always send
+   * the matching `source-add`. The bridge is left with no signalled sources
+   * for us and discards every packet: the tile is on everyone's stage, the
+   * camera is running, and nobody receives anything (prod rehearsal
+   * 2026-11-21, the server logged the `source-remove` 0.45 s after another
+   * performer reloaded; reproduced 2026-11-23). Chromium never sends that
+   * `source-remove`. So in Firefox a re-publish after an unpublish goes
+   * through a fresh conference session, exactly like a page reload would —
+   * the join signals our sources from scratch.
+   */
+  let unpublishedInThisSession = false;
+  const isFirefox = (): boolean => {
+    try {
+      const lib = JitsiMeetJS as { util?: { browser?: { isFirefox?: () => boolean } } };
+      const viaLib = lib?.util?.browser?.isFirefox?.();
+      if (typeof viaLib === "boolean") return viaLib;
+    } catch {
+      // fall through to the user-agent test
+    }
+    return typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent ?? "");
+  };
+  const rejoinToRepublish = (reason: string): boolean => {
+    const rejoin = (jitsi as { rejoin?: (reason: string) => void })?.rejoin;
+    if (!unpublishedInThisSession || !isFirefox() || typeof rejoin !== "function") return false;
+    unpublishedInThisSession = false;
+    console.log("[jitsi] re-publishing through a fresh conference session", { reason });
+    rejoin(reason);
+    return true;
+  };
+
   const tryPublishWhenReady = async (reason: string) => {
     console.log("[diag] localStream.tryPublishWhenReady", {
       reason,
@@ -201,6 +237,9 @@ export function useLocalStreamPublisher(
     if (!joined.value || !jitsi?.room) return;
     if (tracks.length === 0) return;
     pendingPublish.value = false;
+    // The rejoin flips `joined` false → true; the joined-watcher below then
+    // re-arms and runs this publish against the new conference.
+    if (rejoinToRepublish("republish after unpublish (Firefox)")) return;
     await publishLocalTracksToRoom();
     published.value = true;
     const myUserId = jitsi?.room?.myUserId?.();
@@ -353,6 +392,16 @@ export function useLocalStreamPublisher(
     // re-prompts getUserMedia.
     if (!force && published.value && tracksAreHealthy()) return;
     if (republishing) return;
+    // Firefox: remove+add on the same conference is the unreliable path
+    // described at `unpublishedInThisSession`; refresh through a rejoin.
+    if (
+      isFirefox() &&
+      published.value &&
+      typeof (jitsi as { rejoin?: unknown })?.rejoin === "function"
+    ) {
+      unpublishedInThisSession = true;
+      if (rejoinToRepublish("refresh streams (Firefox)")) return;
+    }
     republishing = true;
     try {
       for (const t of tracks) {
@@ -457,7 +506,26 @@ export function useLocalStreamPublisher(
   );
 
   watch(joined, async (isJoined) => {
+    if (!isJoined) {
+      // A new conference session starts clean.
+      unpublishedInThisSession = false;
+      // The conference is gone (connection lost — useJitsi is rejoining —
+      // or route teardown). Whatever we had published went with it: the
+      // next room is a NEW conference that has none of our tracks, so the
+      // `!published` test below must let the rejoin re-add them. Leaving
+      // this latched at true is how a performer kept "publishing" to a
+      // conference they were no longer in.
+      published.value = false;
+      return;
+    }
     if (isJoined) {
+      // A camera/mic that ended while we were away (device unplugged, OS
+      // revoked it during sleep) cannot be re-added; get fresh tracks.
+      // acquireLocalTracks re-arms the publish itself when an own tile is
+      // on the board, and is a no-op while the current tracks are healthy.
+      if (tracks.length > 0 && !tracksAreHealthy()) {
+        await acquireLocalTracks();
+      }
       // Conference is back online — if a persisted own-tile is already
       // on the board, kick the canonical board-driven publish.
       if (publishingAllowed() && countOwnJitsiOnBoard() > 0 && !published.value) {

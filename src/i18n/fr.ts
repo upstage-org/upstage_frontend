@@ -276,4 +276,7 @@ export default {
     "La réunion semble chargée. Voulez-vous vraiment recharger cette réunion ? Vous quitterez la réunion et la rejoindrez avec la caméra et le micro coupés, et les autres participants vous verront brièvement disparaître.",
   refresh_streams: "Actualiser les flux",
   refresh_streams_tooltip: "Réessayer de connecter les flux vidéo individuels sur scène",
+  streams_reconnecting: "Reconnexion des flux…",
+  streams_reconnecting_tooltip:
+    "Ce navigateur a perdu la connexion au serveur de streaming : les flux en direct ne sont ni envoyés ni reçus. La reconnexion est automatique ; si ce message persiste, vérifiez votre connexion internet ou rechargez la page.",
 };

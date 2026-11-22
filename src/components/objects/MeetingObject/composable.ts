@@ -186,6 +186,81 @@ export const loadJitsiServerConfig = (
 
 // lib-jitsi-meet is vendored and untyped; these are its objects.
 type SessionOptions = { origin: any; stageUrl: any; target: any; initLib: any };
+// Automatic rejoin (see `scheduleRejoin`). Delay before attempt N; the last
+// value repeats for as long as the stage stays open.
+const JITSI_REJOIN_DELAYS_MS = [1000, 3000, 5000, 10000, 15000];
+const JITSI_JOIN_TIMEOUT_MS = 45_000;
+const PAGE_UNLOAD_WINDOW_MS = 5_000;
+const JITSI_INTERRUPTED_TIMEOUT_MS = 30_000;
+// CONFERENCE_FAILED codes (exact values from the bundled lib-jitsi-meet's
+// JitsiConferenceErrors) that joining again cannot cure.
+const JITSI_NO_REJOIN_ERRORS = [
+  "conference.passwordRequired",
+  "conference.authenticationRequired",
+  "conference.connectionError.accessDenied",
+  "conference.connectionError.membersOnly",
+  "conference.connectionError.notAllowed",
+  "conference.max_users",
+  "conference.destroyed",
+  "conference.display_name_required",
+  "conference.incompatible_server_versions",
+  "conference.reservationError",
+];
+
+/**
+ * Two spots in the bundled lib-jitsi-meet throw from inside its own event
+ * handlers, where no caller can catch them, so they surface as uncaught
+ * page errors. Both were captured with stacks on prod (2026-11-23) and both
+ * are harmless to the session, but neither should be an error at all:
+ *
+ *  1. `xmpp.sendDominantSpeakerEvent` — the bridge channel can still report
+ *     "you are the dominant speaker" while the XMPP socket is down (network
+ *     gap, before the rejoin); the speaker-stats stanza is then sent on a
+ *     closed connection and `XmppConnection.send` throws "Not connected".
+ *     Speaker stats are irrelevant to a stage, so skip the send while
+ *     disconnected.
+ *  2. `codecController.selectPreferredCodec` — runs (debounced) on every
+ *     USER_JOINED / USER_LEFT; `getConfiguredVideoCodec` dereferences the
+ *     local video m-line without checking it exists, which it does not while
+ *     the local video track is being added or removed. The lib runs the
+ *     selection again on the next join/leave and when the media session
+ *     starts, so a failed pass is simply dropped.
+ *
+ * Instance-level wrappers only (never the prototypes), each skipped when the
+ * lib does not have the method, so a different lib build is unaffected.
+ */
+export const hardenJitsiLib = (connection: any, room: any) => {
+  try {
+    const xmpp = connection?.xmpp;
+    if (xmpp && typeof xmpp.sendDominantSpeakerEvent === "function" && !xmpp.__upstageGuarded) {
+      const original = xmpp.sendDominantSpeakerEvent.bind(xmpp);
+      xmpp.sendDominantSpeakerEvent = (...args: unknown[]) => {
+        if (!xmpp.connection?.connected) return undefined;
+        return original(...args);
+      };
+      xmpp.__upstageGuarded = true;
+    }
+  } catch (err) {
+    console.warn("[jitsi] could not guard sendDominantSpeakerEvent:", err);
+  }
+  try {
+    const codec = room?.qualityController?.codecController;
+    if (codec && typeof codec.selectPreferredCodec === "function" && !codec.__upstageGuarded) {
+      const original = codec.selectPreferredCodec.bind(codec);
+      codec.selectPreferredCodec = (...args: unknown[]) => {
+        try {
+          return original(...args);
+        } catch (err) {
+          console.debug("[jitsi] codec selection skipped (media line not ready):", err);
+          return undefined;
+        }
+      };
+      codec.__upstageGuarded = true;
+    }
+  } catch (err) {
+    console.warn("[jitsi] could not guard selectPreferredCodec:", err);
+  }
+};
 
 export const useJitsi = () => {
   const joined = ref(false);
@@ -220,6 +295,17 @@ export const useJitsi = () => {
     connection: null as any,
     localTracks,
     sessions,
+    /**
+     * Leave the default server's conference and join it again with a fresh
+     * connection. For callers that need clean signalling state (see
+     * localStreamPublisher: re-publishing in Firefox after an unpublish).
+     * Everything that follows a rejoin — new participant id, own-tile heal,
+     * re-publish of the local tracks — is the same path as after a lost
+     * connection.
+     */
+    rejoin: (reason: string) => {
+      sessions.get(configs.JITSI_ENDPOINT)?.requestRejoin?.(reason);
+    },
   };
   const stageStore = useStageStore();
 
@@ -236,6 +322,8 @@ export const useJitsi = () => {
   // the shared `joined` ref. Sessions on other servers never touch that
   // shared state.
   let currentStageUrl = "";
+  // When the tab last began unloading (beforeunload / pagehide); 0 = never.
+  let pageUnloadingAt = 0;
 
   /**
    * `stageStore.url` is empty until `loadStage()` populates `model.value`.
@@ -275,6 +363,28 @@ export const useJitsi = () => {
   // user has already left.
   let unmounted = false;
 
+  const clearSessionTimers = (session: any) => {
+    for (const key of ["retryTimer", "watchdogTimer", "interruptedTimer"]) {
+      if (session[key]) clearTimeout(session[key]);
+      session[key] = null;
+    }
+  };
+
+  /** Leave the conference and close the XMPP connection held by `target`. */
+  const teardownTarget = (target: any) => {
+    try {
+      const leave = target.room?.leave?.();
+      if (leave && typeof leave.catch === "function") leave.catch(() => {});
+    } catch (err) {
+      console.warn("target.room.leave():", err);
+    }
+    try {
+      target.connection?.disconnect?.();
+    } catch (err) {
+      console.warn("target.connection.disconnect():", err);
+    }
+  };
+
   const createJitsiSession = ({ origin, stageUrl, target, initLib }: SessionOptions) => {
     const session = {
       origin,
@@ -285,6 +395,21 @@ export const useJitsi = () => {
       ended: false,
       leave: () => {},
       isDefault: target === jitsi,
+      // --- automatic rejoin state (see `scheduleRejoin` in startSession) ---
+      // Bumped for every connection attempt AND before an old attempt is
+      // torn down, so events still arriving from a dead connection/room are
+      // recognised as stale and ignored.
+      generation: 0,
+      // Consecutive failed attempts since the last CONFERENCE_JOINED.
+      attempts: 0,
+      everJoined: false,
+      retryTimer: null,
+      watchdogTimer: null,
+      interruptedTimer: null,
+      // Runs the pending rejoin now (browser `online` / page wake).
+      retryNow: () => {},
+      // Set per attempt by startSession; tears the session down and joins anew.
+      requestRejoin: (_reason: string) => {},
       // Session-local join state, mirrored into the shared `joined` only
       // for the default server's session.
       markJoined: (value: boolean) => {
@@ -295,17 +420,9 @@ export const useJitsi = () => {
     const markJoined = session.markJoined;
     session.leave = () => {
       session.ended = true;
-      try {
-        const leave = target.room?.leave?.();
-        if (leave && typeof leave.catch === "function") leave.catch(() => {});
-      } catch (err) {
-        console.warn("target.room.leave():", err);
-      }
-      try {
-        target.connection?.disconnect?.();
-      } catch (err) {
-        console.warn("target.connection.disconnect():", err);
-      }
+      session.generation += 1;
+      clearSessionTimers(session);
+      teardownTarget(target);
       markJoined(false);
     };
     void startSession(session, { origin, stageUrl, target, initLib });
@@ -325,6 +442,89 @@ export const useJitsi = () => {
       );
       return;
     }
+    // This attempt's generation. Every handler below that touches shared
+    // state first checks `live()`: once a newer attempt has started (or the
+    // session was left) events from THIS connection/room are stale — e.g.
+    // the USER_LEFT / TRACK_REMOVED burst lib-jitsi-meet emits while a dead
+    // room is being left must not delete tiles or tracks that the new room
+    // is delivering.
+    session.generation += 1;
+    const gen = session.generation;
+    const live = () => !session.ended && session.generation === gen;
+
+    // ---------------- automatic rejoin ----------------
+    // A stage tab used to stay out of the conference for good once its Jitsi
+    // signalling connection failed: after a network gap of about a minute
+    // the server evicts the client ("Disconnected: Hibernating too long"),
+    // lib-jitsi-meet fires CONNECTION_FAILED, and nothing reconnected. The
+    // rest of the stage kept working over MQTT, so the performer saw a
+    // normal stage while nobody received their stream and every stream they
+    // should have received stayed blank until someone reloaded the page
+    // (2026-11-21 rehearsal). Now any loss of the connection or conference
+    // tears the dead pair down and builds a fresh one, with backoff, until
+    // the conference is joined again. CONFERENCE_JOINED then heals this
+    // tab's own tiles to the new participant id (syncLocalJitsiParticipantId)
+    // and the publisher re-adds the local tracks (its `joined` watcher).
+    const scheduleRejoin = (reason: string) => {
+      if (!live()) return;
+      if (session.retryTimer) return;
+      // lib-jitsi-meet disconnects from its own unload handler when the tab
+      // is closed or reloaded. That is not a lost connection; don't start a
+      // rejoin (and its warning) in a page that is going away. If the page
+      // turns out to survive (unload cancelled), the deferred call runs.
+      if (Date.now() - pageUnloadingAt < PAGE_UNLOAD_WINDOW_MS) {
+        setTimeout(() => scheduleRejoin(reason), PAGE_UNLOAD_WINDOW_MS);
+        return;
+      }
+      if (session.watchdogTimer) clearTimeout(session.watchdogTimer);
+      session.watchdogTimer = null;
+      if (session.interruptedTimer) clearTimeout(session.interruptedTimer);
+      session.interruptedTimer = null;
+      markJoined(false);
+      stageStore.syncLocalJitsiParticipantId(null, serverTag);
+      if (session.isDefault) stageStore.setJitsiConnectionLost(true);
+      const delay =
+        JITSI_REJOIN_DELAYS_MS[Math.min(session.attempts, JITSI_REJOIN_DELAYS_MS.length - 1)];
+      session.attempts += 1;
+      console.warn("[jitsi] connection lost — rejoining", {
+        reason,
+        origin,
+        attempt: session.attempts,
+        delayMs: delay,
+      });
+      const run = () => {
+        if (session.retryTimer) clearTimeout(session.retryTimer);
+        session.retryTimer = null;
+        session.retryNow = () => {};
+        if (!live()) return;
+        // Invalidate this attempt BEFORE tearing it down so the events the
+        // teardown itself emits are ignored.
+        session.generation += 1;
+        teardownTarget(target);
+        // Remote tracks delivered by the dead room would otherwise shadow
+        // the ones the new room is about to deliver for the same
+        // participant ids (Jitsi.vue picks by participant id).
+        stageStore.clearRemoteJitsiTracks(serverTag);
+        void startSession(session, { origin, stageUrl, target, initLib: false });
+      };
+      session.retryNow = run;
+      session.retryTimer = setTimeout(run, delay);
+    };
+    // Deliberate rejoin on request (see `jitsi.rejoin` below): the same
+    // teardown + fresh connection as after a lost connection, without the
+    // backoff wait.
+    session.requestRejoin = (reason: string) => {
+      if (!live()) return;
+      scheduleRejoin(reason);
+      session.retryNow?.();
+    };
+    // No CONFERENCE_JOINED within this long after an attempt starts counts
+    // as a failed attempt (a connect that neither succeeds nor errors).
+    session.watchdogTimer = setTimeout(() => {
+      session.watchdogTimer = null;
+      if (live() && !session.joined.value) scheduleRejoin("join timed out");
+    }, JITSI_JOIN_TIMEOUT_MS);
+
     console.log("[diag] useJitsi: starting connection", { stageUrl, origin });
     const { host, httpScheme, wsScheme } = endpoint;
 
@@ -342,7 +542,7 @@ export const useJitsi = () => {
     // this session was left meanwhile (idle-close of an extra server, or
     // the component unmounting mid-fetch), creating and connecting now
     // would leave an XMPP/WebSocket connection nobody ever tears down.
-    if (session.ended || unmounted) {
+    if (!live() || unmounted) {
       console.log("[diag] useJitsi: session ended during config fetch; not connecting", {
         origin,
       });
@@ -627,6 +827,7 @@ export const useJitsi = () => {
     target.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
       (e: any) => {
+        if (!live()) return;
         console.log("Connection established", e);
         // NOTE on the Colibri "bridge channel":
         // JVB stable-10888+ has dropped SCTP-DataChannel support for the
@@ -681,6 +882,7 @@ export const useJitsi = () => {
           console.error("[diag] composable initJitsiConference threw", initErr);
           return;
         }
+        hardenJitsiLib(target.connection, target.room);
         target.room.on(JitsiMeetJS.events.conference.DATA_CHANNEL_OPENED, () => {
           console.log("[diag] composable DATA_CHANNEL_OPENED (bridge channel up)");
         });
@@ -691,6 +893,7 @@ export const useJitsi = () => {
             trackId: track?.getId?.(),
             isLocal: track?.isLocal?.(),
           });
+          if (!live()) return;
           stageStore.addTrack(track, serverTag);
         });
         target.room.on(JitsiMeetJS.events.conference.TRACK_REMOVED, (track: any) => {
@@ -698,6 +901,7 @@ export const useJitsi = () => {
             type: track?.type,
             participantId: track?.getParticipantId?.(),
           });
+          if (!live()) return;
           if (track) stageStore.removeTrack(track);
         });
         target.room.on(JitsiMeetJS.events.conference.USER_JOINED, (id: any) => {
@@ -705,6 +909,7 @@ export const useJitsi = () => {
         });
         target.room.on(JitsiMeetJS.events.conference.USER_LEFT, (id: any) => {
           console.log("[diag] composable USER_LEFT", id);
+          if (!live()) return;
           if (id != null) stageStore.removeJitsiParticipantLocally(String(id), serverTag);
         });
         target.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e: any) => {
@@ -712,6 +917,12 @@ export const useJitsi = () => {
             myUserId: target.room?.myUserId?.(),
             e,
           });
+          if (!live()) return;
+          if (session.watchdogTimer) clearTimeout(session.watchdogTimer);
+          session.watchdogTimer = null;
+          session.attempts = 0;
+          session.everJoined = true;
+          if (session.isDefault) stageStore.setJitsiConnectionLost(false);
           const myId = target.room?.myUserId?.();
           // Record this tab's id on this server and heal own tiles placed
           // there. Single-server: the one session, no tag (legacy path).
@@ -814,6 +1025,27 @@ export const useJitsi = () => {
         });
         target.room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (...args: any[]) => {
           console.warn("[diag] composable CONFERENCE_FAILED", ...args);
+          // Errors a fresh join cannot cure (locked / members-only / full
+          // room) are left alone; everything else gets a new conference.
+          const code = String(args[0] ?? "");
+          if (JITSI_NO_REJOIN_ERRORS.includes(code)) return;
+          scheduleRejoin(`conference failed: ${code}`);
+        });
+        // Media path to the bridge lost while signalling is still up. The
+        // lib normally recovers by itself (CONNECTION_RESTORED); if it has
+        // not after a while the bridge has expired this endpoint and only a
+        // new session brings media back.
+        target.room.on(JitsiMeetJS.events.conference.CONNECTION_INTERRUPTED, () => {
+          if (!live() || session.interruptedTimer) return;
+          session.interruptedTimer = setTimeout(() => {
+            session.interruptedTimer = null;
+            scheduleRejoin("media connection interrupted");
+          }, JITSI_INTERRUPTED_TIMEOUT_MS);
+        });
+        target.room.on(JitsiMeetJS.events.conference.CONNECTION_RESTORED, () => {
+          if (session.generation !== gen) return;
+          if (session.interruptedTimer) clearTimeout(session.interruptedTimer);
+          session.interruptedTimer = null;
         });
 
         try {
@@ -937,17 +1169,21 @@ export const useJitsi = () => {
     target.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_FAILED,
       (e: any) => {
+        if (!live() || session.retryTimer) return;
         console.error("Connection failed", e);
-        markJoined(false);
-        stageStore.syncLocalJitsiParticipantId(null, serverTag);
+        scheduleRejoin("connection failed");
       },
     );
     target.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
       (e: any) => {
-        console.error("Connection disconnected", e);
-        markJoined(false);
-        stageStore.syncLocalJitsiParticipantId(null, serverTag);
+        // A deliberate disconnect (session.leave / rejoin teardown) has
+        // already bumped the generation, so only an unexpected one lands here.
+        if (!live() || session.retryTimer) return;
+        if (Date.now() - pageUnloadingAt >= PAGE_UNLOAD_WINDOW_MS) {
+          console.error("Connection disconnected", e);
+        }
+        scheduleRejoin("connection disconnected");
       },
     );
 
@@ -1078,6 +1314,30 @@ export const useJitsi = () => {
     );
   });
 
+  // A pending rejoin waits out its backoff delay; when the browser reports
+  // the network is back, or the tab wakes, there is no reason to keep waiting.
+  const onPageUnloading = () => {
+    pageUnloadingAt = Date.now();
+  };
+  const retryPendingNow = () => {
+    for (const session of sessions.values()) session.retryNow?.();
+  };
+  const onVisible = () => {
+    if (document.visibilityState === "visible") retryPendingNow();
+  };
+  onMounted(() => {
+    window.addEventListener("beforeunload", onPageUnloading);
+    window.addEventListener("pagehide", onPageUnloading);
+    window.addEventListener("online", retryPendingNow);
+    document.addEventListener("visibilitychange", onVisible);
+  });
+  onUnmounted(() => {
+    window.removeEventListener("beforeunload", onPageUnloading);
+    window.removeEventListener("pagehide", onPageUnloading);
+    window.removeEventListener("online", retryPendingNow);
+    document.removeEventListener("visibilitychange", onVisible);
+  });
+
   // Tear down the XMPP/BOSH/WebSocket connection on unmount so it does
   // not leak across stage navigation. Browsers diverge on cleanup of
   // idle long-poll/WebSocket connections (Chromium aggressively closes,
@@ -1086,6 +1346,14 @@ export const useJitsi = () => {
   // behaviour everywhere.
   onUnmounted(() => {
     unmounted = true;
+    // Stop every session's rejoin machinery first: nothing may reconnect
+    // after the stage route is gone.
+    for (const session of sessions.values()) {
+      session.ended = true;
+      session.generation += 1;
+      clearSessionTimers(session);
+    }
+    stageStore.setJitsiConnectionLost(false);
     try {
       // `leave()` returns a Promise on lib-jitsi-meet; swallow rejection
       // so an in-flight conference shutdown does not crash unmount.

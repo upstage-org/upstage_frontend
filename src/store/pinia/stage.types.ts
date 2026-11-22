@@ -226,6 +226,7 @@ export interface JitsiTrack {
   // to typecheck.
   getId?: () => string | number | undefined;
   getParticipantId?: () => string | undefined;
+  isLocal?: () => boolean;
   [k: string]: unknown;
 }
 

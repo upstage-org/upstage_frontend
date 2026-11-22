@@ -350,6 +350,9 @@ export default {
   refresh_streams: "Refresh streams",
   refresh_streams_tooltip: "Retry attaching individual video streams on stage",
   frozen_viewers: "Frozen for {count} viewer(s)",
+  streams_reconnecting: "Streams reconnecting…",
+  streams_reconnecting_tooltip:
+    "This browser lost its connection to the streaming server, so live streams are not being sent or received. Reconnecting automatically — if this message stays, check your internet connection or reload the page.",
   frozen_viewers_tooltip:
     "Some viewers have stopped receiving your stream. Click Refresh streams to try to recover it.",
 };

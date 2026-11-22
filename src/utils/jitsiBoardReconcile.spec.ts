@@ -118,4 +118,15 @@ describe("computeFinalJitsiObjectsFromEvents", () => {
     ]);
     expect(ids(r)).toEqual(["A"]);
   });
+
+  it("reports every tile id the archive has heard of, including destroyed and ghost tiles", () => {
+    const r = computeFinalJitsiObjectsFromEvents([
+      place({ id: "live", hostId: "tab1", participantId: "p2" }),
+      place({ id: "ghost", hostId: "tab1", participantId: "p1" }, 0),
+      place({ id: "gone", hostId: "tab2", participantId: "q1" }),
+      destroy({ id: "gone", hostId: "tab2", participantId: "q1" }),
+    ]);
+    expect([...r.seenIds].sort()).toEqual(["ghost", "gone", "live"]);
+    expect(ids(r)).toEqual(["live"]);
+  });
 });

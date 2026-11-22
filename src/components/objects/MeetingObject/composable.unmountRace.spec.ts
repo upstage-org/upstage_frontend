@@ -26,6 +26,8 @@ vi.mock("@stores/pinia/stage", async () => {
     jitsiStreamingEnabled: false,
     jitsiServersInUse: [] as string[],
     syncLocalJitsiParticipantId: vi.fn(),
+    setJitsiConnectionLost: vi.fn(),
+    clearRemoteJitsiTracks: vi.fn(),
   });
   return { useStageStore: () => store };
 });

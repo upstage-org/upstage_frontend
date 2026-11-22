@@ -274,4 +274,7 @@ export default {
   refresh_streams: "Atualizar transmissões",
   refresh_streams_tooltip:
     "Tentar novamente conectar as transmissões de vídeo individuais no palco",
+  streams_reconnecting: "A reconectar transmissões…",
+  streams_reconnecting_tooltip:
+    "Este navegador perdeu a ligação ao servidor de streaming, pelo que as transmissões ao vivo não estão a ser enviadas nem recebidas. A reconexão é automática; se esta mensagem persistir, verifique a sua ligação à internet ou recarregue a página.",
 };

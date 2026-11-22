@@ -5,6 +5,7 @@ import Loading from "components/Loading.vue";
 import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { playMediaElement, retryPlayOnUserGesture } from "@utils/mediaPlayback";
+import { resolveJitsiOrigin } from "@utils/common";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import StreamContextMenu from "../ContextMenuStream.vue";
 import { useStreamFreezeDetector } from "./useStreamFreezeDetector";
@@ -178,7 +179,48 @@ export default {
     // (when the video starts producing frames) AND on unmount, so it does
     // not keep firing against a stale ref after the meeting tile is
     // removed from the stage.
-    const interval = setInterval(loadTrack, 3000);
+    // Re-read this participant's live tracks from the conference when the
+    // store has none for the tile.
+    //
+    // lib-jitsi-meet announces a remote track (TRACK_ADDED) once and then
+    // keeps that same object for as long as the participant stays in the
+    // conference: when a performer takes her stream off the stage and puts
+    // it back, her browser stops and resumes sending on the same track, and
+    // no second TRACK_ADDED is fired. The store, however, drops a
+    // participant's tracks as soon as her tile is gone (DESTROY, reconcile,
+    // USER_LEFT cleanup). The re-placed tile then had nothing to attach and
+    // showed the loading spinner for good — "they could not see or hear my
+    // stream" although the bridge was forwarding it. The conference is the
+    // source of truth for which remote tracks exist, so ask it.
+    const resyncRemoteTracks = () => {
+      const pid = props.object.participantId;
+      if (!pid || isOwnTile.value) return;
+      // Multi-server: only the conference on the tile's own server knows
+      // this participant id. Single-server tiles carry no `jitsiServer`.
+      const tileServer = props.object.jitsiServer;
+      const room = tileServer
+        ? (jitsi?.sessions?.get?.(resolveJitsiOrigin(tileServer))?.target?.room ?? null)
+        : (jitsi?.room ?? null);
+      let live;
+      try {
+        live = room?.getParticipantById?.(pid)?.getTracks?.() ?? [];
+      } catch (error) {
+        console.log("Error on reading participant tracks", error);
+        return;
+      }
+      if (!live.length) return;
+      const known = new Set(tracks.value.map((t) => t.getId?.()));
+      for (const t of live) {
+        if (t?.isLocal?.() || t?.disposed) continue;
+        if (known.has(t.getId?.())) continue;
+        stageStore.addTrack(t);
+      }
+    };
+
+    const interval = setInterval(() => {
+      resyncRemoteTracks();
+      loadTrack();
+    }, 3000);
     onUnmounted(() => {
       if (interval) clearInterval(interval);
     });
@@ -187,6 +229,7 @@ export default {
       reloadStreams,
       (val) => {
         if (val) {
+          resyncRemoteTracks();
           loadTrack();
         }
       },
@@ -203,7 +246,10 @@ export default {
     // stage and `stageStore.addTrack(t)` fires synchronously after
     // `await room.addTrack(t)` resolves). `flush: "post"` ensures Vue
     // has applied the conditional swap before we read `videoEl.value`.
-    onMounted(() => loadTrack());
+    onMounted(() => {
+      resyncRemoteTracks();
+      loadTrack();
+    });
     // Wrap in an arrow: a bare `loadTrack` here would receive the watcher's
     // (newVal, oldVal) args, making `force` truthy and re-detaching on every
     // tracks change — the exact whole-board flicker the idempotent guard
@@ -211,7 +257,10 @@ export default {
     watch(tracks, () => loadTrack(), { flush: "post" });
     watch(
       () => props.object.participantId,
-      () => loadTrack(),
+      () => {
+        resyncRemoteTracks();
+        loadTrack();
+      },
       { flush: "post" },
     );
 
