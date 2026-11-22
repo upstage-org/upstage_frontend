@@ -287,6 +287,24 @@ const stageOps = {
         // truthiness before using stage.id (e.g. updateLastAccess).
         stage: response.stageList[0] ? deriveActiveRecording(response.stageList[0]) : null,
       })),
+  /**
+   * Whether a stage already lives at this URL (exact match). Used by the
+   * new-stage form; deliberately not cached — the answer changes the moment
+   * someone creates a stage.
+   */
+  stageUrlTaken: (fileLocation: string): Promise<boolean> =>
+    studioClient
+      .request<any, Record<string, any>>(
+        gql`
+          query StageUrlTaken($fileLocation: String) {
+            stageList(input: { fileLocation: $fileLocation }) {
+              id
+            }
+          }
+        `,
+        { fileLocation },
+      )
+      .then((response) => (response.stageList ?? []).length > 0),
   loadPermission: (fileLocation: string) =>
     studioClient
       .request<any, Record<string, any>>(

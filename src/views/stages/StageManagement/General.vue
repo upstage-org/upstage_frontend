@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAttribute, useMutation, useQuery, useRequest } from "services/graphql/composable";
+import { useAttribute, useMutation, useQuery } from "services/graphql/composable";
 import { stageGraph, userGraph } from "services/graphql";
 import { inject, reactive, ref, watch, computed, provide } from "vue";
 import type { Ref } from "vue";
@@ -8,6 +8,7 @@ import ImagePicker from "components/form/ImagePicker.vue";
 import MultiTransferAccessColumn from "components/MultiTransferAccessColumn.vue";
 import { useRouter } from "vue-router";
 import { displayName, debounce, compareByLabel } from "utils/common";
+import { suggestStageUrl } from "./stageUrl";
 import ClearChatInStage from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
 import DuplicateStage from "components/stage/DuplicateStage.vue";
@@ -172,26 +173,82 @@ const updateStage = async () => {
 const preservedPaths = ["backstage", "login", "register", "static", "studio", "replay", "api"];
 // `null` while the URL is being typed and has not been checked yet.
 const urlValid = ref<boolean | null>(!!stage.value.id);
-const { loading: validatingURL, fetch } = useRequest(stageGraph.stageList);
+const validatingURL = ref(false);
 
 const validRegex = /^[a-zA-Z0-9-_]*$/;
+// Bumped by every check/suggestion so a slow answer for an older value is
+// dropped instead of overwriting the result for what is in the field now.
+let urlCheckSeq = 0;
+const isUrlTaken = async (url: string) => {
+  validatingURL.value = true;
+  try {
+    return await stageGraph.stageUrlTaken(url);
+  } finally {
+    validatingURL.value = false;
+  }
+};
 const checkURL = debounce(async () => {
+  const seq = ++urlCheckSeq;
   const url = form.fileLocation.trim();
   if (!url || !validRegex.test(url) || preservedPaths.includes(url)) {
     urlValid.value = false;
     return;
   }
-  const response = await fetch({
-    fileLocation: url,
-  });
-  urlValid.value = true;
-  if (response.stages.length) {
-    const existingStage = response.stages[0];
-    if (existingStage.fileLocation !== stage.value.fileLocation) {
-      urlValid.value = false;
-    }
+  // This check used to call the paginated stage-table query, which ignores
+  // the URL, and read a field its answer does not have — so every URL was
+  // reported free. Ask for the stage at exactly this URL instead.
+  let taken: boolean;
+  try {
+    taken = await isUrlTaken(url);
+  } catch {
+    if (seq === urlCheckSeq) urlValid.value = false;
+    return;
   }
+  if (seq !== urlCheckSeq) return;
+  urlValid.value = !taken || url === stage.value.fileLocation;
 }, 500);
+
+// Default URL from the stage name (#1576), for a NEW stage only and only
+// until the player types a URL of their own: "Helen's Bunnies" →
+// helens-bunnies, or bunnies-2 when /bunnies is taken. Emptying the URL
+// field hands it back to the suggestion.
+const urlEdited = ref(false);
+const suggestURL = debounce(async () => {
+  if (stage.value.id || urlEdited.value) return;
+  const seq = ++urlCheckSeq;
+  let url: string;
+  try {
+    url = await suggestStageUrl(form.name, isUrlTaken, { reserved: preservedPaths });
+  } catch {
+    return;
+  }
+  if (seq !== urlCheckSeq || urlEdited.value || stage.value.id) return;
+  form.fileLocation = url;
+  urlValid.value = !!url;
+}, 400);
+watch(
+  () => form.name,
+  () => {
+    if (stage.value.id || urlEdited.value) return;
+    urlValid.value = null;
+    suggestURL();
+  },
+);
+const onUrlInput = (event?: Event) => {
+  const typed = `${(event?.target as HTMLInputElement | null)?.value ?? form.fileLocation ?? ""}`;
+  urlEdited.value = typed.trim() !== "";
+  // Whatever was being checked or suggested is for an older value.
+  urlCheckSeq++;
+  if (urlEdited.value) {
+    urlValid.value = null;
+    checkURL();
+  } else {
+    // Emptied: not valid as it stands. The next change of the stage name
+    // proposes a URL again — not this keystroke, or the field would refill
+    // while the player is about to type their own.
+    urlValid.value = false;
+  }
+};
 
 const urlError = computed(() => {
   if (!validRegex.test(form.fileLocation)) {
@@ -295,8 +352,7 @@ provide("afterDuplicate", afterDuplicate);
           :disabled="!!stage.id"
           class="half-flex"
           maxlength="20"
-          @keyup="urlValid = null"
-          @input="checkURL"
+          @input="onUrlInput"
         />
       </div>
     </div>
