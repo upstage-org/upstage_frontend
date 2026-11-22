@@ -1,6 +1,8 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import type { Ref } from "vue";
 import * as canvasUtil from "utils/canvas";
+import { beginStroke, isTranslucent } from "./strokeLayer";
+import type { StrokeLayer } from "./strokeLayer";
 
 interface Point {
   x: number;
@@ -98,7 +100,15 @@ const wait = (milisecond: number) => new Promise((res) => setTimeout(res, milise
 // Tuned so a typical stroke reads as a live pen rather than an instant flicker.
 const STROKE_SEGMENT_DELAY_MS = 25;
 
-const execute = async (ctx: CanvasRenderingContext2D, command: DrawCommand, animate?: boolean) => {
+/** True once a newer replay of the same canvas has started. */
+type Cancelled = () => boolean;
+
+const executeDirect = async (
+  ctx: CanvasRenderingContext2D,
+  command: DrawCommand,
+  animate?: boolean,
+  cancelled?: Cancelled,
+) => {
   const { type, size, color, alpha, lines } = command;
   if (lines && lines.length) {
     if (type === "draw") {
@@ -115,6 +125,7 @@ const execute = async (ctx: CanvasRenderingContext2D, command: DrawCommand, anim
         });
         if (animate) {
           await wait(STROKE_SEGMENT_DELAY_MS);
+          if (cancelled?.()) return;
         }
       }
     } else {
@@ -139,6 +150,54 @@ const execute = async (ctx: CanvasRenderingContext2D, command: DrawCommand, anim
   }
 };
 
+/**
+ * A translucent stroke, blended as a whole (#981): its segments go fully
+ * opaque onto `stroke`'s layer, which is then shown at the stroke's opacity.
+ * Same segments and dots as executeDirect, so the shape is identical.
+ */
+const executeOnLayer = async (
+  stroke: StrokeLayer,
+  command: DrawCommand,
+  animate?: boolean,
+  cancelled?: Cancelled,
+) => {
+  const { size, color, lines } = command;
+  if (lines && lines.length) {
+    for (let i = 0; i < lines.length; i++) {
+      const { fromX, fromY, x, y } = lines[i];
+      draw(stroke.ctx, { fromX, fromY, x, y, size, color, alpha: 1 });
+      if (animate) {
+        stroke.present();
+        await wait(STROKE_SEGMENT_DELAY_MS);
+        if (cancelled?.()) return;
+      }
+    }
+    if (!animate) stroke.present();
+    return;
+  }
+  if (command.fromX && command.fromY) {
+    draw(stroke.ctx, { ...command, alpha: 1 } as Segment);
+  } else {
+    drawDot(stroke.ctx, { ...command, alpha: 1 });
+  }
+  stroke.present();
+};
+
+const execute = async (
+  ctx: CanvasRenderingContext2D,
+  command: DrawCommand,
+  animate?: boolean,
+  cancelled?: Cancelled,
+) => {
+  if (command.type === "draw" && isTranslucent(command.alpha)) {
+    // Decided synchronously, so a batch of commands replayed without
+    // animation (undo, a saved drawing) still paints in order.
+    const stroke = beginStroke(ctx, command.alpha, { incremental: !!animate });
+    if (stroke) return executeOnLayer(stroke, command, animate, cancelled);
+  }
+  return executeDirect(ctx, command, animate, cancelled);
+};
+
 export const useDrawable = () => {
   const color = ref("#000");
   const size = ref(10);
@@ -155,6 +214,10 @@ export const useDrawable = () => {
   });
 
   const history = reactive<StrokeCommand[]>([]);
+
+  // The translucent stroke being drawn right now (#981), if any. Not part of
+  // `data`: it holds canvases, which must not be made reactive.
+  let liveStroke: StrokeLayer | null = null;
 
   const cropImageFromCanvas = () => {
     return canvasUtil.cropImageFromCanvas(el.value!);
@@ -186,10 +249,20 @@ export const useDrawable = () => {
         color: color.value,
         alpha: alpha.value,
       };
-      execute(ctx, command);
+      liveStroke =
+        command.type === "draw" && isTranslucent(command.alpha)
+          ? beginStroke(ctx, command.alpha, { incremental: true })
+          : null;
+      if (liveStroke) {
+        drawDot(liveStroke.ctx, { ...command, alpha: 1 });
+        liveStroke.present();
+      } else {
+        executeDirect(ctx, command);
+      }
     }
     if (res == "up") {
       data.flag = false;
+      liveStroke = null;
       history.push({
         type: mode.value,
         size: size.value,
@@ -219,7 +292,12 @@ export const useDrawable = () => {
           alpha: alpha.value,
           ...coords,
         };
-        execute(ctx, command);
+        if (liveStroke) {
+          draw(liveStroke.ctx, { ...command, alpha: 1 });
+          liveStroke.present();
+        } else {
+          executeDirect(ctx, command);
+        }
         data.lines.push(coords);
       }
     }
@@ -391,8 +469,16 @@ export const useDrawing = (drawing: Ref<Drawing>) => {
   const el = ref<HTMLCanvasElement | null>(null);
   const commands = useRelativeCommands(drawing);
 
+  // Each replay supersedes the one before it. A stroke still being animated
+  // when the next one arrives used to keep painting alongside the new
+  // replay; with strokes blended as a whole (#981) the two would also share
+  // one scratch layer. The newer replay draws everything already known at
+  // once, so nothing is lost.
+  let replay = 0;
   const draw = async (newDrawing?: Drawing, oldDrawing?: Drawing) => {
     if (!drawing.value) return;
+    const mine = ++replay;
+    const cancelled = () => mine !== replay;
     const { value: canvas } = el;
     canvas!.width = drawing.value.w;
     canvas!.height = drawing.value.h;
@@ -406,7 +492,8 @@ export const useDrawing = (drawing: Ref<Drawing>) => {
           shouldAnimate = false;
         }
       }
-      await execute(ctx, command, shouldAnimate);
+      await execute(ctx, command, shouldAnimate, cancelled);
+      if (cancelled()) return ctx;
     }
     return ctx;
   };
