@@ -130,3 +130,107 @@ describe("computeFinalJitsiObjectsFromEvents", () => {
     expect(ids(r)).toEqual(["live"]);
   });
 });
+
+/**
+ * Scene changes replace the whole board on every live client without any
+ * DESTROY event. The reconcile used to ignore them, so a stream tile that a
+ * scene switch had removed came back as a ghost on the next stage load or
+ * MQTT reconnect (seen on prod 2026-11-23; matches the 2026-11-21 rehearsal
+ * report of a stream that "appeared" for some players only).
+ */
+describe("computeFinalJitsiObjectsFromEvents — scene changes", () => {
+  const background = (payload: Record<string, unknown>, ts = ++seq): ReplayEvent =>
+    ({
+      id: `b${seq}`,
+      mqttTimestamp: ts,
+      topic: "background",
+      payload: JSON.stringify(payload),
+    }) as ReplayEvent;
+  const blankScene = (ts?: number) => background({ type: "blankScene" }, ts);
+  const switchScene = (scene: unknown, ts?: number) =>
+    background({ type: "switchScene", scene }, ts);
+  const tile = (o: Record<string, unknown>) => ({ type: "jitsi", ...o });
+
+  it("the blank scene removes the tiles that were on stage", () => {
+    const r = computeFinalJitsiObjectsFromEvents([
+      place({ id: "a", hostId: "tab1", participantId: "p1" }),
+      blankScene(),
+    ]);
+    expect(ids(r)).toEqual([]);
+    expect(r.destroyedIds).toEqual([]);
+    expect(r.seenIds).toContain("a");
+  });
+
+  it("a tile placed after the scene change stays", () => {
+    const r = computeFinalJitsiObjectsFromEvents([
+      place({ id: "a", hostId: "tab1", participantId: "p1" }),
+      blankScene(),
+      place({ id: "b", hostId: "tab1", participantId: "p1" }),
+    ]);
+    expect(ids(r)).toEqual(["b"]);
+  });
+
+  it("switching to a saved scene leaves exactly the tiles that scene carries", () => {
+    const scenes: Record<string, unknown[]> = {
+      s1: [
+        tile({ id: "inScene", hostId: "tab2", participantId: "q1" }),
+        { id: "img", type: "avatar" },
+      ],
+    };
+    const r = computeFinalJitsiObjectsFromEvents(
+      [place({ id: "a", hostId: "tab1", participantId: "p1" }), switchScene("s1")],
+      { sceneJitsiTiles: (id) => (scenes[String(id)] as never) ?? null },
+    );
+    expect(ids(r)).toEqual(["inScene"]);
+    expect(r.seenIds).toEqual(expect.arrayContaining(["a", "inScene"]));
+  });
+
+  it("switching to a scene without stream tiles removes them all", () => {
+    const r = computeFinalJitsiObjectsFromEvents(
+      [place({ id: "a", hostId: "tab1", participantId: "p1" }), switchScene("empty")],
+      { sceneJitsiTiles: () => [] },
+    );
+    expect(ids(r)).toEqual([]);
+  });
+
+  it("an unknown scene changes nothing (the live clients applied nothing either)", () => {
+    const events = [place({ id: "a", hostId: "tab1", participantId: "p1" }), switchScene("gone")];
+    expect(
+      ids(computeFinalJitsiObjectsFromEvents(events, { sceneJitsiTiles: () => null })),
+    ).toEqual(["a"]);
+    expect(ids(computeFinalJitsiObjectsFromEvents(events))).toEqual(["a"]);
+  });
+
+  it("a scene tile healed afterwards to the performer's current id survives; a stale one does not shadow it", () => {
+    const r = computeFinalJitsiObjectsFromEvents(
+      [
+        place({ id: "old", hostId: "tab1", participantId: "p1" }),
+        switchScene("s1"),
+        move({ id: "old", hostId: "tab1", participantId: "p2" }),
+      ],
+      {
+        sceneJitsiTiles: () => [tile({ id: "old", hostId: "tab1", participantId: "p1" }) as never],
+      },
+    );
+    expect(ids(r)).toEqual(["old"]);
+    expect((r.tiles[0] as { participantId?: string }).participantId).toBe("p2");
+  });
+
+  it("applies scene changes in timestamp order with board events", () => {
+    const r = computeFinalJitsiObjectsFromEvents([
+      blankScene(20),
+      place({ id: "before", hostId: "tab1", participantId: "p1" }, 10),
+      place({ id: "after", hostId: "tab1", participantId: "p1" }, 30),
+    ]);
+    expect(ids(r)).toEqual(["after"]);
+  });
+
+  it("ignores other background messages", () => {
+    const r = computeFinalJitsiObjectsFromEvents([
+      place({ id: "a", hostId: "tab1", participantId: "p1" }),
+      background({ type: "drawCurtain", curtain: null }),
+      background({ type: "setBackdropColor", color: "#fff" }),
+    ]);
+    expect(ids(r)).toEqual(["a"]);
+  });
+});

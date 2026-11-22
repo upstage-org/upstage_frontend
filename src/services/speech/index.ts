@@ -1,7 +1,24 @@
 // @ts-nocheck
 import { getDefaultVoice, isValidVoice } from "./voice";
 
-const { loadVoice, speak, stop } = (window as any).meSpeak;
+// meSpeak is a classic script (/js/mespeak/mespeak.js) loaded by index.html.
+// Look it up when it is used, not when this module is imported: if that one
+// download fails or is slow, destructuring `window.meSpeak` here threw during
+// import and took the whole stage page down with it (seen on prod
+// 2026-11-23: "Cannot destructure property 'loadVoice' of 'window.meSpeak'").
+// Without the library avatars simply stay silent.
+let warnedMissing = false;
+const lib = () => {
+  const meSpeak = (window as any).meSpeak;
+  if (!meSpeak && !warnedMissing) {
+    warnedMissing = true;
+    console.warn("[speech] meSpeak is not loaded; avatar voices are unavailable in this tab");
+  }
+  return meSpeak;
+};
+const loadVoice = (...args: any[]) => lib()?.loadVoice?.(...args);
+const speak = (...args: any[]) => lib()?.speak?.(...args);
+const stop = (...args: any[]) => lib()?.stop?.(...args);
 
 export const avatarSpeak = (avatar, message: string) => {
   const params = {};
