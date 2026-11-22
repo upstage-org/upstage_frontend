@@ -81,6 +81,8 @@ export default {
   hold_this_avatar: "Giữ hình đại diện này",
   remove_from_avatar: "Xóa khỏi hình đại diện",
   add_to_avatar: "Thêm vào hình đại diện",
+  show_timestamps: "Hiện thời gian",
+  include_timestamps: "Kèm thời gian",
   add_prop_to_stream: "Thêm đạo cụ vào luồng",
   add_prop_to_avatar: "Thêm đạo cụ vào nhân vật",
   remove_from_stream: "Gỡ khỏi luồng",

@@ -9,6 +9,7 @@ import DownloadButton from "components/form/DownloadButton.vue";
 import { message } from "ant-design-vue";
 // Aliased: "Switch" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppSwitch from "components/form/Switch.vue";
+import { chatLogLine } from "components/stage/Chat/chatLog";
 
 export default {
   components: { HorizontalField, Field, SaveButton, AppSwitch, DownloadButton },
@@ -22,6 +23,8 @@ export default {
     const downloadOptions = ref({
       audienceChat: false,
       playerChat: false,
+      // #1567: "[YYYY-MM-DD HH:mm:ss] user: message" lines.
+      timestamps: false,
     });
 
     const chats = computed(() => stageStore.chat);
@@ -53,15 +56,9 @@ export default {
         let link = document.createElement("a");
         let content = [];
         link.setAttribute("download", `${stageUrl}-Audience-chat-${timeStamp()}.txt`);
-        content = chats.value.messages.map((item) => {
-          let line = "";
-          if (item.clear) {
-            line = "---------------- Clear Chat ----------------";
-          } else {
-            line = `${item.user}: ${item.message}`;
-          }
-          return `${line}\r\n`;
-        });
+        content = chats.value.messages.map(
+          (item) => `${chatLogLine(item, downloadOptions.value.timestamps)}\r\n`,
+        );
         link.href = makeTextFile(content);
         document.body.appendChild(link);
         window.requestAnimationFrame(function () {
@@ -75,15 +72,9 @@ export default {
         let link = document.createElement("a");
         let content = [];
         link.setAttribute("download", `${stageUrl}-Player-chat-${timeStamp()}.txt`);
-        content = chats.value.privateMessages.map((item) => {
-          let line = "";
-          if (item.clearPlayerChat) {
-            line = "---------------- Clear Chat ----------------";
-          } else {
-            line = `${item.user}: ${item.message}`;
-          }
-          return `${line}\r\n`;
-        });
+        content = chats.value.privateMessages.map(
+          (item) => `${chatLogLine(item, downloadOptions.value.timestamps)}\r\n`,
+        );
         link.href = makeTextFile(content);
         document.body.appendChild(link);
         window.requestAnimationFrame(function () {
@@ -121,6 +112,7 @@ export default {
     const parameters = reactive({
       opacity: stageStore.chat.opacity,
       fontSize: stageStore.chat.fontSize,
+      showTimestamps: Boolean(stageStore.chat.showTimestamps),
     });
     const saveParameters = () => {
       stageStore.SET_CHAT_PARAMETERS(parameters);
@@ -196,6 +188,11 @@ export default {
           @update:model-value="changeFontSize"
         />
       </HorizontalField>
+      <HorizontalField :title="$t('show_timestamps')">
+        <a-tooltip :title="parameters.showTimestamps ? 'On' : 'Off'">
+          <AppSwitch v-model="parameters.showTimestamps" data-testid="show-timestamps" />
+        </a-tooltip>
+      </HorizontalField>
 
       <SaveButton @click="saveParameters" />
     </div>
@@ -221,6 +218,19 @@ export default {
           <div class="field is-narrow">
             <a-tooltip :title="downloadOptions.playerChat ? 'On' : 'Off'">
               <AppSwitch v-model="downloadOptions.playerChat" />
+            </a-tooltip>
+          </div>
+        </div>
+      </div>
+
+      <div class="field is-horizontal">
+        <div class="field-label">
+          <label class="label fix">{{ $t("include_timestamps") }}</label>
+        </div>
+        <div class="field-body">
+          <div class="field is-narrow">
+            <a-tooltip :title="downloadOptions.timestamps ? 'On' : 'Off'">
+              <AppSwitch v-model="downloadOptions.timestamps" data-testid="download-timestamps" />
             </a-tooltip>
           </div>
         </div>

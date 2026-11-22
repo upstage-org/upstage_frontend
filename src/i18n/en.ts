@@ -93,6 +93,8 @@ export default {
   hold_this_avatar: "Hold this avatar",
   remove_from_avatar: "Remove from avatar",
   add_to_avatar: "Add to avatar",
+  show_timestamps: "Show timestamps",
+  include_timestamps: "Include timestamps",
   add_prop_to_stream: "Add prop to stream",
   add_prop_to_avatar: "Add prop to avatar",
   remove_from_stream: "Remove from stream",

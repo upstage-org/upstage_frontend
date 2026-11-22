@@ -107,6 +107,8 @@ export default {
   hold_this_avatar: "Mantenga este avatar",
   remove_from_avatar: "Quitar el avatar",
   add_to_avatar: "Añadir el avatar",
+  show_timestamps: "Mostrar la hora",
+  include_timestamps: "Incluir la hora",
   add_prop_to_stream: "Añadir objeto al stream",
   add_prop_to_avatar: "Añadir objeto al avatar",
   remove_from_stream: "Quitar del stream",

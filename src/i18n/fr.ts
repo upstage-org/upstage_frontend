@@ -109,6 +109,8 @@ export default {
   hold_this_avatar: "Tenez cet avatar",
   remove_from_avatar: "Retirer de l’avatar",
   add_to_avatar: "Ajouter à l’avatar",
+  show_timestamps: "Afficher l'heure",
+  include_timestamps: "Inclure l'heure",
   add_prop_to_stream: "Ajouter un accessoire au flux",
   add_prop_to_avatar: "Ajouter un accessoire à l'avatar",
   remove_from_stream: "Retirer du flux",
