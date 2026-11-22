@@ -507,6 +507,11 @@ export const useStageStore = defineStore(
     // is the mutation target.
     const _activeMovable = ref<ObjectId | null>(null);
 
+    // "Add prop to stream / avatar" (#1566): the object a prop is being
+    // chosen for, and the toolbox panel that choice is made in. Local UI
+    // state; the attachment itself travels as the prop's `wornBy`.
+    const attachingPropTo = ref<ObjectId | null>(null);
+    const requestedTool = ref<string | null>(null);
     const chat = ref<ChatState>({
       messages: [],
       privateMessages: [],
@@ -1276,14 +1281,19 @@ export const useStageStore = defineStore(
       }
     }
 
-    function DELETE_OBJECT(object: BoardObject) {
+    function DELETE_OBJECT(object: BoardObject, options: { keepCostumes?: boolean } = {}) {
       const { id } = object;
       board.value.objects = board.value.objects.filter((o) => o.id !== id);
-      board.value.objects
-        .filter((o) => o.wornBy === id)
-        .forEach((costume) => {
-          costume.wornBy = null;
-        });
+      // `keepCostumes`: the object is only gone from THIS client for now (a
+      // performer's stream tile while she reloads) and is expected back under
+      // the same id — props worn by it must still be attached when it returns.
+      if (!options.keepCostumes) {
+        board.value.objects
+          .filter((o) => o.wornBy === id)
+          .forEach((costume) => {
+            costume.wornBy = null;
+          });
+      }
       if (isJitsiBoardType(object.type) && object.participantId) {
         pruneJitsiTracksForParticipant(String(object.participantId));
       }
@@ -2435,6 +2445,47 @@ export const useStageStore = defineStore(
       }
     }
 
+    /** Open the Props panel so the next prop picked is worn by `targetId`. */
+    function startAttachingProp(targetId: ObjectId) {
+      attachingPropTo.value = targetId;
+      requestedTool.value = "Props";
+    }
+
+    function cancelAttachingProp() {
+      attachingPropTo.value = null;
+    }
+
+    /** The toolbox opened the panel it was asked for. */
+    function consumeRequestedTool() {
+      requestedTool.value = null;
+    }
+
+    /**
+     * Put `prop` on the stage worn by the object chosen in
+     * startAttachingProp, sized and placed over it, unpublished (white bulb)
+     * so the player can adjust it first. Returns the placed object, or null
+     * when nothing was being attached or the target has left the stage.
+     */
+    function attachPropTo(prop: Partial<BoardObject> & { type?: string }): BoardObject | null {
+      const targetId = attachingPropTo.value;
+      attachingPropTo.value = null;
+      if (targetId == null) return null;
+      const target = board.value.objects.find((o) => o.id === targetId);
+      if (!target) return null;
+      const placed = placeObjectOnStage({
+        ...prop,
+        x: target.x,
+        y: target.y,
+        w: target.w,
+        h: target.h,
+        rotate: 0,
+        wornBy: target.id,
+        liveAction: false,
+      });
+      autoFocusMoveable(placed.id);
+      return placed;
+    }
+
     function placeObjectOnStage(
       data: Partial<BoardObject> & {
         assetType?: { name?: string };
@@ -2871,6 +2922,13 @@ export const useStageStore = defineStore(
     // `MOVE_TO` also carries `zIndex` so a drag after reorder cannot leave
     // audience paint order stale if a depth message was missed.
     function deleteObject(object: BoardObject) {
+      // Props worn by the object leave the stage with it (#1566): removing a
+      // stream (or an avatar) that has a frame attached should not leave the
+      // frame behind. To keep the prop, take it off first ("Remove from
+      // stream" / "Remove from avatar"). Removed before the wearer, so no
+      // client ever shows them detached in between.
+      const worn = board.value.objects.filter((o) => o.wornBy === object.id);
+      for (const costume of worn) deleteObject(costume);
       const userStore = useUserStore();
       if (userStore.avatarId === object.id) {
         userStore.setAvatarId(null);
@@ -4236,7 +4294,7 @@ export const useStageStore = defineStore(
           (server == null || resolveJitsiOrigin(o.jitsiServer) === server),
       );
       for (const o of targets) {
-        DELETE_OBJECT(serializeObject(o));
+        DELETE_OBJECT(serializeObject(o), { keepCostumes: true });
       }
       pruneJitsiTracksForParticipant(participantId);
     }
@@ -4458,6 +4516,12 @@ export const useStageStore = defineStore(
       speakAsAvatar,
       handleChatMessage,
       placeObjectOnStage,
+      attachingPropTo,
+      requestedTool,
+      startAttachingProp,
+      cancelAttachingProp,
+      consumeRequestedTool,
+      attachPropTo,
       syncLocalJitsiParticipantId,
       ensureJitsiTileParticipantBroadcast,
       reconcileJitsiBoardFromEvents,

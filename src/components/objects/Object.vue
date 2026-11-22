@@ -8,6 +8,7 @@ import {
   isJitsiBoardType,
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
+  streamWearerOf,
 } from "@utils/common";
 import { autoplayStartFrame } from "@utils/frameAnimation";
 import { containedPictureBox, effectiveFrameFitId, frameShapeStyle } from "./frameShapes";
@@ -56,7 +57,18 @@ export default {
     const canPlay = computed(() => storeCanPlay.value && !replaying);
     const controlable = computed(() => {
       if (replaying) return false;
-      return holdable.value ? isHolding.value : canPlay.value && !props.object.wornBy;
+      if (holdable.value) return isHolding.value;
+      // A worn prop is moved by its wearer's holder — except a frame worn by
+      // a stream tile or a meeting (#1566), which nobody holds: any player
+      // adjusts it. A prop whose wearer is not on the stage (a stream tile
+      // that is away while its performer reloads) is not locked either.
+      const objects = stageStore.board?.objects ?? [];
+      return (
+        canPlay.value &&
+        (!props.object.wornBy ||
+          !objects.some((o) => o.id === props.object.wornBy) ||
+          streamWearerOf(props.object, objects) !== null)
+      );
     });
     provide("holdable", holdable);
 

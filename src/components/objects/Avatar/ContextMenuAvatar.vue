@@ -8,6 +8,8 @@ import {
   isIOS,
   isLocalHoldOfBoardObject,
   isStreamPlaybackBoardType,
+  isMeetingObject,
+  streamWearerOf,
 } from "utils/common";
 import {
   FRAME_FITS,
@@ -169,14 +171,29 @@ export default {
       }
     };
 
+    // A prop worn by a stream tile (#1566): nobody holds a stream, so any
+    // player may take the frame off again.
+    const unheldWearer = computed(() =>
+      streamWearerOf(props.object, stageStore.board?.objects ?? []),
+    );
+    const wornByStream = computed(() => unheldWearer.value !== null);
+    const wornByMeeting = computed(() => isMeetingObject(unheldWearer.value));
+
     const takeOffCostume = () => {
-      if (isWearing.value) {
+      if (isWearing.value || wornByStream.value) {
         stageStore.shapeObject({
           ...props.object,
           wornBy: null,
         });
         props.closeMenu();
       }
+    };
+
+    // "Add prop to avatar" (#1566): choose the prop in the Props panel, no
+    // need to place it on the stage first.
+    const addPropToAvatar = () => {
+      stageStore.startAttachingProp(props.object.id);
+      props.closeMenu();
     };
 
     const deletePermanently = () => {
@@ -342,6 +359,9 @@ export default {
       openVoiceSetting,
       openExitSetting,
       wearCostume,
+      wornByStream,
+      wornByMeeting,
+      addPropToAvatar,
       takeOffCostume,
       currentAvatar,
       isWearing,
@@ -382,6 +402,17 @@ export default {
         </span>
         <span>{{ $t("release") }}</span>
       </a>
+      <a
+        v-if="isHolding"
+        class="panel-block"
+        data-testid="avatar-add-prop"
+        @click="addPropToAvatar"
+      >
+        <span class="panel-icon">
+          <Icon src="prop.svg" />
+        </span>
+        <span>{{ $t("add_prop_to_avatar") }}</span>
+      </a>
       <a v-else class="panel-block" @click="holdAvatar">
         <span class="panel-icon">
           <Icon src="set-as-avatar.svg" />
@@ -395,6 +426,17 @@ export default {
           <Icon src="clear.svg" />
         </span>
         <span>{{ $t("remove_from_avatar") }}</span>
+      </a>
+      <a
+        v-else-if="wornByStream"
+        class="panel-block"
+        data-testid="remove-from-stream"
+        @click="takeOffCostume"
+      >
+        <span class="panel-icon">
+          <Icon src="clear.svg" />
+        </span>
+        <span>{{ $t(wornByMeeting ? "remove_from_meeting" : "remove_from_stream") }}</span>
       </a>
       <a v-else-if="currentAvatar && !isStreamBoardObject" class="panel-block" @click="wearCostume">
         <span class="panel-icon">

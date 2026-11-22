@@ -1,5 +1,5 @@
 <script>
-import { computed, provide, ref } from "vue";
+import { computed, provide, ref, watch } from "vue";
 import TopBar from "./TopBar.vue";
 import PanelItem from "./PanelItem.vue";
 import PlayerChatTool from "./PlayerChatTool.vue";
@@ -20,6 +20,17 @@ export default {
     };
     provide("tool", tool);
     provide("changeTool", changeTool);
+
+    // A context menu can ask for a panel ("Add prop to stream" opens Props).
+    watch(
+      () => stageStore.requestedTool,
+      (name) => {
+        if (!name) return;
+        tool.value = name;
+        stageStore.consumeRequestedTool();
+      },
+      { immediate: true },
+    );
 
     const isScene = computed(() => tool.value === "Scene");
     const enabledLiveStreaming = computed(() => stageStore.enabledLiveStreaming);

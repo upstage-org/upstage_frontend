@@ -81,6 +81,12 @@ export default {
   hold_this_avatar: "Giữ hình đại diện này",
   remove_from_avatar: "Xóa khỏi hình đại diện",
   add_to_avatar: "Thêm vào hình đại diện",
+  add_prop_to_stream: "Thêm đạo cụ vào luồng",
+  add_prop_to_avatar: "Thêm đạo cụ vào nhân vật",
+  remove_from_stream: "Gỡ khỏi luồng",
+  add_prop_to_meeting: "Thêm đạo cụ vào cuộc họp",
+  remove_from_meeting: "Gỡ khỏi cuộc họp",
+  choose_prop_for: "Chọn đạo cụ để thêm vào {name}",
   multiframe_loop_tooltip:
     "Lặp: bật thì các khung chạy lại liên tục; tắt (biểu tượng mờ) thì chỉ phát một lần qua hết các khung rồi dừng.",
   animation_speed_tooltip:

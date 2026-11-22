@@ -123,12 +123,19 @@ export default {
       props.closeMenu();
     };
 
+    // #1566: pick a prop from the Props panel to wear as a frame on this tile.
+    const addProp = () => {
+      stageStore.startAttachingProp(props.object.id);
+      props.closeMenu();
+    };
+
     const deleteObject = () => {
       stageStore.deleteObject(props.object);
       props.closeMenu();
     };
 
     return {
+      addProp,
       FRAME_SHAPES,
       activeShapeId,
       setFrameShape,
@@ -152,6 +159,12 @@ export default {
 
 <template>
   <div class="stream-context-menu card-content p-0">
+    <a class="panel-block" data-testid="stream-add-prop" @click="addProp">
+      <span class="panel-icon">
+        <Icon src="prop.svg" />
+      </span>
+      <span>{{ $t("add_prop_to_stream") }}</span>
+    </a>
     <div class="field has-addons menu-group shape-group">
       <p class="control menu-group-title">
         <span>{{ $t("shape") }}</span>
