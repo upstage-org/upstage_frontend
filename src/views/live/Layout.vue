@@ -15,7 +15,7 @@ import { useStageStore } from "@stores/pinia/stage";
 import { useAuthStore } from "@stores/pinia/auth";
 import { usePageWakeRecovery } from "@composables/usePageWakeRecovery";
 import { storeToRefs } from "pinia";
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { isJwtExpired, loggedIn } from "utils/auth";
 
@@ -37,14 +37,37 @@ export default {
   setup: () => {
     const stageStore = useStageStore();
     const authStore = useAuthStore();
-    const { ready, canPlay } = storeToRefs(stageStore);
+    const { ready, canPlay, stageOpenToViewer } = storeToRefs(stageStore);
 
     const route = useRoute();
-    stageStore.loadStage({ url: route.params.url }).then(() => {
+    let alive = true;
+    let loaded = false;
+    // A stage that is closed to this viewer (#1573: rehearsal, and they are
+    // not one of its players) is not joined at all: no broker subscription,
+    // nothing mounted behind the curtain, so nothing of the rehearsal can be
+    // heard. Logging in from the curtain can turn the viewer into a player
+    // (LoginPrompt reloads the permission), which opens the stage: join then.
+    // Exactly ONE connect per visit. `loadStage` is also called mid-session
+    // (RecordingControl re-reads the model after a recording mutation) and
+    // begins with CLEAN_STAGE, which flips the stage closed/open and the
+    // status to OFFLINE while the socket is still up; reacting to that would
+    // tear the live client down (mqtt.connect ends the previous one) and
+    // drop whatever it had buffered. So the watcher stops once connected.
+    let connected = false;
+    const joinIfOpen = () => {
+      if (connected || !alive || !loaded || !stageOpenToViewer.value) return;
+      connected = true;
+      stopWaitingForOpen();
       stageStore.connect();
+    };
+    const stopWaitingForOpen = watch(stageOpenToViewer, joinIfOpen);
+    stageStore.loadStage({ url: route.params.url }).then((result) => {
+      loaded = result !== false;
+      joinIfOpen();
     });
 
     onUnmounted(() => {
+      alive = false;
       stageStore.disconnect();
     });
 
@@ -106,6 +129,7 @@ export default {
     return {
       ready,
       canPlay,
+      stageOpenToViewer,
       loggedIn,
       studioEndpoint: "/stages/",
     };
@@ -135,15 +159,21 @@ export default {
       Shell.vue's setup so its API is in the same provide-tree as
       `jitsi`/`joined` and reaches every descendant.
     -->
-    <template v-if="ready">
+    <!--
+      Behind the Preloader curtain only once the stage is open to this viewer
+      (#1573): a rehearsal must not be audible to the audience, so the board
+      (with its stream tiles) and the audio player are not mounted for them.
+      The login prompt stays, so that a player can sign in from the curtain.
+    -->
+    <template v-if="ready && stageOpenToViewer">
       <Board />
       <StageToolbox v-if="canPlay" />
       <Chat />
       <PlayerChat v-if="canPlay" />
       <AudioPlayer />
-      <LoginPrompt />
       <SettingPopup />
     </template>
+    <LoginPrompt v-if="ready" />
   </Shell>
 </template>
 

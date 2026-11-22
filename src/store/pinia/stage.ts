@@ -826,6 +826,34 @@ export const useStageStore = defineStore(
       return { width, height, left, top };
     });
 
+    // `ListStage` carries `status` on the stage payload; older payloads only
+    // have it in the attributes array. No status at all means the stage has
+    // never been opened: Stage Management treats that as rehearsal.
+    const stageStatus = computed<string>(() => {
+      const m = model.value as
+        | (StageModel & { status?: string; attributes?: { name: string; description?: string }[] })
+        | null;
+      if (!m) return "";
+      const fromAttributes = m.attributes?.find((a) => a.name === "status")?.description;
+      return m.status ?? fromAttributes ?? "rehearsal";
+    });
+
+    /**
+     * Whether this session may be on the stage at all (#1573). A stage is
+     * open to everyone only while it is live; in rehearsal it is open to its
+     * players (also when they preview as audience). The Preloader keeps the
+     * curtain down for everyone else, and the live layout mounts nothing
+     * behind it — not the board, not the audio player, not the Jitsi
+     * conference — so a closed stage cannot be heard either. Recordings are
+     * not covered here: the replay layout does not consult this.
+     */
+    const stageOpenToViewer = computed<boolean>(() => {
+      if (!model.value) return false;
+      const permission = model.value.permission;
+      if (permission && permission !== "audience") return true;
+      return stageStatus.value === "live";
+    });
+
     const canPlay = computed(() => {
       return (
         model.value &&
@@ -4323,6 +4351,8 @@ export const useStageStore = defineStore(
       activeMovable,
       stageSize,
       canPlay,
+      stageStatus,
+      stageOpenToViewer,
       players,
       audiences,
       unreadPrivateMessageCount,
