@@ -2,9 +2,7 @@
 import { reactive } from "vue";
 import { watch } from "vue";
 import { includesIgnoreCase } from "utils/common";
-import { RightOutlined, LeftOutlined } from "@ant-design/icons-vue";
 export default {
-  components: { RightOutlined, LeftOutlined },
   props: {
     columns: Array,
     modelValue: Array,
@@ -164,25 +162,34 @@ export default {
           </div>
         </article>
       </div>
-      <div v-if="i < columns.length - 1" class="column is-narrow px-0 is-flex is-align-self-center">
-        <div class="upstage-multi-transfer-arrows">
-          <button
-            type="button"
-            class="upstage-multi-transfer-btn"
-            title="Move all matching right"
-            @click="moveAll(i, i + 1)"
-          >
-            <RightOutlined />
-          </button>
-          <button
-            type="button"
-            class="upstage-multi-transfer-btn"
-            title="Move all matching left"
-            @click="moveAll(i + 1, i)"
-          >
-            <LeftOutlined />
-          </button>
-        </div>
+      <!--
+        "Move everyone" buttons between two columns: solid green double
+        chevrons at the TOP of the gap, level with the column headings, as
+        documented in the user manual. Do not shrink, restyle or re-centre
+        them (#1577: a styling pass had turned them into small bare chevrons
+        halfway down the lists, where nobody recognised them as controls).
+      -->
+      <div v-if="i < columns.length - 1" class="column is-narrow px-0">
+        <button
+          type="button"
+          class="button is-primary is-small"
+          data-testid="transfer-all-right"
+          title="Move all matching right"
+          @click="moveAll(i, i + 1)"
+        >
+          <i class="fas fa-angle-double-right"></i>
+        </button>
+        <br />
+        <br />
+        <button
+          type="button"
+          class="button is-primary is-small"
+          data-testid="transfer-all-left"
+          title="Move all matching left"
+          @click="moveAll(i + 1, i)"
+        >
+          <i class="fas fa-angle-double-left"></i>
+        </button>
       </div>
     </template>
   </div>
