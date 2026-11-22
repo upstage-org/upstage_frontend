@@ -4,7 +4,6 @@ import { message } from "ant-design-vue";
 import { gql } from "@apollo/client/core";
 import { computed, inject, PropType, ref, watch } from "vue";
 import { Media, AssignedStage } from "models/studio";
-import { compareByLabel } from "utils/common";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 import MediaPreview from "./MediaPreview.vue";
@@ -17,7 +16,11 @@ const props = defineProps({
     required: true,
   },
 });
-const stages = ref<string[]>([]);
+// Ids of the stages (among those this user manages) the item is assigned to,
+// as edited in the pop-up. Loaded from the item every time the pop-up opens.
+const assigned = ref<string[]>([]);
+const searchAvailable = ref("");
+const searchAssigned = ref("");
 const visible = ref(false);
 const { isAdmin } = storeToRefs(useUserStore());
 // Shown whatever the copyright level (#1570): the owner wrote it for the
@@ -55,20 +58,58 @@ const dataSource = computed(() => {
   });
 });
 
-// Side-effect previously lived inside `dataSource`'s computed function, which
-// triggered vue/no-side-effects-in-computed-properties. Move it to a watcher
-// so `dataSource` stays pure while `stages` still mirrors the assigned ones.
-watch(
-  dataSource,
-  (options) => {
-    stages.value = props.media.stages
-      .filter((el) => options.find((item: AssignedStage) => item.id == el.id))
-      .map((el: AssignedStage) => el.id);
-  },
-  { immediate: true },
+type StageRow = { id: string; name: string };
+
+// The stages this user manages, by name. Mere player access is not enough to
+// assign media to a stage, so those are not offered.
+const manageableStages = computed((): StageRow[] =>
+  (dataSource.value as { id: string | number; name: string }[])
+    .map((el) => ({ id: String(el.id), name: el.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
 );
-const handleFilterStageName = (keyword: string, option: any) => {
-  return option.label.toLowerCase().includes(keyword.toLowerCase());
+
+// (Re)load the current assignments whenever the pop-up opens, and once more
+// if the stage list only arrives while it is open and nothing was changed yet.
+// It used to be filled once at mount and emptied after each save, so the
+// second time the pop-up opened it showed no assigned stage at all — saving
+// then silently unassigned the item from the stages it was on (#1569).
+let touched = false;
+const loadAssigned = () => {
+  const manageable = new Set(manageableStages.value.map((s) => s.id));
+  assigned.value = props.media.stages
+    .map((el: AssignedStage) => String(el.id))
+    .filter((id: string) => manageable.has(id));
+  touched = false;
+};
+watch([visible, manageableStages], ([open], previous) => {
+  const wasOpen = previous?.[0] ?? false;
+  if (!open) return;
+  if (!wasOpen || !touched) loadAssigned();
+  if (!wasOpen) {
+    searchAvailable.value = "";
+    searchAssigned.value = "";
+  }
+});
+
+const matches = (name: string, query: string) =>
+  !query.trim() || name.toLowerCase().includes(query.trim().toLowerCase());
+const availableStages = computed(() =>
+  manageableStages.value.filter(
+    (s) => !assigned.value.includes(s.id) && matches(s.name, searchAvailable.value),
+  ),
+);
+const assignedStages = computed(() =>
+  manageableStages.value.filter(
+    (s) => assigned.value.includes(s.id) && matches(s.name, searchAssigned.value),
+  ),
+);
+const assignStage = (id: string) => {
+  touched = true;
+  if (!assigned.value.includes(id)) assigned.value = [...assigned.value, id];
+};
+const unassignStage = (id: string) => {
+  touched = true;
+  assigned.value = assigned.value.filter((s) => s !== id);
 };
 const { mutate } = useMutation<
   { quickAssignMutation: { asset: Media } },
@@ -100,7 +141,7 @@ const handleOk = async () => {
   const remainIds = props.media.stages
     .filter((el: AssignedStage) => !manageable.has(String(el.id)))
     .map((el: AssignedStage) => el.id);
-  const stageIds: any = stages.value;
+  const stageIds: any = assigned.value;
   try {
     await mutate({
       assetId: props.media.id,
@@ -112,9 +153,8 @@ const handleOk = async () => {
     message.error((error as Error)?.message || "The media could not be assigned");
     return;
   }
-  message.success(`${props.media.name} had been assigned successfully!`);
+  message.success(`Stage assignments saved for ${props.media.name}`);
   refresh();
-  stages.value = [];
   visible.value = false;
 };
 </script>
@@ -127,8 +167,8 @@ const handleOk = async () => {
     v-model:visible="visible"
     class="custom-class"
     style="color: red"
-    title="Assign this media to one of your stages"
-    :width="600"
+    title="Assign this media to your stages"
+    :width="760"
     :footer="null"
   >
     <div class="flex" style="align-items: center; justify-content: flex-start">
@@ -142,36 +182,155 @@ const handleOk = async () => {
       <b>Note from <DName :user="media.owner" />:</b>
       <p>{{ note }}</p>
     </div>
-    <div class="flex">
-      <a-select
-        v-model:value="stages"
-        allow-clear
-        show-arrow
-        :filter-option="handleFilterStageName"
-        mode="tags"
-        style="width: 100%"
-        placeholder="Stage name"
-        :loading="loading"
-        :options="
-          dataSource
-            ? dataSource
-                .map((e: any) => ({
-                  value: e.id,
-                  label: e.name,
-                }))
-                .sort(compareByLabel)
-            : []
-        "
-      >
-      </a-select>
-      &nbsp;
+    <p class="quick-assign-help help mb-3">
+      Click a stage name to move it between the lists, then Save. Only stages you own or can edit
+      are listed.
+    </p>
+    <div class="columns quick-assign-columns">
+      <div class="column">
+        <article class="panel is-light" data-testid="available-stages">
+          <p class="panel-heading">
+            Available stages
+            <span class="tag is-primary">{{ availableStages.length }}</span>
+          </p>
+          <div class="panel-heading pt-0">
+            <p class="control has-icons-left">
+              <input
+                v-model="searchAvailable"
+                class="input is-primary"
+                type="search"
+                placeholder="Search stage name"
+                autocomplete="off"
+              />
+              <span class="icon is-left">
+                <i class="fas fa-search" aria-hidden="true"></i>
+              </span>
+            </p>
+          </div>
+          <div class="panel-body">
+            <p v-if="loading" class="panel-block has-text-grey">Loading stages…</p>
+            <p v-else-if="!availableStages.length" class="panel-block has-text-grey">
+              {{
+                !manageableStages.length
+                  ? "You have no stages you own or can edit."
+                  : searchAvailable.trim()
+                    ? "No stages match your search."
+                    : "All your stages are assigned."
+              }}
+            </p>
+            <button
+              v-for="stage in availableStages"
+              :key="stage.id"
+              type="button"
+              class="panel-block quick-assign-row"
+              title="Click to assign"
+              @click="assignStage(stage.id)"
+            >
+              {{ stage.name }}
+            </button>
+          </div>
+        </article>
+      </div>
+      <div class="column">
+        <article class="panel is-light" data-testid="assigned-stages">
+          <p class="panel-heading">
+            Assigned stages
+            <span class="tag is-primary">{{ assignedStages.length }}</span>
+          </p>
+          <div class="panel-heading pt-0">
+            <p class="control has-icons-left">
+              <input
+                v-model="searchAssigned"
+                class="input is-primary"
+                type="search"
+                placeholder="Search stage name"
+                autocomplete="off"
+              />
+              <span class="icon is-left">
+                <i class="fas fa-search" aria-hidden="true"></i>
+              </span>
+            </p>
+          </div>
+          <div class="panel-body">
+            <p v-if="!assignedStages.length" class="panel-block has-text-grey">
+              {{
+                assigned.length
+                  ? "No assigned stages match your search."
+                  : "Not assigned to any of your stages — click names on the left."
+              }}
+            </p>
+            <div
+              v-for="stage in assignedStages"
+              :key="stage.id"
+              class="panel-block quick-assign-assigned"
+            >
+              <button
+                type="button"
+                class="quick-assign-row quick-assign-row--assigned"
+                title="Click to unassign"
+                @click="unassignStage(stage.id)"
+              >
+                {{ stage.name }}
+              </button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+    <div class="quick-assign-actions">
       <a-button type="primary" data-testid="save" @click="handleOk"> Save </a-button>
     </div>
-    <br />
   </a-modal>
 </template>
 
 <style scoped>
+.quick-assign-help {
+  margin-top: 12px;
+  color: #000;
+}
+.quick-assign-columns article.panel {
+  width: 100%;
+}
+.quick-assign-columns .panel-heading {
+  font-size: unset;
+}
+.quick-assign-columns .panel-body {
+  /* ~7 rows; the lists scroll and are searchable, so the pop-up does not
+     grow with the number of stages. */
+  max-height: min(17.5em, 35vh);
+  overflow-y: auto !important;
+}
+button.quick-assign-row {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.5em 0.75em;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.quick-assign-row:hover {
+  background-color: rgba(0, 112, 17, 0.08);
+}
+.quick-assign-assigned {
+  display: block;
+  padding: 0.25em 0.75em 0.5em;
+}
+button.quick-assign-row--assigned {
+  background-color: rgba(0, 112, 17, 0.12);
+  border-left: 3px solid #007011;
+  margin-bottom: 0.35em;
+}
+button.quick-assign-row--assigned:hover {
+  background-color: rgba(0, 112, 17, 0.18);
+}
+.quick-assign-actions {
+  display: flex;
+  justify-content: flex-end;
+}
 .owner-note {
   margin: 20px 0 12px;
   padding: 10px 12px;

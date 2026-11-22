@@ -24,6 +24,8 @@ vi.mock("@vue/apollo-composable", async () => {
           edges: [
             { id: "7", name: "Mine", permission: "owner" },
             { id: "8", name: "Theirs (player access)", permission: "player" },
+            { id: "5", name: "Bunnies", permission: "editor" },
+            { id: 6, name: "apple stage", permission: "owner" },
           ],
         },
       }),
@@ -57,7 +59,6 @@ const media = (copyrightLevel: number, note?: string) => ({
 const stubs = {
   "a-button": { template: "<button @click=\"$emit('click')\"><slot /></button>" },
   "a-modal": { props: ["visible"], template: "<div v-if='visible' class='modal'><slot /></div>" },
-  "a-select": { template: "<select />" },
   "plus-circle-outlined": true,
   DName: { props: ["user"], template: "<span>{{ user.displayName }}</span>" },
   MediaPreview: true,
@@ -116,6 +117,133 @@ describe("QuickStageAssignment keeps unmanageable assignments (#1569)", () => {
     const sent = mutate.mock.calls[0][0].stageIds;
     expect(sent).toContain("9");
     expect(sent).not.toContain("8");
+  });
+});
+
+/**
+ * #1569, second round: the pop-up is two columns — the stages this user
+ * manages that the item is NOT on (left) and the ones it IS on (right);
+ * clicking a name moves it. Before, a multi-select was filled once and
+ * emptied after each save, so on the second opening nothing was ticked and
+ * saving silently unassigned the item ("the only way to unassign is to
+ * assign to another stage").
+ */
+describe("QuickStageAssignment two columns (#1569)", () => {
+  const names = (wrapper: Awaited<ReturnType<typeof open>>, column: string) =>
+    wrapper.findAll(`[data-testid=${column}] button`).map((b) => b.text());
+  const click = async (wrapper: Awaited<ReturnType<typeof open>>, column: string, name: string) => {
+    const button = wrapper.findAll(`[data-testid=${column}] button`).find((b) => b.text() === name);
+    expect(button, `${name} in ${column}`).toBeTruthy();
+    await button!.trigger("click");
+  };
+  const onBunnies = () => ({ ...media(0), stages: [{ id: "5", name: "Bunnies" }] });
+
+  it("lists only the stages the user owns or edits, sorted, split by whether the item is on them", async () => {
+    const wrapper = await open(onBunnies());
+    expect(names(wrapper, "available-stages")).toEqual(["apple stage", "Mine"]);
+    expect(names(wrapper, "assigned-stages")).toEqual(["Bunnies"]);
+    expect(wrapper.text()).not.toContain("Theirs (player access)");
+  });
+
+  it("assigns by clicking a name on the left", async () => {
+    mutate.mockResolvedValue({});
+    const wrapper = await open(onBunnies());
+    await click(wrapper, "available-stages", "Mine");
+    expect(names(wrapper, "assigned-stages")).toEqual(["Bunnies", "Mine"]);
+    expect(names(wrapper, "available-stages")).toEqual(["apple stage"]);
+    await wrapper.find("[data-testid=save]").trigger("click");
+    await flushPromises();
+    expect(mutate.mock.calls[0][0].stageIds.sort()).toEqual(["5", "7"]);
+  });
+
+  it("unassigns by clicking a name on the right, without assigning it anywhere else", async () => {
+    mutate.mockResolvedValue({});
+    const wrapper = await open(onBunnies());
+    await click(wrapper, "assigned-stages", "Bunnies");
+    expect(names(wrapper, "assigned-stages")).toEqual([]);
+    expect(names(wrapper, "available-stages")).toEqual(["apple stage", "Bunnies", "Mine"]);
+    await wrapper.find("[data-testid=save]").trigger("click");
+    await flushPromises();
+    expect(mutate).toHaveBeenCalledWith({ assetId: "1", stageIds: [] });
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it("unassigning from my stage keeps the owner's own assignment on a stage I cannot manage", async () => {
+    mutate.mockResolvedValue({});
+    const m = {
+      ...media(0),
+      stages: [
+        { id: "5", name: "Bunnies" },
+        { id: "9", name: "Owner's stage" },
+      ],
+    };
+    const wrapper = await open(m);
+    expect(names(wrapper, "assigned-stages")).toEqual(["Bunnies"]);
+    await click(wrapper, "assigned-stages", "Bunnies");
+    await wrapper.find("[data-testid=save]").trigger("click");
+    await flushPromises();
+    expect(mutate.mock.calls[0][0].stageIds).toEqual(["9"]);
+  });
+
+  it("shows the current assignments again every time it is opened (they used to be blank after a save)", async () => {
+    mutate.mockResolvedValue({});
+    const m = onBunnies();
+    const wrapper = await open(m);
+    await click(wrapper, "available-stages", "Mine");
+    await wrapper.find("[data-testid=save]").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".modal").exists()).toBe(false);
+
+    // the media list refreshes after a save and hands the pop-up the new state
+    await wrapper.setProps({
+      media: {
+        ...m,
+        stages: [
+          { id: "5", name: "Bunnies" },
+          { id: "7", name: "Mine" },
+        ],
+      } as never,
+    });
+    await wrapper.find("button").trigger("click");
+    await nextTick();
+    expect(names(wrapper, "assigned-stages")).toEqual(["Bunnies", "Mine"]);
+    expect(names(wrapper, "available-stages")).toEqual(["apple stage"]);
+  });
+
+  it("discards unsaved clicks when the pop-up is closed and opened again", async () => {
+    const wrapper = await open(onBunnies());
+    await click(wrapper, "assigned-stages", "Bunnies");
+    (wrapper.vm as unknown as { visible: boolean }).visible = false;
+    await nextTick();
+    await wrapper.find("button").trigger("click");
+    await nextTick();
+    expect(names(wrapper, "assigned-stages")).toEqual(["Bunnies"]);
+  });
+
+  it("matches a numeric stage id from the API against the item's string id", async () => {
+    const wrapper = await open({ ...media(0), stages: [{ id: "6", name: "apple stage" }] });
+    expect(names(wrapper, "assigned-stages")).toEqual(["apple stage"]);
+  });
+
+  it("filters each column with its search box", async () => {
+    const wrapper = await open(onBunnies());
+    await wrapper.find("[data-testid=available-stages] input").setValue("APP");
+    expect(names(wrapper, "available-stages")).toEqual(["apple stage"]);
+    await wrapper.find("[data-testid=assigned-stages] input").setValue("zzz");
+    expect(names(wrapper, "assigned-stages")).toEqual([]);
+    expect(wrapper.find("[data-testid=assigned-stages]").text()).toContain(
+      "No assigned stages match",
+    );
+  });
+
+  it("a refused save keeps the pop-up open with the user's choices", async () => {
+    mutate.mockRejectedValue(new Error("You can only assign media to stages you own or edit"));
+    const wrapper = await open(onBunnies());
+    await click(wrapper, "available-stages", "Mine");
+    await wrapper.find("[data-testid=save]").trigger("click");
+    await flushPromises();
+    expect(toast.error).toHaveBeenCalledWith("You can only assign media to stages you own or edit");
+    expect(names(wrapper, "assigned-stages")).toEqual(["Bunnies", "Mine"]);
   });
 });
 

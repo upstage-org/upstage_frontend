@@ -76,7 +76,16 @@ const probeSize = () => {
   probe.onload = () => {
     if (!probe || src.value.trim() !== address) return;
     natural.value = { width: probe.naturalWidth, height: probe.naturalHeight };
-    if (!width.value && !height.value && natural.value.width) {
+    // Pre-fill the size only when it is one the fields accept. A picture
+    // smaller than the minimum (an icon, a spacer) used to be filled in with
+    // its own size, which the fields then rejected as too small: Insert did
+    // nothing, with no message. Left empty, the picture keeps its own size.
+    if (
+      !width.value &&
+      !height.value &&
+      natural.value.width >= MIN_IMAGE_SIZE &&
+      natural.value.height >= MIN_IMAGE_SIZE
+    ) {
       width.value = String(natural.value.width);
       height.value = String(natural.value.height);
     }

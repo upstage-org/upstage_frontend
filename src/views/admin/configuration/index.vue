@@ -17,6 +17,13 @@ const { t } = useI18n();
 
 const { foyer, system } = storeToRefs(configStore);
 
+// Every entry reloads the shared configuration after a save. The store is
+// what the rest of the app reads — the e-mail page appends the signature from
+// it, the foyer shows the title/description/menu from it — and what this page
+// shows again when it is revisited without a full reload. Entries without
+// this hook saved to the server but left the store on the old value: a
+// signature image "disappeared" from this page and never reached an e-mail
+// until the browser was reloaded (#1575).
 const refreshConfig = async () => {
   await configStore.fetchConfig();
 };
@@ -28,6 +35,7 @@ const foyerConfigs = () =>
           label: t("title"),
           name: "FOYER_TITLE",
           defaultValue: foyer.value.title?.value ?? "",
+          refresh: refreshConfig,
         }),
         h(Entry, {
           label: t("description"),
@@ -35,12 +43,14 @@ const foyerConfigs = () =>
           name: "FOYER_DESCRIPTION",
           defaultValue: foyer.value.description?.value ?? "",
           richTextEditor: true,
+          refresh: refreshConfig,
         }),
         h(Entry, {
           label: t("menu"),
           multiline: true,
           name: "FOYER_MENU",
           defaultValue: foyer.value.menu?.value ?? "",
+          refresh: refreshConfig,
           help: h("pre", { class: "text-sm" }, [
             `Syntax: "Title (URL)"
 For example: Development (https://github.com/upstage-org/upstage/)
@@ -80,6 +90,7 @@ const systemConfigs = () =>
           label: t("tos.terms_of_service"),
           name: "TERMS_OF_SERVICE",
           defaultValue: system.value.termsOfService?.value ?? "",
+          refresh: refreshConfig,
         }),
         h(Entry, {
           label: t("manual"),
@@ -93,6 +104,7 @@ const systemConfigs = () =>
           label: t("email_subject_prefix"),
           name: "EMAIL_SUBJECT_PREFIX",
           defaultValue: system.value.esp?.value ?? "",
+          refresh: refreshConfig,
         }),
         h(Entry, {
           label: t("email_signature"),
@@ -100,6 +112,7 @@ const systemConfigs = () =>
           name: "EMAIL_SIGNATURE",
           defaultValue: system.value?.emailSignature?.value ?? "",
           richTextEditor: true,
+          refresh: refreshConfig,
         }),
       ]
     : [h(Skeleton)];
