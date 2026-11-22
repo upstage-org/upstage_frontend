@@ -201,7 +201,7 @@ export default {
       const room = tileServer
         ? (jitsi?.sessions?.get?.(resolveJitsiOrigin(tileServer))?.target?.room ?? null)
         : (jitsi?.room ?? null);
-      let live = [];
+      let live;
       try {
         live = room?.getParticipantById?.(pid)?.getTracks?.() ?? [];
       } catch (error) {

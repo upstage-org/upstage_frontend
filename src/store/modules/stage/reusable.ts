@@ -94,6 +94,7 @@ export function takeSnapshotFromStage() {
     settings,
     audioPlayers,
     tools,
+    curtain,
   } = stageStore;
   const board = Object.assign({}, originalBoard);
   board.objects = originalBoard.objects.filter((o) => o.liveAction).map(serializeObject);
@@ -105,6 +106,11 @@ export function takeSnapshotFromStage() {
     settings,
     audioPlayers,
     audios: tools.audios,
+    // The curtain belongs to the scene (#1578): a scene saved with the
+    // curtain down comes back with it down, one saved without comes back
+    // without. Always written — `null` means "no curtain" — so loading the
+    // scene can tell that apart from an older scene that never recorded it.
+    curtain: curtain ?? null,
   });
   // Taking a snapshot must NOT mutate or broadcast live audio. Previously this
   // stopped every track via `updateAudioStatus({ isPlaying: false })`, which
