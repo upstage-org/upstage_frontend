@@ -437,7 +437,7 @@ provide("afterDuplicate", afterDuplicate);
             />
           </div>
         </div>
-        <p class="help">Select the user who will own and manage this stage.</p>
+        <p class="help">Select the player who will own and manage this stage.</p>
       </div>
     </div>
 

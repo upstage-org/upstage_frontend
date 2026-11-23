@@ -57,6 +57,19 @@ describe("MultiTransferAccessColumn — move-all buttons", () => {
     expect(kinds).toEqual(["transfer-all-right", "br", "br", "transfer-all-left"]);
   });
 
+  // Wording asked for by the stage owner (#1577, 2026-11-24): the people in
+  // these lists are "players", and "all matching" read oddly.
+  it("names what the arrows move in their tooltips", () => {
+    const w = mountColumns();
+    for (const b of w.findAll('[data-testid="transfer-all-right"]')) {
+      expect(b.attributes("title")).toBe("Move selected players right");
+    }
+    for (const b of w.findAll('[data-testid="transfer-all-left"]')) {
+      expect(b.attributes("title")).toBe("Move selected players left");
+    }
+    expect(w.html()).not.toContain("all matching");
+  });
+
   it("the old small-arrow markup is gone", () => {
     const html = mountColumns().html();
     expect(html).not.toContain("upstage-multi-transfer");
