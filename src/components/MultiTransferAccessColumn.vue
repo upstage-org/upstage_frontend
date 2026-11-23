@@ -174,7 +174,7 @@ export default {
           type="button"
           class="button is-primary is-small"
           data-testid="transfer-all-right"
-          title="Move all matching right"
+          title="Move selected players right"
           @click="moveAll(i, i + 1)"
         >
           <i class="fas fa-angle-double-right"></i>
@@ -185,7 +185,7 @@ export default {
           type="button"
           class="button is-primary is-small"
           data-testid="transfer-all-left"
-          title="Move all matching left"
+          title="Move selected players left"
           @click="moveAll(i + 1, i)"
         >
           <i class="fas fa-angle-double-left"></i>
