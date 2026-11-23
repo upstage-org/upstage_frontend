@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { message } from "ant-design-vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { animate } from "animejs";
 import { createGaplessLooper } from "./gaplessLoop";
+import { createVolumeFader } from "./volumeFade";
 
 // See the undecodable-file detection in `setRef` below. Exported for tests.
 export const INSTANT_END_MS = 500;
@@ -50,6 +50,8 @@ export default {
     // Read by the undecodable-file check in `ended`; `from` is moved by our
     // own seeks (handleAudioChange) — see the note there.
     const playWindows = new WeakMap();
+    // Volume ramps (see fadeVolume below).
+    const fader = createVolumeFader();
     // Gapless looping (see gaplessLoop.ts). The element stays the transport
     // and clock; for a looping track a Web Audio voice takes over the SOUND
     // and the element runs on muted. Best effort: whenever the voice cannot
@@ -91,6 +93,7 @@ export default {
       if (!el) {
         const gone = elementFor.get(audio);
         if (gone !== undefined) {
+          fader.cancel(gone);
           looper.stop(gone);
           elementFor.delete(audio);
         }
@@ -183,12 +186,13 @@ export default {
       }
     };
 
-    const fadeVolume = (audio, volume, duration = 1000) => {
-      animate(audio, {
-        volume,
-        duration,
-        ease: "linear",
-      });
+    // Every level change of an element goes through here: a track's own
+    // volume (1 s glide), the master volume (instant) and "Fade out". The
+    // ramp runs on a timer, NOT on animation frames — a tab in the
+    // background gets none, and there the old anime.js ramp never moved the
+    // volume at all (see volumeFade.ts).
+    const fadeVolume = (el, volume, duration = 1000) => {
+      fader.fade(el, volume, duration);
     };
 
     const speed = computed(() => {
@@ -253,7 +257,10 @@ export default {
     watch(audios, handleAudioChange);
     watch(() => stageStore.masterAudioSignal, applyMasterVolume);
     onMounted(handleAudioChange);
-    onBeforeUnmount(() => looper.dispose());
+    onBeforeUnmount(() => {
+      fader.dispose();
+      looper.dispose();
+    });
 
     return { audios, setRef };
   },

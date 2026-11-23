@@ -129,6 +129,29 @@ export default defineConfig({
       },
       dependencies: ["setup"],
     },
+    // Stage audio tracks in real browsers: play, per-track volume, master
+    // volume and fade-out, read off the <audio> elements of a performer and
+    // an audience seat. One project per browser because the reported
+    // failures were browser specific (Chrome and Firefox, not Brave).
+    // No --mute-audio: playback must go through the normal output path.
+    {
+      name: "audio",
+      testMatch: /audio\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"], launchOptions: { args: [] } },
+      dependencies: ["setup"],
+    },
+    {
+      name: "audio-chrome",
+      testMatch: /audio\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"], channel: "chrome", launchOptions: { args: [] } },
+      dependencies: ["setup"],
+    },
+    {
+      name: "audio-firefox",
+      testMatch: /audio\.spec\.ts$/,
+      use: { ...devices["Desktop Firefox"], launchOptions: { args: [] } },
+      dependencies: ["setup"],
+    },
   ],
   webServer: e2eCfg.webServerStartsVite
     ? {
