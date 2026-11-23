@@ -67,7 +67,6 @@ vi.mock("./gaplessLoop", () => ({
 }));
 
 vi.mock("ant-design-vue", () => ({ message: { error: messageError } }));
-vi.mock("animejs", () => ({ animate: vi.fn() }));
 vi.mock("@stores/pinia/stage", async () => {
   const { reactive } = await import("vue");
   const store = reactive({
@@ -535,6 +534,169 @@ describe("AudioPlayer gapless loop hand-over", () => {
  * audience session whose playback lagged could stop a track the performer
  * had just started again.
  */
+/**
+ * Levels. Until 2026-11-24 this file mocked the animation library that
+ * moved the volume, so NOTHING here could notice that the volume never
+ * moved: in a real browser the ramp ran on animation frames, which a tab in
+ * the background does not get — there a track's own volume slider did
+ * nothing and "Fade out" held the level until the stop cut the track off,
+ * while the (instant) master slider worked. These tests use the real ramp
+ * code with a `requestAnimationFrame` that never calls back, i.e. a hidden
+ * tab: what must hold is the level of the `<audio>` element itself.
+ */
+describe("AudioPlayer levels — reach the element without animation frames", () => {
+  let raf: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"] });
+    raf = vi.fn(() => 1);
+    vi.stubGlobal("requestAnimationFrame", raf);
+    Object.assign(storeState.store!, {
+      masterAudioVolume: 1,
+      masterAudioSignal: { volume: 1, duration: 0, seq: 0 },
+    });
+    store().audios.forEach((a) => delete a.volume);
+  });
+  afterEach(() => {
+    // Unmount (top-level afterEach runs later) must find its timers.
+    mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+    expect(vi.getTimerCount()).toBe(0);
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    Object.assign(storeState.store!, {
+      masterAudioVolume: 1,
+      masterAudioSignal: { volume: 1, duration: 0, seq: 0 },
+    });
+    store().audios.forEach((a) => delete a.volume);
+  });
+
+  /** Let `ms` of wall-clock pass: the ramp reads the clock, timers tick. */
+  const advance = (ms: number) => {
+    for (let t = 0; t < ms; t += 20) {
+      now += 20;
+      vi.advanceTimersByTime(20);
+    }
+  };
+  /** What UPDATE_AUDIO does when a track message comes back from the broker. */
+  const echo = async (index: number, update: Record<string, unknown>) => {
+    Object.assign(store().audios[index], update, { changed: true });
+    await nextTick();
+  };
+  /** What the store does for a master-volume / fade-out message. */
+  const master = async (volume: number, duration: number) => {
+    const s = storeState.store as unknown as {
+      masterAudioVolume: number;
+      masterAudioSignal: { volume: number; duration: number; seq: number };
+    };
+    s.masterAudioVolume = volume;
+    s.masterAudioSignal = { volume, duration, seq: s.masterAudioSignal.seq + 1 };
+    await nextTick();
+  };
+
+  it("a track's volume slider moves that element's volume (and no other)", async () => {
+    const { els } = mountPlayer();
+    const [first, second] = els();
+    expect(second.volume).toBe(1);
+    // The toolbox slider sends the value as a string.
+    await echo(1, { volume: "0.4" });
+    advance(500);
+    expect(second.volume).toBeGreaterThan(0.45);
+    expect(second.volume).toBeLessThan(0.95);
+    advance(600);
+    expect(second.volume).toBeCloseTo(0.4, 5);
+    expect(first.volume).toBe(1);
+
+    await echo(1, { volume: "0" });
+    advance(1100);
+    expect(second.volume).toBe(0);
+    await echo(1, { volume: "0.71" });
+    advance(1100);
+    expect(second.volume).toBeCloseTo(0.71, 5);
+    expect(raf).not.toHaveBeenCalled();
+  });
+
+  it("the master slider applies at once, scaled by each track's own volume", async () => {
+    const { els } = mountPlayer();
+    await echo(1, { volume: "0.5" });
+    advance(1100);
+    await master(0.4, 0);
+    expect(els()[0].volume).toBeCloseTo(0.4, 5);
+    expect(els()[1].volume).toBeCloseTo(0.2, 5);
+    await master(1, 0);
+    expect(els()[0].volume).toBe(1);
+    expect(els()[1].volume).toBeCloseTo(0.5, 5);
+  });
+
+  it("a track volume set while the master is lowered is scaled by the master", async () => {
+    const { els } = mountPlayer();
+    await master(0.5, 0);
+    await echo(0, { volume: "0.8" });
+    advance(1100);
+    expect(els()[0].volume).toBeCloseTo(0.4, 5);
+  });
+
+  it("Fade out passes through the levels in between, then Stop restores each track's level", async () => {
+    const { els } = mountPlayer();
+    await echo(1, { volume: "0.8" });
+    advance(1100);
+    const [first, second] = els();
+
+    await master(0, 3000);
+    const seen: number[] = [];
+    for (let t = 0; t < 3000; t += 250) {
+      advance(250);
+      seen.push(first.volume);
+    }
+    // A fade: most samples sit strictly between full and silent, falling.
+    expect(seen.filter((v) => v > 0.1 && v < 0.9).length).toBeGreaterThanOrEqual(8);
+    for (let i = 1; i < seen.length; i += 1) expect(seen[i]).toBeLessThan(seen[i - 1] + 1e-9);
+    expect(first.volume).toBe(0);
+    expect(second.volume).toBe(0);
+
+    // What follows on every client: the per-track stops, then master = 1.
+    const pause = HTMLMediaElement.prototype.pause as unknown as ReturnType<typeof vi.fn>;
+    pause.mockClear();
+    await echo(0, { isPlaying: false, currentTime: 0, saken: true });
+    await echo(1, { isPlaying: false, currentTime: 0, saken: true });
+    expect(pause).toHaveBeenCalledTimes(2);
+    await master(1, 0);
+    expect(first.volume).toBe(1);
+    expect(second.volume).toBeCloseTo(0.8, 5);
+    expect(raf).not.toHaveBeenCalled();
+  });
+
+  it("a Stop arriving in the middle of a fade out is not undone by the rest of the fade", async () => {
+    const { els } = mountPlayer();
+    await master(0, 3000);
+    advance(1500);
+    expect(els()[0].volume).toBeCloseTo(0.5, 1);
+    await master(1, 0);
+    expect(els()[0].volume).toBe(1);
+    advance(3000);
+    expect(els()[0].volume).toBe(1);
+  });
+
+  it("a looping voice is given the level the ramp arrives at (it mirrors the element)", async () => {
+    const { els } = mountPlayer();
+    const [first] = els();
+    await echo(0, { volume: "0.3" });
+    advance(1100);
+    looper.setVolume.mockClear();
+    first.dispatchEvent(new Event("volumechange"));
+    expect(looper.setVolume).toHaveBeenCalledWith(first, first.volume);
+    expect(first.volume).toBeCloseTo(0.3, 5);
+  });
+
+  it("unmounting in the middle of a ramp leaves no timer behind", async () => {
+    const { wrapper } = mountPlayer();
+    await master(0, 3000);
+    advance(500);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    wrapper.unmount();
+    mounted.splice(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
 describe("AudioPlayer end-of-track stop — who publishes it", () => {
   const localUpdate = () => storeState.store!.UPDATE_AUDIO as ReturnType<typeof vi.fn>;
 
