@@ -345,7 +345,7 @@ provide("afterDuplicate", afterDuplicate);
           "
           :help="
             !form.fileLocation
-              ? `URL must be unique and can't be changed! Please avoid typos, unnecessarily long urls, spaces and punctuation inside URL.`
+              ? `Enter your stage name first then edit the URL if you want to (no spaces or special characters allowed).`
               : undefined
           "
           :error="urlError"
