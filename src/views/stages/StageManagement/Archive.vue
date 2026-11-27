@@ -7,7 +7,10 @@ import CustomConfirm from "components/CustomConfirm.vue";
 import Field from "components/form/Field.vue";
 import ClearChat from "./ClearChat.vue";
 import SweepStage from "./SweepStage.vue";
-import { computed, inject, ref } from "vue";
+// Aliased: "Switch" is a reserved HTML element name (vue/no-reserved-component-names).
+import AppSwitch from "components/form/Switch.vue";
+import { chatLogLine } from "components/stage/Chat/chatLog";
+import { computed, inject, ref, watch } from "vue";
 import type { Ref } from "vue";
 import dayjs from "@utils/dayjs";
 import humanizeDuration from "humanize-duration";
@@ -20,6 +23,31 @@ import { stageGraph } from "services/graphql";
 const stage = inject("stage") as Ref<any>;
 const refresh = inject("refresh") as ((id: unknown) => void) | undefined;
 const { t } = useI18n();
+
+// Chat timestamps (#1567). The on-stage chat can show and download times,
+// but only for what is still on the stage; once a stage is swept the chat
+// lives here. One switch decides for everything on this tab: the transcript
+// windows show each line's date and time, and the downloaded logs carry
+// "[YYYY-MM-DD HH:mm:ss] " in front of each line. Off by default, as the
+// logs have always been; remembered in this browser.
+const CHAT_TIMESTAMPS_KEY = "upstage-archive-chat-timestamps";
+const readChatTimestamps = () => {
+  try {
+    return localStorage.getItem(CHAT_TIMESTAMPS_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
+const chatTimestamps = ref(readChatTimestamps());
+watch(chatTimestamps, (on) => {
+  try {
+    localStorage.setItem(CHAT_TIMESTAMPS_KEY, on ? "true" : "false");
+  } catch {
+    // Private mode / storage disabled: the switch still works for this visit.
+  }
+});
+/** One line of a downloaded log, with or without its time. */
+const logLine = (item: any) => `${chatLogLine(item, chatTimestamps.value)}\r\n`;
 
 const trimPerformanceId = ref<string | number | null>(null);
 const trimNewName = ref("");
@@ -152,27 +180,11 @@ const downloadChatLog = (option: string, session?: any) => {
           session.end ? timeStamp(session.end) : timeStamp(session.createdOn)
         }.txt`,
       );
-      content = session.publicMessages.map((item: any) => {
-        let line;
-        if (item.clear) {
-          line = "---------------- Clear Chat ----------------";
-        } else {
-          line = `${item.user}: ${item.message}`;
-        }
-        return `${line}\r\n`;
-      });
+      content = session.publicMessages.map(logLine);
     } else {
       link.setAttribute("download", `${stage.value.name}-Audience-chat.txt`);
       sessions.value.forEach((session) => {
-        content = content.concat(
-          session.publicMessages.map((item: any) => {
-            if (item.clear) {
-              return `---------------- Clear Chat ----------------\r\n`;
-            } else {
-              return `${item.user}: ${item.message}\r\n`;
-            }
-          }),
-        );
+        content = content.concat(session.publicMessages.map(logLine));
       });
     }
   } else {
@@ -183,27 +195,11 @@ const downloadChatLog = (option: string, session?: any) => {
           session.end ? timeStamp(session.end) : timeStamp(session.createdOn)
         }.txt`,
       );
-      content = session.privateMessages.map((item: any) => {
-        let line;
-        if (item.clearPlayerChat) {
-          line = "---------------- Clear Chat ----------------";
-        } else {
-          line = `${item.user}: ${item.message}`;
-        }
-        return `${line}\r\n`;
-      });
+      content = session.privateMessages.map(logLine);
     } else {
       link.setAttribute("download", `${stage.value.name}-Player-chat.txt`);
       sessions.value.forEach((session) => {
-        content = content.concat(
-          session.privateMessages.map((item: any) => {
-            if (item.clearPlayerChat) {
-              return `---------------- Clear Chat ----------------\r\n`;
-            } else {
-              return `${item.user}: ${item.message}\r\n`;
-            }
-          }),
-        );
+        content = content.concat(session.privateMessages.map(logLine));
       });
     }
   }
@@ -302,6 +298,12 @@ const duplicateWithTrimmedPauses = async (closeModal?: () => void) => {
 
 <template>
   <div class="has-text-right is-fullwidth pb-3">
+    <a-tooltip :title="$t('archive_chat_timestamps_tooltip')">
+      <span class="archive-chat-timestamps">
+        <span>{{ $t("include_timestamps") }}</span>
+        <AppSwitch v-model="chatTimestamps" data-testid="archive-chat-timestamps" />
+      </span>
+    </a-tooltip>
     <button class="button ml-2 is-light" @click="downloadChatLog('public')">
       <span>{{ $t("download_all_audience_chat") }}</span>
     </button>
@@ -337,7 +339,12 @@ const duplicateWithTrimmedPauses = async (closeModal?: () => void) => {
           <span v-if="item.begin !== item.end">to {{ date(item.end) }}</span>
         </template>
         <template #content>
-          <Messages :messages="item.publicMessages" from="archive" />
+          <Messages
+            :messages="item.publicMessages"
+            from="archive"
+            :show-times="chatTimestamps"
+            full-times
+          />
         </template>
       </Modal>
       <button class="button is-light" @click="downloadChatLog('public', item)">
@@ -356,7 +363,12 @@ const duplicateWithTrimmedPauses = async (closeModal?: () => void) => {
           <span v-if="item.begin !== item.end">to {{ date(item.end) }}</span>
         </template>
         <template #content>
-          <Messages :messages="item.privateMessages" from="archive" />
+          <Messages
+            :messages="item.privateMessages"
+            from="archive"
+            :show-times="chatTimestamps"
+            full-times
+          />
         </template>
       </Modal>
       <button class="button is-light" @click="downloadChatLog('private', item)">
@@ -450,5 +462,21 @@ const duplicateWithTrimmedPauses = async (closeModal?: () => void) => {
 <style scoped>
 .button.is-light > img {
   max-width: unset;
+}
+/* Label and switch on one line, in the row of buttons and centred on them
+   (the switch's own label text would wrap underneath its icon here). */
+.archive-chat-timestamps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Same box as the buttons beside it (Bulma: 2.5em high, aligned top). */
+  height: 2.5em;
+  vertical-align: top;
+  margin-right: 0.5rem;
+  white-space: nowrap;
+}
+.archive-chat-timestamps :deep(.field) {
+  margin-bottom: 0;
+  line-height: 1;
 }
 </style>

@@ -6,7 +6,7 @@ import ContextMenu from "components/ContextMenu.vue";
 import Icon from "components/Icon.vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { computed, inject } from "vue";
-import { chatClockTime } from "./chatLog";
+import { chatClockTime, chatLogStamp } from "./chatLog";
 
 export default {
   components: { Linkify, Divider, ContextMenu, Icon },
@@ -19,8 +19,15 @@ export default {
     // it (a replay, an archived transcript in Stage Management), so the
     // default is the neutral "No messages yet!".
     welcome: Boolean,
+    // Timestamps (#1567). Left alone, the viewer's own on-stage setting
+    // decides and each line gets a clock time. A list shown away from the
+    // stage — the archived transcript in Stage Management — makes its own
+    // choice (`showTimes` true/false) and asks for the full date and time
+    // (`fullTimes`), since its lines can be months old.
+    showTimes: { type: Boolean, default: undefined },
+    fullTimes: Boolean,
   },
-  setup: () => {
+  setup: (props) => {
     const isChatStandalone = inject("isChatStandalone", false);
     const replaying = inject("replaying", false);
     const stageStore = useStageStore();
@@ -39,8 +46,16 @@ export default {
       return dayjs(value).fromNow();
     };
     // Per-viewer switch in the chat settings (Parameters tab), #1567.
-    const showTimestamps = computed(() => Boolean(stageStore.chat.showTimestamps));
-    const clock = (value) => chatClockTime(value);
+    const showTimestamps = computed(
+      () => props.showTimes ?? Boolean(stageStore.chat.showTimestamps),
+    );
+    const clock = (value) => (props.fullTimes ? chatLogStamp(value) : chatClockTime(value));
+    // "Clear chat" dividers carry their time too in the full (archive) form,
+    // as they do in the downloaded log.
+    const clearedAt = (item) => {
+      const stamp = showTimestamps.value && props.fullTimes ? chatLogStamp(item.at) : "";
+      return stamp ? ` (${stamp})` : "";
+    };
 
     // `removeChat` / `highlightChat` are synchronous in Pinia (the
     // mqtt.sendMessage call is not awaited inside the action). The
@@ -70,6 +85,7 @@ export default {
       replaying,
       showTimestamps,
       clock,
+      clearedAt,
     };
   },
 };
@@ -94,10 +110,10 @@ export default {
   <div v-else>
     <p v-for="item in messages" :key="item" :class="{ guest: !item.isPlayer }">
       <template v-if="item.clear">
-        <Divider>{{ $t("clear_chat") }}</Divider>
+        <Divider>{{ $t("clear_chat") }}{{ clearedAt(item) }}</Divider>
       </template>
       <template v-else-if="item.clearPlayerChat">
-        <Divider>{{ $t("clear_chat") }}</Divider>
+        <Divider>{{ $t("clear_chat") }}{{ clearedAt(item) }}</Divider>
       </template>
       <template v-else>
         <ContextMenu>

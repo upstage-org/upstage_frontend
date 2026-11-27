@@ -133,3 +133,86 @@ describe("empty chat", () => {
     expect(en.chat_no_messages).toBe("No messages yet!");
   });
 });
+
+/**
+ * #1567 follow-up: the archived transcript in Stage Management decides for
+ * itself whether times are shown (its own switch, not the viewer's on-stage
+ * setting) and shows the full date and time, since its lines can be old.
+ */
+describe("chat line timestamps chosen by the list's owner (archive)", () => {
+  const withProps = (props: Record<string, unknown>, list: unknown[] = messages) =>
+    mount(Messages, {
+      props: { messages: list, ...props },
+      global: {
+        stubs: { ...stubs, Divider: { template: "<div class='divider-stub'><slot /></div>" } },
+        mocks: { $t: (k: string) => k },
+      },
+    });
+  const setStore = (on: boolean) => {
+    (useStageStore() as unknown as typeof store).chat.showTimestamps = on;
+  };
+
+  it("showTimes=true shows times even when the viewer's on-stage setting is off", () => {
+    setStore(false);
+    expect(withProps({ showTimes: true }).find("[data-testid=chat-time]").exists()).toBe(true);
+  });
+
+  it("showTimes=false hides times even when the viewer's on-stage setting is on", () => {
+    setStore(true);
+    expect(withProps({ showTimes: false }).find("[data-testid=chat-time]").exists()).toBe(false);
+  });
+
+  it("without showTimes the on-stage setting decides, as before", () => {
+    setStore(true);
+    expect(withProps({}).find("[data-testid=chat-time]").exists()).toBe(true);
+    setStore(false);
+    expect(withProps({}).find("[data-testid=chat-time]").exists()).toBe(false);
+  });
+
+  it("fullTimes shows the date and time to the second", () => {
+    setStore(false);
+    const stamped = new Date(2026, 10, 20, 14, 32, 5).getTime();
+    const w = withProps({ showTimes: true, fullTimes: true }, [
+      { user: "helen", message: "hello", at: stamped, isPlayer: true, session: "x" },
+    ]);
+    expect(w.find("[data-testid=chat-time]").text()).toBe("2026-11-20 14:32:05");
+  });
+
+  it("fullTimes without showTimes shows nothing extra", () => {
+    setStore(false);
+    const w = withProps({ showTimes: false, fullTimes: true });
+    expect(w.find("[data-testid=chat-time]").exists()).toBe(false);
+  });
+
+  it("a line without a time gets no stamp", () => {
+    const w = withProps({ showTimes: true, fullTimes: true }, [
+      { user: "helen", message: "hello", isPlayer: true, session: "x" },
+    ]);
+    expect(w.find("[data-testid=chat-time]").exists()).toBe(false);
+    expect(w.text()).toContain("hello");
+  });
+
+  it("'Clear chat' dividers carry their time in the full form only", () => {
+    const cleared = new Date(2026, 10, 20, 15, 0, 0).getTime();
+    const list = [
+      { clear: true, at: cleared },
+      { clearPlayerChat: true, at: cleared },
+      { clear: true },
+    ];
+    const full = withProps({ showTimes: true, fullTimes: true }, list)
+      .findAll(".divider-stub")
+      .map((d) => d.text());
+    expect(full).toEqual([
+      "clear_chat (2026-11-20 15:00:00)",
+      "clear_chat (2026-11-20 15:00:00)",
+      "clear_chat",
+    ]);
+    // On stage (clock times) and with times off the divider is unchanged.
+    for (const props of [{ showTimes: true }, { showTimes: false, fullTimes: true }, {}]) {
+      const plain = withProps(props, list)
+        .findAll(".divider-stub")
+        .map((d) => d.text());
+      expect(plain).toEqual(["clear_chat", "clear_chat", "clear_chat"]);
+    }
+  });
+});

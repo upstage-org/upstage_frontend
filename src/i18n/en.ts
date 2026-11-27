@@ -192,6 +192,8 @@ export default {
   download_chat: "Download Chat",
   show_timestamps: "Show timestamps",
   include_timestamps: "Include timestamps",
+  archive_chat_timestamps_tooltip:
+    "Show the date and time of every chat line when you view or download the chats below.",
   download_all_chat: "Download All Chat",
   download_all_audience_chat: "Download All Audience Chat",
   download_all_player_chat: "Download All Player Chat",
