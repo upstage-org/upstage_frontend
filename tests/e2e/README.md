@@ -155,7 +155,7 @@ Passwords are not stored in `runtime.json`; they stay in code and env.
 | `pnpm e2e:perform:rehearsal` / `pnpm e2e:perform:live` | Perform pass 1 or pass 2 only (`E2E_PHASES=rehearsal` / `live`).                                           |
 | `pnpm e2e:webkit`                                      | `stage.spec.ts` on Playwright's Desktop Safari.                                                            |
 
-`realtime`, `upload-limit` and `streaming` have no script of their own; run
+`realtime`, `upload-limit`, `streaming` and `multiframe-timing` have no script of their own; run
 them with `pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=<name>`.
 
 ## Environment variables
@@ -183,17 +183,18 @@ them with `pnpm exec tsx ./tests/e2e/run-e2e.ts test --project=<name>`.
 
 ## Playwright projects
 
-| Project         | Files                                                                                                             |
-| --------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `smoke`         | `auth.spec.ts`, `media.spec.ts`, `stage.spec.ts`                                                                  |
-| `setup`         | `setup.spec.ts`                                                                                                   |
-| `perform`       | `perform.spec.ts` (runs after `setup` in one invocation)                                                          |
-| `features`      | `features.spec.ts` — drawing, drawing-as-avatar, opacity, depth (runs after `setup`)                              |
-| `replay-studio` | `replay-studio.spec.ts` — Studio Archive tab opens `/replay/:slug/:id` (runs after `setup`)                       |
-| `realtime`      | `realtime.spec.ts` — live drag positions and backdrop fade (runs after `setup`)                                   |
-| `upload-limit`  | `upload-limit.spec.ts` — per-user upload caps through the real dropzone                                           |
-| `streaming`     | `streaming.spec.ts` — performer streams, audience views; Chromium fake camera and microphone (runs after `setup`) |
-| `webkit`        | `stage.spec.ts` on Desktop Safari                                                                                 |
+| Project             | Files                                                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `smoke`             | `auth.spec.ts`, `media.spec.ts`, `stage.spec.ts`                                                                                                              |
+| `setup`             | `setup.spec.ts`                                                                                                                                               |
+| `perform`           | `perform.spec.ts` (runs after `setup` in one invocation)                                                                                                      |
+| `features`          | `features.spec.ts` — drawing, drawing-as-avatar, opacity, depth (runs after `setup`)                                                                          |
+| `replay-studio`     | `replay-studio.spec.ts` — Studio Archive tab opens `/replay/:slug/:id` (runs after `setup`)                                                                   |
+| `realtime`          | `realtime.spec.ts` — live drag positions and backdrop fade (runs after `setup`)                                                                               |
+| `multiframe-timing` | `multiframe-timing.spec.ts` — multiframe prop at 300 s on the real clock, ~5.5 min; latecomers in step with `E2E_EVENT_ARCHIVE=1` (#1582; runs after `setup`) |
+| `upload-limit`      | `upload-limit.spec.ts` — per-user upload caps through the real dropzone                                                                                       |
+| `streaming`         | `streaming.spec.ts` — performer streams, audience views; Chromium fake camera and microphone (runs after `setup`)                                             |
+| `webkit`            | `stage.spec.ts` on Desktop Safari                                                                                                                             |
 
 ### Streaming project
 
@@ -244,6 +245,7 @@ tests/e2e/
 ├── media.spec.ts
 ├── stage.spec.ts
 ├── features.spec.ts          drawing / drawing-as-avatar / opacity / depth
+├── multiframe-timing.spec.ts
 ├── realtime.spec.ts
 ├── replay-studio.spec.ts
 ├── streaming.spec.ts

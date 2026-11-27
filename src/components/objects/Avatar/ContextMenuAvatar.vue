@@ -92,6 +92,8 @@ export default {
               // with Enter ("armed") wins — pressing ▶ right after typing
               // must not silently replay the OLD speed.
               autoplayFrames: armedAnimationSpeed() || props.object.lastAutoplayFrames || 1,
+              // A new run every time Play is pressed — see autoplayRunId below.
+              autoplayRunId: Date.now(),
             }),
       });
       emit("update:active", true);
@@ -246,6 +248,11 @@ export default {
       stageStore.shapeObject({
         ...props.object,
         autoplayFrames: armedAnimationSpeed() ?? 0,
+        // Marks this Enter as the start of a new run, so committing the same
+        // speed again starts the animation over for everyone (the shared
+        // start time is taken when this update is applied — see `frameRuns`
+        // in the stage store). Only an identifier; no clock is compared.
+        autoplayRunId: Date.now(),
       });
       props.closeMenu();
     };

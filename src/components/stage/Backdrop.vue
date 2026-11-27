@@ -1,8 +1,12 @@
 <script>
-import { computed, reactive } from "vue";
-import { watch } from "vue";
+import { computed, onUnmounted, reactive, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
-import { autoplayStartFrame } from "@utils/frameAnimation";
+import {
+  BACKGROUND_RUN,
+  createFrameCycle,
+  isOpacityOnlyChange,
+  layerCycleMs,
+} from "@utils/frameAnimation";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "../Image.vue";
 
@@ -15,7 +19,6 @@ export default {
     const transitionDuration = computed(() => (stageStore.background?.speed || 0) * 1000);
 
     const frameAnimation = reactive({
-      interval: null,
       currentFrame: null,
     });
     const src = computed(() => {
@@ -29,61 +32,99 @@ export default {
       }
     });
 
+    // The frame is worked out from how long ago the cycle started
+    // (`stageStore.frameRuns`, see FrameRun in @utils/frameAnimation), so
+    // everyone on the stage — including whoever joins later — is on the
+    // same frame and changes at the same moment, and nothing but a real
+    // change to the backdrop restarts it (#1582). The store decides what
+    // counts as a restart (`syncBackgroundFrameRun`): anything except an
+    // opacity-only update, exactly as before.
+    //
+    // Total per-frame cycle = fade (`speed`) + hold (`dwell`): with the
+    // interval at just `speed` the next fade would kick off the instant the
+    // previous one finished, and the image would never be seen at full
+    // opacity. `dwell` defaults to 0 for media that has not set it.
+    let localRun = null;
+    const isAnimating = (bg) =>
+      Boolean(bg?.frames?.length) && parseFloat(bg.speed || 0) > 0 && layerCycleMs(bg) > 0;
+    const currentRun = () => {
+      const bg = background.value;
+      if (!isAnimating(bg)) return null;
+      const shared = stageStore.frameRuns?.[BACKGROUND_RUN];
+      if (shared) return shared;
+      // No record in the store (it always has one): start when first seen,
+      // from the picked frame, else the picture already on screen.
+      if (!localRun) {
+        let fromFrame = bg.currentFrame || frameAnimation.currentFrame;
+        if (!bg.frames.includes(fromFrame)) fromFrame = bg.src ?? bg.frames[0] ?? null;
+        localRun = { key: "local", token: -1, startedAt: Date.now(), fromFrame };
+      }
+      return localRun;
+    };
+    const cycle = createFrameCycle({
+      getState: () => {
+        const run = currentRun();
+        if (!run) return null;
+        const bg = background.value;
+        return {
+          frames: bg.frames,
+          frameLoop: bg.frameLoop,
+          intervalMs: layerCycleMs(bg),
+          startedAt: run.startedAt,
+          fromFrame: run.fromFrame,
+        };
+      },
+      onFrame: (frame) => {
+        frameAnimation.currentFrame = frame;
+      },
+      onFinished: (frame) => {
+        const bg = stageStore.background;
+        if (!bg?.frames?.length) return;
+        stageStore.setBackground({
+          ...bg,
+          speed: 0,
+          lastSpeed: bg.lastSpeed ?? bg.speed ?? 0.5,
+          currentFrame: frame ?? bg.frames[bg.frames.length - 1],
+        });
+      },
+    });
+
     watch(
-      background,
-      (value) => {
-        if (!value) return;
-        const { speed, dwell, frames, currentFrame } = value;
-        if (currentFrame) {
-          frameAnimation.currentFrame = currentFrame;
+      [background, () => stageStore.frameRuns?.[BACKGROUND_RUN]?.token],
+      ([value, token], [previous, previousToken] = []) => {
+        if (!value) {
+          cycle.stop();
+          localRun = null;
+          return;
         }
-        clearInterval(frameAnimation.interval);
-        frameAnimation.interval = null;
-        if (frames && parseFloat(speed || 0) > 0) {
-          // Total per-frame cycle = fade (`speed`) + hold (`dwell`).
-          // Setting the interval to just `speed` (as we used to) meant
-          // the next fade kicked off the instant the previous one
-          // finished, so the image was never visible at full opacity.
-          // `dwell` defaults to 0 / undefined to preserve the
-          // pre-dwell behaviour for media that hasn't set it.
-          const fadeSec = parseFloat(speed || 0);
-          const holdSec = parseFloat(dwell || 0);
-          const cycleMs = (fadeSec + holdSec) * 1000;
-          if (cycleMs <= 0) return;
-          // A play-once run parked on the final frame would stop on its
-          // first tick without advancing — rewind it to frame one.
-          frameAnimation.currentFrame = autoplayStartFrame(
-            frames,
-            frameAnimation.currentFrame,
-            value.frameLoop,
-          );
-          frameAnimation.interval = setInterval(() => {
-            const bg = stageStore.background;
-            if (!bg?.frames?.length) return;
-            const fr = bg.frames;
-            const idx = fr.indexOf(frameAnimation.currentFrame);
-            let next = idx + 1;
-            if (next >= fr.length) {
-              if (bg.frameLoop !== false) {
-                next = 0;
-              } else {
-                clearInterval(frameAnimation.interval);
-                frameAnimation.interval = null;
-                stageStore.setBackground({
-                  ...bg,
-                  speed: 0,
-                  lastSpeed: bg.lastSpeed ?? bg.speed ?? 0.5,
-                  currentFrame: frameAnimation.currentFrame ?? fr[fr.length - 1],
-                });
-                return;
-              }
-            }
-            frameAnimation.currentFrame = fr[next];
-          }, cycleMs);
+        if (!isAnimating(value)) {
+          cycle.stop();
+          localRun = null;
+          if (value.currentFrame) frameAnimation.currentFrame = value.currentFrame;
+          return;
         }
+        // Without a store record, an opacity-only update must not restart
+        // the local run; any other change does.
+        if (
+          token == null &&
+          !(cycle.running() && previousToken == null && isOpacityOnlyChange(previous, value))
+        ) {
+          localRun = null;
+        }
+        cycle.sync();
       },
       { immediate: true },
     );
+    // Timers are slowed or paused in a hidden tab; catch up at once when the
+    // stage is looked at again.
+    const onVisible = () => {
+      if (!document.hidden && cycle.running()) cycle.sync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    onUnmounted(() => {
+      document.removeEventListener("visibilitychange", onVisible);
+      cycle.stop();
+    });
 
     return { backgroundOpacity, transitionDuration, src };
   },

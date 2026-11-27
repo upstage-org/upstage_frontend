@@ -64,7 +64,17 @@ import { unnamespaceTopic } from "@utils/mqttTopics";
 import { audienceMayPublish } from "@utils/publishPolicy";
 import { computeFinalJitsiObjectsFromEvents } from "@utils/jitsiBoardReconcile";
 import { useAttribute } from "@services/graphql/composable";
-import { eventsForEntry } from "./stageSession";
+import { eventsForEntry, eventTimeMs } from "./stageSession";
+import {
+  BACKGROUND_RUN,
+  CURTAIN_RUN,
+  framePosition,
+  isOpacityOnlyChange,
+  layerCycleMs,
+  objectFrameRunKey,
+  type FrameRun,
+} from "@utils/frameAnimation";
+import { serverClockSynced, serverNow, syncServerClock } from "@utils/serverClock";
 import { avatarSpeak, stopSpeaking } from "@services/speech";
 import { useAuthStore } from "@stores/pinia/auth";
 import { useUserStore } from "@stores/pinia/user";
@@ -173,6 +183,110 @@ export const useStageStore = defineStore(
     const model = ref<StageModel | null>(null);
     const background = ref<Background | null>(null);
     const curtain = ref<Curtain | null>(null);
+
+    /**
+     * Multiframe animation runs — one per animating board object (keyed by
+     * its id), plus the backdrop and the curtain (BACKGROUND_RUN /
+     * CURTAIN_RUN). See `FrameRun` in @utils/frameAnimation.
+     *
+     * A run is recorded here, at the moment the event that started it is
+     * applied, and the components (Object.vue, Backdrop.vue, Curtain.vue)
+     * work out the frame to show from how long ago that was. That is what
+     * makes a late joiner see the same frame as everyone else: the events
+     * they are caught up with are applied through `withEventAge`, so the
+     * run starts in their past, when it really started.
+     */
+    const frameRuns = ref<Record<string, FrameRun>>({});
+    let frameRunToken = 0;
+    /** How long ago the event being applied right now happened, in ms. */
+    let eventAgeMs = 0;
+    function withEventAge<T>(ageMs: number, apply: () => T): T {
+      const previous = eventAgeMs;
+      eventAgeMs = Number.isFinite(ageMs) && ageMs > 0 ? ageMs : 0;
+      try {
+        return apply();
+      } finally {
+        eventAgeMs = previous;
+      }
+    }
+    function startFrameRun(id: string, key: string, fromFrame: string | null) {
+      frameRunToken += 1;
+      frameRuns.value[id] = {
+        key,
+        token: frameRunToken,
+        startedAt: Date.now() - eventAgeMs,
+        fromFrame,
+      };
+    }
+    function endFrameRun(id: string) {
+      if (id in frameRuns.value) delete frameRuns.value[id];
+    }
+    /** Start, keep or end a board object's run to match its current state. */
+    function syncObjectFrameRun(object: BoardObject, restart = false) {
+      const id = String(object.id);
+      const key = objectFrameRunKey(object);
+      if (key == null) {
+        endFrameRun(id);
+      } else if (restart || frameRuns.value[id]?.key !== key) {
+        startFrameRun(id, key, object.src ?? object.frames?.[0] ?? null);
+      }
+    }
+    /**
+     * For Object.vue, when it finds no run for an animating object: sync
+     * from the board's own copy of the object — never from the caller's,
+     * which lags the store by a render (right after a pause it still says
+     * "animating", and syncing from it would start the run again).
+     */
+    function ensureObjectFrameRun(id: ObjectId) {
+      const object = board.value.objects.find((o) => o.id === id);
+      if (object) syncObjectFrameRun(object);
+      else endFrameRun(String(id));
+    }
+    /**
+     * Backdrop: any accepted change restarts the cycle, as it always has,
+     * except a change of opacity alone (the slider republishes the backdrop
+     * every 100 ms while dragged). A restart begins from the frame picked
+     * with a thumbnail if there is one, else from the frame the previous
+     * run had reached, else from the backdrop's own picture.
+     */
+    function syncBackgroundFrameRun(previous: Background | null, next: Background | null) {
+      const frames = next?.frames;
+      const cycleMs = next ? layerCycleMs(next) : 0;
+      if (!next || !frames?.length || !(parseFloat(String(next.speed ?? 0)) > 0) || cycleMs <= 0) {
+        endFrameRun(BACKGROUND_RUN);
+        return;
+      }
+      const running = frameRuns.value[BACKGROUND_RUN];
+      if (running && isOpacityOnlyChange(previous, next)) return;
+      let fromFrame = (next.currentFrame as string | undefined) || null;
+      if (!fromFrame && running && previous) {
+        fromFrame = framePosition(
+          previous.frames,
+          running.fromFrame,
+          previous.frameLoop,
+          layerCycleMs(previous),
+          Date.now() - eventAgeMs - running.startedAt,
+        ).frame;
+      }
+      if (!fromFrame || !frames.includes(fromFrame)) fromFrame = next.src ?? frames[0] ?? null;
+      startFrameRun(BACKGROUND_RUN, "background", fromFrame);
+    }
+    /** Curtain: every accepted change restarts the cycle (unchanged rule). */
+    function syncCurtainFrameRun(next: Curtain | null) {
+      const frames = next?.frames;
+      if (
+        !next ||
+        !next.multi ||
+        !frames?.length ||
+        !((next.speed ?? 0) > 0) ||
+        layerCycleMs(next) <= 0
+      ) {
+        endFrameRun(CURTAIN_RUN);
+        return;
+      }
+      startFrameRun(CURTAIN_RUN, "curtain", next.currentFrame || frames[0]);
+    }
+
     const backdropColor = ref<string>("gray");
     const chatPosition = ref<string>("right");
     const status = ref<string>("OFFLINE");
@@ -828,6 +942,7 @@ export const useStageStore = defineStore(
       lastOwnMoveSeq.clear();
       background.value = null;
       curtain.value = null;
+      frameRuns.value = {};
       backdropColor.value = "gray";
       attachingPropTo.value = null;
       requestedTool.value = null;
@@ -878,7 +993,9 @@ export const useStageStore = defineStore(
             // of them and faded them back in over 5s.
             animateIfPresent("#stage-backdrop", { opacity: [0, 1], duration: 5000 });
           }
+          const previous = background.value;
           background.value = bg;
+          syncBackgroundFrameRun(previous, bg);
         }
       }
     }
@@ -947,8 +1064,10 @@ export const useStageStore = defineStore(
       const m = board.value.objects.find((o) => o.id === id);
       if (m) {
         Object.assign(m, object);
+        syncObjectFrameRun(m);
       } else {
         board.value.objects.push(object);
+        syncObjectFrameRun(object);
       }
     }
 
@@ -978,11 +1097,13 @@ export const useStageStore = defineStore(
           });
         }
         Object.assign(m, object);
+        syncObjectFrameRun(m);
       }
     }
 
     function DELETE_OBJECT(object: BoardObject, options: { keepCostumes?: boolean } = {}) {
       const { id } = object;
+      endFrameRun(String(id));
       board.value.objects = board.value.objects.filter((o) => o.id !== id);
       // `keepCostumes`: the object is only gone from THIS client for now (a
       // performer's stream tile while she reloads) and is expected back under
@@ -1447,6 +1568,7 @@ export const useStageStore = defineStore(
     function SET_CURTAIN(c: Curtain | string | null) {
       if (c == null) {
         curtain.value = null;
+        syncCurtainFrameRun(null);
         return;
       }
       // Legacy path: older clients publish DRAW_CURTAIN with `curtain: "<src>"`
@@ -1468,6 +1590,7 @@ export const useStageStore = defineStore(
         return;
       }
       curtain.value = normalized;
+      syncCurtainFrameRun(normalized);
     }
 
     /**
@@ -1534,9 +1657,22 @@ export const useStageStore = defineStore(
             (d) => d.drawingId,
           );
         }
-        if (snapshot.background !== undefined) background.value = snapshot.background;
+        // A scene change starts every animation in the scene afresh, for
+        // everyone at the same moment (the moment of this event).
+        if (snapshot.background !== undefined) {
+          background.value = snapshot.background;
+          endFrameRun(BACKGROUND_RUN);
+          syncBackgroundFrameRun(null, snapshot.background);
+        }
         if (snapshot.backdropColor !== undefined) backdropColor.value = snapshot.backdropColor;
-        if (snapshot.board !== undefined) board.value = snapshot.board;
+        if (snapshot.board !== undefined) {
+          board.value = snapshot.board;
+          const ids = new Set(snapshot.board.objects.map((o) => String(o.id)));
+          for (const id of Object.keys(frameRuns.value)) {
+            if (id !== BACKGROUND_RUN && id !== CURTAIN_RUN && !ids.has(id)) endFrameRun(id);
+          }
+          snapshot.board.objects.forEach((o) => syncObjectFrameRun(o, true));
+        }
         if (snapshot.settings !== undefined) settings.value = snapshot.settings;
         // Curtain (#1578). Scene snapshots used not to record it, so the
         // curtain on stage simply stayed whatever it was across a scene
@@ -1547,12 +1683,14 @@ export const useStageStore = defineStore(
         if (snapshot.curtain !== undefined) {
           if (snapshot.curtain == null) {
             curtain.value = null;
+            syncCurtainFrameRun(null);
           } else {
             // Drop the saved `at`: it is the time the curtain was drawn
             // before the scene was saved, and SET_CURTAIN's stale-message
             // guard would compare later curtain changes against it.
             const { at: _savedAt, ...sceneCurtain } = snapshot.curtain;
             curtain.value = sceneCurtain;
+            syncCurtainFrameRun(sceneCurtain);
           }
         }
         if (snapshot.audioPlayers !== undefined) {
@@ -3395,7 +3533,14 @@ export const useStageStore = defineStore(
       CLEAN_STAGE(true);
       SET_PRELOADING_STATUS(true);
       try {
-        const { stage } = await stageGraph.loadStage(url, recordId);
+        // Measured alongside the stage query (about a second, never throws)
+        // so entering a stage is not held up; only a live entry needs it,
+        // to age the archived events below.
+        const [{ stage }] = await Promise.all([
+          stageGraph.loadStage(url, recordId),
+          // Once measured in this tab, re-measure in the background only.
+          recordId || serverClockSynced() ? void syncServerClock() : syncServerClock(),
+        ]);
         if (seq !== loadStageSeq) {
           return false;
         }
@@ -3416,8 +3561,11 @@ export const useStageStore = defineStore(
             const archivedEvents = events ?? [];
             // Temporary on-stage settings (the background colour) only last
             // for the session they were made in; see stageSession.ts (#1572).
+            // Each archived event is applied as of when it happened, so an
+            // animation that started four minutes ago is four minutes in.
+            const now = serverNow();
             eventsForEntry(archivedEvents, Date.now()).forEach((event: ReplayEvent) =>
-              replayEvent(event),
+              withEventAge(now - eventTimeMs(event), () => replayEvent(event)),
             );
             reconcileJitsiBoardFromEvents(archivedEvents);
           }
@@ -3470,7 +3618,10 @@ export const useStageStore = defineStore(
       const lastEventId = model.value.events[model.value.events.length - 1]?.id ?? 0;
       const events = await stageGraph.loadEvents(model.value.fileLocation, lastEventId);
       if (events && model.value.events) {
-        events.forEach((event: ReplayEvent) => replicateEvent(event));
+        const now = serverNow();
+        events.forEach((event: ReplayEvent) =>
+          withEventAge(now - eventTimeMs(event), () => replicateEvent(event)),
+        );
         // `concat` returns a fresh (reactive-eligible) array — keep the
         // appended log raw too, see `rawEvents`.
         model.value.events = markRaw(model.value.events.concat(events));
@@ -3478,18 +3629,24 @@ export const useStageStore = defineStore(
       }
     }
 
-    function replaceScene(sceneId: ObjectId) {
+    function replaceScene(sceneId: ObjectId, happenedAt = Date.now() - eventAgeMs) {
       animateIfPresent("#live-stage", {
         filter: "brightness(0)",
       });
+      // `happenedAt` is when the scene was switched — in the past when a
+      // late joiner is being caught up — and is carried through the retry
+      // below, which runs after `withEventAge` has returned. The scene's
+      // animations start from that moment for everyone.
+      const apply = (payload: string | null) =>
+        withEventAge(Date.now() - happenedAt, () => REPLACE_SCENE({ payload }));
       const scene = model.value?.scenes?.find((s) => s.id == sceneId);
       if (scene) {
-        REPLACE_SCENE({ payload: scene.payload ?? null });
+        apply(scene.payload ?? null);
       } else {
         if (isLoadingScenes.value) {
-          setTimeout(() => replaceScene(sceneId), 1000); // retry after scenes load
+          setTimeout(() => replaceScene(sceneId, happenedAt), 1000); // retry after scenes load
         } else {
-          REPLACE_SCENE({ payload: null });
+          apply(null);
         }
       }
     }
@@ -3576,6 +3733,8 @@ export const useStageStore = defineStore(
       replay.value.isReplaying = true;
       const events = model.value?.events ?? [];
       const speed = replay.value.speed;
+      // Same seconds-or-milliseconds tolerance as `eventTimeMs`.
+      const replayPointMs = current > 1e12 ? current : current * 1000;
       replay.value.interval = setInterval(() => {
         replay.value.timestamp.current += 1;
         if (replay.value.timestamp.current > replay.value.timestamp.end) {
@@ -3606,7 +3765,10 @@ export const useStageStore = defineStore(
           );
           replay.value.timers.push(timer);
         } else {
-          replicateEvent(event);
+          // Already in the past at the point the replay starts from (a seek,
+          // or the recording's opening snapshot): its animations are that
+          // far along, in the recording's own time.
+          withEventAge(replayPointMs - eventTimeMs(event), () => replicateEvent(event));
         }
       });
       scheduleArchivedChats(current, speed, seenChatKeys);
@@ -4111,6 +4273,8 @@ export const useStageStore = defineStore(
       model,
       background,
       curtain,
+      frameRuns,
+      ensureObjectFrameRun,
       backdropColor,
       chatPosition,
       status,

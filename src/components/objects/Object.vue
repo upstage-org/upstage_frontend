@@ -10,7 +10,7 @@ import {
   isStreamPlaybackBoardType,
   streamWearerOf,
 } from "@utils/common";
-import { autoplayStartFrame } from "@utils/frameAnimation";
+import { createFrameCycle, objectFrameRunKey } from "@utils/frameAnimation";
 import { openSafeLink } from "@utils/sanitizeHtml";
 import { containedPictureBox, effectiveFrameFitId, frameShapeStyle } from "./frameShapes";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
@@ -80,7 +80,6 @@ export default {
     };
 
     const frameAnimation = reactive({
-      interval: null,
       currentFrame: null,
     });
     // Plain local, not reactive: holds Image objects only to keep the
@@ -89,61 +88,116 @@ export default {
     // network mid-animation.
     let _warmFrames = null;
     if (props.object.multi) {
-      watch(
-        () => [props.object.autoplayFrames, props.object.frameLoop],
-        () => {
-          const { autoplayFrames, frames, src } = props.object;
-          clearInterval(frameAnimation.interval);
-          frameAnimation.interval = null;
-          _warmFrames = null;
-          if (autoplayFrames) {
-            frameAnimation.currentFrame = src ?? frames?.[0] ?? null;
-            const intervalMs = parseFloat(String(autoplayFrames)) * 1000;
-            if (!(intervalMs > 0) || !frames?.length) return;
-            // Rewind only once the run is actually starting (guards above),
-            // so an invalid speed can't jump the displayed frame.
-            frameAnimation.currentFrame = autoplayStartFrame(
-              frames,
-              frameAnimation.currentFrame,
-              props.object.frameLoop,
-            );
-            _warmFrames = frames.map((frame) => {
-              const img = new Image();
-              img.src = frame;
-              return img;
-            });
-            frameAnimation.interval = setInterval(() => {
-              const fr = props.object.frames;
-              if (!fr?.length) return;
-              const idx = fr.indexOf(frameAnimation.currentFrame);
-              let next = idx + 1;
-              if (next >= fr.length) {
-                if (props.object.frameLoop !== false) {
-                  next = 0;
-                } else {
-                  clearInterval(frameAnimation.interval);
-                  frameAnimation.interval = null;
-                  _warmFrames = null;
-                  stageStore.toggleAutoplayFrames({
-                    ...props.object,
-                    autoplayFrames: null,
-                    lastAutoplayFrames: props.object.autoplayFrames,
-                    src: frameAnimation.currentFrame ?? fr[fr.length - 1],
-                  });
-                  return;
-                }
-              }
-              frameAnimation.currentFrame = fr[next];
-            }, intervalMs);
+      // The frame on screen is worked out from how long ago the run started
+      // (`stageStore.frameRuns`, see FrameRun in @utils/frameAnimation), not
+      // counted up by a local interval. Two things follow (#1582):
+      //  - nothing that happens on stage can reset the timing. The old
+      //    interval was restarted whenever the store rebuilt this object
+      //    (any object moved, any presence heartbeat), so a 300 s speed
+      //    never reached its first change;
+      //  - someone who joins or reloads mid-run is on the same frame as
+      //    everyone else and changes at the same moment.
+      let localRun = null;
+      const currentRun = () => {
+        const key = objectFrameRunKey(props.object);
+        if (key == null) return null;
+        const id = String(props.object.id);
+        if (typeof stageStore.ensureObjectFrameRun === "function") {
+          // The store is the authority. If it has no run under this key —
+          // the object reached the board by a path that did not announce
+          // it — let it look at its own copy of the object and decide.
+          // `props.object` is one render behind the store: just after a
+          // pause it still describes the run that has ended, and then there
+          // is, correctly, nothing to show.
+          if (stageStore.frameRuns?.[id]?.key !== key) {
+            stageStore.ensureObjectFrameRun(props.object.id);
           }
+          const shared = stageStore.frameRuns?.[id];
+          return shared && shared.key === key ? shared : null;
+        }
+        // No store support (component tests with a minimal store): the run
+        // starts when this component first sees it.
+        if (!localRun || localRun.key !== key) {
+          localRun = {
+            key,
+            token: -1,
+            startedAt: Date.now(),
+            fromFrame: props.object.src ?? props.object.frames?.[0] ?? null,
+          };
+        }
+        return localRun;
+      };
+      const cycle = createFrameCycle({
+        getState: () => {
+          const run = currentRun();
+          const frames = props.object.frames;
+          if (!run || !frames?.length) return null;
+          return {
+            frames,
+            frameLoop: props.object.frameLoop,
+            intervalMs: parseFloat(String(props.object.autoplayFrames)) * 1000,
+            startedAt: run.startedAt,
+            fromFrame: run.fromFrame,
+          };
+        },
+        onFrame: (frame) => {
+          frameAnimation.currentFrame = frame;
+        },
+        onFinished: (frame) => {
+          _warmFrames = null;
+          const fr = props.object.frames;
+          stageStore.toggleAutoplayFrames({
+            ...props.object,
+            autoplayFrames: null,
+            lastAutoplayFrames: props.object.autoplayFrames,
+            src: frame ?? fr[fr.length - 1],
+          });
+        },
+      });
+      // Separate getters, NOT one getter returning an array of the object's
+      // fields: the store's `objects` computed hands every component a
+      // brand-new object whenever anything on stage changes, and a fresh
+      // array always counts as "changed". Per-source comparison re-runs
+      // this only when the run itself changes.
+      watch(
+        [
+          () => objectFrameRunKey(props.object),
+          () => stageStore.frameRuns?.[String(props.object.id)]?.token,
+        ],
+        () => {
+          cycle.stop();
+          _warmFrames = null;
+          const { frames, src } = props.object;
+          // What `src` below shows whenever `autoplayFrames` is set: the
+          // object's own picture, until the run's frame is worked out a few
+          // lines down — and for good when there is nothing to run (a speed
+          // that is not a positive number, or no frames).
+          frameAnimation.currentFrame = src ?? frames?.[0] ?? null;
+          if (!currentRun()) {
+            localRun = null;
+            return;
+          }
+          if (!frames?.length) return;
+          _warmFrames = frames.map((frame) => {
+            const img = new Image();
+            img.src = frame;
+            return img;
+          });
+          cycle.sync();
         },
         {
           immediate: true,
         },
       );
+      // Timers are slowed or paused in a hidden tab; catch up at once when
+      // the stage is looked at again.
+      const onVisible = () => {
+        if (!document.hidden && cycle.running()) cycle.sync();
+      };
+      document.addEventListener("visibilitychange", onVisible);
       onUnmounted(() => {
-        clearInterval(frameAnimation.interval);
-        frameAnimation.interval = null;
+        document.removeEventListener("visibilitychange", onVisible);
+        cycle.stop();
         _warmFrames = null;
       });
     }

@@ -2,7 +2,7 @@
 import { computed, onUnmounted, reactive, watch } from "vue";
 import { animate } from "animejs";
 import { useStageStore } from "@stores/pinia/stage";
-import { autoplayStartFrame } from "@utils/frameAnimation";
+import { CURTAIN_RUN, createFrameCycle, layerCycleMs } from "@utils/frameAnimation";
 export default {
   setup: () => {
     const stageStore = useStageStore();
@@ -11,33 +11,78 @@ export default {
     const config = computed(() => stageStore.config);
     const curtainSpeed = computed(() => config.value?.animations?.curtainSpeed ?? 9100);
 
-    // Multi-frame state. Mirrors `Backdrop.vue`'s `frameAnimation`: when a
-    // multi-frame curtain is active and `speed > 0`, we cycle through
-    // `frames` on a `setInterval`. The reactive `currentFrame` is what the
-    // <img> reads; we seed it from the broadcast `currentFrame` (if any)
-    // so audience members joining mid-rotation land on the same picture
-    // the performer is showing.
+    // Multi-frame state. Mirrors `Backdrop.vue`: when a multi-frame curtain
+    // is active and `speed > 0` it cycles through `frames`, one step every
+    // fade (`speed`) + hold (`dwell`) seconds. The CSS `transition: opacity`
+    // on `.frame-fade-*` (bound to `frameFadeDuration`) runs for `speed`
+    // seconds; `dwell` is the time the new frame then sits at full opacity.
+    //
+    // The frame is worked out from how long ago the cycle started
+    // (`stageStore.frameRuns`, see FrameRun in @utils/frameAnimation), so
+    // audience members joining mid-rotation land on the same picture the
+    // performer is showing and change with them (#1582). Every accepted
+    // curtain change restarts the cycle (`syncCurtainFrameRun` in the store).
     const frameAnimation = reactive({
       currentFrame: null,
-      interval: null,
     });
 
-    const clearFrameInterval = () => {
-      if (frameAnimation.interval) {
-        clearInterval(frameAnimation.interval);
-        frameAnimation.interval = null;
+    let localRun = null;
+    const isAnimating = (c) =>
+      Boolean(c?.multi && c.frames?.length) && (c.speed ?? 0) > 0 && layerCycleMs(c) > 0;
+    const currentRun = () => {
+      const c = curtain.value;
+      if (!isAnimating(c)) return null;
+      const shared = stageStore.frameRuns?.[CURTAIN_RUN];
+      if (shared) return shared;
+      // No record in the store (it always has one): start when first seen.
+      if (!localRun) {
+        localRun = {
+          key: "local",
+          token: -1,
+          startedAt: Date.now(),
+          fromFrame: c.currentFrame || c.frames[0],
+        };
       }
+      return localRun;
     };
+    const cycle = createFrameCycle({
+      getState: () => {
+        const run = currentRun();
+        if (!run) return null;
+        const c = curtain.value;
+        return {
+          frames: c.frames,
+          frameLoop: c.frameLoop,
+          intervalMs: layerCycleMs(c),
+          startedAt: run.startedAt,
+          fromFrame: run.fromFrame,
+        };
+      },
+      onFrame: (frame) => {
+        frameAnimation.currentFrame = frame;
+      },
+      onFinished: (frame) => {
+        const c = stageStore.curtain;
+        if (!c?.frames?.length) return;
+        stageStore.drawCurtain({
+          ...c,
+          speed: 0,
+          lastSpeed: c.lastSpeed ?? c.speed ?? 0.5,
+          currentFrame: frame ?? c.frames[c.frames.length - 1],
+        });
+      },
+    });
 
     watch(
-      curtain,
-      (value) => {
-        clearFrameInterval();
+      [curtain, () => stageStore.frameRuns?.[CURTAIN_RUN]?.token],
+      ([value]) => {
+        cycle.stop();
+        localRun = null;
         if (!value) {
           frameAnimation.currentFrame = null;
           return;
         }
-        const { src, multi, frames, speed, dwell, currentFrame } = value;
+        const { src, multi, frames, currentFrame } = value;
         if (currentFrame) {
           frameAnimation.currentFrame = currentFrame;
         } else if (multi && frames && frames.length) {
@@ -45,52 +90,21 @@ export default {
         } else {
           frameAnimation.currentFrame = src ?? null;
         }
-        if (multi && frames && frames.length && (speed ?? 0) > 0) {
-          // Mirror Backdrop.vue: per-frame cycle is fade + dwell. The
-          // CSS `transition: opacity` on `.frame-fade-*` (bound to
-          // `frameFadeDuration` from `speed`) still runs for `speed`
-          // seconds; the `dwell` gap is the slack between the fade
-          // completing and the next setInterval tick, during which
-          // the new frame sits at full opacity.
-          const fadeSec = parseFloat(String(speed));
-          const holdSec = parseFloat(String(dwell ?? 0));
-          const cycleMs = (fadeSec + (Number.isFinite(holdSec) ? holdSec : 0)) * 1000;
-          if (cycleMs <= 0) return;
-          // A play-once run parked on the final frame would stop on its
-          // first tick without advancing — rewind it to frame one.
-          frameAnimation.currentFrame = autoplayStartFrame(
-            frames,
-            frameAnimation.currentFrame,
-            value.frameLoop,
-          );
-          frameAnimation.interval = setInterval(() => {
-            const c = stageStore.curtain;
-            if (!c?.frames?.length) return;
-            const fr = c.frames;
-            const idx = fr.indexOf(frameAnimation.currentFrame);
-            let next = idx + 1;
-            if (next >= fr.length) {
-              if (c.frameLoop !== false) {
-                next = 0;
-              } else {
-                clearFrameInterval();
-                stageStore.drawCurtain({
-                  ...c,
-                  speed: 0,
-                  lastSpeed: c.lastSpeed ?? c.speed ?? 0.5,
-                  currentFrame: frameAnimation.currentFrame ?? fr[fr.length - 1],
-                });
-                return;
-              }
-            }
-            frameAnimation.currentFrame = fr[next];
-          }, cycleMs);
-        }
+        if (isAnimating(value)) cycle.sync();
       },
       { immediate: true },
     );
 
-    onUnmounted(clearFrameInterval);
+    // Timers are slowed or paused in a hidden tab; catch up at once when the
+    // stage is looked at again.
+    const onVisible = () => {
+      if (!document.hidden && cycle.running()) cycle.sync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    onUnmounted(() => {
+      document.removeEventListener("visibilitychange", onVisible);
+      cycle.stop();
+    });
 
     // Single URL the <img> tag reads. Falls back to the curtain's `src`
     // when there's no active frame (single-image curtain, or before the

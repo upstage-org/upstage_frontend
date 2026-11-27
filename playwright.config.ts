@@ -74,6 +74,29 @@ export default defineConfig({
       dependencies: ["setup"],
     },
     {
+      // #1582: a multiframe prop set to 300 s, timed on the real clock for
+      // the full five minutes on a performer seat and an audience seat while
+      // the stage stays busy; with E2E_EVENT_ARCHIVE=1 also that latecomers
+      // change frame together with everyone else. Slow (~5.5 min), so it is its own project and
+      // not part of any other run. The flags stop Chromium throttling timers
+      // in whichever of the two pages is not in front — the test measures
+      // what a viewer with the stage on screen sees.
+      name: "multiframe-timing",
+      testMatch: /multiframe-timing\.spec\.ts$/,
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: [
+            "--mute-audio",
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows",
+          ],
+        },
+      },
+      dependencies: ["setup"],
+    },
+    {
       name: "replay-studio",
       testMatch: /replay-studio\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"] },
