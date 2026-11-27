@@ -21,14 +21,27 @@ vi.mock("./entry.vue", () => ({
   default: defineComponent({
     name: "EntryStub",
     inheritAttrs: false,
-    props: ["name", "label", "defaultValue", "refresh", "richTextEditor", "multiline", "help"],
+    props: [
+      "name",
+      "label",
+      "defaultValue",
+      "refresh",
+      "richTextEditor",
+      "multiline",
+      "help",
+      "tip",
+    ],
     setup(props) {
       seen.entries.push(props as unknown as Record<string, unknown>);
       return () => h("div", { class: "entry", "data-name": props.name });
     },
   }),
 }));
-vi.mock("./PinnedStages.vue", () => ({ default: defineComponent({ render: () => h("div") }) }));
+vi.mock("./PinnedStages.vue", () => ({
+  default: defineComponent({
+    render: () => h("div", { class: "entry", "data-name": "FOYER_PINNED_STAGES" }),
+  }),
+}));
 vi.mock("components/Header.vue", () => ({ default: defineComponent({ render: () => h("div") }) }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 vi.mock("vue-router", () => ({ useRoute: () => ({ query: { tab: "system" } }) }));
@@ -94,5 +107,71 @@ describe("configuration entries refresh the shared store after saving (#1575)", 
     const signature = seen.entries.find((e) => e.name === "EMAIL_SIGNATURE")!;
     await (signature.refresh as () => Promise<void>)();
     expect(fetchConfig).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * #1568 (Helen, 2026-11-25): the Foyer Customisation fields in the order
+ * they are used — pinned stages right after the title and description, the
+ * rarely edited menu last — and a tip beside the Registration toggle.
+ */
+describe("Foyer Customisation layout (#1568)", () => {
+  const mountPage = () => {
+    seen.entries.length = 0;
+    return mount(Configuration, { global: { stubs, mocks: { $t: (k: string) => k } } });
+  };
+  const FOYER = [
+    "FOYER_TITLE",
+    "FOYER_DESCRIPTION",
+    "FOYER_PINNED_STAGES",
+    "SHOW_REGISTRATION",
+    "ENABLE_DONATE",
+    "FOYER_MENU",
+  ];
+
+  it("lists the fields as: title, description, pinned stages, registration, donate, menu", () => {
+    const names = mountPage()
+      .findAll(".entry")
+      .map((e) => e.attributes("data-name"));
+    expect(names.slice(0, FOYER.length)).toEqual(FOYER);
+    // The system tab's own order is untouched.
+    expect(names.slice(FOYER.length)).toEqual([
+      "TERMS_OF_SERVICE",
+      "MANUAL",
+      "EMAIL_SUBJECT_PREFIX",
+      "EMAIL_SIGNATURE",
+    ]);
+  });
+
+  it("puts the menu last and the pinned stages before both toggles", () => {
+    const names = mountPage()
+      .findAll(".entry")
+      .map((e) => e.attributes("data-name"))
+      .slice(0, FOYER.length);
+    expect(names.at(-1)).toBe("FOYER_MENU");
+    expect(names.indexOf("FOYER_PINNED_STAGES")).toBeLessThan(names.indexOf("SHOW_REGISTRATION"));
+    expect(names.indexOf("FOYER_DESCRIPTION")).toBeLessThan(names.indexOf("FOYER_PINNED_STAGES"));
+  });
+
+  it("gives the Registration toggle its tip, and only that entry", () => {
+    mountPage();
+    const registration = seen.entries.find((e) => e.name === "SHOW_REGISTRATION")!;
+    expect(registration.tip).toBe("registration_button_tip");
+    expect(registration.label).toBe("registration_button");
+    for (const entry of seen.entries) {
+      if (entry.name !== "SHOW_REGISTRATION") expect(entry.tip, String(entry.name)).toBeUndefined();
+    }
+  });
+
+  it("keeps each field's settings through the move (menu syntax help, rich text, defaults)", () => {
+    mountPage();
+    const by = (name: string) => seen.entries.find((e) => e.name === name)!;
+    expect(by("FOYER_MENU").multiline).toBe(true);
+    expect(by("FOYER_MENU").help).toBeTruthy();
+    expect(by("FOYER_MENU").defaultValue).toBe("m");
+    expect(by("FOYER_DESCRIPTION").richTextEditor).toBe(true);
+    expect(by("FOYER_TITLE").defaultValue).toBe("t");
+    expect(by("SHOW_REGISTRATION").defaultValue).toBe(false);
+    expect(by("ENABLE_DONATE").defaultValue).toBe(false);
   });
 });

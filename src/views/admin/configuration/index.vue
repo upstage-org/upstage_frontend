@@ -28,6 +28,9 @@ const refreshConfig = async () => {
   await configStore.fetchConfig();
 };
 
+// Order asked for in #1568 (Helen, 2026-11-25): what is changed most often
+// comes first — the pinned stages right after the title and description —
+// and the menu, which hardly anyone edits, last.
 const foyerConfigs = () =>
   foyer.value && system.value
     ? [
@@ -45,6 +48,26 @@ const foyerConfigs = () =>
           richTextEditor: true,
           refresh: refreshConfig,
         }),
+        h(PinnedStages, {
+          key: "FOYER_PINNED_STAGES",
+          defaultValue: foyer.value.pinnedStages?.value ?? "",
+          refresh: refreshConfig,
+        }),
+        h(Entry, {
+          key: "SHOW_REGISTRATION",
+          label: t("registration_button"),
+          name: "SHOW_REGISTRATION",
+          defaultValue: foyer.value.showRegistration?.value ?? false,
+          tip: t("registration_button_tip"),
+          refresh: refreshConfig,
+        }),
+        h(Entry, {
+          key: "ENABLE_DONATE",
+          label: t("enable_upstage_donate"),
+          name: "ENABLE_DONATE",
+          defaultValue: system.value.enableDonate?.value ?? false,
+          refresh: refreshConfig,
+        }),
         h(Entry, {
           label: t("menu"),
           multiline: true,
@@ -60,25 +83,6 @@ About
 > FAQ (https://upstage.org.nz/?page_id=115)
 > Contact (/contact)`,
           ]),
-        }),
-        h(PinnedStages, {
-          key: "FOYER_PINNED_STAGES",
-          defaultValue: foyer.value.pinnedStages?.value ?? "",
-          refresh: refreshConfig,
-        }),
-        h(Entry, {
-          key: "SHOW_REGISTRATION",
-          label: t("registration_button"),
-          name: "SHOW_REGISTRATION",
-          defaultValue: foyer.value.showRegistration?.value ?? false,
-          refresh: refreshConfig,
-        }),
-        h(Entry, {
-          key: "ENABLE_DONATE",
-          label: t("enable_upstage_donate"),
-          name: "ENABLE_DONATE",
-          defaultValue: system.value.enableDonate?.value ?? false,
-          refresh: refreshConfig,
         }),
       ]
     : [h(Skeleton)];

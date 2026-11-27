@@ -294,6 +294,7 @@ export default {
   date: "Date",
   manage: "Manage",
   registration_button: "Registration Button",
+  registration_button_tip: "Expose or hide the Registration button.",
   enable_upstage_donate: "Enable UpStage Donate",
   shape: "Shape",
   loop: {

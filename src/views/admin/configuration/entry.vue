@@ -11,6 +11,8 @@ const props = defineProps<{
   multiline?: boolean;
   richTextEditor?: boolean;
   help?: VNode;
+  /** Short text shown beside an on/off switch, saying what it does. */
+  tip?: string;
   refresh?: () => Promise<void>;
 }>();
 
@@ -31,8 +33,7 @@ const { loading, proceed } = useLoading(
     success: () => "Configuration saved",
     error: (error) => {
       const maybe = error as
-        | { response?: { errors?: Array<{ message?: string }> }; message?: string }
-        | undefined;
+        { response?: { errors?: Array<{ message?: string }> }; message?: string } | undefined;
       return (
         maybe?.response?.errors?.[0]?.message ?? maybe?.message ?? "Failed to save configuration"
       );
@@ -95,6 +96,12 @@ const save = async (checked?: boolean) => {
       :loading="loading"
       @change="save"
     />
+    <span
+      v-if="typeof value === 'boolean' && tip"
+      class="ml-3 text-sm text-gray-500"
+      data-testid="entry-tip"
+      >{{ tip }}</span
+    >
     <help v-if="help" class="mt-2" />
   </a-form-item>
 </template>
