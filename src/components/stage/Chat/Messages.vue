@@ -13,6 +13,12 @@ export default {
   props: {
     messages: Array,
     style: [String, Object],
+    // Empty-list wording (#1581). True where the viewer can type — the live
+    // public chat — and the list greets them and points at the field below.
+    // Everywhere else the same component lists messages with no field under
+    // it (a replay, an archived transcript in Stage Management), so the
+    // default is the neutral "No messages yet!".
+    welcome: Boolean,
   },
   setup: () => {
     const isChatStandalone = inject("isChatStandalone", false);
@@ -72,12 +78,17 @@ export default {
 <template>
   <div
     v-if="!messages.length"
-    class="columns is-vcentered"
+    class="columns is-vcentered chat-empty"
     :class="{ 'is-fullheight': !isChatStandalone, 'chat-empty-standalone': isChatStandalone }"
+    data-testid="chat-empty"
   >
-    <div class="column has-text-centered has-text-light">
-      <i class="fas fa-comments fa-4x"></i>
-      <p class="subtitle has-text-light">No messages yet!</p>
+    <div class="column has-text-centered">
+      <i class="fas fa-comments fa-4x chat-empty-icon"></i>
+      <template v-if="welcome">
+        <p class="chat-empty-title">{{ $t("chat_welcome_title") }}</p>
+        <p class="chat-empty-hint">{{ $t("chat_welcome_hint") }}</p>
+      </template>
+      <p v-else class="chat-empty-title">{{ $t("chat_no_messages") }}</p>
     </div>
   </div>
   <div v-else>
@@ -221,6 +232,32 @@ export default {
 
 .guest {
   opacity: 0.8;
+}
+
+/* Empty list (#1581). No colour of its own: it takes the colour of whatever
+   it sits in, exactly like the chat lines do — dark text on the light chat,
+   white on the dark chat, dark in the Stage Management transcript window.
+   It used to be fixed near-white, which only showed up on the dark chat. */
+.chat-empty {
+  color: inherit;
+
+  .chat-empty-icon {
+    opacity: 0.6;
+  }
+
+  /* Margins spelled out in full: the global paragraph reset adds 1em under
+     every <p>, which pushed the two lines apart as if they were unrelated. */
+  .chat-empty-title {
+    margin: 0.5rem 0 0;
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+
+  .chat-empty-hint {
+    margin: 0.3rem 0 0;
+    font-size: 1rem;
+    line-height: 1.3;
+  }
 }
 
 /* Avoid stretching to the full scroll viewport in /chat/:url — that defeats

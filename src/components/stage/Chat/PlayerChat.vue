@@ -399,6 +399,14 @@ export default {
     padding-top: 0.5em;
   }
 
+  /* Empty list (#1581): this panel is small, and the full-size icon plus
+     "No messages yet!" did not fit its message area — the icon slid up
+     under the buttons. Nobody saw that while the text was near-white on
+     white; now that it is readable, the icon is half the size here. */
+  :deep(.chat-empty-icon) {
+    font-size: 2em;
+  }
+
   .card-content.card-content--standalone-anchor {
     display: flex;
     flex-direction: column;

@@ -357,7 +357,9 @@ export default {
           class="chat-messages-scroll-inner"
           :class="{ 'chat-messages-scroll-inner--standalone': isStandalone }"
         >
-          <Messages :messages="messages" :style="{ fontSize }" />
+          <!-- `welcome`: greet and point at the field below — which a
+               replay does not have (see the footer). -->
+          <Messages :messages="messages" :style="{ fontSize }" :welcome="!replaying" />
         </div>
       </div>
       <footer v-if="!replaying" class="card-footer">
