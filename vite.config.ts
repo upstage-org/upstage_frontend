@@ -3,7 +3,6 @@ import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
-import tsconfigPaths from "vite-tsconfig-paths";
 import Components from "unplugin-vue-components/vite";
 import AutoImport from "unplugin-auto-import/vite";
 import VueDevTools from "vite-plugin-vue-devtools";
@@ -209,7 +208,6 @@ export default defineConfig(({ mode, command }) => {
     plugins: [
       vue(),
       VueDevTools(),
-      tsconfigPaths(),
       AutoImport({
         imports: ["vue", "vue-router", "pinia", "@vueuse/core", { "vue-i18n": ["useI18n"] }],
         dts: "src/auto-imports.d.ts",
@@ -231,6 +229,8 @@ export default defineConfig(({ mode, command }) => {
         : []),
     ],
     resolve: {
+      // The `paths` map of tsconfig.json, resolved by Vite itself.
+      tsconfigPaths: true,
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
       },

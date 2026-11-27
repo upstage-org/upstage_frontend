@@ -1,6 +1,6 @@
 import { defineConfig, mergeConfig } from "vitest/config";
 import type { UserConfig } from "vite";
-import viteBase from "./vite.config";
+import viteBase from "./vite.config.ts";
 
 type ViteExport = UserConfig | Promise<UserConfig> | undefined;
 

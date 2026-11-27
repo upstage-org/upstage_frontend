@@ -14,7 +14,7 @@
     "skipLibCheck": true,
     // No `baseUrl` (deprecated in TS 6, removed in 7): every root the code
     // imports bare ("components/…", "config", …) is listed here, relative to
-    // this file. vite-tsconfig-paths reads the same map for the bundler.
+    // this file. Vite reads the same map (resolve.tsconfigPaths in vite.config.ts).
     "paths": {
       "@/*": ["./src/*"],
       "@components/*": ["./src/components/*"],
