@@ -184,6 +184,15 @@ export const loadJitsiServerConfig = (
   return promise;
 };
 
+/**
+ * The Jitsi conference name of a stage. lib-jitsi-meet refuses a name that
+ * is not all lower case ("Invalid conference name"), so a stage whose URL
+ * has a capital letter (/Villa) never got a conference: no streams, no
+ * meetings. Everyone on the stage derives the name the same way, so they
+ * still meet in one room.
+ */
+export const jitsiRoomName = (stageUrl: unknown): string => String(stageUrl ?? "").toLowerCase();
+
 // lib-jitsi-meet is vendored and untyped; these are its objects.
 type SessionOptions = { origin: any; stageUrl: any; target: any; initLib: any };
 // Automatic rejoin (see `scheduleRejoin`). Delay before attempt N; the last
@@ -677,7 +686,7 @@ export const useJitsi = () => {
     };
     if (preferWebSocket) {
       const sep = baseWs.indexOf("?") >= 0 ? "&" : "?";
-      connectionOptions.serviceUrl = `${baseWs}${sep}room=${encodeURIComponent(stageUrl)}`;
+      connectionOptions.serviceUrl = `${baseWs}${sep}room=${encodeURIComponent(jitsiRoomName(stageUrl))}`;
       connectionOptions.websocket = baseWs;
     }
 
@@ -875,7 +884,7 @@ export const useJitsi = () => {
           // through the JVB SFU makes late and early joiners behave identically.
           // Meetings ride the same room and are unaffected functionally — a
           // 2-party meeting simply routes through the bridge instead of P2P.
-          target.room = target.connection.initJitsiConference(stageUrl, {
+          target.room = target.connection.initJitsiConference(jitsiRoomName(stageUrl), {
             p2p: { enabled: false },
           });
         } catch (initErr) {

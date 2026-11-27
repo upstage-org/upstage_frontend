@@ -69,7 +69,9 @@ const fake = vi.hoisted(() => {
     disconnect() {
       this.disconnectCalls += 1;
     }
-    initJitsiConference() {
+    roomName: unknown;
+    initJitsiConference(name?: unknown) {
+      this.roomName = name;
       this.room = new FakeRoom();
       return this.room;
     }
@@ -113,7 +115,7 @@ vi.mock("@stores/pinia/stage", async () => {
   return { useStageStore: () => store };
 });
 
-import { hardenJitsiLib, useJitsi } from "./composable";
+import { hardenJitsiLib, jitsiRoomName, useJitsi } from "./composable";
 
 const E = fake.JitsiMeetJS.events;
 const store = () => storeMocks.store;
@@ -176,6 +178,27 @@ afterEach(() => {
   while (mounted.length) mounted.pop()?.unmount();
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+describe("useJitsi — conference name", () => {
+  afterEach(() => {
+    store().url = "turn";
+  });
+
+  it("is the stage URL in lower case", () => {
+    expect(jitsiRoomName("Villa")).toBe("villa");
+    expect(jitsiRoomName("turn")).toBe("turn");
+    expect(jitsiRoomName("lgm-2026_B")).toBe("lgm-2026_b");
+    expect(jitsiRoomName(undefined)).toBe("");
+  });
+
+  it("a stage URL with capital letters joins the lower-case conference", async () => {
+    store().url = "Villa";
+    await mountJitsi();
+    await join(0);
+    expect(conn(0).roomName).toBe("villa");
+    expect(JSON.stringify(conn(0).options)).not.toContain("Villa");
+  });
 });
 
 describe("useJitsi — automatic rejoin after the connection is lost", () => {
