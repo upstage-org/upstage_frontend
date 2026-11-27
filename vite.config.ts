@@ -181,6 +181,31 @@ export default defineConfig(({ mode, command }) => {
     define: {
       __UPSTAGE_BUILD__: JSON.stringify(readBuildStamp()),
     },
+    // Vite 8 changed how a default import from a CommonJS module resolves
+    // when the importer is ESM ("type": "module", as this package is): it is
+    // now `module.exports`, not `module.exports.default`. That breaks
+    // `import useForm from "ant-design-vue/lib/form/useForm"` (PlayerForm,
+    // ChangePassword — "useForm is not a function", blank app after login)
+    // and any dependency relying on the old interop. Keep the Vite 7
+    // behaviour until those imports are migrated. Deprecated escape hatch —
+    // see https://vite.dev/guide/migration ("Consistent CommonJS interop").
+    legacy: {
+      inconsistentCjsInterop: true,
+    },
+    // Vite 8 (Oxc/Rolldown) no longer falls back to esbuild's classic JSX
+    // transform: with tsconfig `jsx: "preserve"` it leaves JSX untouched, and
+    // the dep scanner assumes React's automatic runtime, so the dev-only
+    // `<script lang="jsx">` component (MeetingObject/Track.vue, Playground)
+    // broke dependency pre-bundling. Pin both to the classic transform, which
+    // is exactly what Vite 7 emitted.
+    oxc: {
+      jsx: { runtime: "classic" },
+    },
+    optimizeDeps: {
+      rolldownOptions: {
+        transform: { jsx: { runtime: "classic" } },
+      },
+    },
     plugins: [
       vue(),
       VueDevTools(),

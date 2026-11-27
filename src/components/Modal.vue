@@ -1,40 +1,37 @@
-<script>
+<script setup lang="ts">
 import { provide, ref, watchEffect } from "vue";
-export default {
-  props: {
-    id: String,
-    modelValue: Boolean,
-    width: {
-      type: String,
-      default: "80%",
-    },
-    height: {
-      type: String,
-      default: "unset",
-    },
-    styles: {
-      type: String,
-      default: null,
-    },
+
+const props = withDefaults(
+  defineProps<{
+    id?: string;
+    modelValue?: boolean;
+    width?: string;
+    height?: string;
+    // ImagePicker passes a style object; the old declaration said String.
+    styles?: Record<string, string> | null;
+  }>(),
+  {
+    width: "80%",
+    height: "unset",
+    styles: null,
   },
-  emits: ["update:modelValue"],
-  setup: (props, { emit }) => {
-    const isActive = ref(props.modelValue);
-    watchEffect(() => (isActive.value = props.modelValue));
+);
+const emit = defineEmits<{
+  (e: "update:modelValue", visible: boolean): void;
+}>();
 
-    const setVisible = (visible) => {
-      isActive.value = visible;
-      emit("update:modelValue", visible);
-    };
-    const openModal = () => setVisible(true);
-    const closeModal = () => setVisible(false);
+const isActive = ref(props.modelValue);
+watchEffect(() => (isActive.value = props.modelValue));
 
-    provide("openModal", openModal);
-    provide("closeModal", closeModal);
-
-    return { isActive, openModal, closeModal };
-  },
+const setVisible = (visible: boolean) => {
+  isActive.value = visible;
+  emit("update:modelValue", visible);
 };
+const openModal = () => setVisible(true);
+const closeModal = () => setVisible(false);
+
+provide("openModal", openModal);
+provide("closeModal", closeModal);
 </script>
 
 <template>

@@ -54,7 +54,7 @@ export default {
     const downloadChatLog = () => {
       if (downloadOptions.value.audienceChat) {
         let link = document.createElement("a");
-        let content = [];
+        let content;
         link.setAttribute("download", `${stageUrl}-Audience-chat-${timeStamp()}.txt`);
         content = chats.value.messages.map(
           (item) => `${chatLogLine(item, downloadOptions.value.timestamps)}\r\n`,
@@ -70,7 +70,7 @@ export default {
 
       if (downloadOptions.value.playerChat) {
         let link = document.createElement("a");
-        let content = [];
+        let content;
         link.setAttribute("download", `${stageUrl}-Player-chat-${timeStamp()}.txt`);
         content = chats.value.privateMessages.map(
           (item) => `${chatLogLine(item, downloadOptions.value.timestamps)}\r\n`,

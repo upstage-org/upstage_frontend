@@ -1,0 +1,409 @@
+<script>
+import { computed, ref, watch } from "vue";
+import { useStageStore } from "@stores/pinia/stage";
+import Icon from "components/Icon.vue";
+import { paymentGraph } from "services/graphql";
+import { useMutation } from "services/graphql/composable";
+import { message } from "ant-design-vue";
+import { StripeElements, StripeElement } from "vue-stripe-js";
+import Turnstile from "vue-turnstile";
+import config from "config";
+
+export default {
+  components: { Icon, StripeElements, StripeElement, Turnstile },
+  setup() {
+    const stageStore = useStageStore();
+    const isActive = computed(() => stageStore.donationPopup.isActive);
+    const title = computed(() => stageStore.donationPopup.title);
+    const amount = computed(() => stageStore.donationPopup.amount);
+    const isReceiptPopupActive = computed(() => stageStore.receiptPopup.isActive);
+    const donationDetails = computed(() => stageStore.receiptPopup.donationDetails);
+    const loading = ref(false);
+    const clientSecret = ref();
+    const isReceiptFormActive = ref(false);
+    const donorName = ref("");
+    const generating = ref(false);
+    const isProduction = config.MODE === "Production";
+    const siteKey = config.CLOUDFLARE_CAPTCHA_SITEKEY;
+    const captchaToken = ref("");
+    const captcha = ref(null);
+
+    const resetPaymentState = () => {
+      clientSecret.value = undefined;
+      captchaToken.value = "";
+      captcha.value?.reset();
+      loading.value = false;
+    };
+
+    const close = () => {
+      resetPaymentState();
+      stageStore.closeDonationPopup();
+    };
+
+    const closeReceiptPopup = () => {
+      stageStore.closeReceiptPopup();
+    };
+
+    const openReceiptForm = () => {
+      isReceiptPopupActive.value = false;
+      isReceiptFormActive.value = true;
+      closeReceiptPopup();
+    };
+
+    const closeReceiptForm = () => {
+      isReceiptFormActive.value = false;
+      donorName.value = "";
+    };
+
+    const elementsComponent = ref();
+    const paymentComponent = ref();
+    const stripeOptions = ref({});
+    const elementsOptions = ref({
+      mode: "payment",
+      amount: 100,
+      currency: "usd",
+      appearance: { theme: "flat" },
+    });
+    const paymentElementOptions = ref({});
+
+    // Stripe.js is loaded by <StripeElements> (via `stripe-key`) the first
+    // time the popup opens with a client secret. The previous eager
+    // `loadStripe()` here pulled the 200 KB script on every public page.
+
+    const { mutation: paymentSecret } = useMutation(paymentGraph.paymentSecret);
+    const { mutation: generateReceiptMutation } = useMutation(paymentGraph.generateReceipt);
+
+    watch(
+      () => isActive.value,
+      (active) => {
+        if (!active) {
+          resetPaymentState();
+        }
+      },
+    );
+
+    watch(
+      () => [isActive.value, captchaToken.value],
+      async ([active, token]) => {
+        if (!active) return;
+        if (isProduction && siteKey && !token) {
+          return;
+        }
+
+        loading.value = true;
+        const payload = {
+          amount: parseFloat(amount.value) * 100,
+          ...(token ? { token } : {}),
+        };
+        try {
+          const res = await paymentSecret(payload);
+          if (res.paymentSecret) {
+            clientSecret.value = res.paymentSecret;
+          } else {
+            message.error("Stripe Error!");
+            captcha.value?.reset();
+            captchaToken.value = "";
+          }
+        } catch (error) {
+          captcha.value?.reset();
+          captchaToken.value = "";
+          message.error(error.message || "Failed to initialize payment");
+        } finally {
+          loading.value = false;
+        }
+      },
+    );
+
+    const donateToUpstage = async () => {
+      try {
+        loading.value = true;
+        const stripeInstance = elementsComponent.value?.instance;
+        const elements = elementsComponent.value?.elements;
+
+        if (stripeInstance) {
+          const res = await elements.submit();
+          if (res.error) {
+            message.error(res.error.message);
+            return;
+          }
+          const { error } = await stripeInstance.confirmPayment({
+            elements,
+            clientSecret: clientSecret.value,
+            confirmParams: { return_url: window.location.href },
+            redirect: "if_required",
+          });
+          loading.value = false;
+          if (error) {
+            message.error("Donate to UpStage failure!");
+          } else {
+            message.success("Donate to UpStage success!");
+            close();
+            stageStore.openReceiptPopup({
+              amount: amount.value,
+              date: new Date().toLocaleDateString(),
+            });
+          }
+        }
+      } catch (error) {
+        message.error(error.message);
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const generateReceipt = async () => {
+      try {
+        generating.value = true;
+
+        const result = await generateReceiptMutation({
+          receivedFrom: donorName.value,
+          description: "Donation",
+          amount: donationDetails.value.amount.toString(),
+          date: donationDetails.value.date,
+        });
+
+        if (!result.generateReceipt) {
+          throw new Error("Failed to generate receipt");
+        }
+
+        const { fileBase64, fileName } = result.generateReceipt;
+
+        const byteCharacters = atob(fileBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+
+        message.success("Receipt downloaded and sent!");
+        closeReceiptForm();
+      } catch (error) {
+        message.error("Failed to generate receipt: " + error.message);
+      } finally {
+        generating.value = false;
+      }
+    };
+
+    return {
+      isActive,
+      close,
+      title,
+      amount,
+      loading,
+      donateToUpstage,
+      stripeKey: config.STRIPE_KEY,
+      stripeOptions,
+      elementsOptions,
+      paymentElementOptions,
+      elementsComponent,
+      paymentComponent,
+      isReceiptPopupActive,
+      isReceiptFormActive,
+      donationDetails,
+      donorName,
+      openReceiptForm,
+      closeReceiptPopup,
+      closeReceiptForm,
+      generateReceipt,
+      generating,
+      isProduction,
+      siteKey,
+      captchaToken,
+      captcha,
+      clientSecret,
+    };
+  },
+};
+</script>
+
+<template>
+  <transition name="fade">
+    <div v-show="isActive" class="modal" :class="{ 'is-active': isActive }">
+      <div class="modal-background" @click="close"></div>
+      <div class="modal-content">
+        <div class="card">
+          <a href="#" class="card-header-icon" @click="close">
+            <span class="icon">
+              <Icon src="close.svg" />
+            </span>
+          </a>
+          <div class="card-header">
+            <span class="card-header-title">{{ title }}</span>
+          </div>
+          <div class="card-content">
+            <form v-if="isActive" @submit.prevent="donateToUpstage">
+              <Turnstile
+                v-if="isProduction"
+                ref="captcha"
+                v-model="captchaToken"
+                :site-key="siteKey"
+              />
+              <StripeElements
+                v-if="clientSecret"
+                ref="elementsComponent"
+                :stripe-key="stripeKey"
+                :instance-options="stripeOptions"
+                :elements-options="elementsOptions"
+              >
+                <StripeElement
+                  ref="paymentComponent"
+                  type="payment"
+                  :options="paymentElementOptions"
+                />
+              </StripeElements>
+              <br />
+              <div class="button-donate">
+                <button
+                  class="button is-primary"
+                  type="submit"
+                  :class="{ 'is-loading': loading }"
+                  :disabled="
+                    loading || !clientSecret || (isProduction && !!siteKey && !captchaToken)
+                  "
+                >
+                  <span>Donate USD$ {{ amount }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </transition>
+  <transition name="fade">
+    <div v-if="isReceiptPopupActive" class="modal" :class="{ 'is-active': isReceiptPopupActive }">
+      <div class="modal-background" @click="closeReceiptPopup"></div>
+      <div class="modal-content">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-header-title">Would you like a receipt?</span>
+          </div>
+          <div class="card-content">
+            <div class="buttons">
+              <button class="button is-primary" @click="openReceiptForm">Yes</button>
+              <button class="button" @click="closeReceiptPopup">No</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <transition name="fade">
+    <div v-if="isReceiptFormActive" class="modal" :class="{ 'is-active': isReceiptFormActive }">
+      <div class="modal-background" @click="closeReceiptForm"></div>
+      <div class="modal-content">
+        <div class="card">
+          <a href="#" class="card-header-icon" @click="closeReceiptForm">
+            <span class="icon">
+              <Icon src="close.svg" />
+            </span>
+          </a>
+          <div class="card-header">
+            <span class="card-header-title">Donation Receipt</span>
+          </div>
+          <div class="card-content">
+            <form @submit.prevent="generateReceipt">
+              <div class="field">
+                <label class="label">Received from</label>
+                <div class="control">
+                  <input v-model="donorName" class="input" type="text" required />
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Amount</label>
+                <div class="control">
+                  <input class="input" type="text" :value="`$${donationDetails.amount}`" disabled />
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Date</label>
+                <div class="control">
+                  <input class="input" type="text" :value="donationDetails.date" disabled />
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">Description</label>
+                <div class="control">
+                  <input class="input" type="text" value="Donation" disabled />
+                </div>
+              </div>
+              <div class="buttons">
+                <button
+                  class="button is-primary"
+                  type="submit"
+                  :class="{ 'is-loading': generating }"
+                  :disabled="generating"
+                >
+                  Download PDF
+                </button>
+                <button class="button" @click="closeReceiptForm">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </transition>
+</template>
+
+<style scoped lang="scss">
+.card-icon {
+  position: absolute;
+  display: block;
+  height: 100%;
+  line-height: 40px;
+}
+
+.card-input {
+  position: inherit;
+  display: block;
+  margin-left: 1.5rem;
+  border: none;
+  background-color: transparent;
+  width: calc(100% - 1.5rem);
+  font-family: inherit;
+}
+
+card-input:focus {
+  border-color: inherit;
+  -webkit-box-shadow: none;
+  box-shadow: none;
+}
+
+.block-input {
+  margin-bottom: 18px;
+}
+
+.card-secret-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.button-donate {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.card-header-icon {
+  position: absolute;
+  right: 0;
+}
+
+.modal {
+  z-index: 1000;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+</style>

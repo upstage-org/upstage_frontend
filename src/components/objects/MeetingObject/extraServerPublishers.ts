@@ -1,6 +1,6 @@
-// @ts-nocheck
 import { onUnmounted, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
+import type { JitsiTrack } from "@stores/pinia/stage";
 import { isJitsiBoardType, resolveJitsiOrigin } from "@utils/common";
 import configs from "config";
 import { useLowLevelAPI } from "./composable";
@@ -32,7 +32,7 @@ import { useLowLevelAPI } from "./composable";
  * No-op unless more than one server is configured, so single-server installs
  * do not execute any of this.
  */
-export function useExtraServerPublishers(jitsi, publisher) {
+export function useExtraServerPublishers(jitsi: any, publisher: any) {
   const multiServer = (configs.JITSI_SERVER_COUNT ?? 1) > 1;
   const api = {
     /** Origins whose room currently carries this tab's cloned tracks. */
@@ -126,7 +126,7 @@ export function useExtraServerPublishers(jitsi, publisher) {
       }
       // TRACK_REMOVED normally does this; make sure a dead room can't leave
       // a stale clone in board.tracks.
-      stageStore.removeTrack(c);
+      stageStore.removeTrack(c as JitsiTrack);
     }
     disposeClones(state);
     console.log("[diag] extraServerPublishers: unpublished", { origin });
@@ -150,7 +150,7 @@ export function useExtraServerPublishers(jitsi, publisher) {
     for (const c of clones) {
       try {
         await room.addTrack(c);
-        stageStore.addTrack(c, origin);
+        stageStore.addTrack(c as JitsiTrack, origin);
       } catch (err) {
         console.warn(`room.addTrack (${origin}) failed:`, err);
       }
@@ -224,7 +224,7 @@ export function useExtraServerPublishers(jitsi, publisher) {
         }
         try {
           await room.addTrack(c);
-          stageStore.addTrack(c, origin);
+          stageStore.addTrack(c as JitsiTrack, origin);
         } catch (err) {
           console.warn(`room.addTrack (${origin}) failed:`, err);
         }

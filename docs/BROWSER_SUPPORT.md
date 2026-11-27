@@ -27,5 +27,5 @@ UpStage targets **desktop Safari 15+**, **iOS/iPadOS Safari 15+**, and current C
 ### Known limitations (out of scope)
 
 - Safari &lt; 15
-- Codec gaps in lib-jitsi-meet / flv.js where the browser cannot decode the container
+- Codec gaps in lib-jitsi-meet / hls.js where the browser cannot decode the stream
 - Per-stream volume sliders on iOS (hardware volume only; UI hidden)

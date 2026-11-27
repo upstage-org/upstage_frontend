@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import { message } from "ant-design-vue";
-import { PropType, ref, inject } from "vue";
+import { PropType, computed, ref, inject } from "vue";
 import { Media } from "models/studio";
 import { absolutePath } from "utils/common";
 import { useRequestPermission } from "./composable";
+import { ownerNote } from "../ownerNote";
 
 const props = defineProps({
   media: {
@@ -14,6 +15,8 @@ const props = defineProps({
 
 const visible = ref(false);
 const note = ref("");
+// The owner's own conditions (#1570), shown before the player writes theirs.
+const conditions = computed(() => ownerNote(props.media));
 
 const refresh = inject("refresh", () => {});
 const { mutate, loading } = useRequestPermission();
@@ -45,6 +48,10 @@ const handleOk = async () => {
     You are requesting permission for
     <a-avatar class="my-2" :src="absolutePath(media.fileLocation)" />
     {{ media.name }}.
+    <p v-if="conditions" class="owner-note" data-testid="owner-note">
+      <b>Note from <DName :user="media.owner" />:</b>
+      <br />{{ conditions }}
+    </p>
     <a-textarea
       v-model:value="note"
       :placeholder="`Please write something so that ${media.owner.username} can understand your purpose of using the media.`"
@@ -52,3 +59,13 @@ const handleOk = async () => {
     />
   </a-modal>
 </template>
+
+<style scoped>
+.owner-note {
+  margin: 10px 0;
+  padding: 8px 12px;
+  border-left: 3px solid #007011;
+  background: #f6fbf6;
+  white-space: pre-wrap;
+}
+</style>

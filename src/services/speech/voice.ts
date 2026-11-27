@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { AvatarVoice } from "models/studio";
 
 export const voices: { [key: string]: string } = {

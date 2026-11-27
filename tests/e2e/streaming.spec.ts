@@ -2184,7 +2184,10 @@ test.describe("streaming: performer streams, audience views @full", () => {
       audienceCtx = await browser.newContext();
       const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
 
-      const result = await audience.page.evaluate(() => {
+      // Must be the namespace the SPA under test was started with
+      // (tests/e2e/env/vite-e2e.sh).
+      const mqttNamespace = process.env.E2E_MQTT_NAMESPACE ?? "dev";
+      const result = await audience.page.evaluate((mqttNamespace) => {
         type BoardObject = Record<string, unknown> & {
           id: string;
           type?: string;
@@ -2199,7 +2202,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
           ) => void;
         };
 
-        const boardTopic = `dev/${stage.url}/board`;
+        const boardTopic = `${mqttNamespace}/${stage.url}/board`;
         const hostId = "tab-session-host-a";
         const staleGenPid = "participant-gen-1";
         const currentGenPid = "participant-gen-2";
@@ -2305,7 +2308,7 @@ test.describe("streaming: performer streams, audience views @full", () => {
           hasLegacy: ids.includes(legacy),
           hasRemoved: ids.includes(removed),
         };
-      });
+      }, mqttNamespace);
 
       expect(result.hasStale, "prior-generation tile must be dropped").toBe(false);
       expect(result.hasLiveA, "current-generation tile must survive").toBe(true);

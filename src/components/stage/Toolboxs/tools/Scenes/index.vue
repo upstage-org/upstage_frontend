@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 import { useStageStore } from "@stores/pinia/stage";
 import Icon from "components/Icon.vue";
 import Loading from "components/Loading.vue";
@@ -6,22 +6,16 @@ import { computed } from "vue";
 import Scene from "./Scene.vue";
 import BlankScene from "./BlankScene.vue";
 
-export default {
-  components: { Icon, Loading, BlankScene, Scene },
-  setup: () => {
-    const stageStore = useStageStore();
+const stageStore = useStageStore();
 
-    const saving = computed(() => stageStore.isSavingScene);
+const saving = computed(() => stageStore.isSavingScene);
 
-    const scenes = computed(() => stageStore.model.scenes);
-    const saveScene = () => {
-      stageStore.openSettingPopup({
-        type: "SaveScene",
-      });
-    };
-
-    return { saving, scenes, saveScene };
-  },
+const scenes = computed(() => stageStore.model!.scenes);
+const saveScene = () => {
+  stageStore.openSettingPopup({
+    isActive: true,
+    type: "SaveScene",
+  });
 };
 </script>
 

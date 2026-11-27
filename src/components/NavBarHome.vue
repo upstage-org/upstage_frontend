@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
 import { loggedIn, logoutToHome } from "utils/auth";
 import { useUserStore } from "@stores/pinia/user";
@@ -6,38 +6,17 @@ import { useConfigStore } from "@stores/pinia/config";
 import { storeToRefs } from "pinia";
 import Logo from "./Logo.vue";
 import LanguageSelector from "./LanguageSelector.vue";
-import configs from "config";
 
-export default {
-  components: { Logo, LanguageSelector },
-  setup() {
-    const { navigations, foyer } = storeToRefs(useConfigStore());
-    const { isAdmin, isGuest } = storeToRefs(useUserStore());
-    const showRegistration = computed(() => foyer.value?.showRegistration?.value ?? false);
+const { navigations, foyer } = storeToRefs(useConfigStore());
+const { isAdmin, isGuest } = storeToRefs(useUserStore());
+const showRegistration = computed(() => foyer.value?.showRegistration?.value ?? false);
 
-    const isShow = (seeByAdmin) => {
-      if (isAdmin.value) {
-        return true;
-      }
+const isShow = (seeByAdmin?: boolean) => {
+  if (isAdmin.value) {
+    return true;
+  }
 
-      return !seeByAdmin;
-    };
-
-    return {
-      loggedIn,
-      logoutToHome,
-      showRegistration,
-      isShow,
-      navigations,
-      isAdmin,
-      isGuest,
-    };
-  },
-  computed: {
-    configs() {
-      return configs;
-    },
-  },
+  return !seeByAdmin;
 };
 </script>
 
@@ -68,9 +47,9 @@ export default {
               <div class="navbar-dropdown">
                 <a
                   v-for="(submenu, j) in menu.children"
-                  :key="{ j }"
+                  :key="j"
                   class="navbar-item"
-                  :href="submenu.url"
+                  :href="submenu.url ?? undefined"
                   :target="submenu.url?.startsWith('http') ? '_blank' : ''"
                 >
                   {{ submenu.title }}
@@ -80,7 +59,7 @@ export default {
             <a
               v-else-if="isShow(menu.seeByAdmin)"
               class="navbar-item"
-              :href="menu.url"
+              :href="menu.url ?? undefined"
               :target="menu.url?.startsWith('http') ? '_blank' : ''"
             >
               {{ menu.title }}

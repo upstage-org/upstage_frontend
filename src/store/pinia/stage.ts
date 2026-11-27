@@ -47,6 +47,7 @@ import {
   randomMessageColor,
   randomRange,
   resolveJitsiOrigin,
+  snapToDevicePixel,
 } from "@utils/common";
 import { BACKGROUND_ACTIONS, BOARD_ACTIONS, COLORS, DRAW_ACTIONS, TOPICS } from "@utils/constants";
 import { loadReplayMarkers } from "@utils/replayMarkers";
@@ -63,6 +64,7 @@ import { unnamespaceTopic } from "@utils/mqttTopics";
 import { audienceMayPublish } from "@utils/publishPolicy";
 import { computeFinalJitsiObjectsFromEvents } from "@utils/jitsiBoardReconcile";
 import { useAttribute } from "@services/graphql/composable";
+import { eventsForEntry } from "./stageSession";
 import { avatarSpeak, stopSpeaking } from "@services/speech";
 import { useAuthStore } from "@stores/pinia/auth";
 import { useUserStore } from "@stores/pinia/user";
@@ -75,369 +77,39 @@ function animateIfPresent(selector: string, options: Parameters<typeof animate>[
   }
 }
 
-// ====================================================================
-// SHAPES
-//
-// First-party shapes for the stage store. Kept intentionally permissive
-// — most of this data originates as GraphQL responses or MQTT message
-// bodies and carries fields beyond what the SPA reads, so each shape
-// allows arbitrary extra keys via an index signature. The narrow
-// fields here are the ones the store + its consumers actually touch.
-// ====================================================================
+import type {
+  ObjectId,
+  BoardObject,
+  ToolboxItem,
+  Background,
+  Curtain,
+  StageModel,
+  Scene,
+  ReplayEvent,
+  Speak,
+  ChatMessage,
+  Drawing,
+  TextEntity,
+  WhiteboardCommand,
+  JitsiTrack,
+  Session,
+  Reaction,
+  AudioPlayer,
+  StreamingMode,
+  StageConfig,
+  StageSettings,
+  Preferences,
+  ChatState,
+  BoardState,
+  ToolsState,
+  SettingPopup,
+  DonationPopup,
+  ReceiptPopup,
+  ReplayState,
+  Viewport,
+} from "./stage.types";
 
-export type ObjectId = string | number;
-
-export interface BoardObject {
-  id: ObjectId;
-  type?: string;
-  name?: string;
-  src?: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  rotate: number;
-  opacity?: number;
-  volume?: number;
-  moveSpeed?: number;
-  voice?: Record<string, unknown>;
-  liveAction?: boolean;
-  published?: boolean;
-  displayName?: string;
-  hostId?: ObjectId | null;
-  drawingId?: string;
-  textId?: string;
-  wornBy?: ObjectId | null;
-  multi?: boolean;
-  frames?: string[];
-  /** When false, multiframe `autoplayFrames` stops after one cycle; true/omitted = loop. */
-  frameLoop?: boolean;
-  /** Live RTMP feed tile (renders via LiveStreamPlayer, not <video src>). */
-  isRTMP?: boolean;
-  /** Origin of the Jitsi server the tile's participant is on (multi-server
-   *  streaming, `configs.JITSI_ENDPOINTS`). Absent = the default server, so
-   *  every pre-existing tile, archived event and replay keeps working. Only
-   *  ever written when more than one server is configured. */
-  jitsiServer?: string;
-  /** Frame shape for live stream tiles (jitsi + RTMP): a registry id from
-   *  components/objects/frameShapes.ts. Legacy values are null/absent
-   *  (per-kind default look) and "circle". Rides MQTT broadcasts untouched. */
-  shape?: string | null;
-  /** Exit (removal) animation for this stage assignment, seeded from the
-   *  stage's assets at placement time; absent = default ("vanish"). */
-  exitAnimation?: string;
-  /** Exit animation duration in ms; only meaningful with exitAnimation. */
-  exitSpeed?: number;
-  assetType?: { name?: string };
-  description?: string;
-  fontSize?: string;
-  speak?: Speak | null;
-  commands?: unknown;
-  holder?: Session;
-  [k: string]: unknown;
-}
-
-export interface ToolboxItem {
-  id: ObjectId;
-  name?: string;
-  src?: string;
-  url?: string;
-  multi?: boolean;
-  frames?: string[];
-  assetType?: { name?: string };
-  description?: string;
-  fileLocation?: string;
-  isPlaying?: boolean;
-  changed?: boolean;
-  [k: string]: unknown;
-}
-
-export interface Background {
-  id?: ObjectId;
-  at?: number;
-  opacity?: number;
-  // `speed` is the FADE duration: how long each crossfade between
-  // consecutive frames takes (seconds). Set to 0 to pause the
-  // animation entirely.
-  speed?: number;
-  // `dwell` is the HOLD duration: how long each frame stays at full
-  // opacity *before* the next fade starts (seconds). Default
-  // (undefined / 0) means "advance immediately when a fade
-  // completes" — the legacy behaviour, kept so vintage broadcasts
-  // and existing media animate exactly as they did before the
-  // dwell field was introduced. The full per-frame cycle is
-  // therefore `(speed + dwell)` seconds: a slideshow with `speed=1`
-  // and `dwell=10` shows each image for 10s at full opacity, then
-  // takes 1s to crossfade to the next.
-  dwell?: number;
-  /** When false, playback stops after one full pass; when true/omitted, loops (legacy). */
-  frameLoop?: boolean;
-  src?: string;
-  multi?: boolean;
-  frames?: string[];
-  [k: string]: unknown;
-}
-
-export interface Curtain {
-  id?: ObjectId;
-  src?: string;
-  // Multi-frame curtain support (mirrors `Background`). When `multi` and
-  // `frames` are present, `Curtain.vue` cycles through `frames` on a
-  // setInterval driven by `speed` (FADE duration, seconds per
-  // crossfade; 0 = paused) and `dwell` (HOLD duration, seconds the
-  // frame stays at full opacity between fades; default 0 =
-  // immediate advance, legacy behaviour). `currentFrame` is the
-  // last-shown frame so audience joins land on the same picture the
-  // performer sees. `at` is a timestamp used by `SET_CURTAIN` to
-  // ignore stale MQTT messages.
-  multi?: boolean;
-  frames?: string[];
-  speed?: number;
-  dwell?: number;
-  lastSpeed?: number;
-  currentFrame?: string;
-  /** Same semantics as `Background.frameLoop` for multi-frame curtains. */
-  frameLoop?: boolean;
-  at?: number;
-  [k: string]: unknown;
-}
-
-/**
- * Stage model — GraphQL `stage` query response. The SPA reads a small
- * fixed set of fields, but the payload carries many more (attributes,
- * media subobjects, etc.). Extra keys are allowed via the index
- * signature; consumers that need them cast on read.
- */
-export interface StageModel {
-  id?: ObjectId;
-  fileLocation?: string;
-  cover?: string | null;
-  name?: string;
-  description?: string;
-  status?: string;
-  /** `"owner" | "editor" | "player" | "audience"` — string-typed because GraphQL also returns nulls and ad-hoc values. */
-  permission?: string;
-  assets?: ToolboxItem[];
-  scenes?: Scene[];
-  events?: ReplayEvent[];
-  chats?: { payload: ChatMessage | string; performanceId?: string | number }[];
-  activeRecording?: { id: string | number; name?: string; createdOn?: string } | null;
-  [k: string]: unknown;
-}
-
-export interface Scene {
-  id: ObjectId;
-  payload?: string;
-  scenePreview?: boolean;
-  [k: string]: unknown;
-}
-
-export interface ReplayEvent {
-  id: ObjectId;
-  mqttTimestamp: number;
-  topic?: string;
-  payload?: unknown;
-  [k: string]: unknown;
-}
-
-export interface Speak {
-  user?: string;
-  message: string;
-  behavior?: string;
-  isPlayer?: boolean;
-  isPrivate?: boolean;
-  session?: string | null;
-  at?: number;
-  id?: string;
-  hash?: string;
-  [k: string]: unknown;
-}
-
-export interface ChatMessage {
-  id?: string;
-  user?: string;
-  message?: string;
-  behavior?: string;
-  color?: string;
-  hash?: string;
-  at?: number;
-  isPlayer?: boolean;
-  isPrivate?: boolean;
-  highlighted?: boolean;
-  session?: string | null;
-  clear?: boolean;
-  clearPlayerChat?: boolean;
-  remove?: string;
-  highlight?: string;
-  mute?: boolean;
-  avatarId?: ObjectId;
-  type?: string;
-  [k: string]: unknown;
-}
-
-export interface Drawing {
-  drawingId: string;
-  commands?: unknown;
-  [k: string]: unknown;
-}
-
-export interface TextEntity {
-  textId: string;
-  type?: string;
-  [k: string]: unknown;
-}
-
-export interface WhiteboardCommand {
-  [k: string]: unknown;
-}
-
-export interface JitsiTrack {
-  // lib-jitsi-meet methods we invoke from typed code. Declaring them here
-  // keeps the rest of the interface loose while letting TS resolve call
-  // signatures; without this, `track.getId?.()` narrows to `{}` and fails
-  // to typecheck.
-  getId?: () => string | number | undefined;
-  getParticipantId?: () => string | undefined;
-  isLocal?: () => boolean;
-  [k: string]: unknown;
-}
-
-export interface Session {
-  id: string;
-  isPlayer?: boolean;
-  nickname?: string;
-  at: number;
-  avatarId?: ObjectId | null;
-  /** Logged-in performer's user id; distinct from `id` (per-tab session). */
-  userId?: string | number | null;
-  leaving?: boolean;
-  [k: string]: unknown;
-}
-
-export interface Reaction {
-  reaction: unknown;
-  x: number;
-  y: number;
-}
-
-export interface AudioPlayer {
-  currentTime?: number;
-  [k: string]: unknown;
-}
-
-/** Which live-streaming transports a stage enables while streaming is on. */
-export type StreamingMode = "jitsi" | "rtmp" | "both";
-
-export interface StageConfig {
-  animateDuration: number;
-  reactionDuration: number;
-  ratio: number;
-  defaultcolor?: string;
-  enabledLiveStreaming?: boolean;
-  streamingMode?: StreamingMode;
-  [k: string]: unknown;
-}
-
-export interface StageSettings {
-  chatVisibility: boolean;
-  chatDarkMode: boolean;
-  reactionVisibility: boolean;
-  [k: string]: unknown;
-}
-
-export interface Preferences {
-  isDrawing: boolean;
-  isWriting?: boolean;
-  text: { fontSize: string; fontFamily: string };
-  [k: string]: unknown;
-}
-
-/**
- * `color` carries a foreground/background pair when initialised
- * (`randomMessageColor()`), but `CLEAN_STAGE` historically reset it to
- * a bare hex string (`randomColor()`). Consumers tolerate both shapes,
- * so the type stays a union to preserve that legacy behaviour without
- * losing the rich object at init time.
- */
-export type ChatColor = string | { text: string; bg: string };
-
-export interface ChatState {
-  messages: ChatMessage[];
-  privateMessages: ChatMessage[];
-  privateMessage: string;
-  color: ChatColor;
-  opacity: number;
-  fontSize: string;
-  playerFontSize: string;
-  /** Show a time next to every chat line (per viewer, #1567). */
-  showTimestamps?: boolean;
-  [k: string]: unknown;
-}
-
-export interface BoardState {
-  objects: BoardObject[];
-  drawings: Drawing[];
-  texts: TextEntity[];
-  whiteboard: WhiteboardCommand[];
-  tracks: JitsiTrack[];
-}
-
-export interface ToolsState {
-  avatars: ToolboxItem[];
-  props: ToolboxItem[];
-  backdrops: ToolboxItem[];
-  audios: ToolboxItem[];
-  videos: ToolboxItem[];
-  meetings: ToolboxItem[];
-  curtains: ToolboxItem[];
-  [k: string]: ToolboxItem[];
-}
-
-export interface SettingPopup {
-  isActive: boolean;
-  [k: string]: unknown;
-}
-
-export interface PurchasePopup {
-  isActive: boolean;
-  amount?: number;
-  [k: string]: unknown;
-}
-
-export interface ReceiptPopup {
-  isActive: boolean;
-  donationDetails: { amount: number; date: string; [k: string]: unknown };
-}
-
-export interface ReplayMarker {
-  id: string;
-  label: string;
-  mqttTimestamp: number;
-}
-
-export interface ReplayState {
-  timestamp: { begin: number; end: number; current: number };
-  timers: ReturnType<typeof setTimeout>[];
-  interval: ReturnType<typeof setInterval> | null;
-  speed: number;
-  isReplaying?: boolean;
-  /** Restart from `begin` when playback passes `end` (exhibition loop). */
-  loop?: boolean;
-  performanceId?: string | null;
-  markers?: ReplayMarker[];
-}
-
-export interface Viewport {
-  width: number;
-  height: number;
-}
-
-export interface StageSize {
-  width: number;
-  height: number;
-  left: number;
-  top: number;
-}
+export type * from "./stage.types";
 
 /**
  * Per-tab stage session id. Stored in `sessionStorage` so refreshes
@@ -667,7 +339,7 @@ export const useStageStore = defineStore(
       Number(localStorage.getItem("lastSeenPrivateMessage")) || 0,
     );
     const masquerading = ref<boolean>(false);
-    const purchasePopup = ref<PurchasePopup>({ isActive: false });
+    const donationPopup = ref<DonationPopup>({ isActive: false });
     const receiptPopup = ref<ReceiptPopup>({
       isActive: false,
       donationDetails: { amount: 0, date: "" },
@@ -832,17 +504,28 @@ export const useStageStore = defineStore(
       const ratio = config.value.ratio;
       if (width / height > ratio) {
         width = height * ratio;
-        left = (window.innerWidth - width) / 2;
+        left = snapToDevicePixel((window.innerWidth - width) / 2);
       } else {
         height = width / ratio;
         if (window.innerWidth < window.innerHeight) {
           // Portrait mobile
           top = 0;
         } else {
-          top = (window.innerHeight - height) / 2;
+          top = snapToDevicePixel((window.innerHeight - height) / 2);
         }
       }
       return { width, height, left, top };
+    });
+
+    const canPlay = computed(() => {
+      return (
+        model.value &&
+        model.value.permission &&
+        model.value.permission !== "audience" &&
+        !replay.value.isReplaying &&
+        !masquerading.value &&
+        !replay.value.isReplaying
+      );
     });
 
     // `ListStage` carries `status` on the stage payload; older payloads only
@@ -871,17 +554,6 @@ export const useStageStore = defineStore(
       const permission = model.value.permission;
       if (permission && permission !== "audience") return true;
       return stageStatus.value === "live";
-    });
-
-    const canPlay = computed(() => {
-      return (
-        model.value &&
-        model.value.permission &&
-        model.value.permission !== "audience" &&
-        !replay.value.isReplaying &&
-        !masquerading.value &&
-        !replay.value.isReplaying
-      );
     });
 
     /**
@@ -1137,14 +809,28 @@ export const useStageStore = defineStore(
       if (cleanModel) {
         model.value = null;
         tools.value.audios = [];
+        // SET_MODEL pushes onto these buckets, so without a reset the next
+        // stage's Streams palette listed the previous stage's meetings too,
+        // and audioPlayers (indexed alongside tools.audios) kept stale
+        // positions for tracks that no longer existed.
+        tools.value.meetings = [];
+        audioPlayers.value = [];
       }
       status.value = "OFFLINE";
+      // Per-stage presence state. Left over from stage A it was counted in
+      // stage B's STATISTICS publishes and fed the frozen-viewer pruner.
+      sessions.value = [];
+      subscribeSuccess.value = false;
+      reactions.value = [];
+      frozenViewerReports.value = new Map();
       replay.value.isReplaying = false;
       liveMoves.clear();
       lastOwnMoveSeq.clear();
       background.value = null;
       curtain.value = null;
       backdropColor.value = "gray";
+      attachingPropTo.value = null;
+      requestedTool.value = null;
       tools.value.avatars = [];
       tools.value.props = [];
       tools.value.backdrops = [];
@@ -2027,12 +1713,12 @@ export const useStageStore = defineStore(
       }
     }
 
-    function SET_PURCHASE_POPUP(purchase: PurchasePopup) {
-      purchasePopup.value = purchase;
-      if (purchase.isActive) {
+    function SET_DONATION_POPUP(donation: DonationPopup) {
+      donationPopup.value = donation;
+      if (donation.isActive) {
         receiptPopup.value.donationDetails = {
-          ...purchase,
-          amount: purchase.amount ?? 0,
+          ...donation,
+          amount: donation.amount ?? 0,
           date: new Date().toLocaleDateString(),
         };
       }
@@ -2502,8 +2188,10 @@ export const useStageStore = defineStore(
       if (targetId == null) return null;
       const target = board.value.objects.find((o) => o.id === targetId);
       if (!target) return null;
+      // The palette item is live reactive state shared with the toolbox;
+      // the Board drop path clones it through dataTransfer, so do the same.
       const placed = placeObjectOnStage({
-        ...prop,
+        ...(JSON.parse(JSON.stringify(prop)) as typeof prop),
         x: target.x,
         y: target.y,
         w: target.w,
@@ -3692,11 +3380,25 @@ export const useStageStore = defineStore(
       }
     }
 
+    // Monotonic load counter: a slow response for stage A must not overwrite
+    // stage B once the user has moved on (or the Live view has unmounted).
+    let loadStageSeq = 0;
+
+    /**
+     * Load a stage (and optionally a recording) into the store.
+     * Resolves `true` when this load populated the store, `false` when it was
+     * superseded by a newer loadStage() call or failed — callers chaining
+     * `connect()` should check it.
+     */
     async function loadStage({ url, recordId }: { url: string; recordId?: string }) {
+      const seq = ++loadStageSeq;
       CLEAN_STAGE(true);
       SET_PRELOADING_STATUS(true);
       try {
         const { stage } = await stageGraph.loadStage(url, recordId);
+        if (seq !== loadStageSeq) {
+          return false;
+        }
         if (stage) {
           SET_MODEL(stage);
           const { events } = stage as StageModel;
@@ -3712,24 +3414,33 @@ export const useStageStore = defineStore(
             });
           } else {
             const archivedEvents = events ?? [];
-            archivedEvents.forEach((event: ReplayEvent) => replayEvent(event));
+            // Temporary on-stage settings (the background colour) only last
+            // for the session they were made in; see stageSession.ts (#1572).
+            eventsForEntry(archivedEvents, Date.now()).forEach((event: ReplayEvent) =>
+              replayEvent(event),
+            );
             reconcileJitsiBoardFromEvents(archivedEvents);
           }
           await stageGraph.updateLastAccess(stage.id);
+          return seq === loadStageSeq;
         } else {
           SET_PRELOADING_STATUS(false);
         }
       } catch (e) {
         console.error("[stage/loadStage] failed", e);
-        SET_PRELOADING_STATUS(false);
+        if (seq === loadStageSeq) SET_PRELOADING_STATUS(false);
       }
+      return false;
     }
 
     async function reloadPermission() {
       if (!model.value?.fileLocation) return;
-      const { stage } = await stageGraph.loadStage(model.value.fileLocation);
-      if (stage && model.value) {
-        model.value.permission = stage.permission;
+      // Only the caller's permission is wanted; loadStage would refetch the
+      // whole model (assets, scenes, events) for that one field.
+      const reloaded = await stageGraph.loadPermission(model.value.fileLocation);
+      if (reloaded?.permission !== undefined && model.value) {
+        model.value.permission = reloaded.permission;
+        if (reloaded.mqtt) (model.value as { mqtt?: unknown }).mqtt = reloaded.mqtt;
       }
     }
 
@@ -4152,7 +3863,10 @@ export const useStageStore = defineStore(
       const id = session.value;
       // Presence-suppressed pop-outs never joined, so they publish no leave.
       if (id != null && !standaloneChatPresenceSuppressed.value) {
-        mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true });
+        // `unload`: the page is going away, which may be a reload that rejoins
+        // in seconds. stageSession.ts keeps the stage "occupied" briefly for
+        // such a leave; the in-app leave above ends presence at once.
+        mqtt.sendMessageSync(TOPICS.COUNTER, { id, leaving: true, unload: true });
       }
       session.value = null;
       CLEAN_STAGE();
@@ -4261,13 +3975,13 @@ export const useStageStore = defineStore(
       mqtt.sendMessage(TOPICS.DRAW, { type: DRAW_ACTIONS.CLEAR });
     }
 
-    function closePurchasePopup() {
-      SET_PURCHASE_POPUP({ isActive: false });
+    function closeDonationPopup() {
+      SET_DONATION_POPUP({ isActive: false });
     }
 
-    function openPurchasePopup(setting: PurchasePopup) {
+    function openDonationPopup(setting: DonationPopup) {
       setting.isActive = true;
-      SET_PURCHASE_POPUP(setting);
+      SET_DONATION_POPUP(setting);
     }
 
     function openReceiptPopup(setting?: unknown) {
@@ -4431,7 +4145,7 @@ export const useStageStore = defineStore(
       publicChatPosition,
       lastSeenPrivateMessage,
       masquerading,
-      purchasePopup,
+      donationPopup,
       receiptPopup,
       _reloadStreams,
       _forceReloadStreams,
@@ -4529,7 +4243,7 @@ export const useStageStore = defineStore(
       TOGGLE_MASQUERADING,
       CREATE_ROOM,
       REORDER_TOOLBOX,
-      SET_PURCHASE_POPUP,
+      SET_DONATION_POPUP,
       ADD_TRACK,
       RELOAD_STREAMS,
       REFRESH_MEETING,
@@ -4629,8 +4343,8 @@ export const useStageStore = defineStore(
       sendDrawWhiteboard,
       sendUndoWhiteboard,
       sendClearWhiteboard,
-      closePurchasePopup,
-      openPurchasePopup,
+      closeDonationPopup,
+      openDonationPopup,
       openReceiptPopup,
       closeReceiptPopup,
       addTrack,

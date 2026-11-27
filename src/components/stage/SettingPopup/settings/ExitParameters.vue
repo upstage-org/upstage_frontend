@@ -4,7 +4,7 @@
   the persistent per-stage-assignment exit settings in the studio media
   editor are deliberately left untouched.
 -->
-<script>
+<script setup lang="ts">
 import { computed, reactive } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import SaveButton from "components/form/SaveButton.vue";
@@ -12,48 +12,41 @@ import ExitSettings from "components/media/ExitSettings.vue";
 import { DEFAULT_EXIT_ANIMATION, DEFAULT_EXIT_SPEED } from "components/stage/removalAnimations";
 import { isJitsiBoardType, isStreamPlaybackBoardType } from "utils/common";
 
-export default {
-  components: {
-    ExitSettings,
-    SaveButton,
-  },
-  emits: ["close"],
-  setup: (props, { emit }) => {
-    const stageStore = useStageStore();
-    const currentObject = computed(() => stageStore.activeObject);
-    const parameters = reactive({
-      exitAnimation: currentObject.value?.exitAnimation || DEFAULT_EXIT_ANIMATION,
-      exitSpeed: currentObject.value?.exitSpeed || DEFAULT_EXIT_SPEED,
-    });
+const emit = defineEmits<{
+  (e: "close"): void;
+}>();
 
-    // Live tiles have no poster image; ExitSettings falls back to its
-    // placeholder circle when previewSrc is absent.
-    const previewSrc = computed(() => {
-      const object = currentObject.value;
-      if (!object?.src) return undefined;
-      if (
-        isStreamPlaybackBoardType(object.type) ||
-        isStreamPlaybackBoardType(object.assetType?.name) ||
-        isJitsiBoardType(object.type)
-      ) {
-        return undefined;
-      }
-      return object.src;
-    });
+const stageStore = useStageStore();
+const currentObject = computed<any>(() => stageStore.activeObject);
+const parameters = reactive({
+  exitAnimation: currentObject.value?.exitAnimation || DEFAULT_EXIT_ANIMATION,
+  exitSpeed: currentObject.value?.exitSpeed || DEFAULT_EXIT_SPEED,
+});
 
-    // `shapeObject` is synchronous in Pinia (see VolumeParameters for the
-    // same pattern), so close can run inline after it.
-    const save = () => {
-      stageStore.shapeObject({
-        ...currentObject.value,
-        exitAnimation: parameters.exitAnimation,
-        exitSpeed: parameters.exitSpeed,
-      });
-      emit("close");
-    };
+// Live tiles have no poster image; ExitSettings falls back to its
+// placeholder circle when previewSrc is absent.
+const previewSrc = computed(() => {
+  const object = currentObject.value;
+  if (!object?.src) return undefined;
+  if (
+    isStreamPlaybackBoardType(object.type) ||
+    isStreamPlaybackBoardType(object.assetType?.name) ||
+    isJitsiBoardType(object.type)
+  ) {
+    return undefined;
+  }
+  return object.src;
+});
 
-    return { save, parameters, previewSrc };
-  },
+// `shapeObject` is synchronous in Pinia (see VolumeParameters for the
+// same pattern), so close can run inline after it.
+const save = () => {
+  stageStore.shapeObject({
+    ...currentObject.value,
+    exitAnimation: parameters.exitAnimation,
+    exitSpeed: parameters.exitSpeed,
+  });
+  emit("close");
 };
 </script>
 

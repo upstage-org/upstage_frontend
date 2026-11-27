@@ -1,4 +1,4 @@
-<script lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { Spin, Tag } from "ant-design-vue";
 import { stageGraph } from "services/graphql";
@@ -21,74 +21,64 @@ const ROLES: Record<Role, { label: string; color: string; rank: number }> = {
   player: { label: "Player", color: "blue", rank: 2 },
 };
 
-export default {
-  components: { Spin, Tag },
-  props: {
-    player: {
-      type: Object,
-      required: true,
-    },
-  },
-  setup(props) {
-    const loading = ref(true);
-    const error = ref("");
-    const stages = ref<AccessStage[]>([]);
+const props = defineProps<{
+  player: Record<string, any>;
+}>();
 
-    onMounted(async () => {
-      try {
-        const response = (await stageGraph.stageAccessOverview()) as {
-          stages?: { edges?: AccessStage[] };
-        };
-        stages.value = response.stages?.edges ?? [];
-      } catch (e) {
-        error.value = e instanceof Error ? e.message : String(e);
-      } finally {
-        loading.value = false;
-      }
-    });
+const loading = ref(true);
+const error = ref("");
+const stages = ref<AccessStage[]>([]);
 
-    // Mirrors resolve_permission on the backend: ownership wins, then the
-    // playerAccess attribute, which holds [[player ids], [editor ids]].
-    // Older saves stored the ids as numbers, newer ones as strings — the
-    // dev DB has both — so compare everything as strings.
-    const roleFor = (stage: AccessStage): Role | null => {
-      const id = String(props.player.id);
-      if (stage.owner && String(stage.owner.id) === id) {
-        return "owner";
-      }
-      let access;
-      try {
-        access = JSON.parse(stage.playerAccess ?? "null");
-      } catch {
-        return null;
-      }
-      if (!Array.isArray(access)) {
-        return null;
-      }
-      const has = (group: unknown) =>
-        Array.isArray(group) && group.some((entry) => String(entry) === id);
-      if (has(access[1])) {
-        return "editor";
-      }
-      if (has(access[0])) {
-        return "player";
-      }
-      return null;
+onMounted(async () => {
+  try {
+    const response = (await stageGraph.stageAccessOverview()) as {
+      stages?: { edges?: AccessStage[] };
     };
+    stages.value = response.stages?.edges ?? [];
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    loading.value = false;
+  }
+});
 
-    const rows = computed(() =>
-      stages.value
-        .map((stage) => ({ stage, role: roleFor(stage) }))
-        .filter((row): row is { stage: AccessStage; role: Role } => row.role !== null)
-        .sort(
-          (a, b) =>
-            ROLES[a.role].rank - ROLES[b.role].rank || a.stage.name.localeCompare(b.stage.name),
-        ),
-    );
-
-    return { loading, error, rows, ROLES };
-  },
+// Mirrors resolve_permission on the backend: ownership wins, then the
+// playerAccess attribute, which holds [[player ids], [editor ids]].
+// Older saves stored the ids as numbers, newer ones as strings — the
+// dev DB has both — so compare everything as strings.
+const roleFor = (stage: AccessStage): Role | null => {
+  const id = String(props.player.id);
+  if (stage.owner && String(stage.owner.id) === id) {
+    return "owner";
+  }
+  let access;
+  try {
+    access = JSON.parse(stage.playerAccess ?? "null");
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(access)) {
+    return null;
+  }
+  const has = (group: unknown) =>
+    Array.isArray(group) && group.some((entry) => String(entry) === id);
+  if (has(access[1])) {
+    return "editor";
+  }
+  if (has(access[0])) {
+    return "player";
+  }
+  return null;
 };
+
+const rows = computed(() =>
+  stages.value
+    .map((stage) => ({ stage, role: roleFor(stage) }))
+    .filter((row): row is { stage: AccessStage; role: Role } => row.role !== null)
+    .sort(
+      (a, b) => ROLES[a.role].rank - ROLES[b.role].rank || a.stage.name.localeCompare(b.stage.name),
+    ),
+);
 </script>
 
 <template>

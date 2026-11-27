@@ -1,4 +1,3 @@
-// @ts-nocheck
 import configs from "config";
 import { onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
@@ -43,6 +42,12 @@ const readEnvString = (key: string): string | undefined => {
   const trimmed = raw.trim();
   return trimmed === "" ? undefined : trimmed;
 };
+
+// Wire-level XMPP/BOSH tracing (the `[diag]` WebSocket / XHR / Strophe hooks
+// below). Dev-only AND explicitly opted in with VITE_JITSI_WIRE_TRACE=true:
+// the hooks monkey-patch globals for the whole SPA and log auth stanzas.
+const JITSI_WIRE_TRACE =
+  Boolean((import.meta as any).env?.DEV) && readEnvString("VITE_JITSI_WIRE_TRACE") === "true";
 
 //
 // Multi-server streaming: `origin` selects one of `configs.JITSI_ENDPOINTS`.
@@ -179,6 +184,8 @@ export const loadJitsiServerConfig = (
   return promise;
 };
 
+// lib-jitsi-meet is vendored and untyped; these are its objects.
+type SessionOptions = { origin: any; stageUrl: any; target: any; initLib: any };
 // Automatic rejoin (see `scheduleRejoin`). Delay before attempt N; the last
 // value repeats for as long as the stage stays open.
 const JITSI_REJOIN_DELAYS_MS = [1000, 3000, 5000, 10000, 15000];
@@ -222,12 +229,12 @@ const JITSI_NO_REJOIN_ERRORS = [
  * Instance-level wrappers only (never the prototypes), each skipped when the
  * lib does not have the method, so a different lib build is unaffected.
  */
-export const hardenJitsiLib = (connection, room) => {
+export const hardenJitsiLib = (connection: any, room: any) => {
   try {
     const xmpp = connection?.xmpp;
     if (xmpp && typeof xmpp.sendDominantSpeakerEvent === "function" && !xmpp.__upstageGuarded) {
       const original = xmpp.sendDominantSpeakerEvent.bind(xmpp);
-      xmpp.sendDominantSpeakerEvent = (...args) => {
+      xmpp.sendDominantSpeakerEvent = (...args: unknown[]) => {
         if (!xmpp.connection?.connected) return undefined;
         return original(...args);
       };
@@ -240,7 +247,7 @@ export const hardenJitsiLib = (connection, room) => {
     const codec = room?.qualityController?.codecController;
     if (codec && typeof codec.selectPreferredCodec === "function" && !codec.__upstageGuarded) {
       const original = codec.selectPreferredCodec.bind(codec);
-      codec.selectPreferredCodec = (...args) => {
+      codec.selectPreferredCodec = (...args: unknown[]) => {
         try {
           return original(...args);
         } catch (err) {
@@ -284,8 +291,8 @@ export const useJitsi = () => {
   //              `localJitsiParticipantIds` is the reactive join signal.
   const sessions = new Map();
   const jitsi = {
-    room: null,
-    connection: null,
+    room: null as any,
+    connection: null as any,
     localTracks,
     sessions,
     /**
@@ -351,7 +358,12 @@ export const useJitsi = () => {
    * `initLib` runs `JitsiMeetJS.init` exactly as the old code did for the
    * first session; extra sessions must not re-init the global lib.
    */
-  const clearSessionTimers = (session) => {
+  // Set once the component unmounts (below); `startSession` consults it
+  // after its only await so a connection is never created for a stage the
+  // user has already left.
+  let unmounted = false;
+
+  const clearSessionTimers = (session: any) => {
     for (const key of ["retryTimer", "watchdogTimer", "interruptedTimer"]) {
       if (session[key]) clearTimeout(session[key]);
       session[key] = null;
@@ -359,7 +371,7 @@ export const useJitsi = () => {
   };
 
   /** Leave the conference and close the XMPP connection held by `target`. */
-  const teardownTarget = (target) => {
+  const teardownTarget = (target: any) => {
     try {
       const leave = target.room?.leave?.();
       if (leave && typeof leave.catch === "function") leave.catch(() => {});
@@ -373,11 +385,14 @@ export const useJitsi = () => {
     }
   };
 
-  const createJitsiSession = ({ origin, stageUrl, target, initLib }) => {
+  const createJitsiSession = ({ origin, stageUrl, target, initLib }: SessionOptions) => {
     const session = {
       origin,
       target,
       joined: ref(false),
+      // True once `leave()` ran; a still-pending `startSession` for this
+      // session then bails instead of connecting (see below).
+      ended: false,
       leave: () => {},
       isDefault: target === jitsi,
       // --- automatic rejoin state (see `scheduleRejoin` in startSession) ---
@@ -385,8 +400,6 @@ export const useJitsi = () => {
       // torn down, so events still arriving from a dead connection/room are
       // recognised as stale and ignored.
       generation: 0,
-      // Set by `leave()` (route teardown / idle extra session): no rejoin.
-      ended: false,
       // Consecutive failed attempts since the last CONFERENCE_JOINED.
       attempts: 0,
       everJoined: false,
@@ -416,7 +429,10 @@ export const useJitsi = () => {
     return session;
   };
 
-  const startSession = async (session, { origin, stageUrl, target, initLib }) => {
+  const startSession = async (
+    session: any,
+    { origin, stageUrl, target, initLib }: SessionOptions,
+  ) => {
     const endpoint = useJitsiEndpoint(origin);
     const serverTag = multiServer ? origin : undefined;
     const markJoined = session.markJoined;
@@ -522,7 +538,16 @@ export const useJitsi = () => {
     // presence is silently dropped and `CONFERENCE_JOINED` never fires
     // (the long "preview works but other browsers can't see me" bug).
     const serverCfg = await loadJitsiServerConfig(httpScheme, host);
-    if (!live()) return;
+    // That fetch is the only await before the connection is created. If
+    // this session was left meanwhile (idle-close of an extra server, or
+    // the component unmounting mid-fetch), creating and connecting now
+    // would leave an XMPP/WebSocket connection nobody ever tears down.
+    if (!live() || unmounted) {
+      console.log("[diag] useJitsi: session ended during config fetch; not connecting", {
+        origin,
+      });
+      return;
+    }
     // The env overrides describe the default server only (see useJitsiEndpoint).
     const envXmpp = endpoint.isDefaultServer ? readEnvString("VITE_JITSI_XMPP_DOMAIN") : undefined;
     const envMuc = endpoint.isDefaultServer
@@ -677,7 +702,12 @@ export const useJitsi = () => {
     // doesn't drown the console.
     // TODO(streaming-diag): remove once the CONFERENCE_JOINED-never-fires
     // root cause is identified.
-    {
+    //
+    // Opt-in only (JITSI_WIRE_TRACE): the wrap replaces the global
+    // WebSocket / XMLHttpRequest for the whole SPA and logs every XMPP
+    // stanza, SASL auth included, so it must never run in a production
+    // bundle. Everything else on this path is untouched.
+    if (JITSI_WIRE_TRACE) {
       const w = window as unknown as {
         WebSocket: typeof WebSocket;
         __upstageWsHooked?: boolean;
@@ -796,7 +826,7 @@ export const useJitsi = () => {
 
     target.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
-      (e) => {
+      (e: any) => {
         if (!live()) return;
         console.log("Connection established", e);
         // NOTE on the Colibri "bridge channel":
@@ -856,7 +886,7 @@ export const useJitsi = () => {
         target.room.on(JitsiMeetJS.events.conference.DATA_CHANNEL_OPENED, () => {
           console.log("[diag] composable DATA_CHANNEL_OPENED (bridge channel up)");
         });
-        target.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track) => {
+        target.room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track: any) => {
           console.log("[diag] composable TRACK_ADDED", {
             type: track?.type,
             participantId: track?.getParticipantId?.(),
@@ -866,7 +896,7 @@ export const useJitsi = () => {
           if (!live()) return;
           stageStore.addTrack(track, serverTag);
         });
-        target.room.on(JitsiMeetJS.events.conference.TRACK_REMOVED, (track) => {
+        target.room.on(JitsiMeetJS.events.conference.TRACK_REMOVED, (track: any) => {
           console.log("[diag] composable TRACK_REMOVED", {
             type: track?.type,
             participantId: track?.getParticipantId?.(),
@@ -874,15 +904,15 @@ export const useJitsi = () => {
           if (!live()) return;
           if (track) stageStore.removeTrack(track);
         });
-        target.room.on(JitsiMeetJS.events.conference.USER_JOINED, (id) => {
+        target.room.on(JitsiMeetJS.events.conference.USER_JOINED, (id: any) => {
           console.log("[diag] composable USER_JOINED", id);
         });
-        target.room.on(JitsiMeetJS.events.conference.USER_LEFT, (id) => {
+        target.room.on(JitsiMeetJS.events.conference.USER_LEFT, (id: any) => {
           console.log("[diag] composable USER_LEFT", id);
           if (!live()) return;
           if (id != null) stageStore.removeJitsiParticipantLocally(String(id), serverTag);
         });
-        target.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e) => {
+        target.room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, (e: any) => {
           console.log("[diag] composable CONFERENCE_JOINED", {
             myUserId: target.room?.myUserId?.(),
             e,
@@ -927,13 +957,13 @@ export const useJitsi = () => {
                 // no track arrives, JVB is withholding (subscribe-side). If it
                 // shows NO source, the publisher isn't announcing media at all
                 // (publish-side). getSources() returns a Map(mediaType -> Set).
-                const participants = (room?.getParticipants?.() || []).map((p) => {
+                const participants = (room?.getParticipants?.() || []).map((p: any) => {
                   let sources = null;
                   try {
                     const m = p.getSources?.();
                     if (m && typeof m.forEach === "function") {
                       sources = {};
-                      m.forEach((set, mediaType) => {
+                      m.forEach((set: any, mediaType: any) => {
                         sources[mediaType] = [...(set?.keys?.() || [])];
                       });
                     }
@@ -945,7 +975,7 @@ export const useJitsi = () => {
                     displayName: p.getDisplayName?.(),
                     // muted/videoType distinguish "camera off / not sending"
                     // (publish-side) from "JVB withholding live media".
-                    tracks: (p.getTracks?.() || []).map((t) => ({
+                    tracks: (p.getTracks?.() || []).map((t: any) => ({
                       type: t.getType?.(),
                       muted: t.isMuted?.(),
                       videoType: t.getVideoType?.(),
@@ -959,7 +989,7 @@ export const useJitsi = () => {
                 // LOCAL tracks (publisher side): are we actually sending, and
                 // is the camera muted? Empty here on a publisher = addTrack never
                 // ran. muted:true on the video = camera off / not sending RTP.
-                const localTracks = (room?.getLocalTracks?.() || []).map((t) => ({
+                const localTracks = (room?.getLocalTracks?.() || []).map((t: any) => ({
                   type: t.getType?.(),
                   muted: t.isMuted?.(),
                   videoType: t.getVideoType?.(),
@@ -993,7 +1023,7 @@ export const useJitsi = () => {
           probe(10000);
           probe(20000);
         });
-        target.room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (...args) => {
+        target.room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (...args: any[]) => {
           console.warn("[diag] composable CONFERENCE_FAILED", ...args);
           // Errors a fresh join cannot cure (locked / members-only / full
           // room) are left alone; everything else gets a new conference.
@@ -1098,50 +1128,55 @@ export const useJitsi = () => {
         // capture. Defensive: lib could reorganise this internal path
         // between releases, so wrap in try/catch.
         // TODO(streaming-diag): remove with the rest of the trace.
-        try {
-          const xmppConn = target.connection?.xmpp?.connection;
-          if (xmppConn && typeof xmppConn.xmlInput !== "function") {
-            xmppConn.xmlInput = (elem: { outerHTML?: string }) => {
-              try {
-                const s = elem?.outerHTML ?? String(elem);
-                console.log(
-                  "[diag] strophe xmlInput",
-                  s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
-                );
-              } catch (_) {
-                /* swallow */
-              }
-            };
+        // Opt-in only (JITSI_WIRE_TRACE), same reason as the WebSocket wrap.
+        if (JITSI_WIRE_TRACE)
+          try {
+            const xmppConn = target.connection?.xmpp?.connection;
+            if (xmppConn && typeof xmppConn.xmlInput !== "function") {
+              xmppConn.xmlInput = (elem: { outerHTML?: string }) => {
+                try {
+                  const s = elem?.outerHTML ?? String(elem);
+                  console.log(
+                    "[diag] strophe xmlInput",
+                    s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
+                  );
+                } catch (_) {
+                  /* swallow */
+                }
+              };
+            }
+            if (xmppConn && typeof xmppConn.xmlOutput !== "function") {
+              xmppConn.xmlOutput = (elem: { outerHTML?: string }) => {
+                try {
+                  const s = elem?.outerHTML ?? String(elem);
+                  console.log(
+                    "[diag] strophe xmlOutput",
+                    s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
+                  );
+                } catch (_) {
+                  /* swallow */
+                }
+              };
+            }
+            console.log("[diag] strophe xmlInput/xmlOutput hooks installed", {
+              hasXmppConn: !!xmppConn,
+            });
+          } catch (hookErr) {
+            console.warn("[diag] failed to install strophe xmlInput/xmlOutput", hookErr);
           }
-          if (xmppConn && typeof xmppConn.xmlOutput !== "function") {
-            xmppConn.xmlOutput = (elem: { outerHTML?: string }) => {
-              try {
-                const s = elem?.outerHTML ?? String(elem);
-                console.log(
-                  "[diag] strophe xmlOutput",
-                  s.length > 800 ? `${s.slice(0, 800)}…(+${s.length - 800})` : s,
-                );
-              } catch (_) {
-                /* swallow */
-              }
-            };
-          }
-          console.log("[diag] strophe xmlInput/xmlOutput hooks installed", {
-            hasXmppConn: !!xmppConn,
-          });
-        } catch (hookErr) {
-          console.warn("[diag] failed to install strophe xmlInput/xmlOutput", hookErr);
-        }
       },
     );
-    target.connection.addEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, (e) => {
-      if (!live() || session.retryTimer) return;
-      console.error("Connection failed", e);
-      scheduleRejoin("connection failed");
-    });
+    target.connection.addEventListener(
+      JitsiMeetJS.events.connection.CONNECTION_FAILED,
+      (e: any) => {
+        if (!live() || session.retryTimer) return;
+        console.error("Connection failed", e);
+        scheduleRejoin("connection failed");
+      },
+    );
     target.connection.addEventListener(
       JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
-      (e) => {
+      (e: any) => {
         // A deliberate disconnect (session.leave / rejoin teardown) has
         // already bumped the generation, so only an unexpected one lands here.
         if (!live() || session.retryTimer) return;
@@ -1158,7 +1193,7 @@ export const useJitsi = () => {
     // (e.g. native "WebSocket"), the patch race is the reason we're
     // not seeing [diag] xmpp lines, NOT a server hang.
     // TODO(streaming-diag): remove with the rest of the trace.
-    {
+    if (JITSI_WIRE_TRACE) {
       const w = window as unknown as { WebSocket: typeof WebSocket; __upstageWsHooked?: boolean };
       console.log("[diag] composable about to connect()", {
         wsHooked: !!w.__upstageWsHooked,
@@ -1310,6 +1345,7 @@ export const useJitsi = () => {
   // cleanly after backgrounding) — explicit teardown gives consistent
   // behaviour everywhere.
   onUnmounted(() => {
+    unmounted = true;
     // Stop every session's rejoin machinery first: nothing may reconnect
     // after the stage route is gone.
     for (const session of sessions.values()) {

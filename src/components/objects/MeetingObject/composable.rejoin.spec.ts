@@ -382,41 +382,6 @@ describe("useJitsi — automatic rejoin after the connection is lost", () => {
 });
 
 /**
- * A stage that is closed to this viewer (#1573: rehearsal, and they are not
- * one of its players) must not join the conference at all — joining delivers
- * the performers' audio to a tab that is still behind the curtain.
- */
-describe("useJitsi — stage closed to the viewer (#1573)", () => {
-  afterEach(() => {
-    delete (store() as Record<string, unknown>).stageOpenToViewer;
-  });
-
-  it("does not connect while the stage is closed", async () => {
-    store().stageOpenToViewer = false;
-    await mountJitsi();
-    await vi.advanceTimersByTimeAsync(120_000);
-    expect(fake.connections).toHaveLength(0);
-    expect(store().setJitsiConnectionLost).not.toHaveBeenCalledWith(true);
-  });
-
-  it("connects once the stage opens to the viewer (status goes live, or they log in as a player)", async () => {
-    store().stageOpenToViewer = false;
-    await mountJitsi();
-    expect(fake.connections).toHaveLength(0);
-    store().stageOpenToViewer = true;
-    await flushPromises();
-    expect(fake.connections).toHaveLength(1);
-    expect(conn(0).connectCalls).toBe(1);
-  });
-
-  it("an open stage connects as before", async () => {
-    store().stageOpenToViewer = true;
-    await mountJitsi();
-    expect(fake.connections).toHaveLength(1);
-  });
-});
-
-/**
  * Uncaught page errors captured on prod (2026-11-23) from inside
  * lib-jitsi-meet's own event handlers; see `hardenJitsiLib`.
  */

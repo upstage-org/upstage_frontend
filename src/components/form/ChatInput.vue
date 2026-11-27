@@ -208,8 +208,11 @@ export default {
 
     const pickerEnter = async (el, complete) => {
       await updateEmojiPickerPosition();
-      el.addEventListener("emoji-click", handleEmoji);
-      el.shadowRoot.querySelector("#search").placeholder = 'Hold "Shift" key to select multiple';
+      // `emoji-click` is bound once in the template. Adding it here on every
+      // enter transition stacked a listener per open, so the Nth open sent
+      // N reactions per click.
+      const search = el.shadowRoot?.querySelector("#search");
+      if (search) search.placeholder = 'Hold "Shift" key to select multiple';
 
       // Apply positioning to the element
       Object.assign(el.style, emojiPickerStyle.value);
@@ -244,6 +247,7 @@ export default {
       input,
       isPicking,
       emojiPicker,
+      handleEmoji,
       pickerEnter,
       pickerLeave,
       dynamicClass,
@@ -304,6 +308,7 @@ export default {
             ref="emojiPicker"
             :class="{ dark: chatDarkMode, light: !chatDarkMode }"
             :style="emojiPickerStyle"
+            @emoji-click="handleEmoji"
           />
         </transition>
       </div>

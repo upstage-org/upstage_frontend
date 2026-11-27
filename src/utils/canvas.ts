@@ -1,13 +1,13 @@
-// @ts-nocheck
-export const clipDrawedArea = (canvas) => {
-  var ctx = canvas.getContext("2d");
-  var w = canvas.width,
+export const clipDrawedArea = (canvas: HTMLCanvasElement) => {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  let w = canvas.width,
     h = canvas.height,
-    pix = { x: [], y: [] },
-    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height),
-    x,
-    y,
-    index;
+    x: number,
+    y: number,
+    index: number;
+  const pix: { x: number[]; y: number[] } = { x: [], y: [] },
+    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
   for (y = 0; y < h; y++) {
     for (x = 0; x < w; x++) {
@@ -24,7 +24,7 @@ export const clipDrawedArea = (canvas) => {
   pix.y.sort(function (a, b) {
     return a - b;
   });
-  var n = pix.x.length - 1;
+  const n = pix.x.length - 1;
 
   x = pix.x[0];
   y = pix.y[0];
@@ -50,19 +50,20 @@ export const clipDrawedArea = (canvas) => {
   }
 };
 
-export const cropImageFromCanvas = (canvas) => {
+export const cropImageFromCanvas = (canvas: HTMLCanvasElement) => {
   const position = clipDrawedArea(canvas);
   if (!position) {
     return;
   }
   const { x, y, w, h } = position;
-  var ctx = canvas.getContext("2d");
-  var cut = ctx.getImageData(x, y, w, h);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const cut = ctx.getImageData(x, y, w, h);
 
   const tmpCanvas = document.createElement("canvas");
   tmpCanvas.width = w;
   tmpCanvas.height = h;
-  tmpCanvas.getContext("2d").putImageData(cut, 0, 0);
+  tmpCanvas.getContext("2d")?.putImageData(cut, 0, 0);
 
   const image = tmpCanvas.toDataURL();
   return {

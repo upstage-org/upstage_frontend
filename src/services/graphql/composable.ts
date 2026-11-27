@@ -1,20 +1,23 @@
-// @ts-nocheck
 import { computed, reactive, ref } from "vue";
 import hash from "object-hash";
 import { message } from "ant-design-vue";
-import { configGraph } from "services/graphql";
 import { logout } from "utils/auth";
 import { useCacheStore } from "@stores/pinia/cache";
 
-export const useRequest = (service, ...params) => {
+type Service = (...args: any[]) => any;
+type RequestParams = [service: Service, ...params: any[]];
+type LegacyGraphqlError =
+  { response?: { errors?: Array<{ message?: string }> } } | null | undefined;
+
+export const useRequest = (service: Service, ...params: any[]) => {
   const loading = ref(false);
-  const data = ref();
+  const data = ref<any>();
   const nodes = computed(() => {
     if (!data.value) return null;
     const value = Object.values(data.value)[0];
     return Array.isArray(value) ? value : [value];
   });
-  const pushNode = (node, reverse) => {
+  const pushNode = (node: any, reverse?: boolean) => {
     if (data.value) {
       const key = Object.keys(data.value)[0];
       let edges = data.value[key].edges;
@@ -26,11 +29,11 @@ export const useRequest = (service, ...params) => {
       data.value = { [key]: { edges } };
     }
   };
-  const popNode = (selector) => {
+  const popNode = (selector: (node: any) => boolean) => {
     if (data.value) {
       const key = Object.keys(data.value)[0];
       let edges = data.value[key].edges;
-      const position = edges.findIndex((edge) => selector(edge.node));
+      const position = edges.findIndex((edge: any) => selector(edge.node));
       edges.splice(position, 1);
       data.value = { [key]: { edges } };
     }
@@ -40,9 +43,9 @@ export const useRequest = (service, ...params) => {
     const key = Object.keys(data.value)[0];
     return data.value[key].totalCount;
   });
-  const cacheKeys = reactive([]);
+  const cacheKeys = reactive<string[]>([]);
 
-  const fetch = async (...newParams) => {
+  const fetch = async (...newParams: any[]) => {
     try {
       const payload = newParams.length ? newParams : params;
       const cacheKey = hash({ service, payload });
@@ -61,7 +64,7 @@ export const useRequest = (service, ...params) => {
       return data.value;
     } catch (error) {
       // A pure network failure has no `response`; don't crash extracting it.
-      const gqlMessage = error?.response?.errors?.[0]?.message;
+      const gqlMessage = (error as LegacyGraphqlError)?.response?.errors?.[0]?.message;
       if (gqlMessage == "Invalid refresh token") {
         logout();
       }
@@ -70,7 +73,7 @@ export const useRequest = (service, ...params) => {
       loading.value = false;
     }
   };
-  const refetch = async (...newParams) => {
+  const refetch = async (...newParams: any[]) => {
     try {
       const payload = newParams.length ? newParams : params;
       const cacheKey = hash({ service, payload });
@@ -82,7 +85,7 @@ export const useRequest = (service, ...params) => {
       }
       return data.value;
     } catch (error) {
-      const gqlMessage = error?.response?.errors?.[0]?.message;
+      const gqlMessage = (error as LegacyGraphqlError)?.response?.errors?.[0]?.message;
       if (gqlMessage == "Invalid refresh token") {
         logout();
       }
@@ -98,7 +101,7 @@ export const useRequest = (service, ...params) => {
     cacheKeys.length = 0;
   };
 
-  const refresh = (...params) => {
+  const refresh = (...params: any[]) => {
     clearCache();
     return fetch(...params);
   };
@@ -117,48 +120,39 @@ export const useRequest = (service, ...params) => {
   };
 };
 
-export const useMutation = (...params) => {
+export const useMutation = (...params: RequestParams) => {
   const { refresh, ...rest } = useRequest(...params);
   const mutation = refresh;
-  const prm = params[0];
-  const save = async (success, ...params) => {
+  const save = async (success: any, ...params: any[]) => {
     try {
       const response = await mutation(...params);
       if (typeof success === "function") {
         success(response);
       } else {
-        if (prm === configGraph.sendEmail) {
-          message.emailSuccess(success); //notification.emailSuccess(success);
-        } else {
-          message.success(success);
-        }
+        message.success(success);
       }
       return response;
     } catch (error) {
-      if (prm === configGraph.sendEmail) {
-        message.error(error); // notification.emailError(error);
-      } else {
-        message.error(error);
-      }
+      message.error(error as string);
     }
   };
 
   return { mutation, save, ...rest };
 };
 
-export const useQuery = (...params) => {
+export const useQuery = (...params: RequestParams) => {
   const { fetch, ...rest } = useRequest(...params);
   fetch();
   return { fetch, ...rest };
 };
 
-export const useFirst = (nodes) => {
+export const useFirst = (nodes: { value?: any[] | null }) => {
   return computed(() => (nodes.value && nodes.value.length && nodes.value[0]) ?? {});
 };
 
-export function useAttribute(node, attributeName, isJson?: boolean) {
+export function useAttribute(node: { value?: any }, attributeName: string, isJson?: boolean) {
   return computed(() => {
-    let value = node.value?.attributes?.find((a) => a.name === attributeName)?.description;
+    let value = node.value?.attributes?.find((a: any) => a.name === attributeName)?.description;
     if (isJson && value) {
       value = JSON.parse(value);
     }
@@ -166,9 +160,9 @@ export function useAttribute(node, attributeName, isJson?: boolean) {
   });
 }
 
-export function useOwners(nodes) {
+export function useOwners(nodes: { value?: any[] | null }) {
   return computed(() => {
-    let list = [];
+    let list: any[] = [];
     if (nodes.value) {
       nodes.value.forEach(({ owner }) => {
         if (!list.some((user) => user.username === owner.username)) {

@@ -8,6 +8,7 @@ import AppImage from "components/Image.vue";
 import Icon from "components/Icon.vue";
 import SavedDrawing from "./tools/Draw/SavedDrawing.vue";
 import { isHoldableBoardObject, isLocalHoldOfBoardObject } from "@utils/common";
+import { sanitizeRichText } from "@utils/sanitizeHtml";
 
 export default {
   components: { AppImage, Icon, SavedDrawing },
@@ -196,6 +197,7 @@ export default {
       drop,
       dropzone,
       tooltipTitle,
+      sanitizeRichText,
       skelEl,
       dragPending,
     };
@@ -237,7 +239,7 @@ export default {
           'transform-origin': 0,
           'max-width': '100%',
         }"
-        v-html="data.content"
+        v-html="sanitizeRichText(data.content)"
       ></p>
       <div v-else-if="data.type === 'video'" class="skeleton-meta">
         <Icon src="stream.svg" size="36" />

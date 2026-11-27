@@ -18,7 +18,7 @@ import { normalizeStageAccess } from "utils/studioInquiry";
 const { t } = useI18n();
 const { isAdmin } = storeToRefs(useUserStore());
 const enterStage = (stage: Stage) => {
-  window.open(`/${stage.fileLocation}`, "_blank");
+  window.open(`/${stage.fileLocation}`, "_blank", "noopener");
 };
 const DEFAULT_SORT = ["LAST_ACCESS_DESC"] as const;
 

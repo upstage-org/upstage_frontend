@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { getDefaultVoice, isValidVoice } from "./voice";
 
 // meSpeak is a classic script (/js/mespeak/mespeak.js) loaded by index.html.
@@ -20,8 +19,11 @@ const loadVoice = (...args: any[]) => lib()?.loadVoice?.(...args);
 const speak = (...args: any[]) => lib()?.speak?.(...args);
 const stop = (...args: any[]) => lib()?.stop?.(...args);
 
-export const avatarSpeak = (avatar, message: string) => {
-  const params = {};
+type SpeakParams = { variant?: string; amplitude?: number; pitch?: number; speed?: number };
+
+// A board avatar object; only `voice` and `speak.behavior` are read here.
+export const avatarSpeak = (avatar: Record<string, any>, message: string) => {
+  const params: SpeakParams = {};
   if (avatar.voice && avatar.voice.voice) {
     const { voice, variant, amplitude, pitch, speed } = avatar.voice;
     params.variant = variant;
@@ -31,7 +33,7 @@ export const avatarSpeak = (avatar, message: string) => {
         return;
       }
       if (avatar.speak.behavior === "shout") {
-        params.amplitude *= 5;
+        params.amplitude = (params.amplitude ?? 100) * 5;
       }
     }
     params.pitch = pitch;

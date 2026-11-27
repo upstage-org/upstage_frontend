@@ -1,21 +1,17 @@
-<script>
+<script setup lang="ts">
 import { computed } from "vue";
 
-export default {
-  props: {
-    src: { type: String, required: true },
-    size: {
-      type: [Number, String],
-      default: 16,
-    },
-    width: [Number, String],
-    height: [Number, String],
-  },
-  setup: (props) => {
-    const path = computed(() => `/icons/${props.src}`);
-    return { path };
-  },
-};
+const props = withDefaults(
+  defineProps<{
+    src: string;
+    size?: number | string;
+    width?: number | string;
+    height?: number | string;
+  }>(),
+  { size: 16 },
+);
+
+const path = computed(() => `/icons/${props.src}`);
 </script>
 
 <template>

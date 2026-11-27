@@ -160,4 +160,12 @@ describe("live Layout on an open stage", () => {
     expect(has(w, "AudioPlayer")).toBe(true);
     expect(has(w, "StageToolbox")).toBe(false);
   });
+
+  it("does not connect when the load failed", async () => {
+    s().stageOpenToViewer = true;
+    s().loadResult = false;
+    mountLayout();
+    await flushPromises();
+    expect(s().connect).not.toHaveBeenCalled();
+  });
 });

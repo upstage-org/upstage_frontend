@@ -1,34 +1,29 @@
-<script>
+<script setup lang="ts">
 import Icon from "components/Icon.vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { computed } from "vue";
-export default {
-  components: { Icon },
-  setup: () => {
-    const stageStore = useStageStore();
-    const audios = computed(() => stageStore.audios);
 
-    const stopAudio = (audio) => {
-      audio.currentTime = 0;
-      audio.saken = true;
-      audio.isPlaying = false;
-      stageStore.updateAudioStatus(audio);
-    };
+const stageStore = useStageStore();
+const audios = computed(() => stageStore.audios);
 
-    const createScene = async () => {
-      if (
-        confirm(
-          "Create a new blank scene will erase everything on the stage. Make sure your scene is saved before you do this. Are you sure you want to continue?",
-        )
-      ) {
-        stageStore.blankScene();
-        audios.value?.forEach((audio) => {
-          stopAudio(audio);
-        });
-      }
-    };
-    return { createScene };
-  },
+const stopAudio = (audio: any) => {
+  audio.currentTime = 0;
+  audio.saken = true;
+  audio.isPlaying = false;
+  stageStore.updateAudioStatus(audio);
+};
+
+const createScene = async () => {
+  if (
+    confirm(
+      "Create a new blank scene will erase everything on the stage. Make sure your scene is saved before you do this. Are you sure you want to continue?",
+    )
+  ) {
+    stageStore.blankScene();
+    audios.value?.forEach((audio: any) => {
+      stopAudio(audio);
+    });
+  }
 };
 </script>
 

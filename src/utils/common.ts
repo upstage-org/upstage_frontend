@@ -1,5 +1,5 @@
-// @ts-nocheck
 import configs from "config";
+import { escapeHtml } from "./sanitizeHtml";
 import { SharedAuth } from "models/config";
 import { User as LegacyUser } from "models/studio";
 import { message } from "ant-design-vue";
@@ -300,28 +300,40 @@ export const randomMessageColor = () => {
 export const randomRange = (min: number, max: number) =>
   Math.floor(Math.random() * (max - min + 1) + min);
 
+/**
+ * Turn plain text into HTML with clickable links.
+ *
+ * The input is HTML-ESCAPED first: chat messages and speech bubbles are
+ * authored by anyone on the stage (anonymous audience included) and the
+ * result is rendered with `v-html` in Linkify.vue, so a raw `<img onerror>`
+ * used to run in every viewer's browser. Only the `<a>` tags produced here
+ * are markup; everything else is text.
+ */
 export function linkify(inputText: string) {
-  var replacedText, replacePattern1, replacePattern2, replacePattern3;
+  const escaped = escapeHtml(inputText);
+  const LINK_ATTRS = 'target="_blank" rel="noopener noreferrer"';
 
   //URLs starting with http://, https://, or ftp://
-  replacePattern1 = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gim;
-  replacedText = inputText.replace(replacePattern1, '<a href="$1" target="_blank">$1</a>');
+  const replacePattern1 = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gim;
+  let replacedText = escaped.replace(replacePattern1, `<a href="$1" ${LINK_ATTRS}>$1</a>`);
 
   //URLs starting with "www." (without // before it, or it'd re-link the ones done above).
-  replacePattern2 = /(^|[^/])(www\.[\S]+(\b|$))/gim;
+  const replacePattern2 = /(^|[^/])(www\.[\S]+(\b|$))/gim;
   replacedText = replacedText.replace(
     replacePattern2,
-    '$1<a href="http://$2" target="_blank">$2</a>',
+    `$1<a href="http://$2" ${LINK_ATTRS}>$2</a>`,
   );
 
   //Change email addresses to mailto:: links.
-  replacePattern3 = /(([a-zA-Z0-9\-_.])+@[a-zA-Z_]+?(\.[a-zA-Z]{2,6})+)/gim;
+  // Letters and digits of any script: internationalised addresses are links too.
+  const replacePattern3 =
+    /([\p{L}\p{N}\-_.+]+@[\p{L}\p{N}\-_]+(?:\.[\p{L}\p{N}\-_]+)*\.\p{L}{2,})/gimu;
   replacedText = replacedText.replace(replacePattern3, '<a href="mailto:$1">$1</a>');
 
   return replacedText;
 }
 
-export function outOfViewportPosition(el) {
+export function outOfViewportPosition(el: Element) {
   const rect = el.getBoundingClientRect();
   if (rect.top < 0) {
     return "top";
@@ -337,9 +349,9 @@ export function outOfViewportPosition(el) {
   }
   return false;
 }
-export function throttle(callback, limit) {
+export function throttle<T extends (...args: any[]) => void>(callback: T, limit: number) {
   let wait = false;
-  return function (...args) {
+  return function (this: unknown, ...args: Parameters<T>) {
     if (!wait) {
       callback.call(this, ...args);
       wait = true;
@@ -395,7 +407,7 @@ export function coerceNumber(
   return v;
 }
 
-export function handleError(e) {
+export function handleError(e: any) {
   console.log("====e", e);
   if (e & e.response?.errors && e.response?.errors[0] && e.response?.errors[0].message) {
     message.error(e.response?.errors[0].message);
@@ -509,6 +521,52 @@ export function shortServerLabel(origin: unknown, origins: readonly unknown[]): 
   if (common === 0) return host;
   const own = host.split(".");
   return own.slice(0, own.length - common).join(".");
+}
+
+/**
+ * Shorten `text` to at most `keep` characters followed by an ellipsis when it
+ * is longer than `max`. Counts code points, not UTF-16 units, so an emoji or
+ * a character outside the BMP is never cut in half.
+ */
+/**
+ * The user-perceived characters of `text`: grapheme clusters where the
+ * platform can segment them (flags, skin tones and family emoji stay whole),
+ * code points otherwise.
+ */
+function graphemes(text: string): string[] {
+  const Segmenter = (
+    Intl as {
+      Segmenter?: new (
+        locale?: string,
+        options?: object,
+      ) => { segment(input: string): Iterable<{ segment: string }> };
+    }
+  ).Segmenter;
+  if (Segmenter) {
+    const segmenter = new Segmenter(undefined, { granularity: "grapheme" });
+    return Array.from(segmenter.segment(text), (g) => g.segment);
+  }
+  return Array.from(text);
+}
+
+export function truncateText(text: string, max: number, keep: number = max): string {
+  const units = graphemes(text);
+  if (units.length <= max) return text;
+  return `${units.slice(0, keep).join("")}...`;
+}
+
+/**
+ * Round a CSS length so it lands on a whole device pixel (#1571). Chromium's
+ * compositor can draw a one-pixel hairline along the edge of a rounded,
+ * overflow-clipped layer — a circular stream tile — when that layer sits at
+ * a fractional device-pixel offset, which the centred stage and freely
+ * dragged objects produce all the time. Firefox is unaffected. A shift of
+ * under half a device pixel is invisible.
+ */
+export function snapToDevicePixel(length: number, ratio = globalThis.devicePixelRatio): number {
+  if (!Number.isFinite(length)) return length;
+  const scale = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  return Math.round(length * scale) / scale;
 }
 
 /**

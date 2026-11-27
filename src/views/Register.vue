@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 import Field from "components/form/Field.vue";
 import Password from "components/form/Password.vue";
 import TermsOfService from "components/TermsOfService.vue";
@@ -10,105 +10,88 @@ import { message } from "ant-design-vue";
 import Turnstile from "vue-turnstile";
 import configs from "config";
 
-export default {
-  components: { Field, Password, TermsOfService, Turnstile },
-  setup: () => {
-    const router = useRouter();
-    const form = reactive({});
-    const { mutation, loading } = useMutation(userGraph.createUser, form);
-    const confirmPasswordError = computed(() =>
-      form.password !== form.confirmPassword
-        ? "Confirm password mismatch"
-        : (form.password || "").length < 8
-          ? "Make your password at least 8 characters long"
-          : false,
-    );
-    const touched = ref(false);
-    const agreed = ref(false);
-    const captcha = ref();
+const router = useRouter();
+const form = reactive<Record<string, any>>({});
+const { mutation, loading } = useMutation(userGraph.createUser, form);
+const confirmPasswordError = computed(() =>
+  form.password !== form.confirmPassword
+    ? "Confirm password mismatch"
+    : (form.password || "").length < 8
+      ? "Make your password at least 8 characters long"
+      : false,
+);
+const touched = ref(false);
+const agreed = ref(false);
+const captcha = ref();
 
-    const introMaxLength = configs.INTRO_MAX_LENGTH;
-    const introHelp = computed(() => {
-      const length = (form.intro || "").length;
-      if (!length) return `Maximum ${introMaxLength} characters.`;
-      return length >= introMaxLength
-        ? `Character limit reached (maximum ${introMaxLength} characters).`
-        : `${length} / ${introMaxLength} characters`;
-    });
-    // One-shot toast when the limit is hit; the counter under the field
-    // keeps showing the state afterwards.
-    watch(
-      () => (form.intro || "").length,
-      (length, previous) => {
-        if (length >= introMaxLength && previous < introMaxLength) {
-          message.warning(
-            `You have reached the introduction limit of ${introMaxLength} characters.`,
-          );
-        }
-      },
-    );
-
-    const submit = async () => {
-      touched.value = true;
-      if (
-        !form.username ||
-        !form.password ||
-        !form.email ||
-        !form.intro ||
-        (form.password || "").length < 8
-      )
-        return;
-      if (confirmPasswordError.value) return;
-      if (form.username.length < 2) {
-        message.error("Make your user name at least 2 characters long");
-        return;
-      }
-      if (configs.MODE === "Production" && !form.token) {
-        return;
-      }
-      if (configs.MODE !== "Production") {
-        form["token"] = null;
-      }
-      if (!agreed.value) {
-        message.error("Please agree to the Terms & Conditions");
-        return;
-      }
-      try {
-        await mutation();
-        message.success(
-          "Thank you for registering. Your account needs to be approved by an Admin - please check your email.",
-        );
-        router.push("/login");
-      } catch (error) {
-        captcha.value?.reset();
-        if (error.includes("upstage_user_username_key")) {
-          message.error("Username " + form.username + " already exists!");
-        } else if (error.includes("upstage_user_email_key")) {
-          if (form.email) {
-            message.error("Email " + form.email + " already exists!");
-          } else {
-            message.error("Email is required!");
-          }
-        } else {
-          message.error(error);
-        }
-      }
-    };
-
-    return {
-      form,
-      loading,
-      submit,
-      confirmPasswordError,
-      touched,
-      agreed,
-      introMaxLength,
-      introHelp,
-      siteKey: configs.CLOUDFLARE_CAPTCHA_SITEKEY,
-      isProduction: configs.MODE === "Production",
-      captcha,
-    };
+const introMaxLength = configs.INTRO_MAX_LENGTH;
+const introHelp = computed(() => {
+  const length = (form.intro || "").length;
+  if (!length) return `Maximum ${introMaxLength} characters.`;
+  return length >= introMaxLength
+    ? `Character limit reached (maximum ${introMaxLength} characters).`
+    : `${length} / ${introMaxLength} characters`;
+});
+// One-shot toast when the limit is hit; the counter under the field
+// keeps showing the state afterwards.
+watch(
+  () => (form.intro || "").length,
+  (length, previous) => {
+    if (length >= introMaxLength && previous < introMaxLength) {
+      message.warning(`You have reached the introduction limit of ${introMaxLength} characters.`);
+    }
   },
+);
+
+// Only rendered in production, where the key is always configured.
+const siteKey = configs.CLOUDFLARE_CAPTCHA_SITEKEY as string;
+const isProduction = configs.MODE === "Production";
+
+const submit = async () => {
+  touched.value = true;
+  if (
+    !form.username ||
+    !form.password ||
+    !form.email ||
+    !form.intro ||
+    (form.password || "").length < 8
+  )
+    return;
+  if (confirmPasswordError.value) return;
+  if (form.username.length < 2) {
+    message.error("Make your user name at least 2 characters long");
+    return;
+  }
+  if (configs.MODE === "Production" && !form.token) {
+    return;
+  }
+  if (configs.MODE !== "Production") {
+    form["token"] = null;
+  }
+  if (!agreed.value) {
+    message.error("Please agree to the Terms & Conditions");
+    return;
+  }
+  try {
+    await mutation();
+    message.success(
+      "Thank you for registering. Your account needs to be approved by an Admin - please check your email.",
+    );
+    router.push("/login");
+  } catch (error: any) {
+    captcha.value?.reset();
+    if (error.includes("upstage_user_username_key")) {
+      message.error("Username " + form.username + " already exists!");
+    } else if (error.includes("upstage_user_email_key")) {
+      if (form.email) {
+        message.error("Email " + form.email + " already exists!");
+      } else {
+        message.error("Email is required!");
+      }
+    } else {
+      message.error(error);
+    }
+  }
 };
 </script>
 

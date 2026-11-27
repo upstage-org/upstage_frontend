@@ -46,7 +46,8 @@ const onToggleDirect = (checked: boolean | string | number, e: Event, key: strin
 const addCustomRecipient = () => {
   const email = prompt("Enter email: ");
   if (email) {
-    if (/^[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}$/.test(email)) {
+    // Any script in the local part and domain (the backend accepts internationalised addresses).
+    if (/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/u.test(email)) {
       if (!receiverEmails.value.includes(email)) {
         receiverEmails.value = receiverEmails.value.concat(email);
       }
@@ -255,7 +256,7 @@ const { proceed, loading } = useLoading(
         <a-input v-model:value="subject" />
       </a-form-item>
       <a-form-item label="Body" :label-col="{ xl: { span: 4 }, xxl: { span: 3 } }" :colon="false">
-        <RichTextEditor v-model="body" @click="console.log(body)" />
+        <RichTextEditor v-model="body" />
       </a-form-item>
       <a-form-item
         label="Attach signature"

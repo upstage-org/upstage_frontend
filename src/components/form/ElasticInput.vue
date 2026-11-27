@@ -1,33 +1,36 @@
-<script>
+<script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-export default {
-  props: { modelValue: [String, Number] },
-  emits: ["update:modelValue", "ref", "submit"],
-  setup: (props, { emit }) => {
-    const el = ref();
-    onMounted(() => {
-      emit("ref", el.value);
-    });
-    const handleInput = (e) => {
-      emit("update:modelValue", e.target.value);
-    };
-    watch(
-      () => props.modelValue,
-      () => {
-        el.value.style.height = "40px";
-        if (props.modelValue && el.value.scrollHeight) {
-          el.value.style.height = el.value.scrollHeight + "px";
-        }
-      },
-    );
-    const submit = (e) => {
-      if (!e.shiftKey) {
-        e.preventDefault();
-        emit("submit");
-      }
-    };
-    return { el, handleInput, submit };
+
+const props = defineProps<{ modelValue?: string | number }>();
+
+const emit = defineEmits<{
+  (e: "update:modelValue", value: string): void;
+  (e: "ref", element: HTMLTextAreaElement): void;
+  (e: "submit"): void;
+}>();
+
+const el = ref<HTMLTextAreaElement>();
+onMounted(() => {
+  emit("ref", el.value as HTMLTextAreaElement);
+});
+const handleInput = (e: Event) => {
+  emit("update:modelValue", (e.target as HTMLTextAreaElement).value);
+};
+watch(
+  () => props.modelValue,
+  () => {
+    const textarea = el.value as HTMLTextAreaElement;
+    textarea.style.height = "40px";
+    if (props.modelValue && textarea.scrollHeight) {
+      textarea.style.height = textarea.scrollHeight + "px";
+    }
   },
+);
+const submit = (e: KeyboardEvent) => {
+  if (!e.shiftKey) {
+    e.preventDefault();
+    emit("submit");
+  }
 };
 </script>
 

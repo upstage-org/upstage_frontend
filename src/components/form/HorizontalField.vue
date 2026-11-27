@@ -1,7 +1,5 @@
-<script>
-export default {
-  props: { title: String },
-};
+<script setup lang="ts">
+defineProps<{ title?: string }>();
 </script>
 
 <template>

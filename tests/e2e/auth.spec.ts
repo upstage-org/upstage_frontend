@@ -62,6 +62,10 @@ test.describe("auth flow @smoke", () => {
     });
 
     await page.goto("/admin");
-    await expect(page).not.toHaveURL(/\/admin\b/);
+    // The guard sends a visitor to the login page and remembers where they
+    // were going (`/login?redirect=/admin`), so test the path, not the URL.
+    await expect
+      .poll(() => new URL(page.url()).pathname, { timeout: 5_000 })
+      .not.toMatch(/^\/admin\b/);
   });
 });

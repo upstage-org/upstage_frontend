@@ -15,6 +15,7 @@ interface UserData {
   lastName?: string;
   username?: string;
   name?: string;
+  uploadLimit?: number;
 }
 
 interface BoardObject {
@@ -37,8 +38,10 @@ const AUTH_ERRORS = [
  */
 const handleAuthFailure = (errorMsg: string | undefined): void => {
   if (errorMsg && AUTH_ERRORS.some((m) => errorMsg.includes(m))) {
-    logoutHelper();
-    message.warning("You have been logged out of this session!");
+    // Deferred while a stage is open: the player is told there instead.
+    if (logoutHelper()) {
+      message.warning("You have been logged out of this session!");
+    }
   }
 };
 
@@ -99,7 +102,7 @@ export const useUserStore = defineStore("user", () => {
 
   // -- actions --
 
-  const updateUserProfile = async (payload: unknown): Promise<UserData | undefined> => {
+  const updateUserProfile = async (payload: Record<string, any>): Promise<UserData | undefined> => {
     loadingUser.value = true;
     try {
       const { updateUser } = (await userGraph.updateUser(payload)) as { updateUser: UserData };

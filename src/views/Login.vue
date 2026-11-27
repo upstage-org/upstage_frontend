@@ -3,9 +3,13 @@ import LoginForm from "components/LoginForm.vue";
 import { useRoute, useRouter } from "vue-router";
 import { useUserStore } from "@stores/pinia/user";
 import { useConfigStore } from "@stores/pinia/config";
+import { consumeSessionExpiredNotice } from "@utils/sessionExpiry";
 
 const router = useRouter();
 const route = useRoute();
+
+// Set by the auth store when it had to end the session and send the user here.
+const sessionExpired = consumeSessionExpiredNotice();
 
 /**
  * After login, return the user to the page they were trying to reach
@@ -38,6 +42,9 @@ const onLoginSuccess = () => {
     <div
       class="column is-three-quarters-mobile is-two-thirds-tablet is-half-desktop is-one-third-widescreen"
     >
+      <div v-if="sessionExpired" class="notification is-warning is-light" role="status">
+        {{ $t("session_expired_login_again") }}
+      </div>
       <LoginForm @success="onLoginSuccess" />
     </div>
   </div>

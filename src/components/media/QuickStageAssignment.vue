@@ -7,7 +7,8 @@ import { Media, AssignedStage } from "models/studio";
 import { useUserStore } from "@stores/pinia/user";
 import { storeToRefs } from "pinia";
 import MediaPreview from "./MediaPreview.vue";
-import { uniq } from "lodash";
+import { uniq } from "lodash-es";
+import { ownerNote } from "./ownerNote";
 
 const props = defineProps({
   media: {
@@ -22,14 +23,10 @@ const searchAvailable = ref("");
 const searchAssigned = ref("");
 const visible = ref(false);
 const { isAdmin } = storeToRefs(useUserStore());
-const note = computed(() => {
-  try {
-    const description = JSON.parse(props.media.description);
-    return description?.note || "";
-  } catch {
-    return "";
-  }
-});
+// Shown whatever the copyright level (#1570): the owner wrote it for the
+// players who use the item, and they reach this pop-up for free, acknowledged
+// and granted items alike.
+const note = computed(() => ownerNote(props.media));
 const { result, loading } = useQuery(
   gql`
     {
@@ -181,7 +178,10 @@ const handleOk = async () => {
       &nbsp;&nbsp;&nbsp;
       <h4 style="color: black">{{ media.name }}</h4>
     </div>
-    <h3 style="color: black; margin-top: 20px">{{ media.copyrightLevel == 1 ? note : "" }}</h3>
+    <div v-if="note" class="owner-note" data-testid="owner-note">
+      <b>Note from <DName :user="media.owner" />:</b>
+      <p>{{ note }}</p>
+    </div>
     <p class="quick-assign-help help mb-3">
       Click a stage name to move it between the lists, then Save. Only stages you own or can edit
       are listed.
@@ -330,5 +330,16 @@ button.quick-assign-row--assigned:hover {
 .quick-assign-actions {
   display: flex;
   justify-content: flex-end;
+}
+.owner-note {
+  margin: 20px 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid #007011;
+  background: #f6fbf6;
+  color: #000;
+}
+.owner-note p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
 }
 </style>

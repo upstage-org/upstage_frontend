@@ -1,3 +1,4 @@
+import { loginUrlFor } from "@utils/sessionExpiry";
 import {
   createRouter,
   createWebHistory,
@@ -13,6 +14,8 @@ import { UPLOAD_LIMIT_MESSAGE_KEY } from "@utils/constants";
 declare module "vue-router" {
   interface RouteMeta {
     requireAuth?: boolean;
+    /** Only ADMIN / SUPER_ADMIN may enter (checked against `currentUser`). */
+    requireAdmin?: boolean;
     background?: string;
   }
 }
@@ -51,11 +54,17 @@ const routes: RouteRecordRaw[] = [
     name: "Replay Recording",
     component: () => import("views/replay/Layout.vue"),
   },
-  {
-    path: "/playground",
-    name: "Playground",
-    component: () => import("views/Playground.vue"),
-  },
+  // Developer sandbox: not part of the product, so it is only registered in
+  // dev builds (production bundles neither route nor chunk it).
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: "/playground",
+          name: "Playground",
+          component: () => import("views/Playground.vue"),
+        },
+      ]
+    : []),
   {
     // Standalone chat view: same MQTT topic as the main stage, but
     // renders only the chat panes so mobile audience members (and
@@ -140,7 +149,7 @@ const routes: RouteRecordRaw[] = [
         path: "/admin",
         name: "Admin",
         component: () => import("views/admin/index.vue"),
-        meta: { background: "#E6F2FF" },
+        meta: { background: "#E6F2FF", requireAdmin: true },
         children: [
           {
             path: "player",
@@ -165,6 +174,9 @@ export const router = createRouter({
   routes,
 });
 
+/** The views that hold the login while a performance runs (holdForStage). */
+const isStageRoute = (name: unknown): boolean => name === "Live" || name === "ChatStandalone";
+
 router.beforeEach(
   async (
     to: RouteLocationNormalized,
@@ -173,10 +185,21 @@ router.beforeEach(
   ) => {
     document.body.classList.add("waiting");
 
+    // Leaving a stage with a login that ended during the performance: the
+    // deferred logout is completed now, before the next page loads with a
+    // dead token, and the player arrives there after logging in.
+    if (isStageRoute(_from.name) && !isStageRoute(to.name)) {
+      if (useAuthStore().finishDeferredLogout(to.fullPath)) {
+        return next(false);
+      }
+    }
+
     const loggedIn: boolean = useAuthStore().loggedIn;
 
     if (to.matched.some((record) => record.meta.requireAuth) && !loggedIn) {
-      return next("/login");
+      // Same destination the auth store uses when a session ends: the login
+      // page, remembering where the user was going.
+      return next(loginUrlFor(to.fullPath));
     }
 
     if ((to.name === "Login" || to.name === "Register") && loggedIn) {
@@ -189,7 +212,10 @@ router.beforeEach(
     // viewport so phones render at sensible scale.
     setViewportMeta(to.name === "Live" ? "" : "width=device-width,initial-scale=1.0");
 
-    if (to.fullPath.includes("admin") && loggedIn) {
+    // Route meta, not a substring test on the URL: `fullPath.includes("admin")`
+    // also bounced logged-in players off any stage whose slug contained
+    // "admin" (e.g. /badminton).
+    if (to.matched.some((record) => record.meta.requireAdmin) && loggedIn) {
       const isAdmin = await useUserStore().checkIsAdmin();
       if (!isAdmin) {
         return next("/");

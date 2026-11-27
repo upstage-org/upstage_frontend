@@ -1,39 +1,27 @@
-<script>
+<script setup lang="ts">
 import { inject, ref, watch } from "vue";
+import type { Ref } from "vue";
 import SaveButton from "components/form/SaveButton.vue";
 import { stageGraph } from "services/graphql";
 import { useMutation } from "services/graphql/composable";
 import Reorder from "./Reorder.vue";
 
-export default {
-  components: {
-    Reorder,
-    SaveButton,
-  },
-  setup: () => {
-    const stage = inject("stage");
-    const clearCache = inject("clearCache");
+// Provided by StageManagement/index.vue.
+const stage = inject("stage") as Ref<any>;
+const clearCache = inject("clearCache") as () => void;
 
-    // Local working copy: Reorder emits the new order here on every drop;
-    // nothing touches the stage until Save.
-    const selectedMedia = ref((stage.value.assets || []).slice());
-    watch(stage, () => {
-      selectedMedia.value = (stage.value.assets || []).slice();
-    });
+// Local working copy: Reorder emits the new order here on every drop;
+// nothing touches the stage until Save.
+const selectedMedia = ref<any[]>((stage.value.assets || []).slice());
+watch(stage, () => {
+  selectedMedia.value = (stage.value.assets || []).slice();
+});
 
-    const { loading: saving, save } = useMutation(stageGraph.saveStageMedia);
-    const saveOrder = async () => {
-      const ids = selectedMedia.value.map((media) => media.id);
-      await save("Media order saved!", stage.value.id, ids);
-      clearCache();
-    };
-
-    return {
-      selectedMedia,
-      saving,
-      saveOrder,
-    };
-  },
+const { loading: saving, save } = useMutation(stageGraph.saveStageMedia);
+const saveOrder = async () => {
+  const ids = selectedMedia.value.map((media) => media.id);
+  await save("Media order saved!", stage.value.id, ids);
+  clearCache();
 };
 </script>
 

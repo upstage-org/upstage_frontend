@@ -49,6 +49,9 @@ declare global {
     errors: Record<string, Record<string, string>>;
     logLevels: Record<string, string>;
     createLocalTracks(options: Record<string, unknown>): Promise<JitsiLocalTrack[]>;
+    createLocalTracksFromMediaStreams(tracksInfo: unknown[]): unknown[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped vendored library
+    mediaDevices: Record<string, any>;
   }
 
   interface JitsiConnection {
@@ -70,6 +73,7 @@ declare global {
   }
 
   interface JitsiLocalTrack {
+    type?: string;
     getType(): "audio" | "video";
     dispose(): Promise<void>;
     attach(element: HTMLElement): void;

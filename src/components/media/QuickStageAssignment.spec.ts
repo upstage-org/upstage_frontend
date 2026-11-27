@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 
+/**
+ * #1570: the owner's permission note (credits, conditions) has to reach the
+ * players who use the item. The pop-up showed it only for "Use with
+ * acknowledgement" items, so a granted "Use with permission" item — and a
+ * "Copyright free" credit line — were shown without it.
+ */
+
 const { mutate, toast } = vi.hoisted(() => ({
   mutate: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn() },
@@ -237,5 +244,22 @@ describe("QuickStageAssignment two columns (#1569)", () => {
     await flushPromises();
     expect(toast.error).toHaveBeenCalledWith("You can only assign media to stages you own or edit");
     expect(names(wrapper, "assigned-stages")).toEqual(["Bunnies", "Mine"]);
+  });
+});
+
+describe("QuickStageAssignment owner note", () => {
+  it.each([0, 1, 2])("shows the owner's note on a level %i item", async (level) => {
+    const wrapper = await open(media(level, "Please credit Gloria's sister."));
+    const note = wrapper.find("[data-testid=owner-note]");
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain("Note from Gloria");
+    expect(note.text()).toContain("Please credit Gloria's sister.");
+  });
+
+  it("shows nothing when there is no note", async () => {
+    const wrapper = await open(media(1));
+    expect(wrapper.find("[data-testid=owner-note]").exists()).toBe(false);
+    const blank = await open(media(2, "   "));
+    expect(blank.find("[data-testid=owner-note]").exists()).toBe(false);
   });
 });

@@ -1,20 +1,14 @@
-<script>
+<script setup lang="ts">
 import Icon from "components/Icon.vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { computed } from "vue";
-export default {
-  components: { Icon },
-  setup: () => {
-    const stageStore = useStageStore();
-    const showPlayerChat = computed(() => stageStore.showPlayerChat);
-    const togglePlayerChat = () => {
-      stageStore.setShowPlayerChat(!showPlayerChat.value);
-    };
-    const unread = computed(() => stageStore.unreadPrivateMessageCount);
 
-    return { showPlayerChat, togglePlayerChat, unread };
-  },
+const stageStore = useStageStore();
+const showPlayerChat = computed(() => stageStore.showPlayerChat);
+const togglePlayerChat = () => {
+  stageStore.setShowPlayerChat(!showPlayerChat.value);
 };
+const unread = computed(() => stageStore.unreadPrivateMessageCount);
 </script>
 
 <template>

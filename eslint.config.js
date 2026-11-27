@@ -19,6 +19,10 @@ export default [
       "components.d.ts",
       "src/auto-imports.d.ts",
       ".eslintrc-auto-import.json",
+      // Ad-hoc Playwright probe scripts whose bodies run inside
+      // page.evaluate(); they use browser globals in .mjs files and are
+      // not part of the app or the e2e suites.
+      "tests/e2e/scripts/**",
     ],
   },
   js.configs.recommended,
@@ -75,7 +79,10 @@ export default [
       ],
       "no-undef": "off",
       "vue/multi-word-component-names": "off",
-      "vue/no-v-html": "off",
+      // Every remaining v-html site must go through utils/sanitizeHtml.ts;
+      // keep the rule visible so new sites are reviewed.
+      "vue/no-v-html": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
       "vue/no-mutating-props": "warn",
       "vue/require-default-prop": "off",
       "vue/component-name-in-template-casing": ["warn", "PascalCase"],

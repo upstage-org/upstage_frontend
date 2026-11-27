@@ -1,20 +1,17 @@
-<script>
+<script setup lang="ts">
 import { ref } from "vue";
 import Modal from "components/Modal.vue";
 import SaveButton from "components/form/SaveButton.vue";
-export default {
-  components: { Modal, SaveButton },
-  props: {
-    loading: Boolean,
-    onlyYes: Boolean,
-  },
-  emits: ["confirm"],
-  setup: () => {
-    const active = ref(false);
 
-    return { active };
-  },
-};
+defineProps<{
+  loading?: boolean;
+  onlyYes?: boolean;
+}>();
+defineEmits<{
+  (e: "confirm", closeModal: () => void): void;
+}>();
+
+const active = ref(false);
 </script>
 
 <template>

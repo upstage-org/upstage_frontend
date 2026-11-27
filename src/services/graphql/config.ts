@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { gql } from "@apollo/client/core";
 import { studioClient } from "../graphql";
 
@@ -81,7 +80,7 @@ export default {
         }
       }
     `),
-  updateTermsOfService: (variables) =>
+  updateTermsOfService: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation UpdateTermsOfService($url: String!) {
@@ -92,7 +91,7 @@ export default {
       `,
       variables,
     ),
-  saveConfig: (name, value) =>
+  saveConfig: (name: string, value: string | number | boolean) =>
     studioClient.request(
       gql`
         mutation SaveConfig($name: String!, $value: String!, $enabled: Boolean) {
@@ -105,7 +104,7 @@ export default {
       `,
       { name, value: String(value), ...(typeof value == "boolean" ? { enabled: value } : {}) },
     ),
-  sendEmail: (variables) =>
+  sendEmail: (variables: Record<string, any> = {}) =>
     studioClient.request(
       gql`
         mutation SendEmail($subject: String!, $body: String!, $recipients: String!, $bcc: String) {

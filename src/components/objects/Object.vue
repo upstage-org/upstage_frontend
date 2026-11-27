@@ -11,6 +11,7 @@ import {
   streamWearerOf,
 } from "@utils/common";
 import { autoplayStartFrame } from "@utils/frameAnimation";
+import { openSafeLink } from "@utils/sanitizeHtml";
 import { containedPictureBox, effectiveFrameFitId, frameShapeStyle } from "./frameShapes";
 // Aliased: "Image" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppImage from "components/Image.vue";
@@ -265,8 +266,10 @@ export default {
     const hasLink = computed(() => !canPlay.value && props.object.link && props.object.link.url);
     const openLink = () => {
       if (hasLink.value) {
+        // Scheme-checked + noopener: the link is player-authored, and
+        // `window.open(...)` returns null when a popup blocker intervenes.
         const { url, blank } = props.object.link;
-        window.open(url, blank ? "_blank" : "_self").focus();
+        openSafeLink(url, Boolean(blank));
       }
     };
 
@@ -347,6 +350,8 @@ export default {
       loadeddata,
       video,
       isStreamPlaybackBoardType,
+      // Read by the template (`:disabled="replaying"` on the context menu).
+      replaying,
     };
   },
 };

@@ -99,3 +99,55 @@ describe("stageOpenToViewer", () => {
     expect(s.stageOpenToViewer).toBe(true);
   });
 });
+
+describe("loadStage replays the background colour for the current session only", () => {
+  const T0 = 1_700_000_000;
+  const counter = (at: number, id: string, extra: Record<string, unknown> = {}) =>
+    ({
+      id: at,
+      topic: `unit/demo/counter`,
+      mqttTimestamp: at,
+      payload: { id, at: at * 1000, isPlayer: true, ...extra },
+    }) as ReplayEvent;
+  const colour = (at: number, color: string) =>
+    ({
+      id: at,
+      topic: `unit/demo/background`,
+      mqttTimestamp: at,
+      payload: { type: "setBackdropColor", color },
+    }) as ReplayEvent;
+
+  it("applies a colour set while the stage is still occupied", async () => {
+    const s = useStageStore();
+    vi.spyOn(Date, "now").mockReturnValue((T0 + 60) * 1000);
+    loadStage.mockResolvedValue({
+      stage: model({
+        permission: "player",
+        status: "live",
+        events: [counter(T0, "a"), colour(T0 + 10, "#112233")],
+      }),
+    });
+    await s.loadStage({ url: "demo" });
+    expect(s.backdropColor).toBe("#112233");
+  });
+
+  it("falls back to the saved default once the stage has been empty", async () => {
+    const s = useStageStore();
+    vi.spyOn(Date, "now").mockReturnValue((T0 + 600) * 1000);
+    loadStage.mockResolvedValue({
+      stage: model({
+        permission: "player",
+        status: "live",
+        events: [
+          counter(T0, "a"),
+          colour(T0 + 10, "#112233"),
+          counter(T0 + 20, "a", { leaving: true }),
+        ],
+      }),
+    });
+    await s.loadStage({ url: "demo" });
+    expect(s.backdropColor).toBe("#30ac45");
+    // The log itself is untouched: recordings and reconciliation read it all.
+    expect(s.model?.events).toHaveLength(3);
+  });
+});

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { gql } from "@apollo/client/core";
 import { deriveActiveRecording } from "@utils/stageRecording";
 import { studioClient } from "../graphql";
@@ -83,8 +82,8 @@ export const sceneFragment = gql`
 `;
 
 const stageOps = {
-  createStage: async (variables) => {
-    let result = await studioClient.request(
+  createStage: async (variables: Record<string, any>) => {
+    let result = await studioClient.request<any, Record<string, any>>(
       gql`
         mutation CreateStage(
           $name: String
@@ -114,7 +113,7 @@ const stageOps = {
       return result.updateStage;
     }
   },
-  updateStage: (variables) =>
+  updateStage: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         mutation UpdateStage(
@@ -148,7 +147,7 @@ const stageOps = {
       `,
       variables,
     ),
-  updateStatus: (stageId) =>
+  updateStatus: (stageId: string | number) =>
     studioClient.request(gql`
   mutation {
     updateStatus(id: "${stageId}" ) {
@@ -156,7 +155,7 @@ const stageOps = {
     }
   }
   `),
-  updateVisibility: (stageId) =>
+  updateVisibility: (stageId: string | number) =>
     studioClient.request(gql`
   mutation {
     updateVisibility(id: "${stageId}" ) {
@@ -164,7 +163,7 @@ const stageOps = {
     }
   }
   `),
-  updateLastAccess: (stageId) =>
+  updateLastAccess: (stageId: string | number) =>
     studioClient.request(gql`
   mutation {
     updateLastAccess(id: "${stageId}" ) {
@@ -172,7 +171,7 @@ const stageOps = {
     }
   }
   `),
-  sweepStage: (variables) =>
+  sweepStage: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         mutation SweepStage($id: ID!) {
@@ -184,7 +183,7 @@ const stageOps = {
       `,
       variables,
     ),
-  stageList: (variables) =>
+  stageList: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         query StageTable($page: Int, $limit: Int) {
@@ -199,7 +198,7 @@ const stageOps = {
       `,
       variables,
     ),
-  getStage: (id) =>
+  getStage: (id: string | number) =>
     studioClient.request(
       gql`
         query stage($id: ID!) {
@@ -240,9 +239,9 @@ const stageOps = {
       `,
       { id },
     ),
-  loadStage: (fileLocation, performanceId?) =>
+  loadStage: (fileLocation: string, performanceId?: string | number | null) =>
     studioClient
-      .request(
+      .request<any, Record<string, any>>(
         gql`
           query ListStage($fileLocation: String, $performanceId: ID) {
             stageList(input: { fileLocation: $fileLocation, performanceId: $performanceId }) {
@@ -293,9 +292,9 @@ const stageOps = {
    * new-stage form; deliberately not cached — the answer changes the moment
    * someone creates a stage.
    */
-  stageUrlTaken: (fileLocation) =>
+  stageUrlTaken: (fileLocation: string): Promise<boolean> =>
     studioClient
-      .request(
+      .request<any, Record<string, any>>(
         gql`
           query StageUrlTaken($fileLocation: String) {
             stageList(input: { fileLocation: $fileLocation }) {
@@ -306,22 +305,30 @@ const stageOps = {
         { fileLocation },
       )
       .then((response) => (response.stageList ?? []).length > 0),
-  loadPermission: (fileLocation) =>
+  loadPermission: (fileLocation: string) =>
     studioClient
-      .request(
+      .request<any, Record<string, any>>(
         gql`
           query ListStage($fileLocation: String) {
             stageList(input: { fileLocation: $fileLocation }) {
               permission
+              # Withheld from the audience of a closed stage (#1573); a login
+              # from the curtain that opens the stage needs it now.
+              mqtt {
+                username
+                password
+              }
             }
           }
         `,
         { fileLocation },
       )
-      .then((response) => response.stageList[0]?.permission),
-  loadScenes: (fileLocation) =>
+      .then(
+        (response) => response.stageList[0] as { permission?: string; mqtt?: unknown } | undefined,
+      ),
+  loadScenes: (fileLocation: string) =>
     studioClient
-      .request(
+      .request<any, Record<string, any>>(
         gql`
           query ListStage($fileLocation: String) {
             stageList(input: { fileLocation: $fileLocation }) {
@@ -335,9 +342,9 @@ const stageOps = {
         { fileLocation },
       )
       .then((response) => response.stageList[0]?.scenes),
-  loadEvents: (fileLocation, cursor) =>
+  loadEvents: (fileLocation: string, cursor?: string | number | null) =>
     studioClient
-      .request(
+      .request<any, Record<string, any>>(
         gql`
           query ListStage($fileLocation: String, $cursor: Int) {
             stageList(input: { fileLocation: $fileLocation, cursor: $cursor }) {
@@ -350,10 +357,10 @@ const stageOps = {
             }
           }
         `,
-        { fileLocation, ...(cursor ? { cursor: parseInt(cursor) } : {}) },
+        { fileLocation, ...(cursor ? { cursor: parseInt(cursor as string) } : {}) },
       )
       .then((response) => response.stageList[0]?.events),
-  uploadMedia: (variables) =>
+  uploadMedia: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         mutation uploadMedia(
@@ -372,7 +379,7 @@ const stageOps = {
       `,
       variables,
     ),
-  mediaList: (variables) =>
+  mediaList: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         query MediaList($nameLike: String, $mediaType: String) {
@@ -404,7 +411,7 @@ const stageOps = {
       `,
       variables,
     ),
-  mediaTypeList: (variables) =>
+  mediaTypeList: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         query MediaTypeList {
@@ -416,7 +423,7 @@ const stageOps = {
       `,
       variables,
     ),
-  saveStageMedia: (id, mediaIds) =>
+  saveStageMedia: (id: string | number, mediaIds: Array<string | number>) =>
     studioClient.request(
       gql`
         mutation assignMedia($id: ID!, $mediaIds: [ID]) {
@@ -428,7 +435,7 @@ const stageOps = {
       `,
       { id, mediaIds },
     ),
-  assignStages: (id, stageIds) =>
+  assignStages: (id: string | number, stageIds: Array<string | number>) =>
     studioClient.request(
       gql`
         mutation AssignStages($id: ID!, $stageIds: [ID!]) {
@@ -439,7 +446,12 @@ const stageOps = {
       `,
       { id, stageIds },
     ),
-  updateStageAssignment: (stageId, assetId, exitAnimation, exitSpeed) =>
+  updateStageAssignment: (
+    stageId: string | number,
+    assetId: string | number,
+    exitAnimation?: string | null,
+    exitSpeed?: number | null,
+  ) =>
     studioClient.request(
       gql`
         mutation UpdateStageAssignment(
@@ -464,7 +476,7 @@ const stageOps = {
       `,
       { stageId, assetId, exitAnimation, exitSpeed },
     ),
-  saveStageConfig: (id, config) =>
+  saveStageConfig: (id: string | number, config: string) =>
     studioClient.request(
       gql`
         mutation UpdateStage($id: ID!, $config: String) {
@@ -500,7 +512,7 @@ const stageOps = {
       }
       ${assetFragment}
     `),
-  updateMedia: (variables) =>
+  updateMedia: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         mutation updateMedia(
@@ -533,7 +545,7 @@ const stageOps = {
       `,
       variables,
     ),
-  deleteMedia: (id) =>
+  deleteMedia: (id: string | number) =>
     studioClient.request(
       gql`
         mutation deleteMedia($id: ID!) {
@@ -545,7 +557,7 @@ const stageOps = {
       `,
       { id },
     ),
-  deleteStage: (id) =>
+  deleteStage: (id: string | number) =>
     studioClient.request(
       gql`
         mutation deleteStage($id: ID!) {
@@ -556,7 +568,7 @@ const stageOps = {
       `,
       { id },
     ),
-  saveScene: (variables) =>
+  saveScene: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         mutation SaveScene($stageId: ID, $payload: String, $preview: String, $name: String) {
@@ -569,7 +581,7 @@ const stageOps = {
       `,
       variables,
     ),
-  deleteScene: (id) =>
+  deleteScene: (id: string | number) =>
     studioClient.request(
       gql`
         mutation DeleteScene($id: ID!) {
@@ -581,7 +593,7 @@ const stageOps = {
       `,
       { id },
     ),
-  duplicateStage: ({ id, name }) =>
+  duplicateStage: ({ id, name }: { id: string | number; name: string }) =>
     studioClient.request(
       gql`
         mutation duplicateStage($id: ID!, $name: String!) {
@@ -594,7 +606,7 @@ const stageOps = {
       `,
       { id, name },
     ),
-  deletePerformance: (id) =>
+  deletePerformance: (id: string | number) =>
     studioClient.request(
       gql`
         mutation DeletePerformance($id: ID!) {
@@ -606,7 +618,7 @@ const stageOps = {
       `,
       { id: String(id) },
     ),
-  updatePerformance: (id, name, description) =>
+  updatePerformance: (id: string | number, name: string, description?: string | null) =>
     studioClient.request(
       gql`
         mutation updatePerformance($id: ID!, $name: String!, $description: String) {
@@ -617,7 +629,7 @@ const stageOps = {
       `,
       { id, name, description },
     ),
-  duplicatePerformanceWithTrimmedPauses: (variables) =>
+  duplicatePerformanceWithTrimmedPauses: (variables: Record<string, any>) =>
     studioClient.request(
       gql`
         mutation DuplicatePerformanceWithTrimmedPauses($input: DuplicatePerformanceTrimInput!) {
@@ -629,7 +641,7 @@ const stageOps = {
       `,
       variables,
     ),
-  startRecording: (stageId, name, description) =>
+  startRecording: (stageId: string | number, name: string, description?: string | null) =>
     studioClient.request(
       gql`
         mutation startRecording($input: RecordInput!) {
@@ -643,7 +655,7 @@ const stageOps = {
       `,
       { input: { stageId: String(stageId), name, description } },
     ),
-  saveRecording: (id) =>
+  saveRecording: (id: string | number) =>
     studioClient.request(
       gql`
         mutation saveRecording($id: ID!) {

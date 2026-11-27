@@ -1,13 +1,8 @@
-<script>
+<script setup lang="ts">
 import { useConfigStore } from "@stores/pinia/config";
 import { storeToRefs } from "pinia";
 
-export default {
-  setup: () => {
-    const { termsOfService: url } = storeToRefs(useConfigStore());
-    return { url };
-  },
-};
+const { termsOfService: url } = storeToRefs(useConfigStore());
 </script>
 
 <template>

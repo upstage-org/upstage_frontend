@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 import Field from "components/form/Field.vue";
 import SaveButton from "components/form/SaveButton.vue";
 import html2canvas from "html2canvas";
@@ -9,47 +9,44 @@ import { takeSnapshotFromStage } from "store/modules/stage/reusable";
 import { useStageStore } from "@stores/pinia/stage";
 import { reactive } from "vue";
 import { message } from "ant-design-vue";
-export default {
-  components: { Field, SaveButton },
-  emits: ["close"],
-  setup: (props, { emit }) => {
-    const stageStore = useStageStore();
 
-    const form = reactive({});
+const emit = defineEmits<{
+  (e: "close"): void;
+}>();
 
-    const payload = takeSnapshotFromStage();
+const stageStore = useStageStore();
 
-    const saveScene = async () => {
-      emit("close");
-      if (form.name?.trim()) {
-        try {
-          stageStore.SET_SAVING_SCENE(true);
-          const el = document.querySelector("#board");
-          const { width } = el.getBoundingClientRect();
-          const canvas = await html2canvas(el, { scale: 200 / width });
-          const preview = cropImageFromCanvas(canvas)?.src;
-          const stageId = stageStore.model.id;
-          const { name } = form;
-          const { save } = useMutation(stageGraph.saveScene);
-          await save("Scene saved successfully!", {
-            name,
-            stageId,
-            payload,
-            preview,
-          });
-          stageStore.loadScenes();
-        } catch (error) {
-          console.log(error);
-        } finally {
-          stageStore.SET_SAVING_SCENE(false);
-        }
-      } else {
-        message.error("Scene name is required!");
-      }
-    };
+const form = reactive<{ name?: string }>({});
 
-    return { form, saveScene };
-  },
+const payload = takeSnapshotFromStage();
+
+const saveScene = async () => {
+  emit("close");
+  if (form.name?.trim()) {
+    try {
+      stageStore.SET_SAVING_SCENE(true);
+      const el = document.querySelector<HTMLElement>("#board")!;
+      const { width } = el.getBoundingClientRect();
+      const canvas = await html2canvas(el, { scale: 200 / width });
+      const preview = cropImageFromCanvas(canvas)?.src;
+      const stageId = stageStore.model!.id;
+      const { name } = form;
+      const { save } = useMutation(stageGraph.saveScene);
+      await save("Scene saved successfully!", {
+        name,
+        stageId,
+        payload,
+        preview,
+      });
+      stageStore.loadScenes();
+    } catch (error) {
+      console.log(error);
+    } finally {
+      stageStore.SET_SAVING_SCENE(false);
+    }
+  } else {
+    message.error("Scene name is required!");
+  }
 };
 </script>
 

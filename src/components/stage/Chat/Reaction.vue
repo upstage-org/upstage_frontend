@@ -1,5 +1,6 @@
 <script>
 import { computed, watch } from "vue";
+import { truncateText } from "utils/common";
 import { useStageStore } from "@stores/pinia/stage";
 import { animate } from "animejs";
 import ChatInput from "components/form/ChatInput.vue";
@@ -14,13 +15,7 @@ export default {
     const userStore = useUserStore();
     const reactionVisibility = computed(() => stageStore.settings.reactionVisibility);
     watch(reactionVisibility, console.log);
-    const nickname = computed(() => {
-      const n = userStore.nickname;
-      if (n.length > 15) {
-        return n.slice(0, 10) + "...";
-      }
-      return n;
-    });
+    const nickname = computed(() => truncateText(userStore.nickname, 15, 10));
 
     const reactions = ["❤️", "🤣", "🙌", "👏"];
     const sendReaction = (react) => {

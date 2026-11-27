@@ -1,7 +1,5 @@
-<script>
-export default {
-  props: { loading: Boolean },
-};
+<script setup lang="ts">
+defineProps<{ loading?: boolean }>();
 </script>
 
 <template>

@@ -1,4 +1,4 @@
-<script>
+<script setup lang="ts">
 import { provide, watch } from "vue";
 import { useFirst, useRequest } from "services/graphql/composable";
 import { stageGraph } from "services/graphql";
@@ -7,29 +7,26 @@ import Loading from "components/Loading.vue";
 import AppHeader from "components/Header.vue";
 import { LoginOutlined } from "@ant-design/icons-vue";
 
-export default {
-  components: { Loading, AppHeader, LoginOutlined },
-  props: { id: [String, Number] },
-  setup: (props) => {
-    const { nodes, loading, refetch, data, refresh, clearCache } = useRequest(stageGraph.getStage);
-    const stage = useFirst(nodes);
-    provide("stage", stage);
-    provide("refresh", refresh);
-    provide("clearCache", clearCache);
-    watch(
-      () => props.id,
-      () => {
-        if (props.id) {
-          refetch(props.id);
-        } else {
-          data.value = null;
-        }
-      },
-      { immediate: true },
-    );
-    return { stage, loading };
+const props = defineProps<{
+  id?: string | number;
+}>();
+
+const { nodes, loading, refetch, data, refresh, clearCache } = useRequest(stageGraph.getStage);
+const stage = useFirst(nodes);
+provide("stage", stage);
+provide("refresh", refresh);
+provide("clearCache", clearCache);
+watch(
+  () => props.id,
+  () => {
+    if (props.id) {
+      refetch(props.id);
+    } else {
+      data.value = null;
+    }
   },
-};
+  { immediate: true },
+);
 </script>
 
 <template>
