@@ -38,6 +38,9 @@ const mounted: Array<{ unmount: () => void }> = [];
 function mountTile() {
   const w = mount(MeetingObject, {
     props: { object: { id: "m1", type: "meeting", name: "room-1", w: 640, h: 360 } },
+    // In the document: `isVisible()` reads the computed style, which is
+    // empty for an element that is not connected (jsdom 31).
+    attachTo: document.body,
     global: {
       mocks: { $t: (k: string) => k },
       stubs: { AppObject: { template: "<div><slot name='render' /></div>" } },
