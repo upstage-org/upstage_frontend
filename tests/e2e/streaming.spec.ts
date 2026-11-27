@@ -2620,6 +2620,653 @@ test.describe("streaming: performer streams, audience views @full", () => {
   });
 });
 
+/**
+ * Audience tools in an embedded meeting (#1580).
+ *
+ * A player chooses from the meeting's right-click menu what the audience
+ * may use in that meeting: nothing (watch only, the default and the only
+ * behaviour before this feature), a microphone button, or microphone and
+ * camera. See src/components/objects/MeetingObject/audienceTools.ts.
+ *
+ * Two tests, both through the real app and the real broker:
+ *
+ *  1. Contract (Jitsi stubbed, always runs): the choice reaches the
+ *     audience's iframe — toolbar, browser permission, a reload — while
+ *     every performer's iframe stays the very same DOM node with the very
+ *     same address and permissions, and the tile's styling is untouched.
+ *
+ *  2. Live (`@live`, real Jitsi server): an audience member really can
+ *     speak while it is allowed and really cannot before or after; the
+ *     performer stays in the meeting throughout; and an individual stream
+ *     playing next to the meeting is not disturbed by any of it.
+ *
+ * The Jitsi server only lets the UpStage sites embed it (CSP
+ * `frame-ancestors`), so the live test runs the working-tree app under one
+ * of those addresses INSIDE THE TEST BROWSER: `aliasAppOrigin` answers every
+ * request for that address from the local e2e servers. Nothing is sent to
+ * the real site.
+ */
+const JITSI_FRAME_ORIGIN = process.env.E2E_JITSI_FRAME_ORIGIN ?? "https://dev.upstage.live";
+
+async function aliasAppOrigin(context: BrowserContext): Promise<void> {
+  const base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3001";
+  await context.route(`${JITSI_FRAME_ORIGIN}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    try {
+      const response = await route.fetch({ url: `${base}${url.pathname}${url.search}` });
+      await route.fulfill({ response });
+    } catch {
+      await route.abort().catch(() => {});
+    }
+  });
+  // The SPA calls the e2e backend by absolute loopback URL, which a browser
+  // refuses from a public https origin; answer those from the test side.
+  const graphql = new URL(process.env.E2E_GRAPHQL_ENDPOINT ?? "http://127.0.0.1:9092/api/");
+  await context.route(`${graphql.origin}/**`, async (route) => {
+    try {
+      const response = await route.fetch();
+      await route.fulfill({
+        response,
+        headers: {
+          ...response.headers(),
+          "access-control-allow-origin": JITSI_FRAME_ORIGIN,
+          "access-control-allow-credentials": "true",
+        },
+      });
+    } catch {
+      await route.abort().catch(() => {});
+    }
+  });
+}
+
+/** The meeting's iframe in a page, by room name. */
+const meetingIframe = (page: Page, room: string) =>
+  page.locator(`.frame:has(iframe.room[src*="${room}"]) iframe.room`).first();
+
+/** Tag the current iframe node so a later check can tell if it was replaced. */
+const markMeetingIframe = (page: Page, room: string) =>
+  page.evaluate((r) => {
+    const el = document.querySelector(`iframe.room[src*="${r}"]`) as
+      (HTMLIFrameElement & { __toolsMark?: boolean }) | null;
+    if (!el) throw new Error("meeting iframe not found");
+    el.__toolsMark = true;
+  }, room);
+const meetingIframeStillMarked = (page: Page, room: string) =>
+  page.evaluate((r) => {
+    const el = document.querySelector(`iframe.room[src*="${r}"]`) as
+      (HTMLIFrameElement & { __toolsMark?: boolean }) | null;
+    return Boolean(el && el.__toolsMark === true);
+  }, room);
+
+/**
+ * Open the meeting's right-click menu the way a player does. An unselected
+ * tile is a cross-origin iframe that keeps its own clicks, so the menu is
+ * reached on the tile's green top bar. Once the tile is selected (Moveable
+ * handles showing) the iframe lets clicks through (`.disable-pointer`) and
+ * the handles sit on the bar, so the menu is reached anywhere inside.
+ */
+async function openMeetingMenu(page: Page, room: string): Promise<void> {
+  const frame = page.locator(`.frame:has(iframe.room[src*="${room}"])`).first();
+  const box = await frame.boundingBox();
+  if (!box) throw new Error("meeting frame has no box");
+  const selected = await frame.evaluate((el) => el.classList.contains("disable-pointer"));
+  if (selected) {
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: "right" });
+  } else {
+    await page.mouse.click(box.x + box.width / 2, box.y + 4, { button: "right" });
+  }
+}
+
+async function chooseAudienceTools(
+  page: Page,
+  room: string,
+  level: "none" | "mic" | "mic-camera",
+): Promise<void> {
+  await openMeetingMenu(page, room);
+  const option = page.locator(`[data-testid="meeting-audience-tools-${level}"]`).first();
+  await option.waitFor({ state: "visible", timeout: 10_000 });
+  await option.click();
+  await option.waitFor({ state: "hidden", timeout: 10_000 });
+}
+
+/** Everything about the tile's look that this feature must not change. */
+const meetingTileStyle = (page: Page, room: string) =>
+  page.evaluate((r) => {
+    const iframe = document.querySelector(`iframe.room[src*="${r}"]`) as HTMLIFrameElement;
+    const frame = iframe.closest(".frame") as HTMLElement;
+    const c = getComputedStyle(frame);
+    const i = getComputedStyle(iframe);
+    const fr = frame.getBoundingClientRect();
+    const ir = iframe.getBoundingClientRect();
+    const side = (s: "Top" | "Right" | "Bottom" | "Left") =>
+      `${c[`border${s}Width`]} ${c[`border${s}Style`]} ${c[`border${s}Color`]}`;
+    return {
+      borderTop: side("Top"),
+      borderRight: side("Right"),
+      borderBottom: side("Bottom"),
+      borderLeft: side("Left"),
+      radius: c.borderTopLeftRadius,
+      overflow: c.overflow,
+      boxSizing: c.boxSizing,
+      position: c.position,
+      frameSize: [Math.round(fr.width), Math.round(fr.height)],
+      iframeBorder: i.borderTopWidth,
+      iframeDisplay: i.display,
+      iframeSize: [Math.round(ir.width), Math.round(ir.height)],
+      iframeInset: [Math.round(ir.left - fr.left), Math.round(ir.top - fr.top)],
+    };
+  }, room);
+
+test.describe("meeting audience tools (#1580) @full", () => {
+  test.describe.configure({ mode: "serial" });
+  test.setTimeout(300_000);
+
+  test("a player opens and closes the audience's tools; performers' meetings are never reloaded", async ({
+    browser,
+  }) => {
+    const runtime = readRuntime();
+    const personaA = findPersona(PERFORMER_USERNAME);
+    const personaB = findPersona("tybalt");
+    const roomName = `streaming-test-tools-${runtime.runId}-${Date.now().toString(36)}`;
+    const stubMeetingFor = async (context: BrowserContext) => {
+      await context.route("**/streaming-test-*", async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: `<!DOCTYPE html><html><head><title>${roomName}</title></head><body></body></html>`,
+        });
+      });
+    };
+    const refreshKey = (page: Page) =>
+      page.evaluate(
+        () =>
+          (window.__UPSTAGE_PINIA__!.stage as unknown as { meetingRefreshKey: number })
+            .meetingRefreshKey,
+      );
+    const attrs = async (page: Page) => {
+      const el = meetingIframe(page, roomName);
+      return {
+        src: (await el.getAttribute("src")) ?? "",
+        allow: (await el.getAttribute("allow")) ?? "",
+        fullscreen: await el.getAttribute("allowfullscreen"),
+      };
+    };
+
+    let ctxA: BrowserContext | null = null;
+    let ctxB: BrowserContext | null = null;
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      ctxA = await browser.newContext();
+      await stubMeetingFor(ctxA);
+      const pageA = await ctxA.newPage();
+      await new LoginPage(pageA).login(personaA.username, personaA.password);
+      await new LiveStagePage(pageA).goto(runtime.stageSlug);
+
+      ctxB = await browser.newContext();
+      await stubMeetingFor(ctxB);
+      const pageB = await ctxB.newPage();
+      await new LoginPage(pageB).login(personaB.username, personaB.password);
+      await new LiveStagePage(pageB).goto(runtime.stageSlug);
+      await pageB.waitForFunction(() => window.__UPSTAGE_PINIA__!.stage.status === "LIVE", {
+        timeout: 30_000,
+      });
+
+      audienceCtx = await browser.newContext();
+      await stubMeetingFor(audienceCtx);
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      await publishMeetingFromPerformer(pageA, roomName);
+      for (const page of [pageA, pageB, audience.page]) {
+        await meetingIframe(page, roomName).waitFor({ state: "attached", timeout: 30_000 });
+      }
+
+      // ---- Before: exactly the watch-only audience and the full performer.
+      const performerBefore = await attrs(pageA);
+      const performerBBefore = await attrs(pageB);
+      const audienceBefore = await attrs(audience.page);
+      expect(performerBefore.allow).toBe("camera; microphone; display-capture; autoplay");
+      expect(performerBBefore.allow).toBe("camera; microphone; display-capture; autoplay");
+      expect(audienceBefore.allow).toBe("autoplay");
+      expect(parseJitsiFragment(audienceBefore.src).get("config.toolbarButtons")).toBe("[]");
+      expect(parseJitsiFragment(audienceBefore.src).get("config.disableSelfView")).toBe("true");
+      expect(parseJitsiFragment(performerBefore.src).has("config.toolbarButtons")).toBe(false);
+
+      // The tile's look, as it has always been.
+      const FROZEN_STYLE = {
+        borderTop: "10px solid rgb(0, 112, 17)",
+        borderRight: "2px solid rgb(0, 0, 0)",
+        borderBottom: "2px solid rgb(0, 0, 0)",
+        borderLeft: "2px solid rgb(0, 0, 0)",
+        radius: "8px",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        position: "relative",
+        iframeBorder: "0px",
+        iframeDisplay: "block",
+        iframeInset: [2, 10],
+      };
+      // The tile scales in when it is placed; measure once it has settled
+      // (two readings in a row agree and the iframe sits inside the border).
+      const settledStyle = async (page: Page) => {
+        let previous = await meetingTileStyle(page, roomName);
+        for (let i = 0; i < 80; i += 1) {
+          await page.waitForTimeout(250);
+          const next = await meetingTileStyle(page, roomName);
+          const same = JSON.stringify(next) === JSON.stringify(previous);
+          previous = next;
+          if (
+            same &&
+            JSON.stringify(next.iframeInset) === JSON.stringify(FROZEN_STYLE.iframeInset)
+          ) {
+            break;
+          }
+        }
+        return previous;
+      };
+      const styleA = await settledStyle(pageA);
+      const styleAudience = await settledStyle(audience.page);
+      expect(styleA).toMatchObject(FROZEN_STYLE);
+      expect(styleAudience).toMatchObject(FROZEN_STYLE);
+      expect(styleA.iframeSize).toEqual([styleA.frameSize[0] - 4, styleA.frameSize[1] - 12]);
+
+      for (const page of [pageA, pageB, audience.page]) await markMeetingIframe(page, roomName);
+      const keysBefore = [await refreshKey(pageA), await refreshKey(pageB)];
+
+      // ---- The audience has no such menu.
+      await openMeetingMenu(audience.page, roomName);
+      await audience.page.waitForTimeout(500);
+      await expect(audience.page.locator('[data-testid="meeting-audience-tools"]')).toHaveCount(0);
+
+      // ---- Player A: the menu shows "Off" in force; choose Microphone.
+      await openMeetingMenu(pageA, roomName);
+      await expect(pageA.locator('[data-testid="meeting-audience-tools"]')).toBeVisible();
+      await expect(pageA.locator('[data-testid="meeting-audience-tools-none"]')).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      await pageA.locator('[data-testid="meeting-audience-tools-mic"]').click();
+
+      // Audience: a NEW iframe, with the microphone toolbar and permission.
+      await expect
+        .poll(() => meetingIframeStillMarked(audience.page, roomName), { timeout: 15_000 })
+        .toBe(false);
+      await expect(meetingIframe(audience.page, roomName)).toHaveAttribute(
+        "allow",
+        "microphone; autoplay",
+      );
+      const audienceMic = await attrs(audience.page);
+      const micFragment = parseJitsiFragment(audienceMic.src);
+      expect(micFragment.get("config.toolbarButtons")).toBe(
+        '["microphone","raisehand","tileview"]',
+      );
+      expect(micFragment.get("interfaceConfig.TOOLBAR_BUTTONS")).toBe(
+        '["microphone","raisehand","tileview"]',
+      );
+      expect(micFragment.get("config.disableSelfView")).toBe("false");
+      expect(micFragment.get("config.disableInitialGUM")).toBe("true");
+      expect(micFragment.get("config.startAudioMuted")).toBe("1");
+      expect(audienceMic.fullscreen).toBeNull();
+      // Everything else the audience is sent is what it was sent before.
+      const beforeFragment = parseJitsiFragment(audienceBefore.src);
+      expect([...micFragment.keys()]).toEqual([...beforeFragment.keys()]);
+      for (const [key, value] of beforeFragment) {
+        if (
+          [
+            "config.toolbarButtons",
+            "interfaceConfig.TOOLBAR_BUTTONS",
+            "config.disableSelfView",
+          ].includes(key)
+        ) {
+          continue;
+        }
+        expect(micFragment.get(key), key).toBe(value);
+      }
+
+      // Performers A and B: the very same iframe, address and permissions.
+      const assertPerformersUntouched = async (label: string) => {
+        expect(
+          await meetingIframeStillMarked(pageA, roomName),
+          `${label}: A keeps its iframe`,
+        ).toBe(true);
+        expect(
+          await meetingIframeStillMarked(pageB, roomName),
+          `${label}: B keeps its iframe`,
+        ).toBe(true);
+        expect(await attrs(pageA), `${label}: A`).toEqual(performerBefore);
+        expect(await attrs(pageB), `${label}: B`).toEqual(performerBBefore);
+        expect([await refreshKey(pageA), await refreshKey(pageB)], label).toEqual(keysBefore);
+        for (const page of [pageA, pageB]) {
+          await expect(page.locator(".ant-modal-confirm"), label).toHaveCount(0);
+        }
+      };
+      await assertPerformersUntouched("after Microphone");
+
+      // Both players see the level in force in their own menu.
+      await openMeetingMenu(pageB, roomName);
+      await expect(pageB.locator('[data-testid="meeting-audience-tools-mic"]')).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+
+      // ---- Player B (not the one who placed the meeting): Microphone + camera.
+      await markMeetingIframe(audience.page, roomName);
+      await pageB.locator('[data-testid="meeting-audience-tools-mic-camera"]').click();
+      await expect
+        .poll(() => meetingIframeStillMarked(audience.page, roomName), { timeout: 15_000 })
+        .toBe(false);
+      await expect(meetingIframe(audience.page, roomName)).toHaveAttribute(
+        "allow",
+        "camera; microphone; autoplay",
+      );
+      expect(
+        parseJitsiFragment((await attrs(audience.page)).src).get("config.toolbarButtons"),
+      ).toBe('["microphone","camera","raisehand","tileview"]');
+      await assertPerformersUntouched("after Microphone + camera");
+
+      // ---- Choosing the level already in force reloads nobody.
+      await markMeetingIframe(audience.page, roomName);
+      await chooseAudienceTools(pageA, roomName, "mic-camera");
+      await audience.page.waitForTimeout(1500);
+      expect(await meetingIframeStillMarked(audience.page, roomName)).toBe(true);
+
+      // ---- A player moving the meeting reloads nobody and keeps the level.
+      await pageA.evaluate((room) => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          board: { objects: Array<Record<string, unknown>> };
+          shapeObject: (o: unknown) => unknown;
+        };
+        const meeting = stage.board.objects.find((o) => o.name === room)!;
+        stage.shapeObject({ ...meeting, x: (meeting.x as number) + 40 });
+      }, roomName);
+      await audience.page.waitForTimeout(1500);
+      expect(await meetingIframeStillMarked(audience.page, roomName)).toBe(true);
+      await expect(meetingIframe(audience.page, roomName)).toHaveAttribute(
+        "allow",
+        "camera; microphone; autoplay",
+      );
+      await assertPerformersUntouched("after a move");
+
+      // ---- Off again: the audience is back to exactly what it had before.
+      await chooseAudienceTools(pageA, roomName, "none");
+      await expect
+        .poll(() => meetingIframeStillMarked(audience.page, roomName), { timeout: 15_000 })
+        .toBe(false);
+      await expect(meetingIframe(audience.page, roomName)).toHaveAttribute("allow", "autoplay");
+      expect(await attrs(audience.page)).toEqual(audienceBefore);
+      await assertPerformersUntouched("after Off");
+
+      // ---- The tile looks exactly as it did, for both.
+      expect(await settledStyle(pageA)).toEqual(styleA);
+      expect(await settledStyle(audience.page)).toEqual(styleAudience);
+    } finally {
+      await ctxA?.close().catch(() => {});
+      await ctxB?.close().catch(() => {});
+      await audienceCtx?.close().catch(() => {});
+    }
+  });
+
+  test("live Jitsi: the audience can speak only while a player allows it; performer and stream tile undisturbed @live", async ({
+    browser,
+  }) => {
+    test.skip(
+      process.env.JITSI_E2E_LIVE !== "1",
+      "JITSI_E2E_LIVE=1 required (real Jitsi server + JVB reachable)",
+    );
+
+    const runtime = readRuntime();
+    const persona = findPersona(PERFORMER_USERNAME);
+    const stamp = Date.now().toString(36);
+    const roomName = `upstage-e2e-tools-${runtime.runId}-${stamp}`.toLowerCase();
+    const streamName = `stream-tools-${runtime.runId}-${stamp}`;
+
+    /** State of the Jitsi app inside the meeting iframe of one page. */
+    const meeting = async (page: Page) => {
+      const frame = page.frames().find((f) => {
+        try {
+          return decodeURIComponent(new URL(f.url()).pathname).toLowerCase() === `/${roomName}`;
+        } catch {
+          return false;
+        }
+      });
+      if (!frame) return null;
+      return frame
+        .evaluate(() => {
+          type Participant = { id: string; name?: string; role?: string };
+          type Track = { participantId: string; mediaType: string; muted: boolean };
+          const app = (window as unknown as { APP?: { store?: { getState: () => unknown } } }).APP;
+          if (!app?.store) return null;
+          const state = app.store.getState() as Record<string, unknown>;
+          const participants = state["features/base/participants"] as {
+            local?: Participant;
+            remote?: Map<string, Participant>;
+          };
+          const tracks = (state["features/base/tracks"] ?? []) as Track[];
+          const live = (id: string, type: string) =>
+            tracks.some((t) => t.participantId === id && t.mediaType === type && !t.muted);
+          const local = participants.local;
+          return {
+            joined: Boolean(
+              (state["features/base/conference"] as { conference?: unknown }).conference,
+            ),
+            id: local?.id ?? null,
+            role: local?.role ?? null,
+            audio: local ? live(local.id, "audio") : false,
+            video: local ? live(local.id, "video") : false,
+            remotes: [...(participants.remote?.values() ?? [])].map((p) => ({
+              name: p.name ?? "",
+              audio: live(p.id, "audio"),
+              video: live(p.id, "video"),
+            })),
+            toolbar: [...document.querySelectorAll(".toolbox-content-items [aria-label]")].map(
+              (e) => e.getAttribute("aria-label") ?? "",
+            ),
+          };
+        })
+        .catch(() => null);
+    };
+    const waitMeeting = async (
+      page: Page,
+      label: string,
+      predicate: (m: NonNullable<Awaited<ReturnType<typeof meeting>>>) => boolean,
+      timeout = 60_000,
+    ) => {
+      const deadline = Date.now() + timeout;
+      let last: Awaited<ReturnType<typeof meeting>> = null;
+      while (Date.now() < deadline) {
+        last = await meeting(page);
+        if (last && predicate(last)) return last;
+        await page.waitForTimeout(500);
+      }
+      throw new Error(`[meeting tools] timed out: ${label}; last=${JSON.stringify(last)}`);
+    };
+
+    let performerCtx: BrowserContext | null = null;
+    let audienceCtx: BrowserContext | null = null;
+    try {
+      performerCtx = await browser.newContext({ baseURL: JITSI_FRAME_ORIGIN });
+      await aliasAppOrigin(performerCtx);
+      const performerPage = await performerCtx.newPage();
+      await new LoginPage(performerPage).login(persona.username, persona.password);
+      await new LiveStagePage(performerPage).goto(runtime.stageSlug);
+
+      audienceCtx = await browser.newContext({ baseURL: JITSI_FRAME_ORIGIN });
+      await aliasAppOrigin(audienceCtx);
+      const audience = await openAudienceSeat(audienceCtx, runtime.stageSlug);
+
+      // ---- An individual stream, playing for the audience.
+      const meetingTab = performerPage
+        .locator('nav#toolbox .panel-block:has(img[src$="meeting.svg"])')
+        .first();
+      await meetingTab.waitFor({ state: "visible", timeout: 15_000 });
+      await meetingTab.click();
+      await waitForPerformerJoinedAndTracks(performerPage);
+      await placeJitsiTileFromPerformer(performerPage, streamName, { x: 60, y: 60 });
+      await audience.page
+        .locator(`[data-testid="object-${streamName}"] video`)
+        .first()
+        .waitFor({ state: "attached", timeout: 60_000 });
+      await waitForAudienceVideoFrames(audience.page, streamName, 60_000);
+      const streamTile = () =>
+        audience.page.evaluate((name) => {
+          const tile = document.querySelector(`[data-testid="object-${name}"]`) as HTMLElement;
+          const video = tile.querySelector("video") as HTMLVideoElement & { __toolsMark?: boolean };
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            board: { objects: Array<Record<string, unknown>>; tracks: unknown[] };
+          };
+          const object = stage.board.objects.find((o) => o.name === name)!;
+          const box = tile.getBoundingClientRect();
+          const marked = video.__toolsMark === true;
+          video.__toolsMark = true;
+          return {
+            marked,
+            participantId: object.participantId as string,
+            tracks: stage.board.tracks.length,
+            box: [box.left, box.top, box.width, box.height].map(Math.round),
+            videoWidth: video.videoWidth,
+            radius: getComputedStyle(tile).borderRadius,
+            objectFit: getComputedStyle(video).objectFit,
+          };
+        }, streamName);
+      // The tile scales in when it is placed: take the reference once two
+      // readings in a row agree. (Every reading also tags the <video> node.)
+      let streamBefore = await streamTile();
+      for (let i = 0; i < 40; i += 1) {
+        await audience.page.waitForTimeout(250);
+        const next = await streamTile();
+        const settled = JSON.stringify(next.box) === JSON.stringify(streamBefore.box);
+        streamBefore = next;
+        if (settled) break;
+      }
+      const assertStreamUndisturbed = async (label: string) => {
+        const now = await streamTile();
+        expect(now.marked, `${label}: same <video> element`).toBe(true);
+        expect({ ...now, marked: true }, label).toEqual({ ...streamBefore, marked: true });
+        await waitForAudienceVideoFreshFrames(audience.page, streamName, 30_000);
+      };
+
+      // ---- The meeting, watch-only for the audience.
+      // As a player does it: the meeting is dropped on the stage unpublished
+      // (lightbulb off), so the player's own iframe joins first — and the
+      // first to join a Jitsi room is its moderator — and is published after.
+      const meetingId = await performerPage.evaluate((name) => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          placeObjectOnStage: (p: unknown) => { id: string };
+        };
+        return stage.placeObjectOnStage({
+          type: "meeting",
+          name,
+          description: "",
+          w: 420,
+          h: 300,
+          // Clear of the open Streams panel at the top of the stage, which
+          // would otherwise sit on the bar the menu is opened from.
+          x: 320,
+          y: 220,
+        }).id;
+      }, roomName);
+      const performerJoined = await waitMeeting(
+        performerPage,
+        "performer joins as moderator",
+        (m) => m.joined && m.role === "moderator",
+      );
+      await performerPage.evaluate((id) => {
+        const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+          board: { objects: Array<Record<string, unknown>> };
+          shapeObject: (p: unknown) => unknown;
+        };
+        const placed = stage.board.objects.find((o) => o.id === id)!;
+        stage.shapeObject({ ...placed, liveAction: true, published: false });
+      }, meetingId);
+      const audienceJoined = await waitMeeting(audience.page, "audience joins", (m) => m.joined);
+      expect(audienceJoined.toolbar, "watch-only audience has no toolbar").toEqual([]);
+      expect(audienceJoined.audio).toBe(false);
+      await expect(meetingIframe(audience.page, roomName)).toHaveAttribute("allow", "autoplay");
+      await markMeetingIframe(performerPage, roomName);
+      await assertStreamUndisturbed("meeting on stage, tools off");
+
+      // ---- Player: Microphone.
+      await chooseAudienceTools(performerPage, roomName, "mic");
+      const audienceWithMic = await waitMeeting(
+        audience.page,
+        "audience rejoins with a microphone button",
+        (m) => m.joined && m.toolbar.some((label) => /microphone/i.test(label)),
+      );
+      expect(audienceWithMic.id, "the audience rejoined (new participant)").not.toBe(
+        audienceJoined.id,
+      );
+      expect(audienceWithMic.audio, "still muted until they press the button").toBe(false);
+      expect(audienceWithMic.toolbar.some((l) => /camera/i.test(l))).toBe(false);
+      expect(audienceWithMic.toolbar.some((l) => /leave|hang/i.test(l))).toBe(false);
+      expect(
+        audienceWithMic.toolbar.some((l) => /share|settings|invite|chat|participants/i.test(l)),
+      ).toBe(false);
+      expect(audienceWithMic.toolbar.some((l) => /raise/i.test(l))).toBe(true);
+      expect(audienceWithMic.toolbar.some((l) => /tile view/i.test(l))).toBe(true);
+
+      // The performer never left: same participant, same iframe.
+      const performerAfterOpen = await waitMeeting(
+        performerPage,
+        "performer still in",
+        (m) => m.joined,
+      );
+      expect(performerAfterOpen.id).toBe(performerJoined.id);
+      expect(performerAfterOpen.role).toBe("moderator");
+      expect(await meetingIframeStillMarked(performerPage, roomName)).toBe(true);
+
+      // ---- The audience member presses the button and is heard.
+      const audienceFrame = audience.page.frameLocator(`iframe.room[src*="${roomName}"]`);
+      await meetingIframe(audience.page, roomName).hover();
+      await audienceFrame
+        .locator('.toolbox-content-items [aria-label*="microphone" i]')
+        .first()
+        .click();
+      await waitMeeting(audience.page, "audience microphone live", (m) => m.audio);
+      await waitMeeting(performerPage, "performer hears the audience", (m) =>
+        m.remotes.some((r) => r.audio),
+      );
+      await assertStreamUndisturbed("audience speaking in the meeting");
+
+      // ---- Player: Off. The microphone is withdrawn at once.
+      await chooseAudienceTools(performerPage, roomName, "none");
+      const audienceClosed = await waitMeeting(
+        audience.page,
+        "audience back to watch-only",
+        (m) => m.joined && m.toolbar.length === 0 && m.id !== audienceWithMic.id,
+      );
+      expect(audienceClosed.audio).toBe(false);
+      await expect(meetingIframe(audience.page, roomName)).toHaveAttribute("allow", "autoplay");
+      await waitMeeting(performerPage, "nobody from the audience is heard any more", (m) =>
+        m.remotes.every((r) => !r.audio),
+      );
+      const performerAtEnd = await waitMeeting(
+        performerPage,
+        "performer still in",
+        (m) => m.joined,
+      );
+      expect(performerAtEnd.id).toBe(performerJoined.id);
+      expect(await meetingIframeStillMarked(performerPage, roomName)).toBe(true);
+      await assertStreamUndisturbed("tools off again");
+
+      // Leave the stage clean for whoever runs next.
+      await performerPage.evaluate(
+        ({ room, stream }) => {
+          const stage = window.__UPSTAGE_PINIA__!.stage as unknown as {
+            board: { objects: Array<Record<string, unknown>> };
+            deleteObject: (o: unknown) => unknown;
+          };
+          for (const o of [...stage.board.objects]) {
+            if (o.name === room || o.name === stream) stage.deleteObject(o);
+          }
+        },
+        { room: roomName, stream: streamName },
+      );
+    } finally {
+      await performerCtx?.close().catch(() => {});
+      await audienceCtx?.close().catch(() => {});
+    }
+  });
+});
+
 // ============================================================================
 // Streaming-specific helpers (used by the @live tests above).
 // ============================================================================

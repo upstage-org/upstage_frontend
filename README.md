@@ -237,6 +237,7 @@ CI run the same `verify` gate.
   (the backend rotates the refresh token, so one of them is refused).
 - More docs: [docs/REPLAY.md](docs/REPLAY.md) (recordings & replay),
   [docs/STREAM_AUDIO.md](docs/STREAM_AUDIO.md) (who hears a stream),
+  [docs/MEETING_AUDIENCE_TOOLS.md](docs/MEETING_AUDIENCE_TOOLS.md) (what the audience can do in a meeting),
   [docs/BROWSER_SUPPORT.md](docs/BROWSER_SUPPORT.md),
   [TOUCH_CHEATSHEET.md](TOUCH_CHEATSHEET.md) (touch-screen controls).
 

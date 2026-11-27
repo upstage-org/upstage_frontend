@@ -2,10 +2,11 @@
 // Aliased: "Object" is a reserved HTML element name (vue/no-reserved-component-names).
 import AppObject from "../Object.vue";
 import MeetingContextMenu from "./ContextMenuMeeting.vue";
-import { computed, createVNode, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, createVNode, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { useStageStore } from "@stores/pinia/stage";
 import { useUserStore } from "@stores/pinia/user";
 import { useJitsiEndpoint } from "./composable";
+import { audienceToolsOverrides, effectiveAudienceTools } from "./audienceTools";
 import { resolveJitsiOrigin } from "@utils/common";
 import { Modal } from "ant-design-vue";
 import { useI18n } from "vue-i18n";
@@ -104,6 +105,26 @@ export default {
     const failed = ref(false);
     let loadTimer = null;
 
+    // Audience tools (#1580, see ./audienceTools.ts). A player can give the
+    // audience a microphone (and camera) button in this meeting from its
+    // right-click menu; the choice is the board object's `audienceTools`.
+    //
+    // It applies ONLY to an iframe that was loaded for an audience member.
+    // `loadedForPerformer` remembers who the current iframe was loaded for,
+    // so a performer's meeting is built from the exact same values as
+    // before in every situation — including while they preview the stage
+    // as audience — and is never reloaded by this feature. The level is
+    // "none" for them, and "none" contributes nothing below.
+    const replaying = inject("replaying", false);
+    const loadedForPerformer = ref(stageStore.canPlay === true);
+    const audienceTools = computed(() =>
+      effectiveAudienceTools(props.object?.audienceTools, {
+        canPlay: canPlay.value === true,
+        loadedForPerformer: loadedForPerformer.value,
+        replaying: replaying === true,
+      }),
+    );
+
     // Build the Jitsi room URL with role-aware in-fragment config:
     //  - Performers get the full Jitsi toolbar; they can toggle their
     //    own camera/mic during the meeting. Joining muted+cameraless
@@ -120,6 +141,7 @@ export default {
       if (!endpoint) return "";
       const { host, httpScheme } = endpoint;
 
+      const tools = audienceToolsOverrides(audienceTools.value);
       const config = {
         // Auto-join: the legacy flat key was renamed upstream to
         // `prejoinConfig.enabled`; current Jitsi Meet ignores
@@ -134,10 +156,12 @@ export default {
         startAudioMuted: 1,
         disableInitialGUM: !canPlay.value,
         ...(canPlay.value ? {} : AUDIENCE_JITSI_CONFIG),
+        ...tools.config,
       };
       const interfaceConfig = {
         SHOW_CHROME_EXTENSION_BANNER: false,
         ...(canPlay.value ? {} : AUDIENCE_JITSI_INTERFACE_CONFIG),
+        ...tools.interfaceConfig,
       };
 
       const fragmentParts = [
@@ -160,8 +184,15 @@ export default {
     // <video>/<audio> playback works without a user gesture but the
     // iframe cannot acquire camera/mic. `display-capture` covers the
     // optional screen-sharing button on the performer toolbar.
+    //
+    // Audience tools (#1580): an open level adds `microphone` (and
+    // `camera`) for the audience — never `display-capture`. Without the
+    // permission the Jitsi button does nothing, so this attribute is what
+    // really opens and closes the audience's microphone.
     const iframeAllow = computed(() =>
-      canPlay.value ? "camera; microphone; display-capture; autoplay" : "autoplay",
+      canPlay.value
+        ? "camera; microphone; display-capture; autoplay"
+        : (audienceToolsOverrides(audienceTools.value).allow ?? "autoplay"),
     );
 
     const onLoad = () => {
@@ -220,9 +251,23 @@ export default {
     const remountIframe = () => {
       loading.value = true;
       failed.value = false;
+      // The new iframe is loaded for whoever this viewer is now.
+      loadedForPerformer.value = canPlay.value === true;
       iframeKey.value += 1;
       startLoadTimer();
     };
+
+    // Audience tools (#1580): Jitsi reads its settings, and the browser
+    // reads `allow`, only when the iframe loads — so a new level reaches an
+    // audience member by reloading THEIR iframe (a rejoin as a muted
+    // viewer; the same harmless reload "Refresh streams" gives them).
+    // Switching the level off this way also withdraws the microphone at
+    // once. A performer's level never changes (always "none"), so this
+    // never fires for them; the guard states it a second time.
+    watch(audienceTools, () => {
+      if (canPlay.value || loadedForPerformer.value) return;
+      remountIframe();
+    });
 
     // In-tile "Refresh meeting" button on the failed card.
     const retryMeeting = () => remountIframe();

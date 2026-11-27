@@ -36,6 +36,10 @@ export interface BoardObject {
   drawingId?: string;
   textId?: string;
   wornBy?: ObjectId | null;
+  /** Embedded meeting only (#1580): what the audience may use in it —
+   *  "mic" or "mic-camera"; absent or anything else = watch only. Read by
+   *  MeetingObject for the audience's iframe; see MeetingObject/audienceTools.ts. */
+  audienceTools?: string | null;
   multi?: boolean;
   frames?: string[];
   /** When false, multiframe `autoplayFrames` stops after one cycle; true/omitted = loop. */

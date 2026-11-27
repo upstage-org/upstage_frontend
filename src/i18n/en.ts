@@ -103,6 +103,16 @@ export default {
   add_prop_to_avatar: "Add prop to avatar",
   remove_from_stream: "Remove from stream",
   add_prop_to_meeting: "Add prop to meeting",
+  meeting_audience_tools: "Audience tools",
+  meeting_audience_tools_tooltip:
+    "What the audience can do in this meeting. Players always have all the meeting tools.",
+  meeting_audience_tools_none: "Off (watch only)",
+  meeting_audience_tools_mic: "Microphone",
+  meeting_audience_tools_mic_camera: "Microphone + camera",
+  meeting_show_to_everyone: "Show one person to everyone…",
+  meeting_show_to_everyone_title: "Show one person to everyone",
+  meeting_show_to_everyone_help:
+    "This is done inside the meeting, by its moderator: the first person who joined it, normally the player who put the meeting on the stage.\n\n1. In the meeting's toolbar open More actions (⋯), then Settings, then Moderator.\n2. Tick “Everyone follows me” and press OK.\n3. Click a person. Everyone now sees that person large, with the others at the side.\n\nUntick “Everyone follows me” to let everyone choose their own view again.",
   remove_from_meeting: "Remove from meeting",
   choose_prop_for: "Choose a prop to add to {name}",
   multiframe_loop_tooltip:
